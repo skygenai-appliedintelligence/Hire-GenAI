@@ -7,7 +7,12 @@
     "dev": "next dev",
     "lint": "next lint",
     "start": "next start",
-    "setup": "node scripts/setup-env.js"
+    "setup": "node scripts/setup-env.js",
+    "git:push": "powershell -ExecutionPolicy Bypass -File scripts/git-push.ps1",
+    "db:apply": "node scripts/db-apply.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev --name init",
+    "prisma:studio": "prisma studio"
   },
   "dependencies": {
     "@ai-sdk/openai": "latest",
@@ -62,14 +67,37 @@
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.6",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "@prisma/client": "^5.19.1",
+    "dotenv": "^16.4.5",
+    "pg": "^8.12.0"
   },
   "devDependencies": {
+    "@babel/eslint-parser": "^7.28.0",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "eslint": "^9.33.0",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5"
-  }
+    "typescript": "^5",
+    "prisma": "^5.19.1"
+  },
+  "description": "A modern, AI-powered recruitment and hiring platform built with Next.js 15, React 19, and TypeScript.",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ii-dheeraj/hire_gen.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ii-dheeraj/hire_gen/issues"
+  },
+  "homepage": "https://github.com/ii-dheeraj/hire_gen#readme"
 }

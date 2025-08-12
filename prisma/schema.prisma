@@ -1,0 +1,160 @@
+// Prisma schema for SQLite
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model companies {
+  id                String   @id @default(uuid())
+  name              String
+  email             String   @unique
+  logo_url          String?
+  subscription_plan String   @default("basic")
+  created_at        DateTime @default(now())
+  updated_at        DateTime @default(now())
+
+  users             users[]
+  jobs              job_descriptions[]
+  activity_logs     activity_logs[]
+  api_integrations  api_integrations[]
+  messages          messages[]
+}
+
+model users {
+  id         String   @id @default(uuid())
+  company_id String
+  email      String   @unique
+  name       String
+  role       String   @default("user")
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  company companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  jobs    job_descriptions[] @relation("created_by_user")
+
+  @@index([company_id], name: "idx_users_company_id")
+}
+
+model job_descriptions {
+  id               String   @id @default(uuid())
+  company_id       String
+  title            String
+  description      String
+  requirements     String?
+  location         String?
+  salary_range     String?
+  employment_type  String?
+  status           String   @default("draft")
+  posted_platforms String   @default("[]")
+  platform_job_ids String   @default("{}")
+  posting_results  String   @default("[]")
+  interview_rounds Int      @default(3)
+  created_by       String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @default(now())
+
+  company     companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  creator     users?    @relation("created_by_user", fields: [created_by], references: [id])
+  candidates  candidates[]
+  rounds      interview_rounds[]
+  activity    activity_logs[]
+  messages    messages[]
+
+  @@index([company_id], name: "idx_job_descriptions_company_id")
+}
+
+model candidates {
+  id                   String   @id @default(uuid())
+  job_id               String
+  name                 String
+  email                String
+  phone                String?
+  resume_url           String?
+  linkedin_url         String?
+  source_platform      String?
+  current_stage        String   @default("applied")
+  qualification_status String   @default("pending")
+  notes                String?
+  created_at           DateTime @default(now())
+  updated_at           DateTime @default(now())
+
+  job         job_descriptions @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  rounds      interview_rounds[]
+  activity    activity_logs[]
+  messages    messages[]
+
+  @@index([job_id], name: "idx_candidates_job_id")
+}
+
+model interview_rounds {
+  id           String   @id @default(uuid())
+  candidate_id String
+  job_id       String
+  round_type   String
+  scheduled_at DateTime?
+  status       String   @default("pending")
+  result       String?
+  feedback     String?
+  meeting_link String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  candidate candidates       @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
+  job       job_descriptions @relation(fields: [job_id], references: [id], onDelete: Cascade)
+
+  @@index([candidate_id], name: "idx_interview_rounds_candidate_id")
+}
+
+model api_integrations {
+  id         String   @id @default(uuid())
+  company_id String
+  platform   String
+  api_key    String?
+  api_secret String?
+  is_active  Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  company companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
+}
+
+model activity_logs {
+  id           String   @id @default(uuid())
+  company_id   String
+  job_id       String?
+  candidate_id String?
+  action       String
+  details      String?
+  created_at   DateTime @default(now())
+
+  company   companies         @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  job       job_descriptions? @relation(fields: [job_id], references: [id])
+  candidate candidates?       @relation(fields: [candidate_id], references: [id])
+
+  @@index([company_id], name: "idx_activity_logs_company_id")
+}
+
+model messages {
+  id           String   @id @default(uuid())
+  company_id   String
+  job_id       String?
+  candidate_id String?
+  sender_type  String
+  sender_id    String?
+  content      String
+  meta         String   @default("{}")
+  created_at   DateTime @default(now())
+
+  company   companies         @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  job       job_descriptions? @relation(fields: [job_id], references: [id])
+  candidate candidates?       @relation(fields: [candidate_id], references: [id])
+
+  @@index([company_id], name: "idx_messages_company_id")
+  @@index([candidate_id], name: "idx_messages_candidate_id")
+}

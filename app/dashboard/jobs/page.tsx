@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
-import { JobService, type Job } from "@/lib/job-service"
+import { type Job } from "@/lib/job-service"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -21,18 +21,41 @@ export default function JobsPage() {
   }, [company])
 
   const fetchJobs = async () => {
-    if (!company?.id) return
-
     try {
-      console.log("🔄 Fetching jobs for company:", company.id)
-      const jobsList = JobService.getJobs(company.id)
-      setJobs(jobsList)
-      console.log(`✅ Found ${jobsList.length} jobs`)
-
-      // Debug: log all jobs in storage
-      JobService.debugAllJobs()
+      setLoading(true)
+      const companyName = company?.name ? encodeURIComponent(company.name) : ''
+      const url = companyName ? `/api/jobs?company=${companyName}` : '/api/jobs'
+      const res = await fetch(url)
+      const data = await res.json()
+      if (!res.ok || !data?.ok) throw new Error(data?.error || 'Failed to load jobs')
+      setJobs(
+        (data.jobs || []).map((j: any) => ({
+          id: j.id,
+          company_id: j.company_id,
+          title: j.title,
+          description: j.description,
+          requirements: j.requirements || '',
+          location: j.location || '',
+          salary_range: j.salary_range || '',
+          employment_type: j.employment_type || '',
+          status: j.status,
+          posted_platforms: JSON.parse(j.posted_platforms || '[]'),
+          platform_job_ids: JSON.parse(j.platform_job_ids || '{}'),
+          posting_results: JSON.parse(j.posting_results || '[]'),
+          interview_rounds: j.interview_rounds,
+          created_by: j.created_by || '',
+          created_at: j.created_at,
+          updated_at: j.updated_at,
+          total_applications: 0,
+          qualified_candidates: 0,
+          in_progress: 0,
+          completed_interviews: 0,
+          recommended: 0,
+          rejected: 0,
+        }))
+      )
     } catch (error) {
-      console.error("❌ Error fetching jobs:", error)
+      console.error('❌ Error fetching jobs:', error)
     } finally {
       setLoading(false)
     }

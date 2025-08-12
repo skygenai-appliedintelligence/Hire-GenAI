@@ -61,20 +61,25 @@ export default function CreateJobPage() {
     setIsSubmitting(true)
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      // Store job data in localStorage for the agents page
+      const res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || 'Failed to create job')
+      }
+
+      // Store minimal info for downstream pages (existing flow expectation)
       const jobData = {
         ...formData,
-        id: `job_${Date.now()}`,
-        createdAt: new Date().toISOString()
+        id: data.jobId,
+        createdAt: new Date().toISOString(),
       }
-      
       localStorage.setItem('newJobData', JSON.stringify(jobData))
       localStorage.setItem('selectedInterviewRounds', JSON.stringify(formData.interviewRounds))
-      
-      // Redirect to agents creation page
+
       router.push('/dashboard/agents/create?from=job-creation')
     } catch (error) {
       console.error('Error creating job:', error)

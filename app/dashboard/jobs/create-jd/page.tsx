@@ -131,26 +131,30 @@ export default function CreateJDPage() {
     setIsSubmitting(true)
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      // Log form data
-      console.log("Job Description Created:", formData)
-      
-      // Save to localStorage for persistence
-      const existingJobs = JSON.parse(localStorage.getItem("jobs") || "[]")
-      const newJob = {
-        id: Date.now().toString(),
-        ...formData,
-        createdAt: new Date().toISOString(),
-        status: "Active"
+      const payload = {
+        jobTitle: formData.jobTitle,
+        company: formData.company || 'Company',
+        location: formData.cityCountry || (formData.locationType ?? 'Remote'),
+        jobType: formData.employmentType,
+        description: formData.jobSummary,
+        requirements: formData.requiredQualifications,
+        responsibilities: formData.keyResponsibilities,
+        benefits: formData.benefits,
+        salaryRange: formData.salary,
+        interviewRounds: [],
+        platforms: [],
       }
-      existingJobs.push(newJob)
-      localStorage.setItem("jobs", JSON.stringify(existingJobs))
-      
-      // Redirect to jobs list
-      router.push("/dashboard/jobs")
-      
+      const res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || 'Failed to create job')
+      }
+
+      router.push('/dashboard/jobs')
     } catch (error) {
       console.error("Error creating job:", error)
     } finally {

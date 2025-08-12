@@ -29,6 +29,10 @@ OPENAI_API_KEY=your_openai_api_key_here
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 
+# Database URL (Prisma / Postgres). Replace with your Supabase URI
+# Example: postgres://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres?sslmode=require
+DATABASE_URL=postgres://postgres:YOUR_SUPABASE_DB_PASSWORD@db.YOUR_PROJECT_REF.supabase.co:5432/postgres?sslmode=require
+
 # Environment
 NODE_ENV=development
 `;
