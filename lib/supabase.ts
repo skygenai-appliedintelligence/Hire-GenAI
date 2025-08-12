@@ -269,11 +269,7 @@ export const supabase: SupabaseClient =
         console.warn(
           "⚠️  Supabase env config missing or invalid. Falling back to mock auth. Set valid NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to enable real database.",
         )
-        console.warn(
-          "Using mock authentication for preview. Use these credentials:\n" +
-            "Email: demo@company.com, Password: demo123\n" +
-            "Email: sandeep@gmail.com, Password: Demo@12345",
-        )
+        console.warn("Using mock authentication for preview. Configure Supabase env vars to enable real database.")
         return createMockClient()
       })()
 

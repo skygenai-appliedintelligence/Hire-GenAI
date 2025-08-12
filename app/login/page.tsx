@@ -56,69 +56,7 @@ export default function LoginPage() {
     }
   }
 
-  const handleDemoLogin = async () => {
-    setEmail("demo@company.com")
-    setPassword("demo123")
-
-    // Auto-submit with demo credentials
-    setLoading(true)
-    try {
-      const result = await signIn("demo@company.com", "demo123")
-      if (result.error) {
-        toast({
-          title: "Error",
-          description: result.error.message || "Demo login failed",
-          variant: "destructive",
-        })
-      } else {
-        toast({
-          title: "Success",
-          description: "Welcome to the demo!",
-        })
-      }
-    } catch (error) {
-      console.error("Demo login error:", error)
-      toast({
-        title: "Error",
-        description: "Demo login failed",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSandeepLogin = async () => {
-    setEmail("sandeep@gmail.com")
-    setPassword("Demo@12345")
-
-    // Auto-submit with Sandeep's credentials
-    setLoading(true)
-    try {
-      const result = await signIn("sandeep@gmail.com", "Demo@12345")
-      if (result.error) {
-        toast({
-          title: "Error",
-          description: result.error.message || "Login failed",
-          variant: "destructive",
-        })
-      } else {
-        toast({
-          title: "Success",
-          description: "Welcome back, Sandeep!",
-        })
-      }
-    } catch (error) {
-      console.error("Sandeep login error:", error)
-      toast({
-        title: "Error",
-        description: "Login failed",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Removed demo and hardcoded login shortcuts
 
   if (authLoading) {
     return (
@@ -181,71 +119,7 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 space-y-4">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-muted-foreground">Demo Credentials</span>
-              </div>
-            </div>
-
-            <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-              <p className="text-sm font-medium text-gray-700 mb-2">Try the demo:</p>
-
-              <div className="space-y-2">
-                <div className="text-xs text-gray-600">
-                  <p>
-                    <strong>Email:</strong> demo@company.com
-                  </p>
-                  <p>
-                    <strong>Password:</strong> demo123
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full bg-transparent"
-                  onClick={handleDemoLogin}
-                  disabled={loading}
-                >
-                  {loading ? "Signing in..." : "Use Demo Account"}
-                </Button>
-              </div>
-
-              <div className="space-y-2">
-                <div className="text-xs text-gray-600">
-                  <p>
-                    <strong>Email:</strong> sandeep@gmail.com
-                  </p>
-                  <p>
-                    <strong>Password:</strong> Demo@12345
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full bg-transparent"
-                  onClick={handleSandeepLogin}
-                  disabled={loading}
-                >
-                  {loading ? "Signing in..." : "Use Sandeep's Account"}
-                </Button>
-              </div>
-            </div>
-
-            <div className="text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{" "}
-                <Link href="/register" className="text-emerald-600 hover:underline">
-                  Sign up
-                </Link>
-              </p>
-            </div>
-          </div>
+          {/* Demo and preset login UI removed */}
         </CardContent>
       </Card>
     </div>

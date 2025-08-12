@@ -55,63 +55,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
     }
   }
 
-  const handleDemoLogin = async () => {
-    setLoading(true)
-    try {
-      const result = await signIn("demo@company.com", "demo123")
-      if (result.error) {
-        toast({
-          title: "Error",
-          description: result.error.message,
-          variant: "destructive",
-        })
-      } else {
-        toast({
-          title: "Success",
-          description: "Welcome to the demo!",
-        })
-        onClose()
-        router.push("/dashboard")
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Demo login failed",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSandeepLogin = async () => {
-    setLoading(true)
-    try {
-      const result = await signIn("sandeep@gmail.com", "Demo@12345")
-      if (result.error) {
-        toast({
-          title: "Error",
-          description: result.error.message,
-          variant: "destructive",
-        })
-      } else {
-        toast({
-          title: "Success",
-          description: "Welcome back, Sandeep!",
-        })
-        onClose()
-        router.push("/dashboard")
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Login failed",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Removed demo and hardcoded login handlers
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -149,39 +93,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
           </Button>
         </form>
 
-        <div className="space-y-4">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <Separator />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-muted-foreground">Demo Accounts</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleDemoLogin}
-              className="text-xs bg-transparent"
-              disabled={loading}
-            >
-              {loading ? "..." : "Demo Account"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleSandeepLogin}
-              className="text-xs bg-transparent"
-              disabled={loading}
-            >
-              {loading ? "..." : "Sandeep's Account"}
-            </Button>
-          </div>
-        </div>
+        {/* Demo shortcuts removed */}
       </DialogContent>
     </Dialog>
   )

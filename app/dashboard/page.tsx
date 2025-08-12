@@ -7,8 +7,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Briefcase, Users, Calendar, TrendingUp, Play, ExternalLink } from "lucide-react"
-import { DemoBanner } from "@/components/demo-banner"
+import { Briefcase, Users, Calendar, TrendingUp, ExternalLink } from "lucide-react"
 import Link from "next/link"
 
 interface DashboardStats {
@@ -73,7 +72,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <DemoBanner />
+      {/* Demo banner removed */}
 
       {/* AIP Quick Access */}
       <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
@@ -85,12 +84,6 @@ export default function DashboardPage() {
                 Test the complete AI-powered interview system with sample data and real-time processing
               </p>
               <div className="flex space-x-3">
-                <Link href="/dashboard/demo">
-                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-                    <Play className="h-4 w-4 mr-1" />
-                    Demo & Testing
-                  </Button>
-                </Link>
                 <Link href="/apply/job-1" target="_blank">
                   <Button
                     variant="outline"
