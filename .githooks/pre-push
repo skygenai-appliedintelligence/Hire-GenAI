@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Re‑check staged scope before pushing
+node tools/featurectl.js verify-staged || exit 1
