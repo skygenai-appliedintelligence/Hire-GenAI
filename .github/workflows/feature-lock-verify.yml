@@ -1,0 +1,21 @@
+name: feature-lock-verify
+on: [pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Node
+        uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm i -g node-fetch@latest || true
+      - name: Download feature map from lock server
+        run: curl -sfL ${{ secrets.FEATURELOCK_SERVER }}/features -o .featuremap.yml
+      - name: Verify changed files are inside declared feature
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}...${{ github.sha }})
+          echo "$CHANGED" | awk 'NF' > changed.txt
+          node tools/featurectl.js verify-staged
+        env:
+          # Your lock server URL, e.g. https://locks.internal
+          FEATURELOCK_SERVER: ${{ secrets.FEATURELOCK_SERVER }}
