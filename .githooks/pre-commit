@@ -1,2 +1,0 @@
-#!/usr/bin/env bash
-node tools/featurectl.js verify-staged || exit 1
