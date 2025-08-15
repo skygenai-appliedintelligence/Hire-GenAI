@@ -1,0 +1,16 @@
+{
+  "name": "monorepo-locking-starter",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "prepare": "husky",
+    "featurectl": "node tools/featurectl.js",
+    "lock:status": "node tools/featurectl.js status"
+  },
+  "devDependencies": {
+    "husky": "^9.0.0",
+    "yaml": "^2.5.1",
+    "picocolors": "^1.0.0"
+  }
+}

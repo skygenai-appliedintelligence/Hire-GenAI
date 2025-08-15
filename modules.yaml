@@ -1,0 +1,14 @@
+modules:
+  home:
+    ownerGroup: web
+    paths:
+      - apps/web/app
+  auth:
+    ownerGroup: web
+    paths:
+      - apps/web/app/(auth)/login
+      - apps/web/app/(auth)/signup
+  api:
+    ownerGroup: backend
+    paths:
+      - services/api
