@@ -1,1 +1,0 @@
-console.log("API placeholder service. Add your server implementation here.");
