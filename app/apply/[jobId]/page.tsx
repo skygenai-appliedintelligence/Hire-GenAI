@@ -66,7 +66,12 @@ export default function ApplyPage({ params }: { params: { jobId: string } }) {
           }
         }
 
-        setJob(foundJob)
+        // Gate by job status: only "active" is open for applications
+        if (foundJob && (foundJob.status && ["active", "open"].includes(String(foundJob.status).toLowerCase()))) {
+          setJob(foundJob)
+        } else {
+          setJob(null)
+        }
       } catch (error) {
         console.error("Error loading job details:", error)
         toast({
@@ -258,8 +263,14 @@ export default function ApplyPage({ params }: { params: { jobId: string } }) {
         <div className="max-w-2xl mx-auto px-4">
           <Card className="border-red-200">
             <CardContent className="p-8 text-center">
-              <h2 className="text-xl font-semibold text-red-600 mb-2">Job Not Found</h2>
-              <p className="text-gray-600">The job you're looking for doesn't exist or has been removed.</p>
+              <h2 className="text-xl font-semibold text-red-600 mb-2">This job is not accepting applications</h2>
+              <p className="text-gray-600">
+                The job you're trying to apply for is On-Hold, Closed, or Cancelled. Please visit the company's jobs
+                page to see open roles.
+              </p>
+              <div className="mt-4">
+                <Button onClick={() => window.history.back()}>Go Back</Button>
+              </div>
             </CardContent>
           </Card>
         </div>

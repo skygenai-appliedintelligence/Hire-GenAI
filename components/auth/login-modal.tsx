@@ -33,7 +33,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
       if (result.error) {
         toast({
           title: "Error",
-          description: result.error.message,
+          description: result.error?.message ?? "Login failed",
           variant: "destructive",
         })
       } else {

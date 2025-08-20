@@ -7,23 +7,40 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 model companies {
   id                String   @id @default(uuid())
-  name              String
+  name              String   @unique
+  slug              String   @unique
   email             String   @unique
   logo_url          String?
   subscription_plan String   @default("basic")
   created_at        DateTime @default(now())
   updated_at        DateTime @default(now())
 
+  // Extended company profile
+  website           String?
+  domain            String?
+  hq_location       String?
+  industry          String?
+  size              String?
+  billing_contact   String?
+  billing_address   String?
+  tax_id            String?
+
   users             users[]
   jobs              job_descriptions[]
   activity_logs     activity_logs[]
   api_integrations  api_integrations[]
   messages          messages[]
+
+  subscriptions     subscriptions[]
+  postings          postings[]
+  sourcing_jobs     sourcing_jobs[]
+  webhooks          webhooks[]
+  suppression_list  suppression_list[]
+  outreach_messages outreach_messages[]
 }
 
 model users {
@@ -32,6 +49,7 @@ model users {
   email      String   @unique
   name       String
   role       String   @default("user")
+  status     String   @default("active") // invited, active, suspended, revoked
   created_at DateTime @default(now())
   updated_at DateTime @default(now())
 
@@ -45,12 +63,13 @@ model job_descriptions {
   id               String   @id @default(uuid())
   company_id       String
   title            String
+  slug             String
   description      String
   requirements     String?
   location         String?
   salary_range     String?
   employment_type  String?
-  status           String   @default("draft")
+  status           String   @default("open") // open, on-hold, closed, cancelled
   posted_platforms String   @default("[]")
   platform_job_ids String   @default("{}")
   posting_results  String   @default("[]")
@@ -65,13 +84,18 @@ model job_descriptions {
   rounds      interview_rounds[]
   activity    activity_logs[]
   messages    messages[]
+  applications applications[]
+  postings    postings[]
+  sourcing    sourcing_jobs[]
 
   @@index([company_id], name: "idx_job_descriptions_company_id")
+  @@unique([company_id, slug], name: "uq_jd_company_slug")
 }
 
 model candidates {
   id                   String   @id @default(uuid())
   job_id               String
+  company_id           String?
   name                 String
   email                String
   phone                String?
@@ -88,6 +112,8 @@ model candidates {
   rounds      interview_rounds[]
   activity    activity_logs[]
   messages    messages[]
+  applications applications[]
+  outreach_messages outreach_messages[]
 
   @@index([job_id], name: "idx_candidates_job_id")
 }
@@ -157,4 +183,181 @@ model messages {
 
   @@index([company_id], name: "idx_messages_company_id")
   @@index([candidate_id], name: "idx_messages_candidate_id")
+}
+
+// User model for OTP-based authentication
+model User {
+  id                String   @id @default(cuid())
+  email             String?  @unique
+  phone             String?  @unique
+  verified          Boolean  @default(false)
+  otpHash           String?
+  otpExpiresAt      DateTime?
+  passwordHash      String?
+  failedOtpAttempts Int      @default(0)
+  lockUntil         DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([email, phone])
+  @@map("users_auth")
+}
+
+// Email OTPs for DEV and future email OTP integration
+model email_otps {
+  id         String   @id @default(uuid())
+  email      String
+  code       String
+  expires_at DateTime
+  created_at DateTime @default(now())
+}
+
+// Subscriptions & billing
+model subscriptions {
+  id              String   @id @default(uuid())
+  company_id      String
+  plan            String   @default("base") // base
+  addons          String   @default("[]")
+  period          String   @default("monthly") // monthly, annual
+  status          String   @default("active") // active, past_due, canceled
+  current_period_start DateTime @default(now())
+  current_period_end   DateTime @default(now())
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
+
+  company companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
+}
+
+// Applications per candidate per JD
+model applications {
+  id            String   @id @default(uuid())
+  candidate_id  String
+  jd_id         String
+  answers_json  String   @default("{}")
+  cv_url        String?
+  screening_score Int?
+  consent_flags String   @default("{}")
+  status        String   @default("submitted") // submitted, auto_rejected, invited, completed, reviewed
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  candidate candidates       @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
+  jd        job_descriptions @relation(fields: [jd_id], references: [id], onDelete: Cascade)
+
+  @@index([jd_id], name: "idx_applications_jd_id")
+
+  interviews interviews[]
+}
+
+// Interviews linked to an application
+model interviews {
+  id               String   @id @default(uuid())
+  application_id   String
+  agent_id         String?
+  invite_expires_at DateTime?
+  started_at       DateTime?
+  completed_at     DateTime?
+  score            Int?
+  rubric_json      String   @default("{}")
+  transcript_url   String?
+  recording_url    String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @default(now())
+
+  application applications @relation(fields: [application_id], references: [id], onDelete: Cascade)
+}
+
+// Job Distribution postings
+model postings {
+  id            String   @id @default(uuid())
+  company_id    String
+  jd_id         String
+  board         String
+  external_job_id String?
+  status        String   @default("queued") // queued, posted, error
+  logs          String   @default("[]")
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  company companies       @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  jd      job_descriptions @relation(fields: [jd_id], references: [id], onDelete: Cascade)
+
+  @@index([jd_id], name: "idx_postings_jd_id")
+}
+
+// Sourcing jobs
+model sourcing_jobs {
+  id         String   @id @default(uuid())
+  company_id String
+  jd_id      String
+  status     String   @default("queued")
+  filters_json String @default("{}")
+  stats_json   String @default("{}")
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  company companies       @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  jd      job_descriptions @relation(fields: [jd_id], references: [id], onDelete: Cascade)
+
+  prospects prospects[]
+}
+
+// Prospects discovered via sourcing
+model prospects {
+  id               String   @id @default(uuid())
+  sourcing_job_id  String
+  person_id        String?
+  name             String?
+  email            String?
+  phone            String?
+  matched_score    Int?
+  consent_flags    String   @default("{}")
+  created_at       DateTime @default(now())
+  updated_at       DateTime @default(now())
+
+  sourcing_job sourcing_jobs @relation(fields: [sourcing_job_id], references: [id], onDelete: Cascade)
+
+  outreach_messages outreach_messages[]
+}
+
+// Outreach messages (email/SMS/LinkedIn)
+model outreach_messages {
+  id            String   @id @default(uuid())
+  company_id    String
+  prospect_id   String?
+  candidate_id  String?
+  channel       String
+  template_id   String?
+  status        String   @default("queued")
+  sent_at       DateTime?
+  meta          String   @default("{}")
+  created_at    DateTime @default(now())
+
+  company   companies  @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  prospect  prospects? @relation(fields: [prospect_id], references: [id])
+  candidate candidates? @relation(fields: [candidate_id], references: [id])
+}
+
+// Webhooks per tenant
+model webhooks {
+  id         String   @id @default(uuid())
+  company_id String
+  event_type String
+  target_url String
+  secret     String?
+  created_at DateTime @default(now())
+
+  company companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
+}
+
+// Suppression list for opt-outs/bounces per tenant
+model suppression_list {
+  id         String   @id @default(uuid())
+  company_id String
+  channel    String   // email or sms
+  value      String
+  reason     String?
+  created_at DateTime @default(now())
+
+  company companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
 }

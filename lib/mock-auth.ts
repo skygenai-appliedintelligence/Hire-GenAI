@@ -8,6 +8,7 @@ export interface User {
 export interface Company {
   id: string
   name: string
+  slug: string
   industry: string
   size: string
   website: string
@@ -55,6 +56,14 @@ export class MockAuthService {
     } catch (error) {
       console.error("Error initializing users:", error)
     }
+  }
+
+  private static slugify(text: string): string {
+    return (text || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)+/g, "")
+      .slice(0, 40)
   }
 
   static getUsers(): MockUserData[] {
@@ -117,6 +126,17 @@ export class MockAuthService {
           company: user.company,
         }
 
+        // Sync company data to database
+        try {
+          await fetch('/api/auth/sync-company', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ company: user.company })
+          })
+        } catch (syncError) {
+          console.warn('Failed to sync company to database:', syncError)
+        }
+
         // Save session to localStorage with enhanced key
         if (typeof window !== "undefined") {
           localStorage.setItem(this.STORAGE_KEY, JSON.stringify(session))
@@ -167,6 +187,7 @@ export class MockAuthService {
         company: {
           id: `company_${Date.now()}`,
           name: companyName,
+          slug: this.slugify(companyName) || `company-${Date.now()}`,
           industry: "Technology",
           size: "1-10",
           website: "",
@@ -184,6 +205,17 @@ export class MockAuthService {
           role: newUser.role,
         },
         company: newUser.company,
+      }
+
+      // Sync company data to database
+      try {
+        await fetch('/api/auth/sync-company', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ company: newUser.company })
+        })
+      } catch (syncError) {
+        console.warn('Failed to sync company to database:', syncError)
       }
 
       // Save session to localStorage
@@ -204,6 +236,144 @@ export class MockAuthService {
         error: { message: "Sign up failed" },
       }
     }
+  }
+
+  // OTP-style sign in: DEV-only convenience to sign in by email (after OTP verification)
+  static async signInWithEmail(email: string) {
+    try {
+      // Try to get user from database first
+      const dbResponse = await fetch('/api/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp: 'dummy' }) // This will fail but we can check if user exists
+      })
+
+      // If user exists in database, get their data
+      if (dbResponse.status === 400) {
+        const errorData = await dbResponse.json()
+        if (errorData.error && errorData.error.includes('Invalid OTP')) {
+          // User exists, get their data from database
+          const userResponse = await fetch(`/api/users/by-email?email=${encodeURIComponent(email)}`)
+          if (userResponse.ok) {
+            const userData = await userResponse.json()
+            const session: AuthSession = {
+              user: userData.user,
+              company: userData.company,
+            }
+
+            if (typeof window !== "undefined") {
+              localStorage.setItem(this.STORAGE_KEY, JSON.stringify(session))
+              localStorage.setItem(`${this.STORAGE_KEY}_backup`, JSON.stringify(session))
+            }
+
+            return {
+              data: { session: { user: session.user } },
+              error: null,
+            }
+          }
+        }
+      }
+
+      // Fallback to localStorage users
+      const users = this.getUsers()
+      const user = users.find((u) => u.email === email)
+      if (!user) {
+        return {
+          data: { session: null },
+          error: { message: "User not found. Please register first." },
+        }
+      }
+
+      const session: AuthSession = {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        },
+        company: user.company,
+      }
+
+      // Sync company data to database
+      try {
+        await fetch('/api/auth/sync-company', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ company: user.company })
+        })
+      } catch (syncError) {
+        console.warn('Failed to sync company to database:', syncError)
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(session))
+        localStorage.setItem(`${this.STORAGE_KEY}_backup`, JSON.stringify(session))
+      }
+
+      return {
+        data: { session: { user: session.user } },
+        error: null,
+      }
+    } catch (error) {
+      console.error("Sign in with email error:", error)
+      return {
+        data: { session: null },
+        error: { message: "Sign in failed" },
+      }
+    }
+  }
+
+  // Team management helpers (localStorage-based)
+  static getCompanyMembers(companyId: string): Array<Pick<MockUserData, "id" | "email" | "name" | "role">> {
+    const users = this.getUsers()
+    return users
+      .filter((u) => u.company.id === companyId)
+      .map((u) => ({ id: u.id, email: u.email, name: u.name, role: u.role }))
+  }
+
+  static addCompanyMember(
+    companyId: string,
+    memberEmail: string,
+    memberName: string,
+    role: "company_admin" | "user" = "user",
+  ) {
+    const users = this.getUsers()
+    const exists = users.find((u) => u.email === memberEmail)
+    if (exists) return { error: { message: "User email already exists" } }
+
+    // Find a company to copy details (name, slug, etc.)
+    const companyOwner = users.find((u) => u.company.id === companyId)
+    if (!companyOwner) return { error: { message: "Company not found" } }
+
+    const newUser: MockUserData = {
+      id: `user_${Date.now()}`,
+      email: memberEmail,
+      password: Math.random().toString(36).slice(2, 10),
+      name: memberName || memberEmail.split("@")[0],
+      role,
+      company: companyOwner.company,
+    }
+
+    users.push(newUser)
+    this.saveUsers(users)
+    return { ok: true }
+  }
+
+  static removeCompanyMember(companyId: string, memberEmail: string) {
+    const users = this.getUsers()
+    const filtered = users.filter((u) => !(u.company.id === companyId && u.email === memberEmail))
+    if (filtered.length === users.length) return { error: { message: "Member not found" } }
+    this.saveUsers(filtered)
+    return { ok: true }
+  }
+
+  static updateMemberRole(companyId: string, memberEmail: string, role: "company_admin" | "user") {
+    const users = this.getUsers()
+    const idx = users.findIndex((u) => u.company.id === companyId && u.email === memberEmail)
+    if (idx === -1) return { error: { message: "Member not found" } }
+    users[idx].role = role
+    this.saveUsers(users)
+    return { ok: true }
   }
 
   static async signOut() {
@@ -278,5 +448,14 @@ export class MockAuthService {
     }
 
     return null
+  }
+
+  // Allow setting session from server response (OTP flow)
+  static setSessionFromServer(user: User, company: Company) {
+    const session: AuthSession = { user, company }
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(session))
+      localStorage.setItem(`${this.STORAGE_KEY}_backup`, JSON.stringify(session))
+    }
   }
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
-import { User, Building, Bell, Shield, CreditCard } from "lucide-react"
+import { User, Building, Bell, Shield, CreditCard, Users as UsersIcon, Plus, Trash } from "lucide-react"
 
 export default function SettingsPage() {
   const { user, company } = useAuth()
@@ -39,6 +39,103 @@ export default function SettingsPage() {
     interviewReminders: true,
     weeklyReports: false,
   })
+
+  // Team management state
+  const [membersLoading, setMembersLoading] = useState(false)
+  const [members, setMembers] = useState<Array<{ id: string; email: string; name: string; role: "company_admin" | "user" }>>([])
+  const [newMember, setNewMember] = useState({ email: "", name: "", role: "user" as "company_admin" | "user" })
+
+  const loadMembers = async () => {
+    if (!company?.id) return
+    setMembersLoading(true)
+    try {
+      const res = await fetch(`/api/company-members?companyId=${company.id}`)
+      const data = await res.json()
+      if (data.ok) setMembers(data.members)
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to load team members", variant: "destructive" })
+    } finally {
+      setMembersLoading(false)
+    }
+  }
+
+  // Load members on mount when company is ready
+  useEffect(() => {
+    loadMembers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [company?.id])
+
+  const addMember = async () => {
+    if (!company?.id || !newMember.email) return
+    setMembersLoading(true)
+    try {
+      const res = await fetch(`/api/company-members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          companyId: company.id, 
+          companyName: company.name,
+          email: newMember.email, 
+          name: newMember.name, 
+          role: newMember.role 
+        }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        toast({ title: "Member added", description: `${newMember.email} invited` })
+        setNewMember({ email: "", name: "", role: "user" })
+        loadMembers()
+      } else {
+        const msg = typeof data.error === 'string' ? data.error : data.error?.message || 'Failed to add member'
+        toast({ title: "Error", description: msg, variant: "destructive" })
+      }
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to add member", variant: "destructive" })
+    } finally {
+      setMembersLoading(false)
+    }
+  }
+
+  const removeMember = async (email: string) => {
+    if (!company?.id) return
+    setMembersLoading(true)
+    try {
+      const res = await fetch(`/api/company-members?companyId=${company.id}&email=${encodeURIComponent(email)}`, { method: "DELETE" })
+      const data = await res.json()
+      if (data.ok) {
+        toast({ title: "Member removed" })
+        loadMembers()
+      } else {
+        const msg = typeof data.error === 'string' ? data.error : data.error?.message || 'Failed to remove member'
+        toast({ title: "Error", description: msg, variant: "destructive" })
+      }
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to remove member", variant: "destructive" })
+    } finally {
+      setMembersLoading(false)
+    }
+  }
+
+  const updateRole = async (email: string, role: "company_admin" | "user") => {
+    if (!company?.id) return
+    try {
+      const res = await fetch(`/api/company-members`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId: company.id, email, role }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setMembers((prev) => prev.map((m) => (m.email === email ? { ...m, role } : m)))
+        toast({ title: "Role updated" })
+      } else {
+        const msg = typeof data.error === 'string' ? data.error : data.error?.message || 'Failed to update role'
+        toast({ title: "Error", description: msg, variant: "destructive" })
+      }
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to update role", variant: "destructive" })
+    }
+  }
 
   const handleSaveProfile = async () => {
     setLoading(true)
@@ -87,7 +184,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="profile" className="flex items-center space-x-2">
             <User className="h-4 w-4" />
             <span>Profile</span>
@@ -95,6 +192,10 @@ export default function SettingsPage() {
           <TabsTrigger value="company" className="flex items-center space-x-2">
             <Building className="h-4 w-4" />
             <span>Company</span>
+          </TabsTrigger>
+          <TabsTrigger value="team" className="flex items-center space-x-2">
+            <UsersIcon className="h-4 w-4" />
+            <span>Team</span>
           </TabsTrigger>
           <TabsTrigger value="notifications" className="flex items-center space-x-2">
             <Bell className="h-4 w-4" />
@@ -170,6 +271,77 @@ export default function SettingsPage() {
                 <Button onClick={handleSaveProfile} disabled={loading} className="linkedin-button">
                   {loading ? "Saving..." : "Save Changes"}
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="team">
+          <Card className="linkedin-card">
+            <CardHeader>
+              <CardTitle>Team Members</CardTitle>
+              <CardDescription>Manage recruiter team members and roles</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <Input
+                  placeholder="Member email"
+                  value={newMember.email}
+                  onChange={(e) => setNewMember((p) => ({ ...p, email: e.target.value }))}
+                  className="linkedin-input"
+                />
+                <Input
+                  placeholder="Full name (optional)"
+                  value={newMember.name}
+                  onChange={(e) => setNewMember((p) => ({ ...p, name: e.target.value }))}
+                  className="linkedin-input"
+                />
+                <Select
+                  value={newMember.role}
+                  onValueChange={(v) => setNewMember((p) => ({ ...p, role: v as any }))}
+                >
+                  <SelectTrigger className="linkedin-input">
+                    <SelectValue placeholder="Role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">Team member</SelectItem>
+                    <SelectItem value="company_admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={addMember} disabled={membersLoading} className="linkedin-button">
+                  <Plus className="h-4 w-4 mr-1" /> Add
+                </Button>
+              </div>
+
+              <div className="divide-y rounded border">
+                {membersLoading && (
+                  <div className="p-4 text-sm text-gray-600">Loading members...</div>
+                )}
+                {!membersLoading && members.length === 0 && (
+                  <div className="p-4 text-sm text-gray-600">No team members yet</div>
+                )}
+                {members.map((m) => (
+                  <div key={m.id} className="p-3 flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{m.name || m.email.split('@')[0]}</div>
+                      <div className="text-sm text-gray-600">{m.email}</div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Select value={m.role} onValueChange={(v) => updateRole(m.email, v as any)}>
+                        <SelectTrigger className="w-40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="user">Team member</SelectItem>
+                          <SelectItem value="company_admin">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button variant="outline" onClick={() => removeMember(m.email)}>
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>

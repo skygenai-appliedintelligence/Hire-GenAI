@@ -1,3 +1,34 @@
+-- Optional seed fixture for local/dev
+-- Creates a sample company with slug and an admin user
+
+do $$
+declare
+  v_company_id uuid;
+begin
+  if not exists (select 1 from companies where slug = 'ai-consulting') then
+    insert into companies (name, slug, email, logo_url, subscription_plan)
+    values ('AI Consulting', 'ai-consulting', 'admin@ai-consulting.example', null, 'basic')
+    returning id into v_company_id;
+
+    insert into users (company_id, email, name, role)
+    values (v_company_id, 'admin@ai-consulting.example', 'AI Consulting Admin', 'company_admin');
+
+    insert into job_descriptions (
+      company_id, title, description, requirements, location, salary_range, employment_type, status, posted_platforms, platform_job_ids, posting_results, interview_rounds
+    ) values (
+      v_company_id,
+      'Senior AI Engineer',
+      'Work on cutting-edge AI solutions.',
+      '5+ years in ML/AI',
+      'Remote',
+      '$120k-$180k',
+      'full-time',
+      'open',
+      '[]','{}','[]',3
+    );
+  end if;
+end $$;
+
 -- Seed dummy data while respecting foreign keys
 with inserted_company as (
   insert into companies (name, email, logo_url, subscription_plan)

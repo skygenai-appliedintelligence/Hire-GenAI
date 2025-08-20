@@ -14,6 +14,7 @@ interface User {
 interface Company {
   id: string
   name: string
+  slug: string
   industry: string
   size: string
   website: string
@@ -23,7 +24,7 @@ interface AuthContextType {
   user: User | null
   company: Company | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<{ error?: { message: string } }>
+  signInWithEmail: (email: string) => Promise<{ error?: { message: string } }>
   signUp: (
     email: string,
     password: string,
@@ -71,35 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth()
   }, [])
 
-  const signIn = async (email: string, password: string) => {
-    try {
-      setLoading(true)
-      console.log("🔐 Signing in user:", email)
 
-      const result = await MockAuthService.signIn(email, password)
-
-      if (result.error) {
-        console.log("❌ Sign in failed:", result.error.message)
-        return { error: result.error }
-      }
-
-      if (result.data.session?.user) {
-        const currentUser = MockAuthService.getCurrentUser()
-        if (currentUser) {
-          setUser(currentUser.user)
-          setCompany(currentUser.company)
-          console.log("✅ Sign in successful for:", currentUser.user.email)
-        }
-      }
-
-      return {}
-    } catch (error) {
-      console.error("❌ Sign in error:", error)
-      return { error: { message: "An unexpected error occurred" } }
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const signUp = async (email: string, password: string, companyName: string, fullName: string) => {
     try {
@@ -131,6 +104,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const signInWithEmail = async (email: string) => {
+    try {
+      setLoading(true)
+      const result = await MockAuthService.signInWithEmail(email)
+      if (result.error) {
+        return { error: result.error }
+      }
+      const currentUser = MockAuthService.getCurrentUser()
+      if (currentUser) {
+        setUser(currentUser.user)
+        setCompany(currentUser.company)
+      }
+      return {}
+    } catch (error) {
+      return { error: { message: "An unexpected error occurred" } }
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const signOut = async () => {
     try {
       setLoading(true)
@@ -152,7 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     company,
     loading,
-    signIn,
+    signInWithEmail,
     signUp,
     signOut,
   }

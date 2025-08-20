@@ -77,6 +77,30 @@ NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 ```
 
+## 🗄️ Database Setup
+
+This project supports PostgreSQL via Prisma. To enable DB features:
+
+1. Create `.env.local` with your Postgres URLs:
+```env
+DATABASE_URL=postgres://user:password@host:5432/db?sslmode=require
+DIRECT_URL=postgres://user:password@host:5432/db?sslmode=require
+```
+2. Apply schema using Prisma (recommended):
+```bash
+pnpm prisma migrate dev --name init
+```
+Or apply raw SQL schema/seed:
+```bash
+node scripts/db-apply.js
+```
+3. Optional seed data lives in `scripts/003-insert-dummy-data.sql`.
+
+### New schema elements added
+- `companies.slug` (unique) for public company URLs: `/{slug}`
+- `email_otps` for OTP issuance/verification
+- Default `job_descriptions.status` set to `open`
+
 ## 🎯 AI Features
 
 ### AI Question Generator
