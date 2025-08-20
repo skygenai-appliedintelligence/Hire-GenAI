@@ -245,7 +245,7 @@ This project is licensed under the MIT License.
 
 You now have:
 
-- 1 CreateBranch — create/switch branch
+- CreateBranch — create/switch branch
 - SwitchBranch — switch to an existing branch
 - WhichBranchIamIn — print current branch, tracking remote, and dirty status
 - CheckInToGithub — commit + push
@@ -253,6 +253,74 @@ You now have:
 - UpdateFromMain — bring main -> feature
 - 7ReleaseToMain — merge to main + tag (+ optional push)
 - RollbackRelease — delete release tag and optionally revert the merge on main
+
+### Recommended Git workflow sequence (feature lifecycle)
+
+1. **CreateBranch**: Start a new feature branch from `main`.
+2. **SwitchBranch**: Move between branches as needed.
+3. Code, commit locally using your IDE or with **CheckInToGithub**.
+4. Periodically **UpdateFromMain** to get latest `main` into your feature branch (reduce merge conflicts).
+5. When feature is ready, **MergeToMain** (optionally `-NoFF`) and push.
+6. If you need a tagged release, run **ReleaseToMain** (choose tag strategy and push).
+7. If a release must be undone, use **RollbackRelease** (delete tag and optionally revert merge).
+
+Why this order?
+- **Stability**: Working off a feature branch isolates changes from `main`.
+- **Fresh base**: Regularly updating from `main` keeps your branch current.
+- **Traceability**: Merges and tags create a clear project history.
+- **Safety**: Rollback paths exist if something goes wrong.
+
+### Command reference (what/when/why)
+
+- **CreateBranch** (`CreateBranch.ps1/.cmd`)
+  - Purpose: Create and/or switch to a new branch off `main`.
+  - Use when: Starting any new feature, fix, or spike.
+  - Why: Keeps work isolated and reviewable; aligns with trunk-based or GitFlow-lite.
+  - Example: `./CreateBranch.cmd "feature/login-flow"`
+
+- **SwitchBranch** (`SwitchBranch.ps1/.cmd`)
+  - Purpose: Checkout an existing local branch.
+  - Use when: You need to move between feature branches or go back to `main`.
+  - Why: Fast context switching without recreating branches.
+  - Example: `./SwitchBranch.cmd "Signup"`
+
+- **WhichBranchIamIn** (`WhichBranchIamIn.ps1/.cmd`)
+  - Purpose: Show current branch, upstream tracking, and workspace dirtiness.
+  - Use when: Before merges, releases, or any action where current branch matters.
+  - Why: Prevents mistakes like merging from the wrong branch.
+  - Example: `./WhichBranchIamIn.cmd`
+
+- **CheckInToGithub** (`CheckInToGithub.ps1/.cmd`)
+  - Purpose: Stage all changes, commit with a message, and push to upstream.
+  - Use when: Saving progress or sharing work.
+  - Why: Standardizes push flow; supports flags like `-NoVerify`.
+  - Example: `./CheckInToGithub.cmd "Fix tests"`
+
+- **UpdateFromMain** (`UpdateFromMain.ps1/.cmd`)
+  - Purpose: Bring the latest `main` into your current branch (merge or rebase).
+  - Use when: Regularly during development and before final merge.
+  - Why: Minimizes conflicts and surprises; keeps branch up to date.
+  - Example: `./UpdateFromMain.cmd "Signup" -Rebase -Push`
+
+- **MergeToMain** (`MergeToMain.ps1/.cmd`)
+  - Purpose: Merge a finished feature branch into `main`.
+  - Use when: Feature is reviewed and ready.
+  - Why: Integrates work; optional `-NoFF` preserves a merge commit for history clarity.
+  - Example: `./MergeToMain.cmd "Signup" -NoFF -Push`
+
+- **ReleaseToMain** (`ReleaseToMain.ps1/.cmd`)
+  - Purpose: Create a release tag on `main` and optionally push.
+  - Use when: Cutting a release (versioned or timestamped).
+  - Why: Immutable tag marks a deployable snapshot; aids rollbacks and changelogs.
+  - Example: `./ReleaseToMain.cmd "Signup" -Tag v1.2.3 -NoFF -Push`
+
+- **RollbackRelease** (`RollbackRelease.ps1/.cmd`)
+  - Purpose: Remove a mistaken release tag and optionally revert the merge on `main`.
+  - Use when: A release needs to be withdrawn.
+  - Why: Restores repo state to pre-release condition; can also delete remote tag.
+  - Example: `./RollbackRelease.cmd -Tag v1.2.3 -RevertMerge -Push`
+
+Tip: Use `OpenGitBash.ps1/.cmd` to quickly open a Git Bash shell at the repo root if you prefer bash.
 
 ### How to run these scripts
 
