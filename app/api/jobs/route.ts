@@ -25,6 +25,7 @@ type CreateJobBody = {
   interviewRounds?: string[]
   interviewDuration?: string
   platforms?: string[]
+  createdBy?: string | null
 }
 
 function normalizeJobType(value?: string | null): 'full_time' | 'part_time' | 'contract' | 'freelance' | null {
@@ -116,7 +117,7 @@ export async function POST(req: Request) {
         ${Array.isArray(body.interviewRounds) ? body.interviewRounds : []},
         ${body.interviewDuration || null},
         ${Array.isArray(body.platforms) ? body.platforms : []},
-        ${null}
+        ${body.createdBy || null}
       )
       RETURNING id;
     `)
@@ -133,7 +134,12 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const companyName = searchParams.get('company')?.trim()
 
-    // Read from the new public.job_descriptions table
+    // Require company for tenant isolation: no company => no data
+    if (!companyName) {
+      return NextResponse.json({ ok: true, jobs: [] })
+    }
+
+    // Read only the requesting company's jobs
     const rows = await prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT id,
              title,
@@ -153,7 +159,7 @@ export async function GET(req: Request) {
              created_at,
              updated_at
         FROM public.job_descriptions
-       ${companyName ? Prisma.sql`WHERE company_name = ${companyName}` : Prisma.empty}
+       WHERE company_name = ${companyName}
        ORDER BY created_at DESC
        LIMIT 200
     `)
