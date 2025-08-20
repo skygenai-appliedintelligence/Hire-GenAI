@@ -245,11 +245,13 @@ This project is licensed under the MIT License.
 
 You now have:
 
-- CreateBranch — create/switch branch
+- 1 CreateBranch — create/switch branch
+- SwitchBranch — switch to an existing branch
+- WhichBranchIamIn — print current branch, tracking remote, and dirty status
 - CheckInToGithub — commit + push
 - MergeToMain — merge feature -> main
 - UpdateFromMain — bring main -> feature
-- ReleaseToMain — merge to main + tag (+ optional push)
+- 7ReleaseToMain — merge to main + tag (+ optional push)
 - RollbackRelease — delete release tag and optionally revert the merge on main
 
 ### How to run these scripts
@@ -270,6 +272,20 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
   .\CreateBranch.ps1 "feature/login-flow"
   # or via CMD wrapper
   .\CreateBranch.cmd "Signup"
+  ```
+
+- SwitchBranch
+  ```powershell
+  .\SwitchBranch.ps1 "Signup"
+  # or via CMD wrapper
+  .\SwitchBranch.cmd "Signup"
+  ```
+
+- WhichBranchIamIn
+  ```powershell
+  .\WhichBranchIamIn.ps1
+  # or via CMD wrapper
+  .\WhichBranchIamIn.cmd
   ```
 
 - CheckInToGithub
@@ -313,6 +329,23 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
   # or via CMD wrapper
   .\RollbackRelease.cmd -Tag v1.2.3 -RevertMerge -Push
   ```
+
+- OpenGitBash
+  ```powershell
+  # Opens a new Git Bash window in the repository directory
+  .\OpenGitBash.ps1
+  # or via CMD wrapper
+  .\OpenGitBash.cmd
+  ```
+
+### Use Git Bash as the default terminal (VS Code)
+
+- Open Command Palette: Ctrl+Shift+P
+- Run: Terminal: Select Default Profile
+- Choose: Git Bash
+- Open a new terminal: Terminal -> New Terminal (it will start as Git Bash)
+
+If Git Bash is not listed, install Git for Windows: https://git-scm.com/download/win
 
 ## 🆘 Support
 
