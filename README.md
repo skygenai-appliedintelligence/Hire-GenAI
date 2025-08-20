@@ -252,45 +252,66 @@ You now have:
 - ReleaseToMain — merge to main + tag (+ optional push)
 - RollbackRelease — delete release tag and optionally revert the merge on main
 
+### How to run these scripts
+
+- PowerShell: run from repo root with `./Script.ps1` syntax.
+- CMD wrapper: use the matching `.cmd` file, e.g. `./Script.cmd ...`.
+
+If PowerShell blocks execution, run once in the current shell:
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
 ### Examples
 
 - CreateBranch
   ```powershell
-  CreateBranch "Signup"
-  # or
+  .\CreateBranch.ps1 "Signup"
   .\CreateBranch.ps1 "feature/login-flow"
+  # or via CMD wrapper
+  .\CreateBranch.cmd "Signup"
   ```
 
 - CheckInToGithub
   ```powershell
-  CheckInToGithub "Initial commit"
-  CheckInToGithub "Fix tests" -NoVerify -Force
+  .\CheckInToGithub.ps1 "Initial commit"
+  .\CheckInToGithub.ps1 "Fix tests" -NoVerify -Force
+  # or via CMD wrapper
+  .\CheckInToGithub.cmd "Initial commit"
   ```
 
 - MergeToMain
   ```powershell
   .\MergeToMain.ps1 "Signup"
   .\MergeToMain.ps1 "Signup" -NoFF -Push
+  # or via CMD wrapper
+  .\MergeToMain.cmd "Signup" -NoFF -Push
   ```
 
 - UpdateFromMain
   ```powershell
   .\UpdateFromMain.ps1                 # merge main into current branch
-  .\UpdateFromMain "Signup" -Rebase -Push
+  .\UpdateFromMain.ps1 "Signup" -Rebase -Push
+  # or via CMD wrapper
+  .\UpdateFromMain.cmd "Signup" -Rebase -Push
   ```
 
 - ReleaseToMain
   ```powershell
-  .\ReleaseToMain "Signup"                    # timestamp tag
-  ReleaseToMain "Signup" -UsePackageVersion -Push
-  ReleaseToMain "Signup" -Tag v1.2.3 -NoFF -Push
+  .\ReleaseToMain.ps1 "Signup"                    # timestamp tag
+  .\ReleaseToMain.ps1 "Signup" -UsePackageVersion -Push
+  .\ReleaseToMain.ps1 "Signup" -Tag v1.2.3 -NoFF -Push
+  # or via CMD wrapper
+  .\ReleaseToMain.cmd "Signup" -Tag v1.2.3 -NoFF -Push
   ```
 
 - RollbackRelease
   ```powershell
-  .\RollbackRelease -Tag v1.2.3
-  RollbackRelease -Tag v1.2.3 -DeleteRemote
-  RollbackRelease -Tag v1.2.3 -RevertMerge -Push
+  .\RollbackRelease.ps1 -Tag v1.2.3
+  .\RollbackRelease.ps1 -Tag v1.2.3 -DeleteRemote
+  .\RollbackRelease.ps1 -Tag v1.2.3 -RevertMerge -Push
+  # or via CMD wrapper
+  .\RollbackRelease.cmd -Tag v1.2.3 -RevertMerge -Push
   ```
 
 ## 🆘 Support
