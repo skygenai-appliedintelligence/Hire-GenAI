@@ -269,26 +269,26 @@ You now have:
 
 - MergeToMain
   ```powershell
-  MergeToMain "Signup"
-  MergeToMain "Signup" -NoFF -Push
+  .\MergeToMain.ps1 "Signup"
+  .\MergeToMain.ps1 "Signup" -NoFF -Push
   ```
 
 - UpdateFromMain
   ```powershell
-  UpdateFromMain                 # merge main into current branch
-  UpdateFromMain "Signup" -Rebase -Push
+  .\UpdateFromMain.ps1                 # merge main into current branch
+  .\UpdateFromMain "Signup" -Rebase -Push
   ```
 
 - ReleaseToMain
   ```powershell
-  ReleaseToMain "Signup"                    # timestamp tag
+  .\ReleaseToMain "Signup"                    # timestamp tag
   ReleaseToMain "Signup" -UsePackageVersion -Push
   ReleaseToMain "Signup" -Tag v1.2.3 -NoFF -Push
   ```
 
 - RollbackRelease
   ```powershell
-  RollbackRelease -Tag v1.2.3
+  .\RollbackRelease -Tag v1.2.3
   RollbackRelease -Tag v1.2.3 -DeleteRemote
   RollbackRelease -Tag v1.2.3 -RevertMerge -Push
   ```

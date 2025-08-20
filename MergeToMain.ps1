@@ -64,8 +64,10 @@ try {
     git fetch origin --prune
     if ($LASTEXITCODE -ne 0) { throw "git fetch failed" }
 
-    # Ensure main exists
-    if (-not (git show-ref --verify --quiet "refs/heads/$MainBranch")) {
+    # Ensure main exists (check via exit code, not output)
+    git show-ref --verify --quiet "refs/heads/$MainBranch" 2>$null
+    $mainExists = ($LASTEXITCODE -eq 0)
+    if (-not $mainExists) {
         Write-Info "Creating local $MainBranch tracking origin/$MainBranch"
         git checkout -b $MainBranch --track "origin/$MainBranch"
         if ($LASTEXITCODE -ne 0) { throw "Failed to create local $MainBranch" }
@@ -80,8 +82,10 @@ try {
     git pull --ff-only origin $MainBranch
     if ($LASTEXITCODE -ne 0) { throw "Failed to pull $MainBranch (consider resolving local changes)" }
 
-    # Ensure source branch exists locally; if not, try to track remote
-    if (-not (git show-ref --verify --quiet "refs/heads/$BranchName")) {
+    # Ensure source branch exists locally; if not, try to track remote (using exit code)
+    git show-ref --verify --quiet "refs/heads/$BranchName" 2>$null
+    $srcExists = ($LASTEXITCODE -eq 0)
+    if (-not $srcExists) {
         Write-Info "Creating local branch $BranchName tracking origin/$BranchName"
         git checkout -b $BranchName --track "origin/$BranchName"
         if ($LASTEXITCODE -ne 0) { throw "Source branch $BranchName not found locally or on origin" }
