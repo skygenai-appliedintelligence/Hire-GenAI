@@ -68,15 +68,19 @@ try {
     if ([string]::IsNullOrWhiteSpace($BranchName) -or $BranchName -eq 'HEAD') { throw "Could not determine target branch." }
     Write-Info "Target branch: $BranchName"
 
-    # Ensure main exists locally
-    if (-not (git show-ref --verify --quiet "refs/heads/$MainBranch")) {
+    # Ensure main exists locally (check exit code, not output)
+    git show-ref --verify --quiet "refs/heads/$MainBranch"
+    $mainExists = ($LASTEXITCODE -eq 0)
+    if (-not $mainExists) {
         Write-Info "Creating local $MainBranch tracking origin/$MainBranch"
         git checkout -b $MainBranch --track "origin/$MainBranch"
         if ($LASTEXITCODE -ne 0) { throw "Failed to create local $MainBranch" }
     }
 
     # Ensure target branch exists locally; if not, track remote
-    if (-not (git show-ref --verify --quiet "refs/heads/$BranchName")) {
+    git show-ref --verify --quiet "refs/heads/$BranchName"
+    $branchExists = ($LASTEXITCODE -eq 0)
+    if (-not $branchExists) {
         Write-Info "Creating local branch $BranchName tracking origin/$BranchName"
         git checkout -b $BranchName --track "origin/$BranchName"
         if ($LASTEXITCODE -ne 0) { throw "Branch $BranchName not found locally or on origin" }
