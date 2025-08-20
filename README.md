@@ -241,6 +241,79 @@ The platform uses mock authentication for demo purposes. In production, you can 
 
 This project is licensed under the MIT License.
 
+## 🛠️ Git Workflow Summary
+
+You now have:
+
+- CreateBranch — create/switch branch
+- CheckInToGithub — commit + push
+- MergeToMain — merge feature -> main
+- UpdateFromMain — bring main -> feature
+- ReleaseToMain — merge to main + tag (+ optional push)
+- RollbackRelease — delete release tag and optionally revert the merge on main
+
+### How to run these scripts
+
+- PowerShell: run from repo root with `./Script.ps1` syntax.
+- CMD wrapper: use the matching `.cmd` file, e.g. `./Script.cmd ...`.
+
+If PowerShell blocks execution, run once in the current shell:
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+### Examples
+
+- CreateBranch
+  ```powershell
+  .\CreateBranch.ps1 "Signup"
+  .\CreateBranch.ps1 "feature/login-flow"
+  # or via CMD wrapper
+  .\CreateBranch.cmd "Signup"
+  ```
+
+- CheckInToGithub
+  ```powershell
+  .\CheckInToGithub.ps1 "Initial commit"
+  .\CheckInToGithub.ps1 "Fix tests" -NoVerify -Force
+  # or via CMD wrapper
+  .\CheckInToGithub.cmd "Initial commit"
+  ```
+
+- MergeToMain
+  ```powershell
+  .\MergeToMain.ps1 "Signup"
+  .\MergeToMain.ps1 "Signup" -NoFF -Push
+  # or via CMD wrapper
+  .\MergeToMain.cmd "Signup" -NoFF -Push
+  ```
+
+- UpdateFromMain
+  ```powershell
+  .\UpdateFromMain.ps1                 # merge main into current branch
+  .\UpdateFromMain.ps1 "Signup" -Rebase -Push
+  # or via CMD wrapper
+  .\UpdateFromMain.cmd "Signup" -Rebase -Push
+  ```
+
+- ReleaseToMain
+  ```powershell
+  .\ReleaseToMain.ps1 "Signup"                    # timestamp tag
+  .\ReleaseToMain.ps1 "Signup" -UsePackageVersion -Push
+  .\ReleaseToMain.ps1 "Signup" -Tag v1.2.3 -NoFF -Push
+  # or via CMD wrapper
+  .\ReleaseToMain.cmd "Signup" -Tag v1.2.3 -NoFF -Push
+  ```
+
+- RollbackRelease
+  ```powershell
+  .\RollbackRelease.ps1 -Tag v1.2.3
+  .\RollbackRelease.ps1 -Tag v1.2.3 -DeleteRemote
+  .\RollbackRelease.ps1 -Tag v1.2.3 -RevertMerge -Push
+  # or via CMD wrapper
+  .\RollbackRelease.cmd -Tag v1.2.3 -RevertMerge -Push
+  ```
+
 ## 🆘 Support
 
 - **Documentation**: See `SETUP.md` for detailed setup instructions

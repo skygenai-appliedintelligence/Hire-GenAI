@@ -20,20 +20,20 @@ model companies {
   updated_at        DateTime @default(now())
 
   // Extended company profile
-  website           String?
-  domain            String?
-  hq_location       String?
-  industry          String?
-  size              String?
-  billing_contact   String?
-  billing_address   String?
-  tax_id            String?
+  website         String?
+  domain          String?
+  hq_location     String?
+  industry        String?
+  size            String?
+  billing_contact String?
+  billing_address String?
+  tax_id          String?
 
-  users             users[]
-  jobs              job_descriptions[]
-  activity_logs     activity_logs[]
-  api_integrations  api_integrations[]
-  messages          messages[]
+  users            users[]
+  jobs             job_descriptions[]
+  activity_logs    activity_logs[]
+  api_integrations api_integrations[]
+  messages         messages[]
 
   subscriptions     subscriptions[]
   postings          postings[]
@@ -53,41 +53,42 @@ model users {
   created_at DateTime @default(now())
   updated_at DateTime @default(now())
 
-  company companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  company companies          @relation(fields: [company_id], references: [id], onDelete: Cascade)
   jobs    job_descriptions[] @relation("created_by_user")
 
   @@index([company_id], name: "idx_users_company_id")
 }
 
 model job_descriptions {
-  id               String   @id @default(uuid())
-  company_id       String
-  title            String
-  slug             String
-  description      String
-  requirements     String?
-  responsibilities String?
-  benefits         String?
-  location         String?
-  salary_range     String?
-  employment_type  String?
-  status           String   @default("open") // open, on-hold, closed, cancelled
-  visibility       String   @map("visibility") @default("public")
-  department       String?  @map("department")
-  is_remote        Boolean  @map("is_remote") @default(false)
-  visa_sponsorship Boolean  @map("visa_sponsorship") @default(false)
-  must_have_skills String[] @map("must_have_skills")
-  nice_to_have_skills String[] @map("nice_to_have_skills")
-  screening_questions Json  @map("screening_questions")
-  hiring_team      Json     @map("hiring_team")
-  target_dates     Json     @map("target_dates")
-  work_eligibility String?  @map("work_eligibility")
-  equal_opportunity_statement String? @map("equal_opportunity_statement")
-  apply_deadline   DateTime? @map("apply_deadline")
-  created_by       String?
-  created_at       DateTime @default(now())
-  updated_at       DateTime @default(now())
+  id                          String    @id @default(uuid())
+  company_id                  String
+  title                       String
+  slug                        String
+  description                 String
+  requirements                String?
+  responsibilities            String?
+  benefits                    String?
+  location                    String?
+  salary_range                String?
+  employment_type             String?
+  status                      String    @default("open") // open, on-hold, closed, cancelled
+  visibility                  String    @default("public") @map("visibility")
+  department                  String?   @map("department")
+  is_remote                   Boolean   @default(false) @map("is_remote")
+  visa_sponsorship            Boolean   @default(false) @map("visa_sponsorship")
+  must_have_skills            String[]  @map("must_have_skills")
+  nice_to_have_skills         String[]  @map("nice_to_have_skills")
+  screening_questions         Json      @map("screening_questions")
+  hiring_team                 Json      @map("hiring_team")
+  target_dates                Json      @map("target_dates")
+  work_eligibility            String?   @map("work_eligibility")
+  equal_opportunity_statement String?   @map("equal_opportunity_statement")
+  apply_deadline              DateTime? @map("apply_deadline")
+  created_by                  String?
+  created_at                  DateTime  @default(now())
+  updated_at                  DateTime  @default(now())
 
+<<<<<<< HEAD
   company     companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
   creator     users?    @relation("created_by_user", fields: [created_by], references: [id])
   activity    activity_logs[]     @relation("job_activity")
@@ -97,9 +98,20 @@ model job_descriptions {
   applications applications[]     @relation("job_applications")
   postings    postings[]          @relation("job_postings")
   sourcing    sourcing_jobs[]     @relation("job_sourcing_jobs")
+=======
+  company       companies          @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  creator       users?             @relation("created_by_user", fields: [created_by], references: [id])
+  activity      activity_logs[]
+  candidates    candidates[]
+  rounds        interview_rounds[]
+  applications  applications[]
+  postings      postings[]
+  sourcing_jobs sourcing_jobs[]
+  messages      messages[]
+>>>>>>> Signup
 
-  @@index([company_id], name: "idx_job_descriptions_company_id")
   @@unique([company_id, slug], name: "uq_jd_company_slug")
+  @@index([company_id], name: "idx_job_descriptions_company_id")
   @@map("jds")
 }
 
@@ -119,28 +131,36 @@ model candidates {
   created_at           DateTime @default(now())
   updated_at           DateTime @default(now())
 
+<<<<<<< HEAD
   job         job_descriptions @relation("job_candidates", fields: [job_id], references: [id], onDelete: Cascade)
   rounds      interview_rounds[]
   activity    activity_logs[]
   messages    messages[]
   applications applications[]
+=======
+  job               job_descriptions    @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  rounds            interview_rounds[]
+  activity          activity_logs[]
+  messages          messages[]
+  applications      applications[]
+>>>>>>> Signup
   outreach_messages outreach_messages[]
 
   @@index([job_id], name: "idx_candidates_job_id")
 }
 
 model interview_rounds {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   candidate_id String
   job_id       String
   round_type   String
   scheduled_at DateTime?
-  status       String   @default("pending")
+  status       String    @default("pending")
   result       String?
   feedback     String?
   meeting_link String?
-  created_at   DateTime @default(now())
-  updated_at   DateTime @default(now())
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now())
 
   candidate candidates       @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
   job       job_descriptions @relation("job_rounds", fields: [job_id], references: [id], onDelete: Cascade)
@@ -198,17 +218,17 @@ model messages {
 
 // User model for OTP-based authentication
 model User {
-  id                String   @id @default(cuid())
-  email             String?  @unique
-  phone             String?  @unique
-  verified          Boolean  @default(false)
+  id                String    @id @default(cuid())
+  email             String?   @unique
+  phone             String?   @unique
+  verified          Boolean   @default(false)
   otpHash           String?
   otpExpiresAt      DateTime?
   passwordHash      String?
-  failedOtpAttempts Int      @default(0)
+  failedOtpAttempts Int       @default(0)
   lockUntil         DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@index([email, phone])
   @@map("users_auth")
@@ -225,106 +245,116 @@ model email_otps {
 
 // Subscriptions & billing
 model subscriptions {
-  id              String   @id @default(uuid())
-  company_id      String
-  plan            String   @default("base") // base
-  addons          String   @default("[]")
-  period          String   @default("monthly") // monthly, annual
-  status          String   @default("active") // active, past_due, canceled
+  id                   String   @id @default(uuid())
+  company_id           String
+  plan                 String   @default("base") // base
+  addons               String   @default("[]")
+  period               String   @default("monthly") // monthly, annual
+  status               String   @default("active") // active, past_due, canceled
   current_period_start DateTime @default(now())
   current_period_end   DateTime @default(now())
-  created_at      DateTime @default(now())
-  updated_at      DateTime @default(now())
+  created_at           DateTime @default(now())
+  updated_at           DateTime @default(now())
 
   company companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
 }
 
 // Applications per candidate per JD
 model applications {
-  id            String   @id @default(uuid())
-  candidate_id  String
-  jd_id         String
-  answers_json  String   @default("{}")
-  cv_url        String?
+  id              String   @id @default(uuid())
+  candidate_id    String
+  jd_id           String
+  answers_json    String   @default("{}")
+  cv_url          String?
   screening_score Int?
-  consent_flags String   @default("{}")
-  status        String   @default("submitted") // submitted, auto_rejected, invited, completed, reviewed
-  created_at    DateTime @default(now())
-  updated_at    DateTime @default(now())
+  consent_flags   String   @default("{}")
+  status          String   @default("submitted") // submitted, auto_rejected, invited, completed, reviewed
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
 
   candidate candidates       @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
   jd        job_descriptions @relation("job_applications", fields: [jd_id], references: [id], onDelete: Cascade)
 
-  @@index([jd_id], name: "idx_applications_jd_id")
-
   interviews interviews[]
+
+  @@index([jd_id], name: "idx_applications_jd_id")
 }
 
 // Interviews linked to an application
 model interviews {
-  id               String   @id @default(uuid())
-  application_id   String
-  agent_id         String?
+  id                String    @id @default(uuid())
+  application_id    String
+  agent_id          String?
   invite_expires_at DateTime?
-  started_at       DateTime?
-  completed_at     DateTime?
-  score            Int?
-  rubric_json      String   @default("{}")
-  transcript_url   String?
-  recording_url    String?
-  created_at       DateTime @default(now())
-  updated_at       DateTime @default(now())
+  started_at        DateTime?
+  completed_at      DateTime?
+  score             Int?
+  rubric_json       String    @default("{}")
+  transcript_url    String?
+  recording_url     String?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @default(now())
 
   application applications @relation(fields: [application_id], references: [id], onDelete: Cascade)
 }
 
 // Job Distribution postings
 model postings {
-  id            String   @id @default(uuid())
-  company_id    String
-  jd_id         String
-  board         String
+  id              String   @id @default(uuid())
+  company_id      String
+  jd_id           String
+  board           String
   external_job_id String?
-  status        String   @default("queued") // queued, posted, error
-  logs          String   @default("[]")
-  created_at    DateTime @default(now())
-  updated_at    DateTime @default(now())
+  status          String   @default("queued") // queued, posted, error
+  logs            String   @default("[]")
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
 
+<<<<<<< HEAD
   company companies       @relation(fields: [company_id], references: [id], onDelete: Cascade)
   jd      job_descriptions @relation("job_postings", fields: [jd_id], references: [id], onDelete: Cascade)
+=======
+  company companies        @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  jd      job_descriptions @relation(fields: [jd_id], references: [id], onDelete: Cascade)
+>>>>>>> Signup
 
   @@index([jd_id], name: "idx_postings_jd_id")
 }
 
 // Sourcing jobs
 model sourcing_jobs {
-  id         String   @id @default(uuid())
-  company_id String
-  jd_id      String
-  status     String   @default("queued")
-  filters_json String @default("{}")
-  stats_json   String @default("{}")
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  id           String   @id @default(uuid())
+  company_id   String
+  jd_id        String
+  status       String   @default("queued")
+  filters_json String   @default("{}")
+  stats_json   String   @default("{}")
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
 
+<<<<<<< HEAD
   company companies       @relation(fields: [company_id], references: [id], onDelete: Cascade)
   jd      job_descriptions @relation("job_sourcing_jobs", fields: [jd_id], references: [id], onDelete: Cascade)
+=======
+  company companies        @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  jd      job_descriptions @relation(fields: [jd_id], references: [id], onDelete: Cascade)
+>>>>>>> Signup
 
   prospects prospects[]
 }
 
 // Prospects discovered via sourcing
 model prospects {
-  id               String   @id @default(uuid())
-  sourcing_job_id  String
-  person_id        String?
-  name             String?
-  email            String?
-  phone            String?
-  matched_score    Int?
-  consent_flags    String   @default("{}")
-  created_at       DateTime @default(now())
-  updated_at       DateTime @default(now())
+  id              String   @id @default(uuid())
+  sourcing_job_id String
+  person_id       String?
+  name            String?
+  email           String?
+  phone           String?
+  matched_score   Int?
+  consent_flags   String   @default("{}")
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
 
   sourcing_job sourcing_jobs @relation(fields: [sourcing_job_id], references: [id], onDelete: Cascade)
 
@@ -333,19 +363,19 @@ model prospects {
 
 // Outreach messages (email/SMS/LinkedIn)
 model outreach_messages {
-  id            String   @id @default(uuid())
-  company_id    String
-  prospect_id   String?
-  candidate_id  String?
-  channel       String
-  template_id   String?
-  status        String   @default("queued")
-  sent_at       DateTime?
-  meta          String   @default("{}")
-  created_at    DateTime @default(now())
+  id           String    @id @default(uuid())
+  company_id   String
+  prospect_id  String?
+  candidate_id String?
+  channel      String
+  template_id  String?
+  status       String    @default("queued")
+  sent_at      DateTime?
+  meta         String    @default("{}")
+  created_at   DateTime  @default(now())
 
-  company   companies  @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  prospect  prospects? @relation(fields: [prospect_id], references: [id])
+  company   companies   @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  prospect  prospects?  @relation(fields: [prospect_id], references: [id])
   candidate candidates? @relation(fields: [candidate_id], references: [id])
 }
 
@@ -365,7 +395,7 @@ model webhooks {
 model suppression_list {
   id         String   @id @default(uuid())
   company_id String
-  channel    String   // email or sms
+  channel    String // email or sms
   value      String
   reason     String?
   created_at DateTime @default(now())
