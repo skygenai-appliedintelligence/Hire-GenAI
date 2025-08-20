@@ -27,7 +27,7 @@ export function SignupModal({ open, onClose }: SignupModalProps) {
   const [countdown, setCountdown] = useState(0)
   const router = useRouter()
   const { toast } = useToast()
-  const { signInWithEmail } = useAuth()
+  const { setAuthSession } = useAuth() as any
 
   useEffect(() => {
     if (countdown > 0) {
@@ -81,13 +81,14 @@ export function SignupModal({ open, onClose }: SignupModalProps) {
       const data = await res.json()
       if (!res.ok || !data.ok) throw new Error(data.error || "Failed to verify OTP")
 
-      // Update client session
-      const result = await signInWithEmail(formData.email)
-      if (result.error) throw new Error(result.error.message)
+      // Set client session directly in context (avoid second verify)
+      if (data.user && data.company) {
+        setAuthSession(data.user, data.company)
+      }
 
       toast({ title: "Account created", description: "Welcome to HireGenAI" })
-        onClose()
-        router.push("/dashboard")
+      onClose()
+      router.push("/dashboard")
     } catch (err: any) {
       toast({ title: "Error", description: err?.message || "Failed to verify OTP", variant: "destructive" })
     } finally {

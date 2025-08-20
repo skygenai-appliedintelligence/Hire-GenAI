@@ -3,8 +3,9 @@ import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CompanyPublicPage({ params }: { params: { companySlug: string } }) {
-  const company = await prisma.companies.findFirst({ where: { slug: params.companySlug } })
+export default async function CompanyPublicPage({ params }: { params: Promise<{ companySlug: string }> }) {
+  const { companySlug } = await params
+  const company = await prisma.companies.findFirst({ where: { slug: companySlug } })
   if (!company) {
     return (
       <div className="max-w-3xl mx-auto py-12">

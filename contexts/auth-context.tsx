@@ -24,6 +24,7 @@ interface AuthContextType {
   user: User | null
   company: Company | null
   loading: boolean
+  signIn: (email: string, password: string) => Promise<{ error?: { message: string } }>
   signInWithEmail: (email: string) => Promise<{ error?: { message: string } }>
   signUp: (
     email: string,
@@ -32,6 +33,7 @@ interface AuthContextType {
     fullName: string,
   ) => Promise<{ error?: { message: string } }>
   signOut: () => Promise<void>
+  setAuthSession: (user: User, company: Company) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -73,6 +75,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
 
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      setLoading(true)
+      const result = await MockAuthService.signIn(email, password)
+      if (result.error) {
+        return { error: result.error }
+      }
+      const currentUser = MockAuthService.getCurrentUser()
+      if (currentUser) {
+        setUser(currentUser.user)
+        setCompany(currentUser.company)
+      }
+      return {}
+    } catch (error) {
+      return { error: { message: "An unexpected error occurred" } }
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const signUp = async (email: string, password: string, companyName: string, fullName: string) => {
     try {
@@ -141,13 +163,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Allow setting session directly from server response (e.g., OTP verify)
+  const setAuthSession = (userObj: User, companyObj: Company) => {
+    try {
+      MockAuthService.setSessionFromServer(userObj, companyObj)
+      setUser(userObj)
+      setCompany(companyObj)
+    } catch (e) {
+      console.error("Failed to set auth session:", e)
+    }
+  }
+
   const value: AuthContextType = {
     user,
     company,
     loading,
+    signIn,
     signInWithEmail,
     signUp,
     signOut,
+    setAuthSession,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
