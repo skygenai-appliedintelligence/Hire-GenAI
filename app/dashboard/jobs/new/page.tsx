@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,9 +13,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Building2, MapPin, DollarSign, Clock, Users, Briefcase, Target, CheckCircle } from 'lucide-react'
+import { useAuth } from "@/contexts/auth-context"
 
 export default function CreateJobPage() {
   const router = useRouter()
+  const { company } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentTab, setCurrentTab] = useState("basic")
   
@@ -25,8 +27,8 @@ export default function CreateJobPage() {
     jobTitle: "",
     company: "",
     location: "",
-    jobType: "",
-    experienceLevel: "",
+    jobType: "full-time",
+    experienceLevel: "entry",
     
     // Job Details
     description: "",
@@ -42,6 +44,13 @@ export default function CreateJobPage() {
     // Platform Selection
     platforms: [] as string[],
   })
+
+  // Auto-fill company from auth context
+  useEffect(() => {
+    if (company?.name) {
+      setFormData(prev => ({ ...prev, company: company.name }))
+    }
+  }, [company?.name])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -71,7 +80,7 @@ export default function CreateJobPage() {
         throw new Error(data?.error || 'Failed to create job')
       }
 
-      // Store minimal info for downstream pages (existing flow expectation)
+      // Store minimal info for downstream pages
       const jobData = {
         ...formData,
         id: data.jobId,
@@ -80,7 +89,13 @@ export default function CreateJobPage() {
       localStorage.setItem('newJobData', JSON.stringify(jobData))
       localStorage.setItem('selectedInterviewRounds', JSON.stringify(formData.interviewRounds))
 
-      router.push('/dashboard/agents/create?from=job-creation')
+      // Derive selectedAgents from the number of selected interview rounds
+      const agentsCount = Array.isArray(formData.interviewRounds) ? formData.interviewRounds.length : 0
+      const selectedAgents = Array.from({ length: agentsCount }, (_, i) => i + 1) // [1,2,3,...]
+      localStorage.setItem('selectedAgents', JSON.stringify(selectedAgents))
+
+      // Redirect to the Selected Agents page
+      router.push('/selected-agents')
     } catch (error) {
       console.error('Error creating job:', error)
     } finally {
@@ -155,10 +170,10 @@ export default function CreateJobPage() {
                     <Label htmlFor="company">Company *</Label>
                     <Input
                       id="company"
-                      placeholder="e.g. TechCorp Inc."
                       value={formData.company}
-                      onChange={(e) => handleInputChange('company', e.target.value)}
-                      required
+                      placeholder={company?.name || 'Loading company...'}
+                      disabled
+                      readOnly
                     />
                   </div>
                 </div>
@@ -396,7 +411,15 @@ export default function CreateJobPage() {
             </Button>
             <Button 
               type="submit" 
-              disabled={isSubmitting || !formData.jobTitle || !formData.company || formData.interviewRounds.length === 0}
+              disabled={
+                isSubmitting ||
+                !formData.jobTitle ||
+                !company?.name ||
+                !formData.location ||
+                !formData.jobType ||
+                !formData.experienceLevel ||
+                formData.interviewRounds.length === 0
+              }
               className="min-w-[200px]"
             >
               {isSubmitting ? (

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -9,6 +10,7 @@ type CreateJobBody = {
   company: string
   location?: string
   jobType?: string
+  experienceLevel?: string
   description: string
   requirements: string
   responsibilities?: string
@@ -19,6 +21,30 @@ type CreateJobBody = {
   visaSponsorship?: boolean
   mustHaveSkills?: string[]
   niceToHaveSkills?: string[]
+  // From form
+  interviewRounds?: string[]
+  interviewDuration?: string
+  platforms?: string[]
+}
+
+function normalizeJobType(value?: string | null): 'full_time' | 'part_time' | 'contract' | 'freelance' | null {
+  if (!value) return null
+  const v = value.toLowerCase().replace(/[-\s]+/g, '_')
+  if (['full_time', 'fulltime'].includes(v)) return 'full_time'
+  if (['part_time', 'parttime'].includes(v)) return 'part_time'
+  if (['contract', 'contractor'].includes(v)) return 'contract'
+  if (['freelance', 'freelancer'].includes(v)) return 'freelance'
+  return null
+}
+
+function normalizeExperience(value?: string | null): 'entry' | 'mid' | 'senior' | 'lead' | null {
+  if (!value) return null
+  const v = value.toLowerCase().replace(/[-\s]+/g, '_')
+  if (['entry', 'junior', 'new_grad', 'newgrad', 'entry_level'].includes(v)) return 'entry'
+  if (['mid', 'mid_level', 'intermediate'].includes(v)) return 'mid'
+  if (['senior', 'sr', 'senior_level'].includes(v)) return 'senior'
+  if (['lead', 'staff', 'principal'].includes(v)) return 'lead'
+  return null
 }
 
 function slugify(text: string): string {
@@ -31,64 +57,72 @@ function slugify(text: string): string {
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as CreateJobBody
-    if (!body || !body.jobTitle || !body.company || !body.description || !body.requirements) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    const raw = (await req.json()) as CreateJobBody | null
+    if (!raw) return NextResponse.json({ error: 'Missing request body' }, { status: 400 })
+
+    // Trim key fields to avoid whitespace-only inputs passing checks
+    const body: CreateJobBody = {
+      ...raw,
+      jobTitle: (raw.jobTitle || '').trim(),
+      company: (raw.company || '').trim(),
+      description: (raw.description || '').trim(),
+      requirements: (raw.requirements || '').trim(),
+      experienceLevel: (raw.experienceLevel || '').trim(),
     }
 
-    // Ensure company exists (create if missing)
-    const companyName = body.company.trim()
-    const companySlug = slugify(companyName) || `company-${Date.now()}`
-    const placeholderEmail = `${companySlug}+${Date.now()}@example.com`
-
-    let company = await prisma.companies.findFirst({ where: { name: companyName } })
-    if (!company) {
-      company = await prisma.companies.create({
-        data: {
-          name: companyName,
-          slug: companySlug,
-          email: placeholderEmail,
-          logo_url: null,
-          subscription_plan: 'basic',
-        },
-      })
+    const missing: string[] = []
+    if (!body.jobTitle) missing.push('jobTitle')
+    if (!body.company) missing.push('company')
+    if (!raw.location || !raw.location.trim()) missing.push('location')
+    if (!raw.jobType || !raw.jobType.trim()) missing.push('jobType')
+    if (!body.experienceLevel) missing.push('experienceLevel')
+    if (!body.description) missing.push('description')
+    if (!body.requirements) missing.push('requirements')
+    if (missing.length) {
+      return NextResponse.json({ error: `Missing required fields: ${missing.join(', ')}` }, { status: 400 })
     }
 
-    // Defaults for required JSON columns in DB
-    const screeningQuestions = {}
-    const hiringTeam = {}
-    const targetDates = {}
+    // Map form values to match enum types
+    const employment = normalizeJobType(raw.jobType)
+    const expLevel = normalizeExperience(body.experienceLevel)
 
-    const jobSlugBase = slugify(body.jobTitle)
-    const jobSlug = jobSlugBase ? `${jobSlugBase}-${Date.now().toString(36).slice(-5)}` : `job-${Date.now()}`
+    const insertResult = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+      INSERT INTO public.job_descriptions (
+        title,
+        company_name,
+        location,
+        employment_type,
+        experience_level,
+        summary,
+        requirements,
+        responsibilities,
+        benefits,
+        salary_label,
+        interview_rounds,
+        interview_duration,
+        platforms,
+        created_by
+      ) VALUES (
+        ${body.jobTitle},
+        ${body.company},
+        ${raw.location?.trim() || ''},
+        CAST(${employment} AS job_type),
+        CAST(${expLevel} AS experience_level),
+        ${body.description},
+        ${body.requirements},
+        ${body.responsibilities || null},
+        ${body.benefits || null},
+        ${body.salaryRange || null},
+        ${Array.isArray(body.interviewRounds) ? body.interviewRounds : []},
+        ${body.interviewDuration || null},
+        ${Array.isArray(body.platforms) ? body.platforms : []},
+        ${null}
+      )
+      RETURNING id;
+    `)
 
-    const job = await prisma.job_descriptions.create({
-      data: {
-        company_id: company.id,
-        title: body.jobTitle,
-        slug: jobSlug,
-        description: body.description,
-        requirements: body.requirements || null,
-        responsibilities: body.responsibilities || null,
-        benefits: body.benefits || null,
-        location: body.location || null,
-        salary_range: body.salaryRange || null,
-        employment_type: body.jobType || null,
-        status: 'open',
-        visibility: 'public',
-        department: body.department || null,
-        is_remote: body.isRemote ?? false,
-        visa_sponsorship: body.visaSponsorship ?? false,
-        must_have_skills: Array.isArray(body.mustHaveSkills) ? body.mustHaveSkills : undefined,
-        nice_to_have_skills: Array.isArray(body.niceToHaveSkills) ? body.niceToHaveSkills : undefined,
-        screening_questions: screeningQuestions as any,
-        hiring_team: hiringTeam as any,
-        target_dates: targetDates as any,
-        created_by: null,
-      },
-    })
-
-    return NextResponse.json({ ok: true, jobId: job.id })
+    const newId = insertResult?.[0]?.id
+    return NextResponse.json({ ok: true, jobId: newId })
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err?.message ?? 'unknown' }, { status: 500 })
   }
@@ -99,18 +133,32 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const companyName = searchParams.get('company')?.trim()
 
-    let companyId: string | null = null
-    if (companyName) {
-      const company = await prisma.companies.findFirst({ where: { name: companyName } })
-      companyId = company?.id ?? null
-    }
+    // Read from the new public.job_descriptions table
+    const rows = await prisma.$queryRaw<any[]>(Prisma.sql`
+      SELECT id,
+             title,
+             company_name,
+             location,
+             employment_type::text AS employment_type,
+             experience_level::text AS experience_level,
+             summary,
+             requirements,
+             responsibilities,
+             benefits,
+             salary_label,
+             interview_rounds,
+             interview_duration,
+             platforms,
+             created_by,
+             created_at,
+             updated_at
+        FROM public.job_descriptions
+       ${companyName ? Prisma.sql`WHERE company_name = ${companyName}` : Prisma.empty}
+       ORDER BY created_at DESC
+       LIMIT 200
+    `)
 
-    const jobs = await prisma.job_descriptions.findMany({
-      where: companyId ? { company_id: companyId } : undefined,
-      orderBy: { created_at: 'desc' },
-    })
-
-    return NextResponse.json({ ok: true, jobs })
+    return NextResponse.json({ ok: true, jobs: rows })
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err?.message ?? 'unknown' }, { status: 500 })
   }

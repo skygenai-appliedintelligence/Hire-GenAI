@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -14,10 +15,13 @@ export default async function CompanyPublicPage({ params }: { params: Promise<{ 
     )
   }
 
-  const jobs = await prisma.job_descriptions.findMany({
-    where: { company_id: company.id, OR: [{ status: 'active' }, { status: 'open' }] },
-    orderBy: { created_at: 'desc' },
-  })
+  const jobs = await prisma.$queryRaw<any[]>(Prisma.sql`
+    SELECT id, title, location
+      FROM public.job_descriptions
+     WHERE company_name = ${company.name}
+     ORDER BY created_at DESC
+     LIMIT 100
+  `)
 
   return (
     <div className="max-w-4xl mx-auto py-12 px-4 space-y-6">
