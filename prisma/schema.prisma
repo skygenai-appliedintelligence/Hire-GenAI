@@ -88,17 +88,6 @@ model job_descriptions {
   created_at                  DateTime  @default(now())
   updated_at                  DateTime  @default(now())
 
-<<<<<<< HEAD
-  company     companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  creator     users?    @relation("created_by_user", fields: [created_by], references: [id])
-  activity    activity_logs[]     @relation("job_activity")
-  candidates  candidates[]        @relation("job_candidates")
-  rounds      interview_rounds[]  @relation("job_rounds")
-  messages    messages[]          @relation("job_messages")
-  applications applications[]     @relation("job_applications")
-  postings    postings[]          @relation("job_postings")
-  sourcing    sourcing_jobs[]     @relation("job_sourcing_jobs")
-=======
   company       companies          @relation(fields: [company_id], references: [id], onDelete: Cascade)
   creator       users?             @relation("created_by_user", fields: [created_by], references: [id])
   activity      activity_logs[]
@@ -108,7 +97,6 @@ model job_descriptions {
   postings      postings[]
   sourcing_jobs sourcing_jobs[]
   messages      messages[]
->>>>>>> Signup
 
   @@unique([company_id, slug], name: "uq_jd_company_slug")
   @@index([company_id], name: "idx_job_descriptions_company_id")
@@ -131,19 +119,11 @@ model candidates {
   created_at           DateTime @default(now())
   updated_at           DateTime @default(now())
 
-<<<<<<< HEAD
-  job         job_descriptions @relation("job_candidates", fields: [job_id], references: [id], onDelete: Cascade)
-  rounds      interview_rounds[]
-  activity    activity_logs[]
-  messages    messages[]
-  applications applications[]
-=======
   job               job_descriptions    @relation(fields: [job_id], references: [id], onDelete: Cascade)
   rounds            interview_rounds[]
   activity          activity_logs[]
   messages          messages[]
   applications      applications[]
->>>>>>> Signup
   outreach_messages outreach_messages[]
 
   @@index([job_id], name: "idx_candidates_job_id")
@@ -310,13 +290,8 @@ model postings {
   created_at      DateTime @default(now())
   updated_at      DateTime @default(now())
 
-<<<<<<< HEAD
-  company companies       @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  jd      job_descriptions @relation("job_postings", fields: [jd_id], references: [id], onDelete: Cascade)
-=======
   company companies        @relation(fields: [company_id], references: [id], onDelete: Cascade)
   jd      job_descriptions @relation(fields: [jd_id], references: [id], onDelete: Cascade)
->>>>>>> Signup
 
   @@index([jd_id], name: "idx_postings_jd_id")
 }
@@ -332,13 +307,8 @@ model sourcing_jobs {
   created_at   DateTime @default(now())
   updated_at   DateTime @default(now())
 
-<<<<<<< HEAD
-  company companies       @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  jd      job_descriptions @relation("job_sourcing_jobs", fields: [jd_id], references: [id], onDelete: Cascade)
-=======
   company companies        @relation(fields: [company_id], references: [id], onDelete: Cascade)
   jd      job_descriptions @relation(fields: [jd_id], references: [id], onDelete: Cascade)
->>>>>>> Signup
 
   prospects prospects[]
 }
