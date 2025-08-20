@@ -241,6 +241,58 @@ The platform uses mock authentication for demo purposes. In production, you can 
 
 This project is licensed under the MIT License.
 
+## 🛠️ Git Workflow Summary
+
+You now have:
+
+- CreateBranch — create/switch branch
+- CheckInToGithub — commit + push
+- MergeToMain — merge feature -> main
+- UpdateFromMain — bring main -> feature
+- ReleaseToMain — merge to main + tag (+ optional push)
+- RollbackRelease — delete release tag and optionally revert the merge on main
+
+### Examples
+
+- CreateBranch
+  ```powershell
+  CreateBranch "Signup"
+  # or
+  .\CreateBranch.ps1 "feature/login-flow"
+  ```
+
+- CheckInToGithub
+  ```powershell
+  CheckInToGithub "Initial commit"
+  CheckInToGithub "Fix tests" -NoVerify -Force
+  ```
+
+- MergeToMain
+  ```powershell
+  MergeToMain "Signup"
+  MergeToMain "Signup" -NoFF -Push
+  ```
+
+- UpdateFromMain
+  ```powershell
+  UpdateFromMain                 # merge main into current branch
+  UpdateFromMain "Signup" -Rebase -Push
+  ```
+
+- ReleaseToMain
+  ```powershell
+  ReleaseToMain "Signup"                    # timestamp tag
+  ReleaseToMain "Signup" -UsePackageVersion -Push
+  ReleaseToMain "Signup" -Tag v1.2.3 -NoFF -Push
+  ```
+
+- RollbackRelease
+  ```powershell
+  RollbackRelease -Tag v1.2.3
+  RollbackRelease -Tag v1.2.3 -DeleteRemote
+  RollbackRelease -Tag v1.2.3 -RevertMerge -Push
+  ```
+
 ## 🆘 Support
 
 - **Documentation**: See `SETUP.md` for detailed setup instructions
