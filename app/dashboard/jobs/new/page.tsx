@@ -17,7 +17,7 @@ import { useAuth } from "@/contexts/auth-context"
 
 export default function CreateJobPage() {
   const router = useRouter()
-  const { company } = useAuth()
+  const { company, user } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentTab, setCurrentTab] = useState("basic")
   
@@ -73,7 +73,10 @@ export default function CreateJobPage() {
       const res = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          createdBy: user?.id || null,
+        }),
       })
       const data = await res.json()
       if (!res.ok || !data?.ok) {
