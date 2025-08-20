@@ -14,12 +14,12 @@ import { useToast } from "@/hooks/use-toast"
 import { User, Building, Bell, Shield, CreditCard, Users as UsersIcon, Plus, Trash } from "lucide-react"
 
 export default function SettingsPage() {
-  const { user, company } = useAuth()
+  const { user, company, setAuthSession } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
 
   const [profileData, setProfileData] = useState({
-    name: user?.email?.split("@")[0] || "",
+    name: user?.name || user?.email?.split("@")[0] || "",
     email: user?.email || "",
     phone: "",
     timezone: "UTC",
@@ -27,9 +27,9 @@ export default function SettingsPage() {
 
   const [companyData, setCompanyData] = useState({
     name: company?.name || "",
-    website: "",
-    industry: "",
-    size: "",
+    website: company?.website || "",
+    industry: company?.industry || "",
+    size: company?.size || "",
     description: "",
   })
 
@@ -64,6 +64,25 @@ export default function SettingsPage() {
     loadMembers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [company?.id])
+
+  // Sync form state when auth context changes
+  useEffect(() => {
+    setProfileData((prev) => ({
+      ...prev,
+      name: user?.name || user?.email?.split("@")[0] || "",
+      email: user?.email || "",
+    }))
+  }, [user?.id, user?.name, user?.email])
+
+  useEffect(() => {
+    setCompanyData((prev) => ({
+      ...prev,
+      name: company?.name || "",
+      website: company?.website || "",
+      industry: company?.industry || "",
+      size: company?.size || "",
+    }))
+  }, [company?.id, company?.name, company?.website, company?.industry, company?.size])
 
   const addMember = async () => {
     if (!company?.id || !newMember.email) return
@@ -138,39 +157,56 @@ export default function SettingsPage() {
   }
 
   const handleSaveProfile = async () => {
+    if (!user?.id) return
     setLoading(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      toast({
-        title: "Success",
-        description: "Profile updated successfully",
+      const res = await fetch('/api/settings/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, name: profileData.name }),
       })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update profile",
-        variant: "destructive",
-      })
+      const data = await res.json()
+      if (!res.ok || !data.ok) throw new Error(typeof data.error === 'string' ? data.error : (data.error?.message || 'Failed'))
+
+      // Update auth session locally
+      setAuthSession(
+        { ...(user as any), name: data.user?.name ?? profileData.name },
+        (company as any)
+      )
+
+      toast({ title: 'Success', description: 'Profile updated successfully' })
+    } catch (error: any) {
+      toast({ title: 'Error', description: error?.message || 'Failed to update profile', variant: 'destructive' })
     } finally {
       setLoading(false)
     }
   }
 
   const handleSaveCompany = async () => {
+    if (!company?.id) return
     setLoading(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      toast({
-        title: "Success",
-        description: "Company information updated successfully",
+      const payload = {
+        companyId: company.id,
+        name: companyData.name,
+        website: companyData.website,
+        industry: companyData.industry,
+        size: companyData.size,
+      }
+      const res = await fetch('/api/settings/company', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update company information",
-        variant: "destructive",
-      })
+      const data = await res.json()
+      if (!res.ok || !data.ok) throw new Error(typeof data.error === 'string' ? data.error : (data.error?.message || 'Failed'))
+
+      // Update auth session locally with new company values
+      setAuthSession((user as any), { ...(company as any), ...data.company })
+
+      toast({ title: 'Success', description: 'Company information updated successfully' })
+    } catch (error: any) {
+      toast({ title: 'Error', description: error?.message || 'Failed to update company information', variant: 'destructive' })
     } finally {
       setLoading(false)
     }

@@ -9,15 +9,16 @@ type CreateJobBody = {
   company: string
   location?: string
   jobType?: string
-  experienceLevel?: string
   description: string
   requirements: string
   responsibilities?: string
   benefits?: string
   salaryRange?: string
-  interviewRounds?: string[]
-  interviewDuration?: string
-  platforms?: string[]
+  department?: string
+  isRemote?: boolean
+  visaSponsorship?: boolean
+  mustHaveSkills?: string[]
+  niceToHaveSkills?: string[]
 }
 
 function slugify(text: string): string {
@@ -53,8 +54,10 @@ export async function POST(req: Request) {
       })
     }
 
-    const postedPlatforms = Array.isArray(body.platforms) ? body.platforms : []
-    const interviewRoundsCount = Array.isArray(body.interviewRounds) ? body.interviewRounds.length : undefined
+    // Defaults for required JSON columns in DB
+    const screeningQuestions = {}
+    const hiringTeam = {}
+    const targetDates = {}
 
     const jobSlugBase = slugify(body.jobTitle)
     const jobSlug = jobSlugBase ? `${jobSlugBase}-${Date.now().toString(36).slice(-5)}` : `job-${Date.now()}`
@@ -66,14 +69,21 @@ export async function POST(req: Request) {
         slug: jobSlug,
         description: body.description,
         requirements: body.requirements || null,
+        responsibilities: body.responsibilities || null,
+        benefits: body.benefits || null,
         location: body.location || null,
         salary_range: body.salaryRange || null,
         employment_type: body.jobType || null,
         status: 'open',
-        posted_platforms: JSON.stringify(postedPlatforms),
-        platform_job_ids: '{}',
-        posting_results: '[]',
-        interview_rounds: interviewRoundsCount ?? 3,
+        visibility: 'public',
+        department: body.department || null,
+        is_remote: body.isRemote ?? false,
+        visa_sponsorship: body.visaSponsorship ?? false,
+        must_have_skills: Array.isArray(body.mustHaveSkills) ? body.mustHaveSkills : undefined,
+        nice_to_have_skills: Array.isArray(body.niceToHaveSkills) ? body.niceToHaveSkills : undefined,
+        screening_questions: screeningQuestions as any,
+        hiring_team: hiringTeam as any,
+        target_dates: targetDates as any,
         created_by: null,
       },
     })

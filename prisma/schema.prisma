@@ -66,30 +66,35 @@ model job_descriptions {
   slug             String
   description      String
   requirements     String?
+  responsibilities String?
+  benefits         String?
   location         String?
   salary_range     String?
   employment_type  String?
   status           String   @default("open") // open, on-hold, closed, cancelled
-  posted_platforms String   @default("[]")
-  platform_job_ids String   @default("{}")
-  posting_results  String   @default("[]")
-  interview_rounds Int      @default(3)
+  visibility       String   @map("visibility") @default("public")
+  department       String?  @map("department")
+  is_remote        Boolean  @map("is_remote") @default(false)
+  visa_sponsorship Boolean  @map("visa_sponsorship") @default(false)
+  must_have_skills String[] @map("must_have_skills")
+  nice_to_have_skills String[] @map("nice_to_have_skills")
+  screening_questions Json  @map("screening_questions")
+  hiring_team      Json     @map("hiring_team")
+  target_dates     Json     @map("target_dates")
+  work_eligibility String?  @map("work_eligibility")
+  equal_opportunity_statement String? @map("equal_opportunity_statement")
+  apply_deadline   DateTime? @map("apply_deadline")
   created_by       String?
   created_at       DateTime @default(now())
   updated_at       DateTime @default(now())
 
   company     companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
   creator     users?    @relation("created_by_user", fields: [created_by], references: [id])
-  candidates  candidates[]
-  rounds      interview_rounds[]
   activity    activity_logs[]
-  messages    messages[]
-  applications applications[]
-  postings    postings[]
-  sourcing    sourcing_jobs[]
 
   @@index([company_id], name: "idx_job_descriptions_company_id")
   @@unique([company_id, slug], name: "uq_jd_company_slug")
+  @@map("jds")
 }
 
 model candidates {
