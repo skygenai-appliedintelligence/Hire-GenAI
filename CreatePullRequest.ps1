@@ -83,7 +83,7 @@ function Get-RepoPathFromOrigin($url) {
 }
 $repoPath = Get-RepoPathFromOrigin $originUrl
 if (-not $repoPath) { Write-Err "Could not parse GitHub repository from origin URL."; exit 1 }
-$compareUrl = "https://github.com/$repoPath/compare/$Base...$Head?expand=1"
+$compareUrl = "https://github.com/$repoPath/compare/${Base}...${Head}?expand=1"
 Write-Info "Open this URL to create the PR:"
 Write-Host $compareUrl
 if ($Open) {
