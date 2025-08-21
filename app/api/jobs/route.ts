@@ -117,7 +117,7 @@ export async function POST(req: Request) {
         ${Array.isArray(body.interviewRounds) ? body.interviewRounds : []},
         ${body.interviewDuration || null},
         ${Array.isArray(body.platforms) ? body.platforms : []},
-        ${body.createdBy || null}
+        CAST(${body.createdBy ?? null} AS uuid)
       )
       RETURNING id;
     `)
