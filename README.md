@@ -249,6 +249,7 @@ You now have:
 - SwitchBranch — switch to an existing branch
 - WhichBranchIamIn — print current branch, tracking remote, and dirty status
 - CheckInToGithub — commit + push
+- CreatePullRequest — open/create a GitHub Pull Request for the current branch
 - MergeToMain — merge feature -> main
 - UpdateFromMain — bring main -> feature
 - 7ReleaseToMain — merge to main + tag (+ optional push)
@@ -260,9 +261,10 @@ You now have:
 2. **SwitchBranch**: Move between branches as needed.
 3. Code, commit locally using your IDE or with **CheckInToGithub**.
 4. Periodically **UpdateFromMain** to get latest `main` into your feature branch (reduce merge conflicts).
-5. When feature is ready, **MergeToMain** (optionally `-NoFF`) and push.
-6. If you need a tagged release, run **ReleaseToMain** (choose tag strategy and push).
-7. If a release must be undone, use **RollbackRelease** (delete tag and optionally revert merge).
+5. When feature is ready, create a Pull Request with **CreatePullRequest** (opens browser or uses GitHub CLI).
+6. After review and approval, you can merge via GitHub UI; or locally with **MergeToMain** (optionally `-NoFF`) and push.
+7. If you need a tagged release, run **ReleaseToMain** (choose tag strategy and push).
+8. If a release must be undone, use **RollbackRelease** (delete tag and optionally revert merge).
 
 Why this order?
 - **Stability**: Working off a feature branch isolates changes from `main`.
@@ -295,6 +297,16 @@ Why this order?
   - Use when: Saving progress or sharing work.
   - Why: Standardizes push flow; supports flags like `-NoVerify`.
   - Example: `./CheckInToGithub.cmd "Fix tests"`
+
+- **CreatePullRequest** (`CreatePullRequest.ps1/.cmd`)
+  - Purpose: Create or open a GitHub Pull Request for the current branch against `main` (or custom base).
+  - Use when: You've pushed your feature branch and want to start code review.
+  - Why: Automates the "Compare & pull request" and "Create pull request" steps. Uses GitHub CLI if available, otherwise opens the compare URL in your browser.
+  - Examples:
+    - `./CreatePullRequest.ps1` (auto-detects head branch, base=main)
+    - `./CreatePullRequest.ps1 -Base main -Title "Add JD" -Body "New job description flow" -Open`
+    - `./CreatePullRequest.ps1 -Draft -Reviewers "alice,bob" -Labels "feature,backend"`
+    - CMD wrapper: `./CreatePullRequest.cmd -Open`
 
 - **UpdateFromMain** (`UpdateFromMain.ps1/.cmd`)
   - Purpose: Bring the latest `main` into your current branch (merge or rebase).
