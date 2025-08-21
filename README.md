@@ -252,7 +252,7 @@ You now have:
 - CreatePullRequest — open/create a GitHub Pull Request for the current branch
 - MergeToMain — merge feature -> main
 - UpdateFromMain — bring main -> feature
-- 7ReleaseToMain — merge to main + tag (+ optional push)
+- ReleaseToMain — merge to main + tag (+ optional push)
 - RollbackRelease — delete release tag and optionally revert the merge on main
 
 ### Recommended Git workflow sequence (feature lifecycle)
@@ -263,7 +263,7 @@ You now have:
 4. Periodically **UpdateFromMain** to get latest `main` into your feature branch (reduce merge conflicts).
 5. When feature is ready, create a Pull Request with **CreatePullRequest** (opens browser or uses GitHub CLI).
 6. After review and approval, you can merge via GitHub UI; or locally with **MergeToMain** (optionally `-NoFF`) and push.
-7. If you need a tagged release, run **ReleaseToMain** (choose tag strategy and push).
+7. If you need a tagged release, run **ReleaseToMain** (choose tag strategy). Use `-Push` to push main and the tag, or `-PushTags` to push only tags.
 8. If a release must be undone, use **RollbackRelease** (delete tag and optionally revert merge).
 
 Why this order?
@@ -321,10 +321,16 @@ Why this order?
   - Example: `./MergeToMain.cmd "Signup" -NoFF -Push`
 
 - **ReleaseToMain** (`ReleaseToMain.ps1/.cmd`)
-  - Purpose: Create a release tag on `main` and optionally push.
-  - Use when: Cutting a release (versioned or timestamped).
-  - Why: Immutable tag marks a deployable snapshot; aids rollbacks and changelogs.
-  - Example: `./ReleaseToMain.cmd "Signup" -Tag v1.2.3 -NoFF -Push`
+  - Purpose: Merge the feature into `main`, create an annotated tag on the resulting `main` commit, and optionally push.
+  - Use when: Cutting a release from the current feature branch.
+  - Why: The tag marks the exact deployable snapshot on `main`; helps rollbacks and changelogs.
+  - How tagging works:
+    - Tag is created locally on `main` after merge.
+    - Tags are pushed only when you pass `-Push` (pushes main and tags) or `-PushTags` (push tags only).
+  - Examples:
+    - `./ReleaseToMain.cmd "Signup"` (timestamp tag, local only)
+    - `./ReleaseToMain.cmd "Signup" -UsePackageVersion -Push` (tag as v<package.json> and push branch+tags)
+    - `./ReleaseToMain.cmd "Signup" -Tag v1.2.3 -NoFF -PushTags` (create tag and push tags only)
 
 - **RollbackRelease** (`RollbackRelease.ps1/.cmd`)
   - Purpose: Remove a mistaken release tag and optionally revert the merge on `main`.
