@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,30 +13,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { User, Building, Bell, Shield, CreditCard, Users as UsersIcon, Plus, Trash } from "lucide-react"
-import { useRouter } from 'next/navigation'
 
-export default function SettingsPage() {
+export default function SettingsContent({ section }: { section?: string }) {
   const router = useRouter()
-  useEffect(() => {
-    router.replace('/dashboard/settings/profile')
-  }, [router])
-  return null
+  const pathname = usePathname()
   const { user, company, setAuthSession } = useAuth()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
 
+  const current = (section || pathname.split("/").pop() || "profile") as
+    | "profile"
+    | "company"
+    | "team"
+    | "notifications"
+    | "security"
+    | "billing"
+
   const [profileData, setProfileData] = useState({
     name: user?.full_name || user?.email?.split("@")[0] || "",
     email: user?.email || "",
-    phone: user?.phone || "",
-    timezone: user?.timezone || "UTC",
+    phone: (user as any)?.phone || "",
+    timezone: (user as any)?.timezone || "UTC",
   })
 
   const [companyData, setCompanyData] = useState({
-    name: company?.name || "",
-    website: company?.website || "",
-    industry: company?.industry || "",
-    size: company?.size || "",
+    name: (company as any)?.name || "",
+    website: (company as any)?.website || "",
+    industry: (company as any)?.industry || "",
+    size: (company as any)?.size || "",
     description: "",
   })
 
@@ -51,14 +56,11 @@ export default function SettingsPage() {
   const [members, setMembers] = useState<Array<{ id: string; email: string; name: string; role: "company_admin" | "user" }>>([])
   const [newMember, setNewMember] = useState({ email: "", name: "", role: "user" as "company_admin" | "user" })
 
-  // Determine if current user is admin based on team roles loaded
-  const isAdmin = !!members.find(m => m.email === user?.email && m.role === 'company_admin')
-
   const loadMembers = async () => {
-    if (!company?.id) return
+    if (!(company as any)?.id) return
     setMembersLoading(true)
     try {
-      const res = await fetch(`/api/company-members?companyId=${company.id}`)
+      const res = await fetch(`/api/company-members?companyId=${(company as any).id}`)
       const data = await res.json()
       if (data.ok) setMembers(data.members)
     } catch (e) {
@@ -72,41 +74,40 @@ export default function SettingsPage() {
   useEffect(() => {
     loadMembers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [company?.id])
+  }, [(company as any)?.id])
 
   // Sync form state when auth context changes
   useEffect(() => {
     setProfileData((prev) => ({
       ...prev,
-      name: user?.full_name || user?.email?.split("@")[0] || "",
-      email: user?.email || "",
+      name: (user as any)?.full_name || (user as any)?.email?.split("@")[0] || "",
+      email: (user as any)?.email || "",
     }))
-  }, [user?.id, user?.full_name, user?.email])
+  }, [(user as any)?.id, (user as any)?.full_name, (user as any)?.email])
 
   useEffect(() => {
     setCompanyData((prev) => ({
       ...prev,
-      name: company?.name || "",
-      website: company?.website || "",
-      industry: company?.industry || "",
-      size: company?.size || "",
+      name: (company as any)?.name || "",
+      website: (company as any)?.website || "",
+      industry: (company as any)?.industry || "",
+      size: (company as any)?.size || "",
     }))
-  }, [company?.id, company?.name, company?.website, company?.industry, company?.size])
+  }, [(company as any)?.id, (company as any)?.name, (company as any)?.website, (company as any)?.industry, (company as any)?.size])
 
   const addMember = async () => {
-    if (!company?.id || !newMember.email) return
+    if (!(company as any)?.id || !newMember.email) return
     setMembersLoading(true)
     try {
       const res = await fetch(`/api/company-members`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          companyId: company.id, 
-          companyName: company.name,
-          email: newMember.email, 
-          name: newMember.name, 
+        body: JSON.stringify({
+          companyId: (company as any).id,
+          companyName: (company as any).name,
+          email: newMember.email,
+          name: newMember.name,
           role: newMember.role,
-          actorEmail: user?.email,
         }),
       })
       const data = await res.json()
@@ -115,7 +116,7 @@ export default function SettingsPage() {
         setNewMember({ email: "", name: "", role: "user" })
         loadMembers()
       } else {
-        const msg = typeof data.error === 'string' ? data.error : data.error?.message || 'Failed to add member'
+        const msg = typeof data.error === "string" ? data.error : data.error?.message || "Failed to add member"
         toast({ title: "Error", description: msg, variant: "destructive" })
       }
     } catch (e) {
@@ -126,10 +127,10 @@ export default function SettingsPage() {
   }
 
   const removeMember = async (email: string) => {
-    if (!company?.id) return
+    if (!(company as any)?.id) return
     setMembersLoading(true)
     try {
-      const res = await fetch(`/api/company-members?companyId=${company.id}&email=${encodeURIComponent(email)}&actorEmail=${encodeURIComponent(user?.email || '')}`, { method: "DELETE" })
+      const res = await fetch(`/api/company-members?companyId=${(company as any).id}&email=${encodeURIComponent(email)}`, { method: "DELETE" })
       const data = await res.json()
       if (data.ok) {
         toast({ title: "Member removed" })
@@ -146,12 +147,12 @@ export default function SettingsPage() {
   }
 
   const updateRole = async (email: string, role: "company_admin" | "user") => {
-    if (!company?.id) return
+    if (!(company as any)?.id) return
     try {
       const res = await fetch(`/api/company-members`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyId: company.id, email, role, actorEmail: user?.email }),
+        body: JSON.stringify({ companyId: (company as any).id, email, role }),
       })
       const data = await res.json()
       if (data.ok) {
@@ -167,14 +168,14 @@ export default function SettingsPage() {
   }
 
   const handleSaveProfile = async () => {
-    if (!user?.id) return
+    if (!(user as any)?.id) return
     setLoading(true)
     try {
       const res = await fetch('/api/settings/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          userId: user.id, 
+          userId: (user as any).id, 
           email: profileData.email,
           name: profileData.name,
           phone: profileData.phone,
@@ -184,7 +185,6 @@ export default function SettingsPage() {
       const data = await res.json()
       if (!res.ok || !data.ok) throw new Error(typeof data.error === 'string' ? data.error : (data.error?.message || 'Failed'))
 
-      // Update auth session locally with real-time data
       setAuthSession(
         { 
           ...(user as any), 
@@ -195,7 +195,6 @@ export default function SettingsPage() {
         (company as any)
       )
 
-      // Update local state to reflect database changes
       setProfileData(prev => ({
         ...prev,
         name: data.user?.full_name ?? prev.name,
@@ -212,17 +211,16 @@ export default function SettingsPage() {
   }
 
   const handleSaveCompany = async () => {
-    if (!company?.id) return
+    if (!(company as any)?.id) return
     setLoading(true)
     try {
       const payload = {
-        companyId: company.id,
+        companyId: (company as any).id,
         name: companyData.name,
         website: companyData.website,
         industry: companyData.industry,
         size: companyData.size,
         description: companyData.description,
-        actorEmail: user?.email,
       }
       const res = await fetch('/api/settings/company', {
         method: 'PUT',
@@ -232,7 +230,6 @@ export default function SettingsPage() {
       const data = await res.json()
       if (!res.ok || !data.ok) throw new Error(typeof data.error === 'string' ? data.error : (data.error?.message || 'Failed'))
 
-      // Update auth session locally with real-time company data
       setAuthSession((user as any), { 
         ...(company as any), 
         name: data.company?.name ?? companyData.name,
@@ -240,11 +237,10 @@ export default function SettingsPage() {
         industry: data.company?.industry ?? companyData.industry,
         size: data.company?.size ?? companyData.size,
         description: data.company?.description ?? companyData.description,
-        verified: data.company?.verified ?? company?.verified,
-        status: data.company?.status ?? company?.status
+        verified: data.company?.verified ?? (company as any)?.verified,
+        status: data.company?.status ?? (company as any)?.status
       })
 
-      // Update local state to reflect database changes
       setCompanyData(prev => ({
         ...prev,
         name: data.company?.name ?? prev.name,
@@ -269,7 +265,7 @@ export default function SettingsPage() {
         <p className="text-gray-600">Manage your account and application preferences</p>
       </div>
 
-      <Tabs defaultValue="profile" className="space-y-6">
+      <Tabs value={current} onValueChange={(v) => router.push(`/dashboard/settings/${v}`)} className="space-y-6">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="profile" className="flex items-center space-x-2">
             <User className="h-4 w-4" />
@@ -375,19 +371,16 @@ export default function SettingsPage() {
                   value={newMember.email}
                   onChange={(e) => setNewMember((p) => ({ ...p, email: e.target.value }))}
                   className="linkedin-input"
-                  disabled={!isAdmin}
                 />
                 <Input
                   placeholder="Full name (optional)"
                   value={newMember.name}
                   onChange={(e) => setNewMember((p) => ({ ...p, name: e.target.value }))}
                   className="linkedin-input"
-                  disabled={!isAdmin}
                 />
                 <Select
                   value={newMember.role}
                   onValueChange={(v) => setNewMember((p) => ({ ...p, role: v as any }))}
-                  disabled={!isAdmin}
                 >
                   <SelectTrigger className="linkedin-input">
                     <SelectValue placeholder="Role" />
@@ -397,7 +390,7 @@ export default function SettingsPage() {
                     <SelectItem value="company_admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button onClick={addMember} disabled={membersLoading || !isAdmin} className="linkedin-button">
+                <Button onClick={addMember} disabled={membersLoading} className="linkedin-button">
                   <Plus className="h-4 w-4 mr-1" /> Add
                 </Button>
               </div>
@@ -416,8 +409,8 @@ export default function SettingsPage() {
                       <div className="text-sm text-gray-600">{m.email}</div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Select value={m.role} onValueChange={(v) => updateRole(m.email, v as any)} disabled={!isAdmin}>
-                        <SelectTrigger className="w-40" disabled={!isAdmin}>
+                      <Select value={m.role} onValueChange={(v) => updateRole(m.email, v as any)}>
+                        <SelectTrigger className="w-40">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -425,7 +418,7 @@ export default function SettingsPage() {
                           <SelectItem value="company_admin">Admin</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Button variant="outline" onClick={() => removeMember(m.email)} disabled={!isAdmin}>
+                      <Button variant="outline" onClick={() => removeMember(m.email)}>
                         <Trash className="h-4 w-4" />
                       </Button>
                     </div>
@@ -510,7 +503,7 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="flex justify-end">
-                <Button onClick={handleSaveCompany} disabled={loading || !isAdmin} className="linkedin-button">
+                <Button onClick={handleSaveCompany} disabled={loading} className="linkedin-button">
                   {loading ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
