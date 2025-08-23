@@ -17,13 +17,15 @@ interface AIQuestionGeneratorModalProps {
   keySkills: Array<{ id: string; name: string; description: string; weight: number }>
   onQuestionsGenerated: (questions: string[]) => void
   trigger?: React.ReactNode
+  initialJobDescription?: string
 }
 
 export function AIQuestionGeneratorModal({ 
   agentType, 
   keySkills, 
   onQuestionsGenerated,
-  trigger 
+  trigger,
+  initialJobDescription
 }: AIQuestionGeneratorModalProps) {
   const [open, setOpen] = useState(false)
   const [jobDescription, setJobDescription] = useState("")
@@ -111,6 +113,10 @@ export function AIQuestionGeneratorModal({
     setOpen(next)
     if (next) {
       setNumberOfQuestions(getRandomQuestionCount())
+      // Prefill job description on open if provided and current is empty
+      if (!jobDescription && initialJobDescription) {
+        setJobDescription(initialJobDescription)
+      }
     }
   }
 
