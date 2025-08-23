@@ -690,4 +690,71 @@ export class DatabaseService {
       await this.query(q, [jobId, r.seq, r.name, r.duration_minutes])
     }
   }
+
+  // Fetch job_rounds for a job (including ids) ordered by seq
+  static async getJobRoundsByJobId(jobId: string): Promise<Array<{ id: string; job_id: string; seq: number; name: string; duration_minutes: number }>> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const q = `
+      SELECT id, job_id, seq, name, duration_minutes
+      FROM job_rounds
+      WHERE job_id = $1::uuid
+      ORDER BY seq ASC
+    `
+    const rows = (await this.query(q, [jobId])) as any[]
+    return rows as any
+  }
+
+  // Create round_agents rows for a specific job_round_id
+  static async createRoundAgents(jobRoundId: string, agents: Array<{ agent_type: string; skill_weights?: any; config?: any }>): Promise<void> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    if (!agents || agents.length === 0) return
+    const q = `
+      INSERT INTO round_agents (job_round_id, agent_type, skill_weights, config)
+      VALUES ($1::uuid, $2, $3::jsonb, $4::jsonb)
+    `
+    for (const a of agents) {
+      await this.query(q, [jobRoundId, a.agent_type, JSON.stringify(a.skill_weights || {}), JSON.stringify(a.config || {})])
+    }
+  }
+
+  // List rounds with their linked agents for a job
+  static async listRoundsWithAgents(jobId: string): Promise<Array<{
+    round_id: string
+    seq: number
+    name: string
+    duration_minutes: number
+    agents: Array<{ id: string; agent_type: string; skill_weights: any; config: any; created_at: string }>
+  }>> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const rounds = await this.getJobRoundsByJobId(jobId)
+    if (!rounds || rounds.length === 0) return []
+
+    const qAgents = `
+      SELECT ra.id, ra.job_round_id, ra.agent_type, ra.skill_weights, ra.config, ra.created_at
+      FROM round_agents ra
+      WHERE ra.job_round_id = ANY($1::uuid[])
+      ORDER BY ra.created_at ASC
+    `
+    const roundIds = rounds.map(r => r.id)
+    const rows = (await this.query(qAgents, [roundIds])) as any[]
+    const byRound = new Map<string, any[]>()
+    for (const row of rows) {
+      const list = byRound.get(row.job_round_id) || []
+      list.push({ id: row.id, agent_type: row.agent_type, skill_weights: row.skill_weights || {}, config: row.config || {}, created_at: row.created_at })
+      byRound.set(row.job_round_id, list)
+    }
+    return rounds.map(r => ({
+      round_id: r.id,
+      seq: r.seq,
+      name: r.name,
+      duration_minutes: r.duration_minutes,
+      agents: byRound.get(r.id) || [],
+    }))
+  }
 }

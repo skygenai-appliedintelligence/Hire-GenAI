@@ -25,6 +25,9 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
+type RoundAgent = { id: string; agent_type: string; skill_weights: any; config: any; created_at: string }
+type RoundWithAgents = { round_id: string; seq: number; name: string; duration_minutes: number; agents: RoundAgent[] }
+
 // Mock job database with specific job descriptions
 const jobDatabase: Record<
   string,
@@ -211,6 +214,7 @@ export default function JobStatsPage() {
   const [job, setJob] = useState<Job | null>(null)
   const [loading, setLoading] = useState(true)
   const [candidates, setCandidates] = useState<any[]>([])
+  const [rounds, setRounds] = useState<RoundWithAgents[]>([])
 
   const jobId = params.jobId as string
 
@@ -228,6 +232,20 @@ export default function JobStatsPage() {
       // Get candidates for this specific job
       const jobCandidates = mockCandidatesData[jobId] || []
       setCandidates(jobCandidates)
+
+      // Fetch interview rounds with linked agents from backend
+      try {
+        const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/rounds`, { cache: 'no-store' })
+        const data = await res.json()
+        if (res.ok && data?.ok && Array.isArray(data.rounds)) {
+          setRounds(data.rounds)
+        } else {
+          setRounds([])
+        }
+      } catch (e) {
+        console.warn('Failed to load rounds (non-fatal):', (e as any)?.message)
+        setRounds([])
+      }
     } catch (error) {
       console.error("Error fetching job details:", error)
     } finally {
@@ -286,6 +304,44 @@ export default function JobStatsPage() {
             <h1 className="text-2xl font-bold text-gray-900">{jobDetails.title}</h1>
             <p className="text-gray-600">Job Performance Analytics</p>
           </div>
+
+      {/* Interview Rounds & Agents */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Users className="h-5 w-5" />
+            <span>Interview Rounds & Agents</span>
+          </CardTitle>
+          <CardDescription>All configured interview rounds and their linked AI agents</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {rounds.length === 0 ? (
+            <p className="text-gray-500">No interview rounds configured for this job yet.</p>
+          ) : (
+            <div className="space-y-4">
+              {rounds.map((r) => (
+                <div key={r.round_id} className="p-4 border rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-medium text-gray-900">{r.seq}. {r.name}</div>
+                    <div className="text-sm text-gray-500">Duration: {r.duration_minutes} min</div>
+                  </div>
+                  {r.agents.length === 0 ? (
+                    <p className="text-sm text-gray-500">No agents linked</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {r.agents.map((a) => (
+                        <Badge key={a.id} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          {a.agent_type}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
         </div>
         <div className="flex space-x-2">
           <Link href={`/apply/${jobId}`} target="_blank">
