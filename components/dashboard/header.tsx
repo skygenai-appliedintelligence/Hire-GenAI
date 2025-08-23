@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
-import { RoleSwitcher } from "@/components/role-switcher"
 
 export function Header() {
   const { user, company, signOut } = useAuth()
@@ -40,8 +39,6 @@ export function Header() {
         </div>
 
         <div className="flex items-center space-x-4">
-          {/* Role Switcher */}
-          <RoleSwitcher />
 
           {/* Notifications */}
           <Button variant="ghost" size="sm" className="relative">
