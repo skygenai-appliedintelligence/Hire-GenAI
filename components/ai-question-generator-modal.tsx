@@ -62,10 +62,12 @@ export function AIQuestionGeneratorModal({
     setLoading(true)
     try {
       const aiAgentType = getAgentTypeForAI(agentType)
+      const skills = keySkills.map(s => s.name)
       const generatedQuestions = await AIService.generateStagedInterviewQuestions(
         jobDescription,
         aiAgentType,
-        numberOfQuestions
+        numberOfQuestions,
+        skills
       )
       
       setQuestions(generatedQuestions)
@@ -167,7 +169,7 @@ export function AIQuestionGeneratorModal({
               <div className="flex flex-wrap gap-2">
                 {keySkills.map((skill) => (
                   <span key={skill.id} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                    {skill.name} ({skill.weight}%)
+                    {skill.name}
                   </span>
                 ))}
               </div>

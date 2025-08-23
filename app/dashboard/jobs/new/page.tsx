@@ -75,6 +75,7 @@ export default function CreateJobPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
+          companyId: company?.id, // Pass companyId directly
           createdBy: user?.id || null,
         }),
       })
