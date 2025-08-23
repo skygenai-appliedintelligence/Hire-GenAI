@@ -110,7 +110,9 @@ export class AIService {
     jobDescription: string,
     agentType: "Screening Agent" | "Initial Interview Agent" | "Technical Interview Agent" | "Behavioral Interview Agent",
     numberOfQuestions: number,
-    skills?: string[]
+    skills?: string[],
+    existingQuestions?: string[],
+    agentName?: string
   ): Promise<string[]> {
     // Check if we're in the browser
     if (typeof window !== "undefined") {
@@ -126,6 +128,8 @@ export class AIService {
             agentType,
             numberOfQuestions,
             skills: Array.isArray(skills) ? skills : undefined,
+            existingQuestions: Array.isArray(existingQuestions) ? existingQuestions : undefined,
+            agentName,
           }),
         })
 

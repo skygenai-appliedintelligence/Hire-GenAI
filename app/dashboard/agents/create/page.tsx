@@ -65,6 +65,8 @@ export default function CreateAgentsPage() {
   const [selectedAgents, setSelectedAgents] = useState<string[]>([])
   const [jobData, setJobData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [roundsFromJob, setRoundsFromJob] = useState<string[] | null>(null)
+  const [showingAll, setShowingAll] = useState<boolean>(false)
 
   useEffect(() => {
     const initializeAgents = () => {
@@ -75,6 +77,7 @@ export default function CreateAgentsPage() {
         
         if (selectedRounds) {
           const rounds = JSON.parse(selectedRounds)
+          setRoundsFromJob(Array.isArray(rounds) ? rounds : null)
           if (jobDataStr) {
             setJobData(JSON.parse(jobDataStr))
           }
@@ -112,6 +115,7 @@ export default function CreateAgentsPage() {
             }
           })
           setAvailableAgents(agents)
+          setShowingAll(true)
         }
         
         setLoading(false)
@@ -123,6 +127,46 @@ export default function CreateAgentsPage() {
 
     initializeAgents()
   }, [])
+
+  const showAllAgents = () => {
+    const allRounds = Object.keys(agentConfigurations)
+    const agents: Agent[] = allRounds.map((roundName, index) => {
+      const config = agentConfigurations[roundName as keyof typeof agentConfigurations]
+      return {
+        id: `agent-${index + 1}`,
+        roundName,
+        name: config.name,
+        description: config.description,
+        duration: config.duration,
+        skills: config.skills,
+        color: config.color,
+        selected: false
+      }
+    })
+    setAvailableAgents(agents)
+    setSelectedAgents([])
+    setShowingAll(true)
+  }
+
+  const showSelectedRoundsAgents = () => {
+    if (!roundsFromJob || roundsFromJob.length === 0) return
+    const agents: Agent[] = roundsFromJob.map((roundName: string, index: number) => {
+      const config = agentConfigurations[roundName as keyof typeof agentConfigurations]
+      return {
+        id: `agent-${index + 1}`,
+        roundName,
+        name: config.name,
+        description: config.description,
+        duration: config.duration,
+        skills: config.skills,
+        color: config.color,
+        selected: false
+      }
+    })
+    setAvailableAgents(agents)
+    setSelectedAgents([])
+    setShowingAll(false)
+  }
 
   const handleAgentToggle = (agentId: string) => {
     setSelectedAgents(prev => 
@@ -225,6 +269,18 @@ export default function CreateAgentsPage() {
           <span className="text-sm text-gray-600">
             {selectedAgents.length} of {availableAgents.length} agents selected
           </span>
+        </div>
+        <div className="flex items-center gap-3">
+          {!showingAll && (
+            <Button onClick={showAllAgents} variant="secondary" size="sm">
+              Show All Agents
+            </Button>
+          )}
+          {showingAll && roundsFromJob && roundsFromJob.length > 0 && (
+            <Button onClick={showSelectedRoundsAgents} variant="outline" size="sm">
+              Show Selected Rounds
+            </Button>
+          )}
         </div>
         
         {selectedAgents.length > 0 && (

@@ -161,13 +161,39 @@ export async function POST(req: Request) {
 
       // Optional: insert job_rounds
       const rounds = Array.isArray(body.interviewRounds) ? body.interviewRounds : []
-      const duration = (() => {
-        const d = String(body.interviewDuration || '').trim()
-        if (['15', '30', '60'].includes(d)) return Number(d)
-        return 30
-      })()
+      const minutesForRound = (name: string): number => {
+        const key = (name || '').trim().toLowerCase()
+        switch (key) {
+          case 'phone screening':
+            return 15
+          case 'technical assessment':
+            return 30
+          case 'system design':
+          case 'architecture':
+          case 'architecture interview':
+          case 'architecture round':
+          case 'system architecture':
+            return 30
+          case 'behavioral interview':
+            return 30
+          case 'final round':
+          case 'final interview':
+            return 30
+          default:
+            // As a fallback, try to parse numeric labels e.g., "45min", "1hour"
+            const raw = String(body.interviewDuration || '').trim().toLowerCase()
+            if (/^\d+$/.test(raw)) return Number(raw)
+            if (raw.includes('1.5')) return 90
+            if (raw.includes('2')) return 120
+            if (raw.includes('1') && raw.includes('hour')) return 60
+            if (raw.includes('45')) return 45
+            if (raw.includes('30')) return 30
+            if (raw.includes('15')) return 15
+            return 30
+        }
+      }
       if (rounds.length) {
-        const rows = rounds.map((name, idx) => ({ seq: idx + 1, name, duration_minutes: duration }))
+        const rows = rounds.map((name, idx) => ({ seq: idx + 1, name, duration_minutes: minutesForRound(name) }))
         try {
           await DatabaseService.createJobRounds(jobId, rows)
         } catch (e) {
@@ -220,13 +246,38 @@ export async function POST(req: Request) {
     }
 
     const rounds = Array.isArray(body.interviewRounds) ? body.interviewRounds : []
-    const duration = (() => {
-      const d = String(body.interviewDuration || '').trim()
-      if (['15', '30', '60'].includes(d)) return Number(d)
-      return 30
-    })()
+    const minutesForRound = (name: string): number => {
+      const key = (name || '').trim().toLowerCase()
+      switch (key) {
+        case 'phone screening':
+          return 15
+        case 'technical assessment':
+          return 30
+        case 'system design':
+        case 'architecture':
+        case 'architecture interview':
+        case 'architecture round':
+        case 'system architecture':
+          return 30
+        case 'behavioral interview':
+          return 30
+        case 'final round':
+        case 'final interview':
+          return 30
+        default:
+          const raw = String(body.interviewDuration || '').trim().toLowerCase()
+          if (/^\d+$/.test(raw)) return Number(raw)
+          if (raw.includes('1.5')) return 90
+          if (raw.includes('2')) return 120
+          if (raw.includes('1') && raw.includes('hour')) return 60
+          if (raw.includes('45')) return 45
+          if (raw.includes('30')) return 30
+          if (raw.includes('15')) return 15
+          return 30
+      }
+    }
     if (rounds.length) {
-      const rows = rounds.map((name, idx) => ({ job_id: jobId, seq: idx + 1, name, duration_minutes: duration }))
+      const rows = rounds.map((name, idx) => ({ job_id: jobId, seq: idx + 1, name, duration_minutes: minutesForRound(name) }))
       await sb.from('job_rounds').insert(rows)
     }
 

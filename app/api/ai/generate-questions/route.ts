@@ -4,7 +4,7 @@ import { openai } from "@ai-sdk/openai"
 
 export async function POST(request: NextRequest) {
   try {
-    const { jobDescription, agentType, numberOfQuestions, skills } = await request.json()
+    const { jobDescription, agentType, numberOfQuestions, skills, existingQuestions, agentName } = await request.json()
 
     if (!jobDescription || !agentType || !numberOfQuestions) {
       return NextResponse.json(
@@ -82,12 +82,16 @@ export async function POST(request: NextRequest) {
       }
 
       const templates = templatesByAgent[agentType as keyof typeof templatesByAgent] || templatesByAgent["Screening Agent"]
+      // Shuffle templates to introduce variety across calls
+      const shuffled = [...templates].sort(() => Math.random() - 0.5)
       const out: string[] = []
       const seen = new Set<string>()
-      for (const t of templates) {
+      const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').replace(/[\p{P}\p{S}]+/gu, '').trim()
+      const existing = Array.isArray(existingQuestions) ? new Set(existingQuestions.map(normalize)) : new Set<string>()
+      for (const t of shuffled) {
         const q = make(t)
-        const key = q.toLowerCase()
-        if (!seen.has(key)) {
+        const key = normalize(q)
+        if (!seen.has(key) && !existing.has(key)) {
           out.push(q)
           seen.add(key)
         }
@@ -105,13 +109,22 @@ export async function POST(request: NextRequest) {
     }
 
     const focus = Array.isArray(skills) && skills.length > 0 ? `\nFOCUS SKILLS:\n${skills.map((s: string)=>`- ${s}`).join('\n')}\n` : ''
+    const seed = Math.floor(Math.random() * 1e9)
+    const priorList = Array.isArray(existingQuestions) && existingQuestions.length
+      ? `\nDO NOT REPEAT ANY OF THESE EXISTING QUESTIONS (case-insensitive, even if phrased slightly differently):\n${existingQuestions.map((q: string, i: number) => `- ${q}`).join('\n')}\n`
+      : ''
+
+    const agentNameHint = agentName
+      ? `\nAGENT/ROUND NAME: ${agentName}. Tailor tone and content to this round name. For example, if it is 'Technical Interview 1' emphasize coding/problem-solving; if 'Technical Interview 2' emphasize system design/depth; if 'HR' or 'Final' emphasize behavior/culture.`
+      : ''
+
     const prompt = `
 You are an AI Interview Question Generator for an automated hiring platform.
 
 JOB DESCRIPTION:
 ${jobDescription}
 
-INTERVIEW STAGE/AGENT TYPE: ${agentType}
+INTERVIEW STAGE/AGENT TYPE: ${agentType}${agentNameHint}
 NUMBER OF QUESTIONS REQUIRED: ${numberOfQuestions}
 
 INSTRUCTIONS:
@@ -139,7 +152,11 @@ Q3: <question>
 ...
 Q${numberOfQuestions}: <question>
 
-Only provide the questions, no explanations or additional text.
+${priorList}
+
+RANDOM_SEED: ${seed}
+
+Only provide the questions, no explanations or additional text. Vary phrasing between runs and avoid repeating earlier ideas.
     `
 
     console.log('Attempting to generate AI questions...')
@@ -149,6 +166,8 @@ Only provide the questions, no explanations or additional text.
         model: openai("gpt-4o"),
         prompt,
         system: "You are an AI Interview Question Generator. Generate relevant, clear, and role-specific interview questions based on the job description and interview stage.",
+        temperature: 0.9,
+        topP: 0.9,
       })
 
       console.log('AI response received')
@@ -163,10 +182,11 @@ Only provide the questions, no explanations or additional text.
       // Deduplicate and limit
       const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').replace(/[\p{P}\p{S}]+/gu, '').trim()
       const seen = new Set<string>()
+      const existing = Array.isArray(existingQuestions) ? new Set(existingQuestions.map(normalize)) : new Set<string>()
       const questions: string[] = []
       for (const q of parsed) {
         const key = normalize(q)
-        if (!seen.has(key)) {
+        if (!seen.has(key) && !existing.has(key)) {
           questions.push(q)
           seen.add(key)
         }
@@ -239,10 +259,12 @@ Only provide the questions, no explanations or additional text.
       const templates = templatesByAgent[agentType as keyof typeof templatesByAgent] || templatesByAgent["Screening Agent"]
       const out: string[] = []
       const seen = new Set<string>()
+      const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').replace(/[\p{P}\p{S}]+/gu, '').trim()
+      const existing = Array.isArray(existingQuestions) ? new Set(existingQuestions.map(normalize)) : new Set<string>()
       for (const t of templates) {
         const q = make(t)
-        const key = q.toLowerCase()
-        if (!seen.has(key)) {
+        const key = normalize(q)
+        if (!seen.has(key) && !existing.has(key)) {
           out.push(q)
           seen.add(key)
         }
