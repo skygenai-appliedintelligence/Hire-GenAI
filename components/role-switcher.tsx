@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { User, Shield, Bot } from "lucide-react"
 
 export function RoleSwitcher() {
-  const { user, switchRole } = useAuth()
+  const { user, company, switchRole } = useAuth()
   const [users, setUsers] = useState<any[]>([])
 
   useEffect(() => {
@@ -52,21 +52,29 @@ export function RoleSwitcher() {
 
   return (
     <div className="flex items-center space-x-2">
-      <Badge className={getRoleColor(user?.role || "")}>
+      <Badge className={getRoleColor(user?.role || "")}> 
         {getRoleIcon(user?.role || "")}
         <span className="ml-1 capitalize">{user?.role?.replace("_", " ") || "User"}</span>
       </Badge>
 
       <Select value={user?.id} onValueChange={handleRoleSwitch}>
-        <SelectTrigger className="w-40">
-          <SelectValue placeholder="Switch Role" />
+        <SelectTrigger className="w-44">
+          <div className="flex flex-col text-left leading-tight">
+            <span className="text-sm font-medium truncate">{user?.full_name || user?.email?.split('@')[0] || 'User'}</span>
+            <span className="text-[11px] text-gray-500 truncate">{company?.name || 'Company'}</span>
+          </div>
         </SelectTrigger>
         <SelectContent>
           {users.map((u) => (
             <SelectItem key={u.id} value={u.id}>
               <div className="flex items-center space-x-2">
                 {getRoleIcon(u.role)}
-                <span>{u.name}</span>
+                <div className="flex flex-col leading-tight">
+                  <span className="text-sm">{u.name || u.email?.split('@')[0] || 'User'}</span>
+                  {u.company?.name && (
+                    <span className="text-[11px] text-gray-500">{u.company.name}</span>
+                  )}
+                </div>
               </div>
             </SelectItem>
           ))}

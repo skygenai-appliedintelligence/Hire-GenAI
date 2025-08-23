@@ -4,7 +4,7 @@ import { openai } from "@ai-sdk/openai"
 
 export async function POST(request: NextRequest) {
   try {
-    const { jobDescription, agentType, numberOfQuestions } = await request.json()
+    const { jobDescription, agentType, numberOfQuestions, skills } = await request.json()
 
     if (!jobDescription || !agentType || !numberOfQuestions) {
       return NextResponse.json(
@@ -37,10 +37,14 @@ export async function POST(request: NextRequest) {
         freq.set(w, (freq.get(w) || 0) + 1)
       }
       const top = Array.from(freq.entries()).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([w])=>w)
+      const focusSkills: string[] = Array.isArray(skills) ? skills : []
       const roleMatch = text.match(/(?:role|position|title)[:\s-]*([^\n]+)/i)
       const role = roleMatch ? roleMatch[1].trim() : (top[0] ? top[0] : "the role")
 
-      const make = (q: string) => q.replace(/\{role\}/g, role).replace(/\{kw(\d)\}/g, (_m, i)=> top[Number(i)-1] || role)
+      const kw = [...focusSkills.map(s=>s.toLowerCase()), ...top]
+      const make = (q: string) => q
+        .replace(/\{role\}/g, role)
+        .replace(/\{kw(\d)\}/g, (_m, i)=> kw[Number(i)-1] || role)
 
       const templatesByAgent: Record<string, string[]> = {
         "Screening Agent": [
@@ -100,6 +104,7 @@ export async function POST(request: NextRequest) {
       "Behavioral Interview Agent": "Generate soft skills, teamwork, and conflict resolution questions. Focus on: leadership, teamwork, communication, conflict resolution, and cultural fit."
     }
 
+    const focus = Array.isArray(skills) && skills.length > 0 ? `\nFOCUS SKILLS:\n${skills.map((s: string)=>`- ${s}`).join('\n')}\n` : ''
     const prompt = `
 You are an AI Interview Question Generator for an automated hiring platform.
 
@@ -124,6 +129,7 @@ INSTRUCTIONS:
   4. Suitable for the given interview stage
 
 ${agentTypePrompts[agentType as keyof typeof agentTypePrompts] || agentTypePrompts["Screening Agent"]}
+${focus}
 
 OUTPUT FORMAT:
 Generate exactly ${numberOfQuestions} questions in this format:
