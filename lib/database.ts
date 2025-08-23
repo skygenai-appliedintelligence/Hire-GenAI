@@ -465,7 +465,7 @@ export class DatabaseService {
 
     const updateUserQuery = `
       UPDATE users 
-      SET notification_preferences = $1::jsonb, updated_at = NOW()
+      SET notification_preferences = $1::jsonb
       WHERE id = $2::uuid
       RETURNING *
     `
@@ -543,7 +543,7 @@ export class DatabaseService {
     const q = `
       SELECT id, company_id, title, location, employment_type, experience_level,
              description_md, responsibilities_md, benefits_md, salary_level,
-             created_by, created_at, updated_at
+             created_by, created_at
       FROM jobs
       WHERE id = $1::uuid AND company_id = $2::uuid
       LIMIT 1
@@ -591,7 +591,7 @@ export class DatabaseService {
       WHERE id = $${i++}::uuid AND company_id = $${i}::uuid
       RETURNING id, company_id, title, location, employment_type, experience_level,
                 description_md, responsibilities_md, benefits_md, salary_level,
-                created_by, created_at, updated_at
+                created_by, created_at
     `
     const rows = (await this.query(q, values)) as any[]
     return rows.length > 0 ? rows[0] : null
