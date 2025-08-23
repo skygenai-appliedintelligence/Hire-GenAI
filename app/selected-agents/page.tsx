@@ -386,15 +386,25 @@ export default function SelectedAgentsPage() {
 
       setSelectedAgents(sorted)
       if (sorted.length > 0) {
-        // Prefer tab from URL if present
+        // Prefer tab from URL if present (supports numeric index like ?tab=1)
         const urlTab = searchParams.get('tab')
-        const initialTab = urlTab && sorted.some(a => a.id === urlTab) ? urlTab : sorted[0].id
+        let initialTab = sorted[0].id
+        if (urlTab) {
+          const asNumber = Number(urlTab)
+          if (Number.isInteger(asNumber) && asNumber >= 1 && asNumber <= sorted.length) {
+            initialTab = sorted[asNumber - 1].id
+          } else if (sorted.some(a => a.id === urlTab)) {
+            initialTab = urlTab
+          }
+        }
         setActiveTab(initialTab)
         // Ensure URL reflects the active tab while preserving jobId (only if changed)
         const jobId = searchParams.get('jobId')
         const qs = new URLSearchParams()
         if (jobId) qs.set('jobId', jobId)
-        qs.set('tab', initialTab)
+        // Write numeric tab index for readability
+        const numericIndex = Math.max(1, sorted.findIndex(a => a.id === initialTab) + 1)
+        qs.set('tab', String(numericIndex))
         const nextUrl = `/selected-agents?${qs.toString()}`
         if (typeof window !== 'undefined' && window.location.search !== `?${qs.toString()}`) {
           router.replace(nextUrl, { scroll: false })
@@ -410,7 +420,7 @@ export default function SelectedAgentsPage() {
             // Group agents by their target round sequence
             const byRound = new Map<number, Array<{ agent_type: string; skill_weights: any; config: any }>>()
             sorted.forEach((agent, idx) => {
-              const seq = agent.interviewRound.seq
+              const seq = (agent as any)?.interviewRound?.seq ?? (idx + 1)
               const list = byRound.get(seq) || []
               list.push({
                 agent_type: mapRoundToAgentType(agent.interviewRound.name),
@@ -683,6 +693,17 @@ export default function SelectedAgentsPage() {
     }
   }
 
+  const getStatusClasses = (status: string) => {
+    switch (status) {
+      case 'Completed':
+        return 'bg-green-50 text-green-700 border border-green-200'
+      case 'In Progress':
+        return 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+      default:
+        return 'bg-gray-50 text-gray-700 border border-gray-200'
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Completed':
@@ -730,20 +751,35 @@ export default function SelectedAgentsPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-7xl p-6 space-y-8">
-      {/* Header */}
-      <div className="text-center space-y-4">
-        <div className="bg-green-100 border border-green-400 text-green-700 px-6 py-4 rounded-lg inline-block">
-          <CheckCircle className="w-6 h-6 inline mr-2" />
-          Successfully configured {selectedAgents.length} specialized AI agents!
+    <div className="mx-auto max-w-6xl px-4 py-6">
+      {/* Top Actions Bar */}
+      <div className="sticky top-0 z-30 mb-4 flex items-center justify-between bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60 py-2 px-2 rounded-md border">
+        <div className="text-sm font-medium text-gray-700">Selected Agents</div>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleBackToSelection}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Selection
+          </Button>
+          <Button
+            onClick={handleGoToDashboard}
+            size="sm"
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+          >
+            <Home className="w-4 h-4" />
+            Go to Dashboard
+          </Button>
         </div>
-        
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-          Agent Management Dashboard
-        </h1>
-        <p className="text-lg text-gray-600">
-          Configure tasks, questions, and key skills for each specialized agent
-        </p>
+      </div>
+
+      {/* Page Header */}
+      <div className="mb-6">
+        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight">Agent Management Dashboard</h1>
+        <p className="text-sm md:text-base text-gray-600 mt-1">Configure tasks, questions, and key skills for each specialized agent</p>
       </div>
 
       {/* Job Summary removed as requested */}
@@ -756,17 +792,19 @@ export default function SelectedAgentsPage() {
           const jobId = searchParams.get('jobId')
           const qs = new URLSearchParams()
           if (jobId) qs.set('jobId', jobId)
-          qs.set('tab', v)
+          // Persist numeric tab index in URL if possible
+          const idx = selectedAgents.findIndex(a => a.id === v)
+          qs.set('tab', String(Math.max(1, idx + 1)))
           router.replace(`/selected-agents?${qs.toString()}`, { scroll: false })
         }}
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2 h-auto p-2">
+        <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2 h-auto p-2 bg-gray-50/80 border rounded-lg">
           {selectedAgents.map((agent) => (
             <TabsTrigger 
               key={agent.id} 
               value={agent.id}
-              className="flex flex-col items-center p-4 h-auto data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
+              className="flex flex-col items-center p-4 h-auto rounded-md border border-transparent hover:border-gray-200 hover:bg-white data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
             >
               <User className="w-5 h-5 mb-2" />
               <span className="font-semibold">{agent.name}</span>
@@ -779,7 +817,7 @@ export default function SelectedAgentsPage() {
           <TabsContent key={agent.id} value={agent.id} className="space-y-6">
             {/* Agent Overview */}
             <Card>
-              <CardHeader>
+              <CardHeader className="p-6 pb-3">
                 <CardTitle className="flex items-center gap-2">
                   <User className="w-6 h-6 text-blue-500" />
                   {agent.name} - {agent.interviewRound.name}
@@ -788,8 +826,8 @@ export default function SelectedAgentsPage() {
                   Candidate: {agent.candidateName} | Duration: {agent.interviewRound.duration} | Interviewer: {agent.interviewRound.interviewer}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${getStatusColor(agent.interviewRound.status)}`}>
+              <CardContent className="p-6 pt-0">
+                <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusClasses(agent.interviewRound.status)}`}>
                   {getStatusIcon(agent.interviewRound.status)}
                   <span className="ml-2">{agent.interviewRound.status}</span>
                 </div>
@@ -798,7 +836,7 @@ export default function SelectedAgentsPage() {
 
             {/* Key Skills Section */}
             <Card>
-              <CardHeader>
+              <CardHeader className="p-6 pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <CardTitle>Key Skills for Evaluation</CardTitle>
@@ -806,14 +844,14 @@ export default function SelectedAgentsPage() {
                       {agent.keySkills.length} skills
                     </span>
                   </div>
-                  <Button onClick={() => addKeySkill(agent.id)} size="sm" className="bg-blue-600 text-white hover:bg-blue-700">
+                  <Button onClick={() => addKeySkill(agent.id)} size="sm" className="bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
                     <Plus className="w-4 h-4 mr-2" />
                     Add Skill
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
+              <CardContent className="p-6 pt-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1 scroll-smooth">
                   {agent.keySkills.map((skill) => (
                     <div
                       key={skill.id}
@@ -870,10 +908,10 @@ export default function SelectedAgentsPage() {
             {/* Tasks & Questions Section */}
             {agent.tasks.map((task) => (
               <Card key={task.id}>
-                <CardHeader>
+                <CardHeader className="p-6 pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex gap-2">
-                      <Button onClick={() => addQuestion(agent.id, task.id)} size="sm">
+                      <Button onClick={() => addQuestion(agent.id, task.id)} size="sm" variant="outline">
                         <Plus className="w-4 h-4 mr-2" />
                         Add Question
                       </Button>
@@ -890,7 +928,7 @@ export default function SelectedAgentsPage() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-6 pt-0">
                   <div className="space-y-4">
                     {task.questions.map((question, index) => (
                       <div key={question.id} className="border rounded-lg p-4 space-y-3">
@@ -984,25 +1022,14 @@ export default function SelectedAgentsPage() {
         ))}
       </Tabs>
 
-      {/* Action Buttons */}
-      <div className="flex justify-center gap-4 pt-6">
+      {/* Bottom Select Button */}
+      <div className="flex justify-center pt-6">
         <Button 
           onClick={handleBackToSelection}
-          variant="outline"
           size="lg"
-          className="flex items-center gap-2"
+          className="px-8"
         >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Selection
-        </Button>
-        
-        <Button 
-          onClick={handleGoToDashboard}
-          size="lg"
-          className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
-        >
-          <Home className="w-4 h-4" />
-          Go to Dashboard
+          Select
         </Button>
       </div>
     </div>
