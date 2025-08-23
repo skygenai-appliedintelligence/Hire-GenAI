@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -201,11 +201,13 @@ const generateQuestions = (roundName: string, keySkills: KeySkill[]): Question[]
 
 export default function SelectedAgentsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [selectedAgents, setSelectedAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<string>("")
   const [editingQuestion, setEditingQuestion] = useState<string | null>(null)
   const [editingSkill, setEditingSkill] = useState<string | null>(null)
+  const [jobData, setJobData] = useState<any | null>(null)
 
   const normalizeQuestionText = (text: string) =>
     text
@@ -245,11 +247,30 @@ export default function SelectedAgentsPage() {
   }
 
   useEffect(() => {
+    const initialize = async () => {
+      try {
+        const storedData = localStorage.getItem("newJobData")
+        if (storedData) {
+          setJobData(JSON.parse(storedData))
+        }
+      } catch (error) {
+        console.error('Error loading job data:', error)
+      }
+    }
+    initialize()
+  }, [])
+
+  useEffect(() => {
     try {
       // Get selected agent IDs from localStorage
       const storedAgents = localStorage.getItem('selectedAgents')
       // Also get the specific interview rounds the user chose when creating the JD (if available)
       const storedChosenRounds = localStorage.getItem('selectedInterviewRounds')
+      // Read job data passed from Jobs page
+      const storedJobData = localStorage.getItem('newJobData')
+      if (storedJobData) {
+        try { setJobData(JSON.parse(storedJobData)) } catch {}
+      }
       if (!storedAgents) {
         router.push('/dashboard/agents/create')
         return
@@ -344,14 +365,21 @@ export default function SelectedAgentsPage() {
 
       setSelectedAgents(agents)
       if (agents.length > 0) {
-        setActiveTab(agents[0].id)
+        // Prefer tab from URL if present
+        const urlTab = searchParams.get('tab')
+        const initialTab = urlTab && agents.some(a => a.id === urlTab) ? urlTab : agents[0].id
+        setActiveTab(initialTab)
+        // Ensure URL reflects the active tab
+        router.replace(`/selected-agents?tab=${encodeURIComponent(initialTab)}`, { scroll: false })
       }
       setLoading(false)
     } catch (error) {
       console.error('Error loading selected agents:', error)
       router.push('/dashboard/agents/create')
     }
-  }, [router])
+  }, [router, searchParams])
+
+  // (Removed) job fetching and inline editing for job summary
 
   const saveToDatabase = (agentId: string, data: any) => {
     // Simulate database save
@@ -595,8 +623,17 @@ export default function SelectedAgentsPage() {
         </p>
       </div>
 
+      {/* Job Summary removed as requested */}
+
       {/* Agent Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => {
+          setActiveTab(v)
+          router.replace(`/selected-agents?tab=${encodeURIComponent(v)}`, { scroll: false })
+        }}
+        className="w-full"
+      >
         <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2 h-auto p-2">
           {selectedAgents.map((agent) => (
             <TabsTrigger 
@@ -708,26 +745,17 @@ export default function SelectedAgentsPage() {
               <Card key={task.id}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Tasks & Questions</CardTitle>
-                      <CardDescription>{task.description}</CardDescription>
-                    </div>
                     <div className="flex gap-2">
-                      <AIQuestionGeneratorModal
-                        agentType={agent.interviewRound.name}
-                        keySkills={agent.keySkills}
-                        onQuestionsGenerated={(questions) => addAIQuestions(agent.id, task.id, questions)}
-                        trigger={
-                          <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-                            <Brain className="w-4 h-4 mr-2" />
-                            AI Generate
-                          </Button>
-                        }
-                      />
                       <Button onClick={() => addQuestion(agent.id, task.id)} size="sm">
                         <Plus className="w-4 h-4 mr-2" />
                         Add Question
                       </Button>
+                      <AIQuestionGeneratorModal
+                        agentType={agent.interviewRound.name}
+                        keySkills={agent.keySkills}
+                        onQuestionsGenerated={(questions) => addAIQuestions(agent.id, task.id, questions)}
+                        initialJobDescription={jobData?.description || ''}
+                      />
                     </div>
                   </div>
                 </CardHeader>
