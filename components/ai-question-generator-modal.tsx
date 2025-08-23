@@ -22,6 +22,7 @@ interface AIQuestionGeneratorModalProps {
   agentId?: string
   taskId?: string
   basePath?: string // default: '/selected-agents'
+  existingQuestions?: string[]
 }
 
 export function AIQuestionGeneratorModal({ 
@@ -32,18 +33,15 @@ export function AIQuestionGeneratorModal({
   initialJobDescription,
   agentId,
   taskId,
-  basePath = '/selected-agents'
+  basePath = '/selected-agents',
+  existingQuestions = []
 }: AIQuestionGeneratorModalProps) {
   const [open, setOpen] = useState(false)
   const [jobDescription, setJobDescription] = useState("")
   const router = useRouter()
   const searchParams = useSearchParams()
-  const getRandomQuestionCount = () => {
-    const min = 5
-    const max = 12
-    return Math.floor(Math.random() * (max - min + 1)) + min
-  }
-  const [numberOfQuestions, setNumberOfQuestions] = useState(getRandomQuestionCount())
+  // Keep number input writable by storing as string and validating on submit
+  const [numberOfQuestions, setNumberOfQuestions] = useState<string>("")
   const [questions, setQuestions] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
@@ -74,11 +72,31 @@ export function AIQuestionGeneratorModal({
     try {
       const aiAgentType = getAgentTypeForAI(agentType)
       const skills = keySkills.map(s => s.name)
+      // Validate number of questions (1-20)
+      const n = parseInt(String(numberOfQuestions).trim(), 10)
+      if (!Number.isFinite(n) || n < 1 || n > 20) {
+        toast({
+          title: "Error",
+          description: "Please enter a valid number of questions between 1 and 20",
+          variant: "destructive",
+        })
+        setLoading(false)
+        return
+      }
+
+      // Avoid repeats across runs by combining existingQuestions (from task) + current modal questions
+      const existing = [
+        ...(existingQuestions || []),
+        ...questions,
+      ]
+
       const generatedQuestions = await AIService.generateStagedInterviewQuestions(
         jobDescription,
         aiAgentType,
-        numberOfQuestions,
-        skills
+        n,
+        skills,
+        existing,
+        agentType // agentName: the visible round name, e.g., "Technical Interview 1"
       )
       
       setQuestions(generatedQuestions)
@@ -115,15 +133,16 @@ export function AIQuestionGeneratorModal({
   const handleClear = () => {
     setJobDescription("")
     setQuestions([])
-    setNumberOfQuestions(getRandomQuestionCount())
+    setNumberOfQuestions("")
   }
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next)
     if (next) {
-      setNumberOfQuestions(getRandomQuestionCount())
-      // Prefill job description on open if provided and current is empty
-      if (!jobDescription && initialJobDescription) {
+      setNumberOfQuestions("")
+      // Prefill only when jobId is present in URL
+      const jobId = searchParams.get('jobId')
+      if (!jobDescription && initialJobDescription && jobId) {
         setJobDescription(initialJobDescription)
       }
       // Update URL to reflect AI modal open state
@@ -191,7 +210,7 @@ export function AIQuestionGeneratorModal({
               min={1}
               max={20}
               value={numberOfQuestions}
-              onChange={(e) => setNumberOfQuestions(parseInt(e.target.value) || getRandomQuestionCount())}
+              onChange={(e) => setNumberOfQuestions(e.target.value)}
               className="w-32"
             />
           </div>

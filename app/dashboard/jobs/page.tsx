@@ -151,8 +151,8 @@ export default function JobsPage() {
       }
       localStorage.setItem('newJobData', JSON.stringify(jobData))
 
-      // Redirect to Selected Agents page
-      router.push('/selected-agents')
+      // Redirect to Selected Agents page with jobId so it can fetch JD directly
+      router.push(`/selected-agents?jobId=${encodeURIComponent(job.id)}`)
     } catch (e) {
       console.error('Failed to store JD for selected agents:', e)
       alert('Unable to proceed. Please try again.')

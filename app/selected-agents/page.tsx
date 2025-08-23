@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useAuth } from '@/contexts/auth-context'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -77,7 +78,7 @@ const interviewRounds = [
     interviewer: 'Michael Rodriguez'
   },
   {
-    name: 'HR Interview',
+    name: 'Final Interview',
     duration: '30 minutes',
     interviewer: 'Emily Davis'
   }
@@ -120,7 +121,7 @@ const generateKeySkills = (roundName: string): KeySkill[] => {
       { name: 'Database Knowledge', description: 'Database design and optimization', weight: 30 },
       { name: 'Performance Optimization', description: 'Code and system optimization', weight: 25 }
     ],
-    'HR Interview': [
+    'Final Interview': [
       { name: 'Leadership Potential', description: 'Leadership qualities and experience', weight: 40 },
       { name: 'Team Collaboration', description: 'Working effectively in teams', weight: 35 },
       { name: 'Career Goals', description: 'Long-term career alignment', weight: 25 }
@@ -145,69 +146,21 @@ const generateKeySkills = (roundName: string): KeySkill[] => {
   }))
 }
 
-// Generate dummy questions for each agent type
-const generateQuestions = (roundName: string, keySkills: KeySkill[]): Question[] => {
-  const questionSets = {
-    'Screening Round': [
-      'Tell me about yourself and your background',
-      'Why are you interested in this position?',
-      'What are your salary expectations?',
-      'When can you start?',
-      'What do you know about our company?',
-      'Why are you looking to leave your current role?'
-    ],
-    'Initial Interview': [
-      'Describe a challenging project you worked on',
-      'How do you handle tight deadlines?',
-      'Tell me about a time you had to learn something new quickly',
-      'How do you prioritize your work?',
-      'Describe a situation where you had to work with a difficult team member',
-      'What motivates you in your work?'
-    ],
-    'Technical Interview 1': [
-      'Implement a function to reverse a linked list',
-      'How would you find the duplicate number in an array?',
-      'Explain the difference between stack and heap memory',
-      'Write a function to check if a string is a palindrome',
-      'How would you optimize a slow database query?',
-      'Describe the time complexity of your solution'
-    ],
-    'Technical Interview 2': [
-      'Design a URL shortening service like bit.ly',
-      'How would you design a chat application?',
-      'Explain database indexing and when to use it',
-      'How would you handle millions of concurrent users?',
-      'Design a caching strategy for a web application',
-      'Explain microservices architecture pros and cons'
-    ],
-    'HR Interview': [
-      'Describe your leadership style',
-      'How do you handle conflict in a team?',
-      'Where do you see yourself in 5 years?',
-      'Tell me about a time you had to make a difficult decision',
-      'How do you give and receive feedback?',
-      'What would you do in your first 90 days in this role?'
-    ]
-  }
-
-  const questions = questionSets[roundName as keyof typeof questionSets] || questionSets['Screening Round']
-  return questions.map((question, index) => ({
-    id: `question-${index + 1}`,
-    text: question,
-    type: roundName.includes('Technical') ? 'technical' : roundName.includes('HR') ? 'behavioral' : 'situational' as const,
-    linkedSkills: keySkills.slice(0, Math.min(2, keySkills.length)).map(skill => skill.id)
-  }))
-}
+// No default questions: questions will start empty and be added via modal or manual add
+const generateQuestions = (_roundName: string, _keySkills: KeySkill[]): Question[] => []
 
 export default function SelectedAgentsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { company } = useAuth()
   const [selectedAgents, setSelectedAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<string>("")
   const [editingQuestion, setEditingQuestion] = useState<string | null>(null)
   const [editingSkill, setEditingSkill] = useState<string | null>(null)
   const [jobData, setJobData] = useState<any | null>(null)
+  const autoGenStarted = useRef(false)
+  const persistDoneForJob = useRef<string | null>(null)
 
   const normalizeQuestionText = (text: string) =>
     text
@@ -216,7 +169,7 @@ export default function SelectedAgentsPage() {
       .replace(/[\p{P}\p{S}]+/gu, "")
       .trim()
 
-  const dedupeAndLimitQuestions = (existing: Question[], incoming: Question[] = [], max: number = 6, preferIncoming: boolean = false): Question[] => {
+  const dedupeAndLimitQuestions = (existing: Question[], incoming: Question[] = [], max: number = Number.MAX_SAFE_INTEGER, preferIncoming: boolean = false): Question[] => {
     const result: Question[] = []
     const seen = new Set<string>()
 
@@ -259,6 +212,41 @@ export default function SelectedAgentsPage() {
     }
     initialize()
   }, [])
+
+  // If jobId is present in URL and company is known, fetch JD from API and prefer it
+  useEffect(() => {
+    const fetchJD = async () => {
+      const jobId = searchParams.get('jobId')
+      const companyName = company?.name
+      if (!jobId || !companyName) return
+      try {
+        const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}?company=${encodeURIComponent(companyName)}`)
+        const data = await res.json().catch(() => ({}))
+        if (res.ok && data?.ok && data?.job) {
+          const j = data.job
+          // Prefer multiple fields to build a useful JD for AI
+          const jd = [j.description_md, j.description, j.responsibilities_md, j.benefits_md]
+            .filter((x: any) => typeof x === 'string' && x.trim().length > 0)
+            .join('\n\n') || `Role: ${j.title || 'Unknown'}\nCompany: ${companyName}`
+          const next = {
+            id: j.id,
+            title: j.title,
+            company: companyName,
+            description: jd,
+            location: j.location,
+            employment_type: j.employment_type,
+            createdAt: j.created_at,
+          }
+          setJobData(next)
+          // keep local copy in case of reloads
+          try { localStorage.setItem('newJobData', JSON.stringify(next)) } catch {}
+        }
+      } catch (e) {
+        console.warn('Failed to fetch job by id (non-fatal):', (e as any)?.message)
+      }
+    }
+    fetchJD()
+  }, [searchParams, company])
 
   useEffect(() => {
     try {
@@ -312,9 +300,10 @@ export default function SelectedAgentsPage() {
           case 'system architecture':
             return 3 // Treat architecture as System Design round
           case 'behavioral interview':
-            return 4 // HR Interview
+            return 1 // Map behavioral to Initial Interview
           case 'final round':
-            return 1 // Initial Interview (fallback)
+          case 'final interview':
+            return 4 // Final Interview (Agent 5)
           default:
             return -1
         }
@@ -401,8 +390,15 @@ export default function SelectedAgentsPage() {
         const urlTab = searchParams.get('tab')
         const initialTab = urlTab && sorted.some(a => a.id === urlTab) ? urlTab : sorted[0].id
         setActiveTab(initialTab)
-        // Ensure URL reflects the active tab
-        router.replace(`/selected-agents?tab=${encodeURIComponent(initialTab)}`, { scroll: false })
+        // Ensure URL reflects the active tab while preserving jobId (only if changed)
+        const jobId = searchParams.get('jobId')
+        const qs = new URLSearchParams()
+        if (jobId) qs.set('jobId', jobId)
+        qs.set('tab', initialTab)
+        const nextUrl = `/selected-agents?${qs.toString()}`
+        if (typeof window !== 'undefined' && window.location.search !== `?${qs.toString()}`) {
+          router.replace(nextUrl, { scroll: false })
+        }
 
         // Persist mapping of selected agents to rounds for this job (best-effort)
         const persist = async () => {
@@ -410,30 +406,26 @@ export default function SelectedAgentsPage() {
             const job = JSON.parse(localStorage.getItem('newJobData') || 'null')
             const jobId = job?.id
             if (!jobId) return
+            if (persistDoneForJob.current === jobId) { console.debug('[Persist] Skipped: already persisted for', jobId); return }
             // Group agents by their target round sequence
             const byRound = new Map<number, Array<{ agent_type: string; skill_weights: any; config: any }>>()
             sorted.forEach((agent, idx) => {
-              // Determine round seq by matching the agent's assigned round name
-              const mappedIdx = interviewRounds.findIndex(r => r.name === agent.interviewRound.name)
-              const safeIdx = mappedIdx >= 0 ? mappedIdx : idx
-              const roundSeq = Math.max(0, Math.min(safeIdx, interviewRounds.length - 1)) + 1
-
-              const payload = {
-                agent_type: agent.interviewRound.name,
-                skill_weights: Object.fromEntries((agent.keySkills || []).map(ks => [ks.name, ks.weight])),
-                config: { ui_agent_id: agent.id },
-              }
-              const list = byRound.get(roundSeq) || []
-              list.push(payload)
-              byRound.set(roundSeq, list)
+              const seq = agent.interviewRound.seq
+              const list = byRound.get(seq) || []
+              list.push({
+                agent_type: mapRoundToAgentType(agent.interviewRound.name),
+                skill_weights: Object.fromEntries((agent.keySkills || []).map(s => [s.name, s.weight || 1])),
+                config: { index: idx + 1 }
+              })
+              byRound.set(seq, list)
             })
-
-            const mappings = Array.from(byRound.entries()).map(([roundSeq, list]) => ({ roundSeq, agents: list }))
+            const mappings = Array.from(byRound.entries()).map(([seq, agents]) => ({ seq, agents }))
             await fetch(`/api/jobs/${encodeURIComponent(jobId)}/round-agents`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ mappings }),
             })
+            persistDoneForJob.current = jobId
           } catch (e) {
             console.warn('Persist selected agents failed (non-fatal):', (e as any)?.message)
           }
@@ -446,6 +438,69 @@ export default function SelectedAgentsPage() {
       router.push('/dashboard/agents/create')
     }
   }, [router, searchParams])
+
+  // Helper to map our round names to AI agent types expected by the generator API
+  const mapRoundToAgentType = (roundName: string): string => {
+    const n = (roundName || '').toLowerCase()
+    if (n.includes('screening')) return 'Screening Agent'
+    if (n.includes('technical')) return 'Technical Interview Agent'
+    if (n.includes('initial')) return 'Initial Interview Agent'
+    if (n.includes('final') || n.includes('hr') || n.includes('behavioral')) return 'Behavioral Interview Agent'
+    return 'Screening Agent'
+  }
+
+  // After agents are loaded and job description is available
+  const triggerAIGeneration = async () => {
+      if (autoGenStarted.current) { console.debug('[AI Gen] Skipped: already started'); return }
+      if (!jobData?.description) { console.debug('[AI Gen] Skipped: missing job description'); return }
+      if (!Array.isArray(selectedAgents) || selectedAgents.length === 0) { console.debug('[AI Gen] Skipped: no agents'); return }
+      autoGenStarted.current = true
+
+      try {
+        // Generate sequentially to avoid rate limits
+        const updates: Record<string, Question[]> = {}
+        for (const agent of selectedAgents) {
+          const jd = String(jobData.description || '')
+          const agentType = mapRoundToAgentType(agent.interviewRound.name)
+          const skills = (agent.keySkills || []).map(s => s.name).filter(Boolean)
+          // Default count removed; generation only via modal path
+          const numberOfQuestions = 5
+          console.debug('[AI Gen] Request', { agent: agent.id, agentType, numberOfQuestions, hasJD: jd.length > 0, skills })
+          const res = await fetch('/api/ai/generate-questions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jobDescription: jd, agentType, numberOfQuestions, skills })
+          })
+          if (!res.ok) { console.warn('[AI Gen] API failed for agent', agent.id); continue }
+          const data = await res.json()
+          const aiQs: string[] = Array.isArray(data?.questions) ? data.questions : []
+          console.debug('[AI Gen] Response', { agent: agent.id, count: aiQs.length })
+          if (aiQs.length === 0) continue
+          const newQuestions: Question[] = aiQs.map((q, idx) => ({
+            id: `ai-question-${Date.now()}-${idx}`,
+            text: q,
+            type: agent.interviewRound.name.includes('Technical') ? 'technical' :
+                  (agent.interviewRound.name.includes('Final') || agent.interviewRound.name.includes('HR')) ? 'behavioral' :
+                  agent.interviewRound.name.includes('Initial') ? 'situational' : 'situational',
+            linkedSkills: agent.keySkills.slice(0, Math.min(2, agent.keySkills.length)).map(s => s.id)
+          }))
+          updates[agent.id] = newQuestions
+        }
+
+        // Single state update to minimize re-renders
+        setSelectedAgents(prev => prev.map(a => {
+          const add = updates[a.id]
+          if (!add) return a
+          const t0 = a.tasks[0]
+          const merged = dedupeAndLimitQuestions(t0.questions, add, add.length, true)
+          return { ...a, tasks: [{ ...t0, questions: merged }] }
+        }))
+      } catch (e) {
+        console.warn('Auto AI question generation failed (non-fatal):', (e as any)?.message)
+      }
+  }
+
+  // Auto-generation disabled: questions will only be generated via the AI modal or manual actions.
 
   // (Removed) job fetching and inline editing for job summary
 
@@ -494,7 +549,7 @@ export default function SelectedAgentsPage() {
                 id: `ai-question-${Date.now()}-${index}`,
                 text: questionText,
                 type: agent.interviewRound.name.includes('Technical') ? 'technical' : 
-                       agent.interviewRound.name.includes('HR') ? 'behavioral' : 'situational',
+                       (agent.interviewRound.name.includes('Final') || agent.interviewRound.name.includes('HR')) ? 'behavioral' : 'situational',
                 linkedSkills: agent.keySkills.slice(0, Math.min(2, agent.keySkills.length)).map(skill => skill.id)
               }))
 
@@ -698,7 +753,11 @@ export default function SelectedAgentsPage() {
         value={activeTab}
         onValueChange={(v) => {
           setActiveTab(v)
-          router.replace(`/selected-agents?tab=${encodeURIComponent(v)}`, { scroll: false })
+          const jobId = searchParams.get('jobId')
+          const qs = new URLSearchParams()
+          if (jobId) qs.set('jobId', jobId)
+          qs.set('tab', v)
+          router.replace(`/selected-agents?${qs.toString()}`, { scroll: false })
         }}
         className="w-full"
       >
@@ -826,6 +885,7 @@ export default function SelectedAgentsPage() {
                         agentId={agent.id}
                         taskId={task.id}
                         basePath="/selected-agents"
+                        existingQuestions={(task.questions || []).map(q => q.text)}
                       />
                     </div>
                   </div>
