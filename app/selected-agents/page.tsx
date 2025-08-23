@@ -271,13 +271,25 @@ export default function SelectedAgentsPage() {
       if (storedJobData) {
         try { setJobData(JSON.parse(storedJobData)) } catch {}
       }
-      if (!storedAgents) {
+      // Parse inputs safely
+      const parsedAgents: any = storedAgents ? (() => { try { return JSON.parse(storedAgents) } catch { return null } })() : null
+      const chosenRounds: string[] = storedChosenRounds ? (() => { try { return JSON.parse(storedChosenRounds) } catch { return [] } })() : []
+
+      // Determine agent count: prefer explicit chosen rounds length, else selectedAgents length
+      const roundsCount = Array.isArray(chosenRounds) ? chosenRounds.length : 0
+      const storedAgentsCount = Array.isArray(parsedAgents) ? parsedAgents.length : (Number.isFinite(parsedAgents) ? Number(parsedAgents) : 0)
+      const agentCount = roundsCount > 0 ? roundsCount : storedAgentsCount
+
+      // If neither is present, redirect to selection
+      if (!agentCount || agentCount <= 0) {
         router.push('/dashboard/agents/create')
         return
       }
 
-      const selectedAgentIds = JSON.parse(storedAgents)
-      const chosenRounds: string[] = storedChosenRounds ? (() => { try { return JSON.parse(storedChosenRounds) } catch { return [] } })() : []
+      // Build selectedAgentIds robustly
+      const selectedAgentIds: any[] = Array.isArray(parsedAgents) && parsedAgents.length >= agentCount
+        ? parsedAgents
+        : Array.from({ length: agentCount }, (_, i) => i + 1)
       
       if (!Array.isArray(selectedAgentIds) || selectedAgentIds.length === 0) {
         router.push('/dashboard/agents/create')
@@ -294,6 +306,11 @@ export default function SelectedAgentsPage() {
             return 2 // Technical Interview 1
           case 'system design':
             return 3 // Technical Interview 2 (closest match)
+          case 'architecture':
+          case 'architecture interview':
+          case 'architecture round':
+          case 'system architecture':
+            return 3 // Treat architecture as System Design round
           case 'behavioral interview':
             return 4 // HR Interview
           case 'final round':
@@ -371,6 +388,47 @@ export default function SelectedAgentsPage() {
         setActiveTab(initialTab)
         // Ensure URL reflects the active tab
         router.replace(`/selected-agents?tab=${encodeURIComponent(initialTab)}`, { scroll: false })
+
+        // Persist mapping of selected agents to rounds for this job (best-effort)
+        const persist = async () => {
+          try {
+            const job = JSON.parse(localStorage.getItem('newJobData') || 'null')
+            const jobId = job?.id
+            if (!jobId) return
+            // Group agents by their target round sequence
+            const byRound = new Map<number, Array<{ agent_type: string; skill_weights: any; config: any }>>()
+            agents.forEach((agent, idx) => {
+              // Determine round index as earlier logic does
+              let mappedIdx = idx
+              if (Array.isArray(chosenRounds) && chosenRounds.length > 0) {
+                const m = mapExternalRoundToIndex(chosenRounds[Math.min(idx, chosenRounds.length - 1)] || '')
+                if (m >= 0) mappedIdx = m
+              }
+              // Ensure within bounds and then convert to seq
+              mappedIdx = Math.max(0, Math.min(mappedIdx, interviewRounds.length - 1))
+              const roundSeq = mappedIdx + 1
+
+              const payload = {
+                agent_type: agent.interviewRound.name,
+                skill_weights: Object.fromEntries((agent.keySkills || []).map(ks => [ks.name, ks.weight])),
+                config: { ui_agent_id: agent.id },
+              }
+              const list = byRound.get(roundSeq) || []
+              list.push(payload)
+              byRound.set(roundSeq, list)
+            })
+
+            const mappings = Array.from(byRound.entries()).map(([roundSeq, list]) => ({ roundSeq, agents: list }))
+            await fetch(`/api/jobs/${encodeURIComponent(jobId)}/round-agents`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mappings }),
+            })
+          } catch (e) {
+            console.warn('Persist selected agents failed (non-fatal):', (e as any)?.message)
+          }
+        }
+        persist()
       }
       setLoading(false)
     } catch (error) {
@@ -755,6 +813,9 @@ export default function SelectedAgentsPage() {
                         keySkills={agent.keySkills}
                         onQuestionsGenerated={(questions) => addAIQuestions(agent.id, task.id, questions)}
                         initialJobDescription={jobData?.description || ''}
+                        agentId={agent.id}
+                        taskId={task.id}
+                        basePath="/selected-agents"
                       />
                     </div>
                   </div>
