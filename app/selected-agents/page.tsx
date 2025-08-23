@@ -320,8 +320,8 @@ export default function SelectedAgentsPage() {
         }
       }
 
-      // Generate full agent data for selected IDs
-      const agents: Agent[] = selectedAgentIds.map((agentId: any, index: number) => {
+      // Generate full agent data for selected IDs with a computed sequence for ordering
+      const built = selectedAgentIds.map((agentId: any, index: number) => {
         // Ensure agentId is a string and handle different formats
         const agentIdStr = String(agentId)
         let agentIndex = 0
@@ -359,32 +359,47 @@ export default function SelectedAgentsPage() {
         const keySkills = generateKeySkills(roundData.name)
         const questions = generateQuestions(roundData.name, keySkills)
         
+        // Compute desired sequence: if chosenRounds supplied, use its position; else fallback to original index
+        const seq = Array.isArray(chosenRounds) && chosenRounds.length > 0
+          ? Math.min(index, chosenRounds.length - 1)
+          : index
+
         return {
-          id: agentIdStr,
-          name: agentName,
-          candidateName,
-          interviewRound: {
-            id: `${agentIdStr}-round`,
-            name: roundData.name,
-            duration: roundData.duration,
-            interviewer: roundData.interviewer,
-            status: Math.random() > 0.7 ? 'Completed' : Math.random() > 0.5 ? 'In Progress' : 'Pending'
-          },
-          tasks: [{
-            id: `task-${agentIdStr}`,
-            name: `${roundData.name} Assessment`,
-            description: `Comprehensive evaluation for ${roundData.name}`,
-            questions
-          }],
-          keySkills
+          seq,
+          agent: {
+            id: agentIdStr,
+            name: agentName,
+            candidateName,
+            interviewRound: {
+              id: `${agentIdStr}-round`,
+              name: roundData.name,
+              duration: roundData.duration,
+              interviewer: roundData.interviewer,
+              status: Math.random() > 0.7 ? 'Completed' : Math.random() > 0.5 ? 'In Progress' : 'Pending'
+            },
+            tasks: [{
+              id: `task-${agentIdStr}`,
+              name: `${roundData.name} Assessment`,
+              description: `Comprehensive evaluation for ${roundData.name}`,
+              questions
+            }],
+            keySkills
+          }
         }
       })
+      // Sort by computed sequence and then relabel agents sequentially (Agent 1..N)
+      const sorted: Agent[] = built
+        .sort((a: any, b: any) => a.seq - b.seq)
+        .map((entry: any, i: number) => ({
+          ...entry.agent,
+          name: `Agent ${i + 1}`,
+        }))
 
-      setSelectedAgents(agents)
-      if (agents.length > 0) {
+      setSelectedAgents(sorted)
+      if (sorted.length > 0) {
         // Prefer tab from URL if present
         const urlTab = searchParams.get('tab')
-        const initialTab = urlTab && agents.some(a => a.id === urlTab) ? urlTab : agents[0].id
+        const initialTab = urlTab && sorted.some(a => a.id === urlTab) ? urlTab : sorted[0].id
         setActiveTab(initialTab)
         // Ensure URL reflects the active tab
         router.replace(`/selected-agents?tab=${encodeURIComponent(initialTab)}`, { scroll: false })
@@ -397,16 +412,11 @@ export default function SelectedAgentsPage() {
             if (!jobId) return
             // Group agents by their target round sequence
             const byRound = new Map<number, Array<{ agent_type: string; skill_weights: any; config: any }>>()
-            agents.forEach((agent, idx) => {
-              // Determine round index as earlier logic does
-              let mappedIdx = idx
-              if (Array.isArray(chosenRounds) && chosenRounds.length > 0) {
-                const m = mapExternalRoundToIndex(chosenRounds[Math.min(idx, chosenRounds.length - 1)] || '')
-                if (m >= 0) mappedIdx = m
-              }
-              // Ensure within bounds and then convert to seq
-              mappedIdx = Math.max(0, Math.min(mappedIdx, interviewRounds.length - 1))
-              const roundSeq = mappedIdx + 1
+            sorted.forEach((agent, idx) => {
+              // Determine round seq by matching the agent's assigned round name
+              const mappedIdx = interviewRounds.findIndex(r => r.name === agent.interviewRound.name)
+              const safeIdx = mappedIdx >= 0 ? mappedIdx : idx
+              const roundSeq = Math.max(0, Math.min(safeIdx, interviewRounds.length - 1)) + 1
 
               const payload = {
                 agent_type: agent.interviewRound.name,

@@ -251,21 +251,34 @@ export async function GET(req: Request) {
       const companyId = await DatabaseService.getCompanyIdByName(companyName)
       if (!companyId) return NextResponse.json({ ok: true, jobs: [] })
       const data = await DatabaseService.listJobsByCompanyId(companyId, 200)
-      const rows = (data || []).map((r: any) => ({
-        id: r.id,
-        title: r.title,
-        company_name: companyName,
-        location: r.location,
-        employment_type: r.employment_type,
-        experience_level: r.experience_level,
-        summary: r.description_md,
-        responsibilities: r.responsibilities_md,
-        benefits: r.benefits_md,
-        salary_label: r.salary_level,
-        created_by: r.created_by,
-        created_at: r.created_at,
-      }))
-      return NextResponse.json({ ok: true, jobs: rows })
+
+      // Attach per-job interview_rounds by fetching rounds for each job
+      const jobsOut = [] as any[]
+      for (const r of (data || [])) {
+        let interviewRounds: string[] = []
+        try {
+          const rounds = await DatabaseService.getJobRoundsByJobId(r.id)
+          interviewRounds = Array.isArray(rounds) ? rounds.map((x: any) => x.name) : []
+        } catch {
+          interviewRounds = []
+        }
+        jobsOut.push({
+          id: r.id,
+          title: r.title,
+          company_name: companyName,
+          location: r.location,
+          employment_type: r.employment_type,
+          experience_level: r.experience_level,
+          summary: r.description_md,
+          responsibilities: r.responsibilities_md,
+          benefits: r.benefits_md,
+          salary_label: r.salary_level,
+          created_by: r.created_by,
+          created_at: r.created_at,
+          interview_rounds: interviewRounds,
+        })
+      }
+      return NextResponse.json({ ok: true, jobs: jobsOut })
     }
 
     // Fallback to Supabase for preview/mock
@@ -279,7 +292,30 @@ export async function GET(req: Request) {
       .order('created_at', { ascending: false })
       .limit(200)
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
-    const rows = (data || []).map((r) => ({
+    const jobs = (data || [])
+
+    // Fetch job_rounds for these jobs in one query and group by job_id
+    let roundsByJob = new Map<string, string[]>()
+    try {
+      const jobIds = jobs.map(j => j.id)
+      if (jobIds.length > 0) {
+        const { data: roundsData } = await sb
+          .from('job_rounds')
+          .select('job_id, name, seq')
+          .in('job_id', jobIds)
+          .order('seq', { ascending: true })
+        if (Array.isArray(roundsData)) {
+          roundsByJob = roundsData.reduce((acc, r: any) => {
+            const arr = acc.get(r.job_id) || []
+            arr.push(r.name)
+            acc.set(r.job_id, arr)
+            return acc
+          }, new Map<string, string[]>())
+        }
+      }
+    } catch {}
+
+    const rows = jobs.map((r) => ({
       id: r.id,
       title: r.title,
       company_name: companyName,
@@ -292,6 +328,7 @@ export async function GET(req: Request) {
       salary_label: r.salary_level,
       created_by: r.created_by,
       created_at: r.created_at,
+      interview_rounds: roundsByJob.get(r.id) || [],
     }))
     return NextResponse.json({ ok: true, jobs: rows })
   } catch (err: any) {
