@@ -15,7 +15,8 @@ param(
     [Parameter()] [switch]$NoFF,
     [Parameter()] [switch]$Push,
     [Parameter()] [string]$Tag,
-    [Parameter()] [switch]$UsePackageVersion
+    [Parameter()] [switch]$UsePackageVersion,
+    [Parameter()] [switch]$PushTags
 )
 
 Set-StrictMode -Version Latest
@@ -130,15 +131,26 @@ try {
     git show-ref --tags --verify --quiet "refs/tags/$tagName"
     if ($LASTEXITCODE -eq 0) { throw "Tag '$tagName' already exists. Provide a different -Tag or enable -UsePackageVersion after bumping version." }
 
-    # Create annotated tag
-    Write-Info "Creating tag $tagName"
+    # Create annotated tag on current HEAD of main
+    Write-Info "Creating tag $tagName on $(git rev-parse --abbrev-ref HEAD)"
     git tag -a $tagName -m "Release $tagName from $BranchName"
     if ($LASTEXITCODE -ne 0) { throw "Failed to create tag $tagName" }
+
+    # Verify tag exists and report its commit
+    git show-ref --tags --verify --quiet "refs/tags/$tagName"
+    if ($LASTEXITCODE -ne 0) { throw "Tag verification failed for $tagName" }
+    $tagCommit = (git rev-list -n 1 $tagName).Trim()
+    $short = (git rev-parse --short $tagCommit).Trim()
+    Write-Info "Tag $tagName -> $short"
 
     if ($Push) {
         Write-Info "Pushing $MainBranch and tags to origin ..."
         git push origin $MainBranch
         if ($LASTEXITCODE -ne 0) { Write-Err "Push main failed."; exit $LASTEXITCODE }
+        git push origin --tags
+        if ($LASTEXITCODE -ne 0) { Write-Err "Push tags failed."; exit $LASTEXITCODE }
+    } elseif ($PushTags) {
+        Write-Info "Pushing tags to origin ..."
         git push origin --tags
         if ($LASTEXITCODE -ne 0) { Write-Err "Push tags failed."; exit $LASTEXITCODE }
     }

@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
-import { RoleSwitcher } from "@/components/role-switcher"
 
 export function Header() {
   const { user, company, signOut } = useAuth()
@@ -40,8 +39,6 @@ export function Header() {
         </div>
 
         <div className="flex items-center space-x-4">
-          {/* Role Switcher */}
-          <RoleSwitcher />
 
           {/* Notifications */}
           <Button variant="ghost" size="sm" className="relative">
@@ -59,7 +56,7 @@ export function Header() {
                   <User className="w-4 h-4 text-emerald-600" />
                 </div>
                 <div className="text-left">
-                  <div className="text-sm font-medium">{user?.name || "User"}</div>
+                  <div className="text-sm font-medium">{user?.full_name || user?.email?.split('@')[0] || "User"}</div>
                   <div className="text-xs text-gray-500">{company?.name || "Company"}</div>
                 </div>
               </Button>

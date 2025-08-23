@@ -33,8 +33,24 @@ export class MockAuthService {
   private static readonly USERS_KEY = "mockUsers"
   private static readonly GLOBAL_USERS_KEY = "hire_genai_all_users"
 
-  // No default demo users in production build
-  private static defaultUsers: MockUserData[] = []
+  // Default demo users for development
+  private static defaultUsers: MockUserData[] = [
+    {
+      id: "user_demo_001",
+      email: "demo@example.com",
+      password: "demo123",
+      name: "Demo User",
+      role: "company_admin",
+      company: {
+        id: "company_demo_001",
+        name: "Demo Company",
+        slug: "demo-company",
+        industry: "Technology",
+        size: "1-10",
+        website: "https://demo.example.com"
+      }
+    }
+  ]
 
   static initializeUsers() {
     if (typeof window === "undefined") return

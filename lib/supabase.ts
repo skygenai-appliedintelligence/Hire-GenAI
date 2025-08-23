@@ -259,11 +259,11 @@ function isValidHttpUrl(url: string) {
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""
-const hasValidSupabaseConfig =
+export const isClientSupabaseConfigured =
   isValidHttpUrl(supabaseUrl) && !!supabaseAnonKey && !isPlaceholder(supabaseUrl) && !isPlaceholder(supabaseAnonKey)
 
 export const supabase: SupabaseClient =
-  hasValidSupabaseConfig
+  isClientSupabaseConfigured
     ? createClient(supabaseUrl, supabaseAnonKey)
     : (() => {
         console.warn(
@@ -281,3 +281,9 @@ export const createServerClient = () => {
   }
   return createMockClient()
 }
+
+export const isServerSupabaseConfigured = (() => {
+  const serverUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+  return isValidHttpUrl(serverUrl) && !!serviceKey && !isPlaceholder(serverUrl)
+})()
