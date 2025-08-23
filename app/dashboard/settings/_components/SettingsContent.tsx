@@ -283,10 +283,7 @@ export default function SettingsContent({ section }: { section?: string }) {
             <Bell className="h-4 w-4" />
             <span>Notifications</span>
           </TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center space-x-2">
-            <Shield className="h-4 w-4" />
-            <span>Security</span>
-          </TabsTrigger>
+          
           <TabsTrigger value="billing" className="flex items-center space-x-2">
             <CreditCard className="h-4 w-4" />
             <span>Billing</span>
@@ -566,31 +563,7 @@ export default function SettingsContent({ section }: { section?: string }) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="security">
-          <Card className="linkedin-card">
-            <CardHeader>
-              <CardTitle>Security Settings</CardTitle>
-              <CardDescription>Manage your account security and privacy</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="currentPassword">Current Password</Label>
-                <Input id="currentPassword" type="password" className="linkedin-input" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">New Password</Label>
-                <Input id="newPassword" type="password" className="linkedin-input" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <Input id="confirmPassword" type="password" className="linkedin-input" />
-              </div>
-              <div className="flex justify-end">
-                <Button className="linkedin-button">Update Password</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+        
 
         <TabsContent value="billing">
           <Card className="linkedin-card">
