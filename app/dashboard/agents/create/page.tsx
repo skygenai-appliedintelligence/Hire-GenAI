@@ -75,48 +75,31 @@ export default function CreateAgentsPage() {
         const selectedRounds = localStorage.getItem('selectedInterviewRounds')
         const jobDataStr = localStorage.getItem('newJobData')
         
+        // Always show all agents by default
         if (selectedRounds) {
           const rounds = JSON.parse(selectedRounds)
           setRoundsFromJob(Array.isArray(rounds) ? rounds : null)
-          if (jobDataStr) {
-            setJobData(JSON.parse(jobDataStr))
-          }
-          
-          // Create agents only for selected interview rounds
-          const agents: Agent[] = rounds.map((roundName: string, index: number) => {
-            const config = agentConfigurations[roundName as keyof typeof agentConfigurations]
-            return {
-              id: `agent-${index + 1}`,
-              roundName,
-              name: config.name,
-              description: config.description,
-              duration: config.duration,
-              skills: config.skills,
-              color: config.color,
-              selected: false
-            }
-          })
-          
-          setAvailableAgents(agents)
-        } else {
-          // Fallback: show all agents if no specific rounds selected
-          const allRounds = Object.keys(agentConfigurations)
-          const agents: Agent[] = allRounds.map((roundName, index) => {
-            const config = agentConfigurations[roundName as keyof typeof agentConfigurations]
-            return {
-              id: `agent-${index + 1}`,
-              roundName,
-              name: config.name,
-              description: config.description,
-              duration: config.duration,
-              skills: config.skills,
-              color: config.color,
-              selected: false
-            }
-          })
-          setAvailableAgents(agents)
-          setShowingAll(true)
         }
+        if (jobDataStr) {
+          setJobData(JSON.parse(jobDataStr))
+        }
+
+        const allRounds = Object.keys(agentConfigurations)
+        const agents: Agent[] = allRounds.map((roundName, index) => {
+          const config = agentConfigurations[roundName as keyof typeof agentConfigurations]
+          return {
+            id: `agent-${index + 1}`,
+            roundName,
+            name: config.name,
+            description: config.description,
+            duration: config.duration,
+            skills: config.skills,
+            color: config.color,
+            selected: false
+          }
+        })
+        setAvailableAgents(agents)
+        setShowingAll(true)
         
         setLoading(false)
       } catch (error) {

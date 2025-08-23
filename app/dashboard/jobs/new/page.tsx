@@ -70,6 +70,12 @@ export default function CreateJobPage() {
     setIsSubmitting(true)
     
     try {
+      // Client-side guard to match API required fields
+      if (!formData.description.trim() || !formData.requirements.trim()) {
+        alert('Please fill in Description and Requirements before creating the job.')
+        setIsSubmitting(false)
+        return
+      }
       const res = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -98,8 +104,8 @@ export default function CreateJobPage() {
       const selectedAgents = Array.from({ length: agentsCount }, (_, i) => i + 1) // [1,2,3,...]
       localStorage.setItem('selectedAgents', JSON.stringify(selectedAgents))
 
-      // Redirect to the Selected Agents page
-      router.push('/selected-agents')
+      // Redirect to the Selected Agents page with jobId and default tab=1
+      router.push(`/selected-agents?jobId=${encodeURIComponent(data.jobId)}&tab=1`)
     } catch (error) {
       console.error('Error creating job:', error)
     } finally {
@@ -422,6 +428,8 @@ export default function CreateJobPage() {
                 !formData.location ||
                 !formData.jobType ||
                 !formData.experienceLevel ||
+                !formData.description.trim() ||
+                !formData.requirements.trim() ||
                 formData.interviewRounds.length === 0
               }
               className="min-w-[200px]"
