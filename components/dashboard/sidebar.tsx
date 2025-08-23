@@ -14,7 +14,7 @@ const navigation = [
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
   { name: "Integrations", href: "/dashboard/integrations", icon: Building2 },
   { name: "Messages", href: "/dashboard/messages", icon: MessageSquare },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
+  { name: "Settings", href: "/dashboard/settings/profile", icon: Settings },
 ]
 
 export function Sidebar() {
@@ -33,7 +33,10 @@ export function Sidebar() {
       <nav className="mt-6">
         <div className="px-3">
           {navigation.map((item) => {
-            const isActive = pathname === item.href || (item.href === "/dashboard/agents/create" && pathname.startsWith("/dashboard/agents"))
+            const isActive =
+              pathname === item.href ||
+              (item.name === "Settings" && pathname.startsWith("/dashboard/settings")) ||
+              (item.href === "/dashboard/agents/create" && pathname.startsWith("/dashboard/agents"))
             return (
               <Link
                 key={item.name}

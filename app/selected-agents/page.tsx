@@ -83,7 +83,21 @@ const interviewRounds = [
   }
 ]
 
-// Generate dummy key skills for each agent type
+// Default evaluation skills applied to every agent by default
+const DEFAULT_EVAL_SKILLS: Array<Pick<KeySkill, 'name' | 'description' | 'weight'>> = [
+  { name: 'Communication', description: 'Clear verbal and written communication', weight: 15 },
+  { name: 'Problem Solving', description: 'Analytical thinking and approach', weight: 15 },
+  { name: 'Teamwork', description: 'Collaborates effectively with others', weight: 10 },
+  { name: 'Leadership', description: 'Influence, ownership, and guidance', weight: 10 },
+  { name: 'Adaptability', description: 'Handles change and ambiguity', weight: 10 },
+  { name: 'Technical Skills', description: 'Role-relevant technical proficiency', weight: 15 },
+  { name: 'Active Listening', description: 'Understands questions and responds thoughtfully', weight: 8 },
+  { name: 'Critical Thinking', description: 'Evaluates information to make reasoned decisions', weight: 7 },
+  { name: 'Work Ethic', description: 'Reliability, ownership, and follow-through', weight: 5 },
+  { name: 'Cultural Fit', description: 'Alignment with company values', weight: 5 },
+]
+
+// Generate key skills for each agent type and merge defaults
 const generateKeySkills = (roundName: string): KeySkill[] => {
   const skillSets = {
     'Screening Round': [
@@ -113,10 +127,21 @@ const generateKeySkills = (roundName: string): KeySkill[] => {
     ]
   }
 
-  const skills = skillSets[roundName as keyof typeof skillSets] || skillSets['Screening Round']
-  return skills.map((skill, index) => ({
+  const base = skillSets[roundName as keyof typeof skillSets] || skillSets['Screening Round']
+
+  // Merge defaults + base, dedupe by name (case-insensitive), keep first weight/description
+  const byName = new Map<string, { name: string; description: string; weight: number }>()
+  const put = (s: { name: string; description: string; weight: number }) => {
+    const key = s.name.trim().toLowerCase()
+    if (!byName.has(key)) byName.set(key, s)
+  }
+  DEFAULT_EVAL_SKILLS.forEach(put)
+  base.forEach(put)
+
+  const merged = Array.from(byName.values())
+  return merged.map((skill, index) => ({
     id: `skill-${index + 1}`,
-    ...skill
+    ...skill,
   }))
 }
 
@@ -223,16 +248,38 @@ export default function SelectedAgentsPage() {
     try {
       // Get selected agent IDs from localStorage
       const storedAgents = localStorage.getItem('selectedAgents')
+      // Also get the specific interview rounds the user chose when creating the JD (if available)
+      const storedChosenRounds = localStorage.getItem('selectedInterviewRounds')
       if (!storedAgents) {
         router.push('/dashboard/agents/create')
         return
       }
 
       const selectedAgentIds = JSON.parse(storedAgents)
+      const chosenRounds: string[] = storedChosenRounds ? (() => { try { return JSON.parse(storedChosenRounds) } catch { return [] } })() : []
       
       if (!Array.isArray(selectedAgentIds) || selectedAgentIds.length === 0) {
         router.push('/dashboard/agents/create')
         return
+      }
+
+      // Helper to map external round names (from job form) to internal round indices
+      const mapExternalRoundToIndex = (roundName: string): number => {
+        const key = roundName.trim().toLowerCase()
+        switch (key) {
+          case 'phone screening':
+            return 0 // Screening Round
+          case 'technical assessment':
+            return 2 // Technical Interview 1
+          case 'system design':
+            return 3 // Technical Interview 2 (closest match)
+          case 'behavioral interview':
+            return 4 // HR Interview
+          case 'final round':
+            return 1 // Initial Interview (fallback)
+          default:
+            return -1
+        }
       }
 
       // Generate full agent data for selected IDs
@@ -255,6 +302,14 @@ export default function SelectedAgentsPage() {
           agentIndex = index
         }
         
+        // If user chose explicit interview rounds, prefer those mappings by order
+        if (Array.isArray(chosenRounds) && chosenRounds.length > 0) {
+          const mapped = mapExternalRoundToIndex(chosenRounds[Math.min(index, chosenRounds.length - 1)] || '')
+          if (mapped >= 0) {
+            agentIndex = mapped
+          }
+        }
+
         // Ensure agentIndex is within bounds
         agentIndex = Math.max(0, Math.min(agentIndex, interviewRounds.length - 1))
         
@@ -581,17 +636,25 @@ export default function SelectedAgentsPage() {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Key Skills for Evaluation</CardTitle>
-                  <Button onClick={() => addKeySkill(agent.id)} size="sm">
+                  <div className="flex items-center gap-3">
+                    <CardTitle>Key Skills for Evaluation</CardTitle>
+                    <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                      {agent.keySkills.length} skills
+                    </span>
+                  </div>
+                  <Button onClick={() => addKeySkill(agent.id)} size="sm" className="bg-blue-600 text-white hover:bg-blue-700">
                     <Plus className="w-4 h-4 mr-2" />
                     Add Skill
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
                   {agent.keySkills.map((skill) => (
-                    <div key={skill.id} className="border rounded-lg p-4 space-y-3">
+                    <div
+                      key={skill.id}
+                      className="relative rounded-lg p-3 space-y-2 border border-blue-100 bg-gradient-to-br from-white to-blue-50/60 hover:from-white hover:to-blue-100/70 shadow-sm hover:shadow-md transition-colors duration-200"
+                    >
                       <div className="flex items-center justify-between">
                         {editingSkill === skill.id ? (
                           <Input
@@ -600,7 +663,7 @@ export default function SelectedAgentsPage() {
                             className="font-semibold"
                           />
                         ) : (
-                          <h4 className="font-semibold text-gray-900">{skill.name}</h4>
+                          <h4 className="font-semibold text-gray-900 truncate" title={skill.name}>{skill.name}</h4>
                         )}
                         <div className="flex items-center gap-2">
                           <Button
@@ -628,32 +691,10 @@ export default function SelectedAgentsPage() {
                             onChange={(e) => updateKeySkill(agent.id, skill.id, { description: e.target.value })}
                             placeholder="Skill description"
                           />
-                          <div className="flex items-center gap-2">
-                            <Label htmlFor={`weight-${skill.id}`}>Weight:</Label>
-                            <Input
-                              id={`weight-${skill.id}`}
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={skill.weight}
-                              onChange={(e) => updateKeySkill(agent.id, skill.id, { weight: parseInt(e.target.value) || 0 })}
-                              className="w-20"
-                            />
-                            <span className="text-sm text-gray-600">%</span>
-                          </div>
                         </div>
                       ) : (
-                        <div className="space-y-2">
-                          <p className="text-sm text-gray-600">{skill.description}</p>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">Weight: {skill.weight}%</span>
-                            <div className="flex-1 bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-blue-500 h-2 rounded-full" 
-                                style={{ width: `${skill.weight}%` }}
-                              ></div>
-                            </div>
-                          </div>
+                        <div>
+                          <p className="text-sm text-gray-600 truncate" title={skill.description}>{skill.description}</p>
                         </div>
                       )}
                     </div>

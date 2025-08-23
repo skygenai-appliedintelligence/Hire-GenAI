@@ -7,17 +7,21 @@ import { MockAuthService } from "@/lib/mock-auth"
 interface User {
   id: string
   email: string
-  name: string
-  role: string
+  full_name: string
+  status: string
+  phone?: string
+  timezone?: string
 }
 
 interface Company {
   id: string
   name: string
-  slug: string
-  industry: string
-  size: string
-  website: string
+  status: string
+  verified: boolean
+  website?: string
+  industry?: string
+  size?: string
+  description?: string
 }
 
 interface AuthContextType {
@@ -57,8 +61,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session.data.session?.user) {
           const currentUser = MockAuthService.getCurrentUser()
           if (currentUser) {
-            setUser(currentUser.user)
-            setCompany(currentUser.company)
+            // Convert mock format to new format
+            const newUser: User = {
+              id: currentUser.user.id,
+              email: currentUser.user.email,
+              full_name: currentUser.user.name,
+              status: 'active',
+              phone: undefined,
+              timezone: 'UTC'
+            }
+            const newCompany: Company = {
+              id: currentUser.company.id,
+              name: currentUser.company.name,
+              status: 'active',
+              verified: false
+            }
+            setUser(newUser)
+            setCompany(newCompany)
             console.log("✅ Restored session for:", currentUser.user.email)
           }
         } else {
@@ -85,8 +104,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       const currentUser = MockAuthService.getCurrentUser()
       if (currentUser) {
-        setUser(currentUser.user)
-        setCompany(currentUser.company)
+        // Convert mock format to new format
+        const newUser: User = {
+          id: currentUser.user.id,
+          email: currentUser.user.email,
+          full_name: currentUser.user.name,
+          status: 'active',
+          phone: undefined,
+          timezone: 'UTC'
+        }
+        const newCompany: Company = {
+          id: currentUser.company.id,
+          name: currentUser.company.name,
+          status: 'active',
+          verified: false
+        }
+        setUser(newUser)
+        setCompany(newCompany)
       }
       return {}
     } catch (error) {
@@ -111,8 +145,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result.data.user) {
         const currentUser = MockAuthService.getCurrentUser()
         if (currentUser) {
-          setUser(currentUser.user)
-          setCompany(currentUser.company)
+          const newUser: User = {
+            id: currentUser.user.id,
+            email: currentUser.user.email,
+            full_name: currentUser.user.name,
+            status: 'active',
+            phone: undefined,
+            timezone: 'UTC'
+          }
+          const newCompany: Company = {
+            id: currentUser.company.id,
+            name: currentUser.company.name,
+            status: 'active',
+            verified: false
+          }
+          setUser(newUser)
+          setCompany(newCompany)
           console.log("✅ Sign up successful for:", currentUser.user.email)
         }
       }
@@ -135,8 +183,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       const currentUser = MockAuthService.getCurrentUser()
       if (currentUser) {
-        setUser(currentUser.user)
-        setCompany(currentUser.company)
+        // Convert mock format to new format
+        const newUser: User = {
+          id: currentUser.user.id,
+          email: currentUser.user.email,
+          full_name: currentUser.user.name,
+          status: 'active',
+          phone: undefined,
+          timezone: 'UTC'
+        }
+        const newCompany: Company = {
+          id: currentUser.company.id,
+          name: currentUser.company.name,
+          status: 'active',
+          verified: false
+        }
+        setUser(newUser)
+        setCompany(newCompany)
       }
       return {}
     } catch (error) {
@@ -166,7 +229,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Allow setting session directly from server response (e.g., OTP verify)
   const setAuthSession = (userObj: User, companyObj: Company) => {
     try {
-      MockAuthService.setSessionFromServer(userObj, companyObj)
+      // Convert new format to mock format for compatibility
+      const mockUser = {
+        id: userObj.id,
+        email: userObj.email,
+        name: userObj.full_name,
+        role: 'admin'
+      }
+      const mockCompany = {
+        id: companyObj.id,
+        name: companyObj.name,
+        slug: companyObj.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        industry: 'Technology',
+        size: '1-10',
+        website: ''
+      }
+      
+      MockAuthService.setSessionFromServer(mockUser, mockCompany)
       setUser(userObj)
       setCompany(companyObj)
     } catch (e) {

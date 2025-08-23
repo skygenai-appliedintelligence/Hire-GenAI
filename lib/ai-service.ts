@@ -109,7 +109,8 @@ export class AIService {
   static async generateStagedInterviewQuestions(
     jobDescription: string,
     agentType: "Screening Agent" | "Initial Interview Agent" | "Technical Interview Agent" | "Behavioral Interview Agent",
-    numberOfQuestions: number
+    numberOfQuestions: number,
+    skills?: string[]
   ): Promise<string[]> {
     // Check if we're in the browser
     if (typeof window !== "undefined") {
@@ -124,6 +125,7 @@ export class AIService {
             jobDescription,
             agentType,
             numberOfQuestions,
+            skills: Array.isArray(skills) ? skills : undefined,
           }),
         })
 
@@ -161,6 +163,7 @@ export class AIService {
       "Behavioral Interview Agent": "Generate soft skills, teamwork, and conflict resolution questions. Focus on: leadership, teamwork, communication, conflict resolution, and cultural fit."
     }
 
+    const focus = Array.isArray(skills) && skills.length > 0 ? `\nFOCUS SKILLS:\n${skills.map((s, i)=>`- ${s}`).join('\n')}\n` : ''
     const prompt = `
 You are an AI Interview Question Generator for an automated hiring platform.
 
@@ -185,6 +188,7 @@ INSTRUCTIONS:
   4. Suitable for the given interview stage
 
 ${agentTypePrompts[agentType]}
+ ${focus}
 
 OUTPUT FORMAT:
 Generate exactly ${numberOfQuestions} questions in this format:

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { createServerClient } from "@/lib/supabase"
 
 export const dynamic = 'force-dynamic'
 
@@ -12,13 +12,28 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Email parameter is required' }, { status: 400 })
     }
 
-    const user = await prisma.users.findUnique({
-      where: { email },
-      include: { company: true }
-    })
+    const sb = createServerClient()
+    const { data: user, error } = await sb
+      .from('users')
+      .select('id, email, full_name, company_id')
+      .eq('email', email)
+      .single()
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    let company: any = null
+    if (user.company_id) {
+      const { data: comp } = await sb
+        .from('companies')
+        .select('id, name, industry, size_band, website_url, careers_url')
+        .eq('id', user.company_id)
+        .single()
+      company = comp || null
     }
 
     return NextResponse.json({
@@ -26,16 +41,14 @@ export async function GET(req: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
-        role: user.role
+        name: user.full_name,
       },
-      company: user.company ? {
-        id: user.company.id,
-        name: user.company.name,
-        slug: user.company.slug,
-        industry: user.company.industry,
-        size: user.company.size,
-        website: user.company.website
+      company: company ? {
+        id: company.id,
+        name: company.name,
+        industry: company.industry,
+        size: company.size_band,
+        website: company.website_url
       } : null
     })
   } catch (error: any) {
