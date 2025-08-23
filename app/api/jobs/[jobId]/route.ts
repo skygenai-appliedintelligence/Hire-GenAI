@@ -5,11 +5,12 @@ import { DatabaseService } from '@/lib/database'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export async function DELETE(req: Request, { params }: { params: { id?: string; jobId?: string } }) {
+export async function DELETE(req: Request, ctx: { params: { id?: string; jobId?: string } | Promise<{ id?: string; jobId?: string }> }) {
   try {
     const { searchParams } = new URL(req.url)
     const companyName = searchParams.get('company')?.trim()
-    const id = (params as any).jobId || (params as any).id
+    const p = await (ctx as any).params
+    const id = (p as any)?.jobId || (p as any)?.id
 
     if (!id) {
       return NextResponse.json({ ok: false, error: 'Missing job id' }, { status: 400 })
@@ -56,11 +57,12 @@ export async function DELETE(req: Request, { params }: { params: { id?: string; 
   }
 }
 
-export async function GET(req: Request, { params }: { params: { id?: string; jobId?: string } }) {
+export async function GET(req: Request, ctx: { params: { id?: string; jobId?: string } | Promise<{ id?: string; jobId?: string }> }) {
   try {
     const { searchParams } = new URL(req.url)
     const companyName = searchParams.get('company')?.trim()
-    const id = (params as any).jobId || (params as any).id
+    const p = await (ctx as any).params
+    const id = (p as any)?.jobId || (p as any)?.id
 
     if (!id) return NextResponse.json({ ok: false, error: 'Missing job id' }, { status: 400 })
     if (!companyName) return NextResponse.json({ ok: false, error: 'Missing company' }, { status: 400 })
@@ -83,7 +85,7 @@ export async function GET(req: Request, { params }: { params: { id?: string; job
         salary_level: row.salary_level,
         created_by: row.created_by,
         created_at: row.created_at,
-        updated_at: row.updated_at,
+        updated_at: (row as any).updated_at ?? null,
       }
       return NextResponse.json({ ok: true, job })
     }
@@ -106,11 +108,12 @@ export async function GET(req: Request, { params }: { params: { id?: string; job
   }
 }
 
-export async function PATCH(req: Request, { params }: { params: { id?: string; jobId?: string } }) {
+export async function PATCH(req: Request, ctx: { params: { id?: string; jobId?: string } | Promise<{ id?: string; jobId?: string }> }) {
   try {
     const { searchParams } = new URL(req.url)
     const companyName = searchParams.get('company')?.trim()
-    const id = (params as any).jobId || (params as any).id
+    const p = await (ctx as any).params
+    const id = (p as any)?.jobId || (p as any)?.id
     if (!id) return NextResponse.json({ ok: false, error: 'Missing job id' }, { status: 400 })
     if (!companyName) return NextResponse.json({ ok: false, error: 'Missing company' }, { status: 400 })
 
