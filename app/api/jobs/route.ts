@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { Prisma } from '@prisma/client'
+import { createServerClient } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -8,6 +7,7 @@ export const dynamic = 'force-dynamic'
 type CreateJobBody = {
   jobTitle: string
   company: string
+  companyId?: string
   location?: string
   jobType?: string
   experienceLevel?: string
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
 
     const missing: string[] = []
     if (!body.jobTitle) missing.push('jobTitle')
-    if (!body.company) missing.push('company')
+    if (!body.companyId) missing.push('companyId')
     if (!raw.location || !raw.location.trim()) missing.push('location')
     if (!raw.jobType || !raw.jobType.trim()) missing.push('jobType')
     if (!body.experienceLevel) missing.push('experienceLevel')
@@ -87,43 +87,47 @@ export async function POST(req: Request) {
     const employment = normalizeJobType(raw.jobType)
     const expLevel = normalizeExperience(body.experienceLevel)
 
-    const insertResult = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
-      INSERT INTO public.job_descriptions (
-        title,
-        company_name,
-        location,
-        employment_type,
-        experience_level,
-        summary,
-        requirements,
-        responsibilities,
-        benefits,
-        salary_label,
-        interview_rounds,
-        interview_duration,
-        platforms,
-        created_by
-      ) VALUES (
-        ${body.jobTitle},
-        ${body.company},
-        ${raw.location?.trim() || ''},
-        CAST(${employment} AS job_type),
-        CAST(${expLevel} AS experience_level),
-        ${body.description},
-        ${body.requirements},
-        ${body.responsibilities || null},
-        ${body.benefits || null},
-        ${body.salaryRange || null},
-        ${Array.isArray(body.interviewRounds) ? body.interviewRounds : []},
-        ${body.interviewDuration || null},
-        ${Array.isArray(body.platforms) ? body.platforms : []},
-        CAST(${body.createdBy ?? null} AS uuid)
-      )
-      RETURNING id;
-    `)
+    const sb = createServerClient()
 
-    const newId = insertResult?.[0]?.id
-    return NextResponse.json({ ok: true, jobId: newId })
+    // Use companyId directly from the request
+    if (!body.companyId) {
+      return NextResponse.json({ ok: false, error: 'Company ID is missing' }, { status: 400 });
+    }
+
+    // Insert into jds (job_descriptions)
+    const { data: job, error: jobErr } = await sb
+      .from('jds')
+      .insert({
+        slug: slugify(body.jobTitle), // Generate slug from title
+        company_id: body.companyId,
+        title: body.jobTitle,
+        location: raw.location?.trim() || null,
+        description: body.description,
+        status: 'open',
+        visibility: 'public',
+        employment_type: employment || 'full_time',
+        responsibilities: body.responsibilities || null,
+        benefits: body.benefits || null,
+        salary_range: body.salaryRange || null,
+        created_by: body.createdBy ?? null,
+      })
+      .select('id')
+      .single()
+    if (jobErr || !job) return NextResponse.json({ ok: false, error: jobErr?.message || 'Failed to create job' }, { status: 500 })
+
+    // Optional: insert job_rounds based on interviewRounds + interviewDuration
+    const rounds = Array.isArray(body.interviewRounds) ? body.interviewRounds : []
+    const duration = (() => {
+      const d = String(body.interviewDuration || '').trim()
+      if (['15', '30', '60'].includes(d)) return Number(d)
+      return 30
+    })()
+    if (rounds.length) {
+      const rows = rounds.map((name, idx) => ({ job_id: job.id, seq: idx + 1, name, duration_minutes: duration }))
+      await sb.from('job_rounds').insert(rows)
+    }
+
+    return NextResponse.json({ ok: true, jobId: job.id })
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err?.message ?? 'unknown' }, { status: 500 })
   }
@@ -139,30 +143,35 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, jobs: [] })
     }
 
+    const sb = createServerClient()
+    // Resolve company id
+    const { data: company } = await sb.from('companies').select('id').eq('name', companyName).single()
+    if (!company?.id) return NextResponse.json({ ok: true, jobs: [] })
+
     // Read only the requesting company's jobs
-    const rows = await prisma.$queryRaw<any[]>(Prisma.sql`
-      SELECT id,
-             title,
-             company_name,
-             location,
-             employment_type::text AS employment_type,
-             experience_level::text AS experience_level,
-             summary,
-             requirements,
-             responsibilities,
-             benefits,
-             salary_label,
-             interview_rounds,
-             interview_duration,
-             platforms,
-             created_by,
-             created_at,
-             updated_at
-        FROM public.job_descriptions
-       WHERE company_name = ${companyName}
-       ORDER BY created_at DESC
-       LIMIT 200
-    `)
+    const { data, error } = await sb
+      .from('jobs')
+      .select('id, title, location, employment_type, experience_level, description_md, responsibilities_md, benefits_md, salary_level, created_by, created_at')
+      .eq('company_id', company.id)
+      .order('created_at', { ascending: false })
+      .limit(200)
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+
+    // Return in a shape similar to previous response
+    const rows = (data || []).map((r) => ({
+      id: r.id,
+      title: r.title,
+      company_name: companyName,
+      location: r.location,
+      employment_type: r.employment_type,
+      experience_level: r.experience_level,
+      summary: r.description_md,
+      responsibilities: r.responsibilities_md,
+      benefits: r.benefits_md,
+      salary_label: r.salary_level,
+      created_by: r.created_by,
+      created_at: r.created_at,
+    }))
 
     return NextResponse.json({ ok: true, jobs: rows })
   } catch (err: any) {

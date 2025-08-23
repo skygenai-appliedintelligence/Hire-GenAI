@@ -1,4 +1,5 @@
-// Prisma schema for SQLite
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
@@ -9,366 +10,99 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model companies {
-  id                String   @id @default(uuid())
-  name              String   @unique
-  slug              String   @unique
-  email             String   @unique
-  logo_url          String?
-  subscription_plan String   @default("basic")
-  created_at        DateTime @default(now())
-  updated_at        DateTime @default(now())
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  status      String   @default("active")
+  verified    Boolean  @default(false)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
 
-  // Extended company profile
-  website         String?
-  domain          String?
-  hq_location     String?
-  industry        String?
-  size            String?
-  billing_contact String?
-  billing_address String?
-  tax_id          String?
+  // Relations
+  domains     CompanyDomain[]
+  users       User[]
 
-  users            users[]
-  jobs             job_descriptions[]
-  activity_logs    activity_logs[]
-  api_integrations api_integrations[]
-  messages         messages[]
-
-  subscriptions     subscriptions[]
-  postings          postings[]
-  sourcing_jobs     sourcing_jobs[]
-  webhooks          webhooks[]
-  suppression_list  suppression_list[]
-  outreach_messages outreach_messages[]
+  @@map("companies")
 }
 
-model users {
-  id         String   @id @default(uuid())
+model CompanyDomain {
+  id         String  @id @default(cuid())
   company_id String
-  email      String   @unique
-  name       String
-  role       String   @default("user")
-  status     String   @default("active") // invited, active, suspended, revoked
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
+  domain     String  @unique
+  verified   Boolean @default(false)
 
-  company companies          @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  jobs    job_descriptions[] @relation("created_by_user")
+  // Relations
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
 
-  @@index([company_id], name: "idx_users_company_id")
+  @@map("company_domains")
 }
 
-model job_descriptions {
-  id                          String    @id @default(uuid())
-  company_id                  String
-  title                       String
-  slug                        String
-  description                 String
-  requirements                String?
-  responsibilities            String?
-  benefits                    String?
-  location                    String?
-  salary_range                String?
-  employment_type             String?
-  status                      String    @default("open") // open, on-hold, closed, cancelled
-  visibility                  String    @default("public") @map("visibility")
-  department                  String?   @map("department")
-  is_remote                   Boolean   @default(false) @map("is_remote")
-  visa_sponsorship            Boolean   @default(false) @map("visa_sponsorship")
-  must_have_skills            String[]  @map("must_have_skills")
-  nice_to_have_skills         String[]  @map("nice_to_have_skills")
-  screening_questions         Json      @map("screening_questions")
-  hiring_team                 Json      @map("hiring_team")
-  target_dates                Json      @map("target_dates")
-  work_eligibility            String?   @map("work_eligibility")
-  equal_opportunity_statement String?   @map("equal_opportunity_statement")
-  apply_deadline              DateTime? @map("apply_deadline")
-  created_by                  String?
-  created_at                  DateTime  @default(now())
-  updated_at                  DateTime  @default(now())
-
-  company       companies          @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  creator       users?             @relation("created_by_user", fields: [created_by], references: [id])
-  activity      activity_logs[]
-  candidates    candidates[]
-  rounds        interview_rounds[]
-  applications  applications[]
-  postings      postings[]
-  sourcing_jobs sourcing_jobs[]
-  messages      messages[]
-
-  @@unique([company_id, slug], name: "uq_jd_company_slug")
-  @@index([company_id], name: "idx_job_descriptions_company_id")
-  @@map("jds")
-}
-
-model candidates {
-  id                   String   @id @default(uuid())
-  job_id               String
-  company_id           String?
-  name                 String
-  email                String
-  phone                String?
-  resume_url           String?
-  linkedin_url         String?
-  source_platform      String?
-  current_stage        String   @default("applied")
-  qualification_status String   @default("pending")
-  notes                String?
-  created_at           DateTime @default(now())
-  updated_at           DateTime @default(now())
-
-  job               job_descriptions    @relation(fields: [job_id], references: [id], onDelete: Cascade)
-  rounds            interview_rounds[]
-  activity          activity_logs[]
-  messages          messages[]
-  applications      applications[]
-  outreach_messages outreach_messages[]
-
-  @@index([job_id], name: "idx_candidates_job_id")
-}
-
-model interview_rounds {
-  id           String    @id @default(uuid())
-  candidate_id String
-  job_id       String
-  round_type   String
-  scheduled_at DateTime?
-  status       String    @default("pending")
-  result       String?
-  feedback     String?
-  meeting_link String?
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @default(now())
-
-  candidate candidates       @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
-  job       job_descriptions @relation("job_rounds", fields: [job_id], references: [id], onDelete: Cascade)
-
-  @@index([candidate_id], name: "idx_interview_rounds_candidate_id")
-}
-
-model api_integrations {
-  id         String   @id @default(uuid())
-  company_id String
-  platform   String
-  api_key    String?
-  api_secret String?
-  is_active  Boolean  @default(false)
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now())
-
-  company companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
-}
-
-model activity_logs {
-  id           String   @id @default(uuid())
-  company_id   String
-  job_id       String?
-  candidate_id String?
-  action       String
-  details      String?
-  created_at   DateTime @default(now())
-
-  company   companies         @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  job       job_descriptions? @relation("job_activity", fields: [job_id], references: [id])
-  candidate candidates?       @relation(fields: [candidate_id], references: [id])
-
-  @@index([company_id], name: "idx_activity_logs_company_id")
-}
-
-model messages {
-  id           String   @id @default(uuid())
-  company_id   String
-  job_id       String?
-  candidate_id String?
-  sender_type  String
-  sender_id    String?
-  content      String
-  meta         String   @default("{}")
-  created_at   DateTime @default(now())
-
-  company   companies         @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  job       job_descriptions? @relation("job_messages", fields: [job_id], references: [id])
-  candidate candidates?       @relation(fields: [candidate_id], references: [id])
-
-  @@index([company_id], name: "idx_messages_company_id")
-  @@index([candidate_id], name: "idx_messages_candidate_id")
-}
-
-// User model for OTP-based authentication
 model User {
-  id                String    @id @default(cuid())
-  email             String?   @unique
-  phone             String?   @unique
-  verified          Boolean   @default(false)
-  otpHash           String?
-  otpExpiresAt      DateTime?
-  passwordHash      String?
-  failedOtpAttempts Int       @default(0)
-  lockUntil         DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id          String   @id @default(cuid())
+  company_id  String
+  email       String   @unique
+  first_name  String?
+  last_name   String?
+  avatar_url  String?
+  status      String   @default("active")
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
 
-  @@index([email, phone])
-  @@map("users_auth")
+  // Relations
+  company         Company         @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  roles           UserRole[]
+  email_identities EmailIdentity[]
+  sessions        Session[]
+
+  @@map("users")
 }
 
-// Email OTPs for DEV and future email OTP integration
-model email_otps {
-  id         String   @id @default(uuid())
-  email      String
-  code       String
-  expires_at DateTime
-  created_at DateTime @default(now())
+model UserRole {
+  id      String @id @default(cuid())
+  user_id String
+  role    String @default("member")
+
+  // Relations
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_roles")
 }
 
-// Subscriptions & billing
-model subscriptions {
-  id                   String   @id @default(uuid())
-  company_id           String
-  plan                 String   @default("base") // base
-  addons               String   @default("[]")
-  period               String   @default("monthly") // monthly, annual
-  status               String   @default("active") // active, past_due, canceled
-  current_period_start DateTime @default(now())
-  current_period_end   DateTime @default(now())
-  created_at           DateTime @default(now())
-  updated_at           DateTime @default(now())
-
-  company companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
-}
-
-// Applications per candidate per JD
-model applications {
-  id              String   @id @default(uuid())
-  candidate_id    String
-  jd_id           String
-  answers_json    String   @default("{}")
-  cv_url          String?
-  screening_score Int?
-  consent_flags   String   @default("{}")
-  status          String   @default("submitted") // submitted, auto_rejected, invited, completed, reviewed
-  created_at      DateTime @default(now())
-  updated_at      DateTime @default(now())
-
-  candidate candidates       @relation(fields: [candidate_id], references: [id], onDelete: Cascade)
-  jd        job_descriptions @relation("job_applications", fields: [jd_id], references: [id], onDelete: Cascade)
-
-  interviews interviews[]
-
-  @@index([jd_id], name: "idx_applications_jd_id")
-}
-
-// Interviews linked to an application
-model interviews {
-  id                String    @id @default(uuid())
-  application_id    String
-  agent_id          String?
-  invite_expires_at DateTime?
-  started_at        DateTime?
-  completed_at      DateTime?
-  score             Int?
-  rubric_json       String    @default("{}")
-  transcript_url    String?
-  recording_url     String?
-  created_at        DateTime  @default(now())
-  updated_at        DateTime  @default(now())
-
-  application applications @relation(fields: [application_id], references: [id], onDelete: Cascade)
-}
-
-// Job Distribution postings
-model postings {
-  id              String   @id @default(uuid())
-  company_id      String
-  jd_id           String
-  board           String
-  external_job_id String?
-  status          String   @default("queued") // queued, posted, error
-  logs            String   @default("[]")
-  created_at      DateTime @default(now())
-  updated_at      DateTime @default(now())
-
-  company companies        @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  jd      job_descriptions @relation(fields: [jd_id], references: [id], onDelete: Cascade)
-
-  @@index([jd_id], name: "idx_postings_jd_id")
-}
-
-// Sourcing jobs
-model sourcing_jobs {
-  id           String   @id @default(uuid())
-  company_id   String
-  jd_id        String
-  status       String   @default("queued")
-  filters_json String   @default("{}")
-  stats_json   String   @default("{}")
-  created_at   DateTime @default(now())
-  updated_at   DateTime @default(now())
-
-  company companies        @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  jd      job_descriptions @relation(fields: [jd_id], references: [id], onDelete: Cascade)
-
-  prospects prospects[]
-}
-
-// Prospects discovered via sourcing
-model prospects {
-  id              String   @id @default(uuid())
-  sourcing_job_id String
-  person_id       String?
-  name            String?
-  email           String?
-  phone           String?
-  matched_score   Int?
-  consent_flags   String   @default("{}")
-  created_at      DateTime @default(now())
-  updated_at      DateTime @default(now())
-
-  sourcing_job sourcing_jobs @relation(fields: [sourcing_job_id], references: [id], onDelete: Cascade)
-
-  outreach_messages outreach_messages[]
-}
-
-// Outreach messages (email/SMS/LinkedIn)
-model outreach_messages {
-  id           String    @id @default(uuid())
-  company_id   String
-  prospect_id  String?
-  candidate_id String?
-  channel      String
-  template_id  String?
-  status       String    @default("queued")
-  sent_at      DateTime?
-  meta         String    @default("{}")
-  created_at   DateTime  @default(now())
-
-  company   companies   @relation(fields: [company_id], references: [id], onDelete: Cascade)
-  prospect  prospects?  @relation(fields: [prospect_id], references: [id])
-  candidate candidates? @relation(fields: [candidate_id], references: [id])
-}
-
-// Webhooks per tenant
-model webhooks {
-  id         String   @id @default(uuid())
-  company_id String
-  event_type String
-  target_url String
-  secret     String?
+model EmailIdentity {
+  id         String   @id @default(cuid())
+  user_id    String
+  email      String   @unique
+  verified   Boolean  @default(false)
   created_at DateTime @default(now())
 
-  company companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  // Relations
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("email_identities")
 }
 
-// Suppression list for opt-outs/bounces per tenant
-model suppression_list {
-  id         String   @id @default(uuid())
-  company_id String
-  channel    String // email or sms
-  value      String
-  reason     String?
-  created_at DateTime @default(now())
+model OtpChallenge {
+  id          String   @id @default(cuid())
+  email       String
+  code_hash   String
+  expires_at  DateTime
+  attempts    Int      @default(0)
+  max_attempts Int     @default(3)
+  verified    Boolean  @default(false)
+  created_at  DateTime @default(now())
 
-  company companies @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  @@map("otp_challenges")
+}
+
+model Session {
+  id              String   @id @default(cuid())
+  user_id         String
+  refresh_token   String   @unique
+  expires_at      DateTime
+  created_at      DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
 }

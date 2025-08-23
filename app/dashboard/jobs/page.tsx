@@ -1,7 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/hooks/use-toast"
 import { type Job } from "@/lib/job-service"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,8 +13,11 @@ import Link from "next/link"
 
 export default function JobsPage() {
   const { company } = useAuth()
+  const router = useRouter()
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     if (company?.id) {
@@ -62,16 +67,28 @@ export default function JobsPage() {
   }
 
   const handleDeleteJob = async (jobId: string) => {
-    if (!company?.id) return
+    if (!company?.name) {
+      toast({ title: "Missing company context", description: "Please re-login or select a company.", variant: "destructive" })
+      return
+    }
 
     if (confirm("Are you sure you want to delete this job?")) {
-      console.log("🗑️ Deleting job:", jobId)
-      const success = await JobService.deleteJob(jobId, company.id)
-      if (success) {
-        setJobs(jobs.filter((job) => job.id !== jobId))
+      try {
+        setDeletingId(jobId)
+        console.log("🗑️ Deleting job:", jobId)
+        const companyName = encodeURIComponent(company.name)
+        const res = await fetch(`/api/jobs/${jobId}?company=${companyName}`, { method: 'DELETE' })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || !data?.ok) throw new Error(data?.error || 'Failed to delete job')
+
+        setJobs((prev) => prev.filter((job) => job.id !== jobId))
         console.log("✅ Job deleted successfully")
-      } else {
-        console.log("❌ Failed to delete job")
+        toast({ title: "Job deleted", description: "The job has been removed successfully." })
+      } catch (err) {
+        console.error("❌ Failed to delete job", err)
+        toast({ title: "Delete failed", description: (err as Error).message, variant: "destructive" })
+      } finally {
+        setDeletingId(null)
       }
     }
   }
@@ -102,6 +119,46 @@ export default function JobsPage() {
     )
   }
 
+  const handleStoreJD = (job: Job) => {
+    try {
+      // Determine number of interview rounds
+      const roundsCount = Array.isArray((job as any).interview_rounds)
+        ? (job as any).interview_rounds.length
+        : (typeof (job as any).interview_rounds === 'number' ? (job as any).interview_rounds : 0)
+
+      // Fallback: if not available, default to 1
+      const agentsCount = Math.max(1, Number(roundsCount) || 0)
+
+      // Build selectedAgents as [1..agentsCount]
+      const selectedAgents = Array.from({ length: agentsCount }, (_, i) => i + 1)
+      localStorage.setItem('selectedAgents', JSON.stringify(selectedAgents))
+
+      // Persist chosen interview rounds if available so Selected Agents can map correctly
+      const rounds = Array.isArray((job as any).interview_rounds) ? (job as any).interview_rounds : []
+      if (rounds.length > 0) {
+        localStorage.setItem('selectedInterviewRounds', JSON.stringify(rounds))
+      }
+
+      // Optionally store minimal job data (not required by selected-agents page but useful)
+      const jobData = {
+        id: job.id,
+        title: job.title,
+        company: company?.name || '',
+        description: job.description,
+        location: job.location,
+        employment_type: job.employment_type,
+        createdAt: job.created_at,
+      }
+      localStorage.setItem('newJobData', JSON.stringify(jobData))
+
+      // Redirect to Selected Agents page
+      router.push('/selected-agents')
+    } catch (e) {
+      console.error('Failed to store JD for selected agents:', e)
+      alert('Unable to proceed. Please try again.')
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -120,7 +177,11 @@ export default function JobsPage() {
       <div className="grid gap-6">
         {jobs.length > 0 ? (
           jobs.map((job) => (
-            <Card key={job.id} className="border border-gray-200 hover:shadow-md transition-shadow">
+            <Card
+              key={job.id}
+              className="border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => handleStoreJD(job)}
+            >
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div>
@@ -196,6 +257,7 @@ export default function JobsPage() {
                         variant="outline"
                         size="sm"
                         className="hover:bg-blue-50 hover:text-blue-700 bg-transparent"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         <BarChart3 className="h-4 w-4 mr-1" />
                         View Stats
@@ -206,23 +268,31 @@ export default function JobsPage() {
                         variant="outline"
                         size="sm"
                         className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 bg-transparent"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         <ExternalLink className="h-4 w-4 mr-1" />
                         Apply Form
                       </Button>
                     </Link>
-                    <Button variant="outline" size="sm" className="hover:bg-gray-50 bg-transparent">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="hover:bg-gray-50 bg-transparent"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDeleteJob(job.id)}
+                      onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      disabled={deletingId === job.id}
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
+                      {deletingId === job.id ? 'Deleting…' : 'Delete'}
                     </Button>
                   </div>
                 </div>
