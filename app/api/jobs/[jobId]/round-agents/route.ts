@@ -5,9 +5,9 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 // Body shape: { mappings: Array<{ roundSeq?: number; roundId?: string; agents: Array<{ agent_type: string; skill_weights?: any; config?: any }> }> }
-export async function POST(_req: Request, { params }: { params: { jobId: string } }) {
+export async function POST(_req: Request, ctx: { params: Promise<{ jobId: string }> }) {
   try {
-    const jobId = params.jobId
+    const { jobId } = await ctx.params
     if (!jobId) return NextResponse.json({ ok: false, error: 'Missing jobId' }, { status: 400 })
 
     const body = await _req.json().catch(() => null) as any
