@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -18,6 +19,9 @@ interface AIQuestionGeneratorModalProps {
   onQuestionsGenerated: (questions: string[]) => void
   trigger?: React.ReactNode
   initialJobDescription?: string
+  agentId?: string
+  taskId?: string
+  basePath?: string // default: '/selected-agents'
 }
 
 export function AIQuestionGeneratorModal({ 
@@ -25,10 +29,15 @@ export function AIQuestionGeneratorModal({
   keySkills, 
   onQuestionsGenerated,
   trigger,
-  initialJobDescription
+  initialJobDescription,
+  agentId,
+  taskId,
+  basePath = '/selected-agents'
 }: AIQuestionGeneratorModalProps) {
   const [open, setOpen] = useState(false)
   const [jobDescription, setJobDescription] = useState("")
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const getRandomQuestionCount = () => {
     const min = 5
     const max = 12
@@ -117,6 +126,25 @@ export function AIQuestionGeneratorModal({
       if (!jobDescription && initialJobDescription) {
         setJobDescription(initialJobDescription)
       }
+      // Update URL to reflect AI modal open state
+      try {
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('ai', '1')
+        if (agentId) params.set('agent', agentId)
+        if (taskId) params.set('task', taskId)
+        router.replace(`${basePath}?${params.toString()}`, { scroll: false })
+      } catch {}
+    }
+    if (!next) {
+      // Remove AI-related params, keep others (like tab)
+      try {
+        const params = new URLSearchParams(searchParams.toString())
+        params.delete('ai')
+        params.delete('agent')
+        params.delete('task')
+        const qs = params.toString()
+        router.replace(qs ? `${basePath}?${qs}` : basePath, { scroll: false })
+      } catch {}
     }
   }
 
