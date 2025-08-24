@@ -46,6 +46,10 @@ export function AIQuestionGeneratorModal({
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
 
+  // Use only highlighted skills if available, fallback to all
+  const highlighted = (keySkills || []).filter((s: any) => (s as any).highlighted)
+  const skillsForUI = highlighted.length > 0 ? highlighted : keySkills
+
   // Map agent types to AI service agent types
   const getAgentTypeForAI = (agentType: string) => {
     const typeMapping: Record<string, "Screening Agent" | "Initial Interview Agent" | "Technical Interview Agent" | "Behavioral Interview Agent"> = {
@@ -71,7 +75,7 @@ export function AIQuestionGeneratorModal({
     setLoading(true)
     try {
       const aiAgentType = getAgentTypeForAI(agentType)
-      const skills = keySkills.map(s => s.name)
+      const skills = skillsForUI.map(s => s.name)
       // Validate number of questions (1-20)
       const n = parseInt(String(numberOfQuestions).trim(), 10)
       if (!Number.isFinite(n) || n < 1 || n > 20) {
@@ -216,11 +220,11 @@ export function AIQuestionGeneratorModal({
           </div>
 
           {/* Key Skills Display */}
-          {keySkills.length > 0 && (
+          {skillsForUI.length > 0 && (
             <div className="space-y-2">
               <Label>Key Skills for {agentType}</Label>
               <div className="flex flex-wrap gap-2">
-                {keySkills.map((skill) => (
+                {skillsForUI.map((skill) => (
                   <span key={skill.id} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
                     {skill.name}
                   </span>
