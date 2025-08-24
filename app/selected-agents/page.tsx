@@ -5,12 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/auth-context'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { CheckCircle, Clock, User, ArrowLeft, Home, Plus, Edit2, Trash2, Save, Brain } from 'lucide-react'
 import { AIQuestionGeneratorModal } from "@/components/ai-question-generator-modal"
+import { useToast } from "@/hooks/use-toast"
 
 // Agent Types - Each agent handles ONE specific interview round
 interface KeySkill {
@@ -18,6 +20,7 @@ interface KeySkill {
   name: string
   description: string
   weight: number
+  highlighted?: boolean
 }
 
 interface Question {
@@ -84,7 +87,7 @@ const interviewRounds = [
   }
 ]
 
-// Default evaluation skills applied to every agent by default
+// Default evaluation skills applied to every agent by default (not highlighted)
 const DEFAULT_EVAL_SKILLS: Array<Pick<KeySkill, 'name' | 'description' | 'weight'>> = [
   { name: 'Communication', description: 'Clear verbal and written communication', weight: 15 },
   { name: 'Problem Solving', description: 'Analytical thinking and approach', weight: 15 },
@@ -102,41 +105,41 @@ const DEFAULT_EVAL_SKILLS: Array<Pick<KeySkill, 'name' | 'description' | 'weight
 const generateKeySkills = (roundName: string): KeySkill[] => {
   const skillSets = {
     'Screening Round': [
-      { name: 'Communication', description: 'Clear verbal and written communication', weight: 30 },
-      { name: 'Cultural Fit', description: 'Alignment with company values', weight: 25 },
-      { name: 'Basic Qualifications', description: 'Meets minimum job requirements', weight: 45 }
+      { name: 'Communication', description: 'Clear verbal and written communication', weight: 30, highlighted: true },
+      { name: 'Cultural Fit', description: 'Alignment with company values', weight: 25, highlighted: true },
+      { name: 'Basic Qualifications', description: 'Meets minimum job requirements', weight: 45, highlighted: true }
     ],
     'Initial Interview': [
-      { name: 'Problem Solving', description: 'Analytical thinking and approach', weight: 35 },
-      { name: 'Experience Relevance', description: 'Past experience alignment', weight: 30 },
-      { name: 'Motivation', description: 'Interest and enthusiasm for role', weight: 35 }
+      { name: 'Problem Solving', description: 'Analytical thinking and approach', weight: 35, highlighted: true },
+      { name: 'Experience Relevance', description: 'Past experience alignment', weight: 30, highlighted: true },
+      { name: 'Motivation', description: 'Interest and enthusiasm for role', weight: 35, highlighted: true }
     ],
     'Technical Interview 1': [
-      { name: 'Coding Skills', description: 'Programming proficiency', weight: 40 },
-      { name: 'Algorithm Knowledge', description: 'Data structures and algorithms', weight: 35 },
-      { name: 'Code Quality', description: 'Clean, maintainable code', weight: 25 }
+      { name: 'Coding Skills', description: 'Programming proficiency', weight: 40, highlighted: true },
+      { name: 'Algorithm Knowledge', description: 'Data structures and algorithms', weight: 35, highlighted: true },
+      { name: 'Problem Solving', description: 'Analytical thinking and approach', weight: 25, highlighted: true }
     ],
     'Technical Interview 2': [
-      { name: 'System Design', description: 'Architecture and scalability', weight: 45 },
-      { name: 'Database Knowledge', description: 'Database design and optimization', weight: 30 },
-      { name: 'Performance Optimization', description: 'Code and system optimization', weight: 25 }
+      { name: 'System Architecture', description: 'Architecture and scalability', weight: 45, highlighted: true },
+      { name: 'Scalability', description: 'Handle growth and performance', weight: 30, highlighted: true },
+      { name: 'Database Design', description: 'Database design and optimization', weight: 25, highlighted: true }
     ],
     'Final Interview': [
-      { name: 'Leadership Potential', description: 'Leadership qualities and experience', weight: 40 },
-      { name: 'Team Collaboration', description: 'Working effectively in teams', weight: 35 },
-      { name: 'Career Goals', description: 'Long-term career alignment', weight: 25 }
+      { name: 'Overall Assessment', description: 'Holistic evaluation across areas', weight: 40, highlighted: true },
+      { name: 'Decision Making', description: 'Judgment and choices', weight: 35, highlighted: true },
+      { name: 'Cultural Fit', description: 'Alignment with company values', weight: 25, highlighted: true }
     ]
   }
 
   const base = skillSets[roundName as keyof typeof skillSets] || skillSets['Screening Round']
 
   // Merge defaults + base, dedupe by name (case-insensitive), keep first weight/description
-  const byName = new Map<string, { name: string; description: string; weight: number }>()
-  const put = (s: { name: string; description: string; weight: number }) => {
+  const byName = new Map<string, { name: string; description: string; weight: number; highlighted?: boolean }>()
+  const put = (s: { name: string; description: string; weight: number; highlighted?: boolean }) => {
     const key = s.name.trim().toLowerCase()
     if (!byName.has(key)) byName.set(key, s)
   }
-  DEFAULT_EVAL_SKILLS.forEach(put)
+  DEFAULT_EVAL_SKILLS.forEach((s) => put({ ...s, highlighted: false }))
   base.forEach(put)
 
   const merged = Array.from(byName.values())
@@ -153,6 +156,7 @@ export default function SelectedAgentsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { company } = useAuth()
+  const { toast } = useToast()
   const [selectedAgents, setSelectedAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<string>("")
@@ -161,6 +165,7 @@ export default function SelectedAgentsPage() {
   const [jobData, setJobData] = useState<any | null>(null)
   const autoGenStarted = useRef(false)
   const persistDoneForJob = useRef<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   // --- Helpers ---
   const normalizeQuestionText = (t: string): string => t.trim().replace(/\s+/g, ' ').toLowerCase()
@@ -289,6 +294,8 @@ export default function SelectedAgentsPage() {
       const storedAgents = localStorage.getItem('selectedAgents')
       // Also get the specific interview rounds the user chose when creating the JD (if available)
       const storedChosenRounds = localStorage.getItem('selectedInterviewRounds')
+      // Mapping of external round name -> skills selected on the Interview Process page
+      const storedRoundSkills = localStorage.getItem('selectedRoundSkills')
       // Read job data passed from Jobs page
       const storedJobData = localStorage.getItem('newJobData')
       if (storedJobData) {
@@ -297,6 +304,7 @@ export default function SelectedAgentsPage() {
       // Parse inputs safely
       const parsedAgents: any = storedAgents ? (() => { try { return JSON.parse(storedAgents) } catch { return null } })() : null
       const chosenRounds: string[] = storedChosenRounds ? (() => { try { return JSON.parse(storedChosenRounds) } catch { return [] } })() : []
+      const roundSkillsMap: Record<string, string[]> = storedRoundSkills ? (() => { try { return JSON.parse(storedRoundSkills) } catch { return {} } })() : {}
 
       // Determine agent count: prefer explicit chosen rounds length, else selectedAgents length
       const roundsCount = Array.isArray(chosenRounds) ? chosenRounds.length : 0
@@ -380,7 +388,44 @@ export default function SelectedAgentsPage() {
         const roundData = interviewRounds[agentIndex]
         
         // Generate key skills and questions for this agent
-        const keySkills = generateKeySkills(roundData.name)
+        const externalRoundName = Array.isArray(chosenRounds) && chosenRounds.length > 0
+          ? chosenRounds[Math.min(index, chosenRounds.length - 1)] || ''
+          : ''
+        let keySkills = generateKeySkills(roundData.name)
+        // If the user selected a specific round on the previous page and we have a skills mapping for it,
+        // mark only those skills as highlighted here to keep UX consistent.
+        const internalDefaults: Record<string, string[]> = {
+          'Screening Round': ['Communication', 'Basic Qualifications', 'Cultural Fit'],
+          'Initial Interview': ['Problem Solving', 'Experience Relevance', 'Motivation'],
+          'Technical Interview 1': ['Coding Skills', 'Algorithm Knowledge', 'Problem Solving'],
+          'Technical Interview 2': ['System Architecture', 'Scalability', 'Database Design'],
+          'Final Interview': ['Overall Assessment', 'Decision Making', 'Cultural Fit']
+        }
+        // Preferred target list from previous page if present, else our internal defaults
+        let selectedNames = internalDefaults[roundData.name] || []
+        if (externalRoundName && roundSkillsMap && Array.isArray(roundSkillsMap[externalRoundName]) && (roundSkillsMap[externalRoundName] as any).length > 0) {
+          selectedNames = roundSkillsMap[externalRoundName]
+        }
+        const target = new Set(selectedNames.map((n: string) => n.trim().toLowerCase()))
+        // Mark existing matches as highlighted according to desired target
+        keySkills = keySkills.map(s => ({
+          ...s,
+          highlighted: target.has(String(s.name || '').trim().toLowerCase())
+        }))
+        // Append missing desired skills
+        const existing = new Set(keySkills.map(s => String(s.name || '').trim().toLowerCase()))
+        const toAdd = selectedNames.filter(n => !existing.has(String(n || '').trim().toLowerCase()))
+        if (toAdd.length > 0) {
+          const startIndex = keySkills.length
+          const additions: KeySkill[] = toAdd.map((name, idx) => ({
+            id: `skill-added-${Date.now()}-${startIndex + idx}`,
+            name,
+            description: '',
+            weight: 30,
+            highlighted: true,
+          }))
+          keySkills = [...keySkills, ...additions]
+        }
         const questions = generateQuestions(roundData.name, keySkills)
         
         // Compute desired sequence: if chosenRounds supplied, use its position; else fallback to original index
@@ -449,6 +494,8 @@ export default function SelectedAgentsPage() {
         const jobId = searchParams.get('jobId')
         const qs = new URLSearchParams()
         if (jobId) qs.set('jobId', jobId)
+        const status = searchParams.get('status')
+        if (status) qs.set('status', status)
         // Write numeric tab index for readability
         const numericIndex = Math.max(1, sorted.findIndex(a => a.id === initialTab) + 1)
         qs.set('tab', String(numericIndex))
@@ -476,7 +523,7 @@ export default function SelectedAgentsPage() {
               })
               byRound.set(seq, list)
             })
-            const mappings = Array.from(byRound.entries()).map(([seq, agents]) => ({ seq, agents }))
+            const mappings = Array.from(byRound.entries()).map(([seq, agents]) => ({ roundSeq: seq, agents }))
             await fetch(`/api/jobs/${encodeURIComponent(jobId)}/round-agents`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -783,6 +830,76 @@ export default function SelectedAgentsPage() {
     router.push('/dashboard')
   }
 
+  const handleSubmitAll = async () => {
+    if (submitting) return
+    setSubmitting(true)
+    try {
+      const jobId = getJobId() || searchParams.get('jobId')
+      if (!jobId) {
+        toast({ title: 'Error', description: 'Missing job. Please create or load a job before submitting.', variant: 'destructive' })
+        setSubmitting(false)
+        return
+      }
+
+      // Persist round-agent mappings (sequence + agent types + skill weights)
+      const mappings = selectedAgents.map((agent, idx) => ({
+        roundSeq: (agent as any)?.interviewRound?.seq ?? (idx + 1),
+        agents: [
+          {
+            agent_type: mapRoundToAgentType(agent.interviewRound.name),
+            skill_weights: Object.fromEntries((agent.keySkills || []).map(s => [s.name, s.weight || 1])),
+            config: { index: idx + 1 },
+          }
+        ],
+      }))
+      const roundAgentsRes = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/round-agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mappings }),
+      })
+      let errText = ''
+      if (!roundAgentsRes.ok) {
+        try { const j = await roundAgentsRes.json(); errText = j?.error || '' } catch {}
+        throw new Error(`Failed to save round agents (${roundAgentsRes.status}). ${errText}`.trim())
+      }
+
+      // Persist questions for each agent's first task and require success
+      for (let idx = 0; idx < selectedAgents.length; idx++) {
+        const agent = selectedAgents[idx]
+        const t0 = agent.tasks?.[0]
+        const questions = (t0?.questions || []).map(q => ({
+          id: q.id,
+          text: q.text,
+          type: q.type,
+          linkedSkills: q.linkedSkills,
+          expectedAnswer: q.expectedAnswer,
+        }))
+        const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/agent-questions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agentIndex: idx + 1, questions }),
+        })
+        if (!res.ok) {
+          let msg = ''
+          try { const j = await res.json(); msg = j?.error || '' } catch {}
+          throw new Error(`Failed to save questions for Agent ${idx + 1} (${res.status}). ${msg}`.trim())
+        }
+      }
+
+      // Navigate to success page preserving existing query params
+      const idx = Math.max(1, selectedAgents.findIndex(a => a.id === activeTab) + 1)
+      const qs = new URLSearchParams(searchParams.toString())
+      qs.set('jobId', String(jobId))
+      qs.set('tab', String(idx))
+      router.push(`/selected-agents/submit-successful?${qs.toString()}`)
+    } catch (e: any) {
+      console.warn('Submit failed:', e?.message)
+      toast({ title: 'Failed to submit', description: e?.message || 'Please try again.', variant: 'destructive' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto max-w-7xl p-6 flex items-center justify-center min-h-screen">
@@ -790,6 +907,14 @@ export default function SelectedAgentsPage() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading selected agents...</p>
         </div>
+
+      {/* Success Banner */}
+      {searchParams.get('status') === 'submit-successful' && (
+        <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
+          <AlertTitle>Submission successful</AlertTitle>
+          <AlertDescription>Agents and questions submitted successfully.</AlertDescription>
+        </Alert>
+      )}
       </div>
     )
   }
@@ -813,17 +938,18 @@ export default function SelectedAgentsPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
       {/* Top Actions Bar */}
-      <div className="sticky top-0 z-30 mb-4 flex items-center justify-between bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/60 py-2 px-2 rounded-md border">
+      <div className="sticky top-0 z-30 mb-4 flex items-center justify-between bg-indigo-50 border border-indigo-200 shadow-sm py-2 px-2 rounded-md">
         <div className="text-sm font-medium text-gray-700">Selected Agents</div>
         <div className="flex gap-2">
           <Button
-            onClick={handleBackToSelection}
-            variant="outline"
+            onClick={handleSubmitAll}
             size="sm"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed"
+            disabled={submitting}
+            aria-busy={submitting}
           >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Selection
+            <Save className={`w-4 h-4 ${submitting ? 'animate-pulse' : ''}`} />
+            {submitting ? 'Submitting…' : 'Submit All'}
           </Button>
           <Button
             onClick={handleGoToDashboard}
@@ -852,6 +978,8 @@ export default function SelectedAgentsPage() {
           const jobId = searchParams.get('jobId')
           const qs = new URLSearchParams()
           if (jobId) qs.set('jobId', jobId)
+          const status = searchParams.get('status')
+          if (status) qs.set('status', status)
           // Persist numeric tab index in URL if possible
           const idx = selectedAgents.findIndex(a => a.id === v)
           qs.set('tab', String(Math.max(1, idx + 1)))
@@ -900,9 +1028,15 @@ export default function SelectedAgentsPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <CardTitle>Key Skills for Evaluation</CardTitle>
-                    <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                      {agent.keySkills.length} skills
-                    </span>
+                    {(() => {
+                      const highlightedCount = (agent.keySkills || []).filter(s => s.highlighted).length
+                      const label = highlightedCount > 0 ? `${highlightedCount} highlighted` : `${agent.keySkills.length} skills`
+                      return (
+                        <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                          {label}
+                        </span>
+                      )
+                    })()}
                   </div>
                   <Button onClick={() => addKeySkill(agent.id)} size="sm" className="bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
                     <Plus className="w-4 h-4 mr-2" />
@@ -912,10 +1046,13 @@ export default function SelectedAgentsPage() {
               </CardHeader>
               <CardContent className="p-6 pt-0">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1 scroll-smooth">
-                  {agent.keySkills.map((skill) => (
+                  {(() => {
+                    const highlighted = (agent.keySkills || []).filter(s => s.highlighted)
+                    const skillsToShow = highlighted.length > 0 ? highlighted : agent.keySkills
+                    return skillsToShow.map((skill) => (
                     <div
                       key={skill.id}
-                      className="relative rounded-lg p-3 space-y-2 border border-blue-100 bg-gradient-to-br from-white to-blue-50/60 hover:from-white hover:to-blue-100/70 shadow-sm hover:shadow-md transition-colors duration-200"
+                      className={`relative rounded-lg p-3 space-y-2 border shadow-sm hover:shadow-md transition-colors duration-200 ${skill.highlighted ? 'border-blue-100 bg-gradient-to-br from-white to-blue-50/60 hover:from-white hover:to-blue-100/70' : 'border-gray-100 bg-white'}`}
                     >
                       <div className="flex items-center justify-between">
                         {editingSkill === skill.id ? (
@@ -960,7 +1097,8 @@ export default function SelectedAgentsPage() {
                         </div>
                       )}
                     </div>
-                  ))}
+                    ))
+                  })()}
                 </div>
               </CardContent>
             </Card>
@@ -983,7 +1121,7 @@ export default function SelectedAgentsPage() {
                         agentId={agent.id}
                         taskId={task.id}
                         basePath="/selected-agents"
-                        existingQuestions={(task.questions || []).map(q => q.text)}
+                        existingQuestions={(agent.tasks || []).flatMap(t => (t.questions || []).map(q => q.text))}
                       />
                     </div>
                   </div>
@@ -1016,21 +1154,25 @@ export default function SelectedAgentsPage() {
                                 <div className="space-y-2">
                                   <Label>Linked Skills:</Label>
                                   <div className="flex flex-wrap gap-2">
-                                    {agent.keySkills.map((skill) => (
-                                      <label key={skill.id} className="flex items-center gap-2 text-sm">
-                                        <input
-                                          type="checkbox"
-                                          checked={question.linkedSkills.includes(skill.id)}
-                                          onChange={(e) => {
-                                            const linkedSkills = e.target.checked
-                                              ? [...question.linkedSkills, skill.id]
-                                              : question.linkedSkills.filter(id => id !== skill.id)
-                                            updateQuestion(agent.id, task.id, question.id, { linkedSkills })
-                                          }}
-                                        />
-                                        {skill.name}
-                                      </label>
-                                    ))}
+                                    {(() => {
+                                      const highlighted = (agent.keySkills || []).filter(s => s.highlighted)
+                                      const list = highlighted.length > 0 ? highlighted : agent.keySkills
+                                      return list.map((skill) => (
+                                        <label key={skill.id} className="flex items-center gap-2 text-sm">
+                                          <input
+                                            type="checkbox"
+                                            checked={question.linkedSkills.includes(skill.id)}
+                                            onChange={(e) => {
+                                              const linkedSkills = e.target.checked
+                                                ? [...question.linkedSkills, skill.id]
+                                                : question.linkedSkills.filter(id => id !== skill.id)
+                                              updateQuestion(agent.id, task.id, question.id, { linkedSkills })
+                                            }}
+                                          />
+                                          {skill.name}
+                                        </label>
+                                      ))
+                                    })()}
                                   </div>
                                 </div>
                               </div>
@@ -1081,17 +1223,7 @@ export default function SelectedAgentsPage() {
           </TabsContent>
         ))}
       </Tabs>
-
-      {/* Bottom Select Button */}
-      <div className="flex justify-center pt-6">
-        <Button 
-          onClick={handleBackToSelection}
-          size="lg"
-          className="px-8"
-        >
-          Select
-        </Button>
-      </div>
+      
     </div>
   )
 }
