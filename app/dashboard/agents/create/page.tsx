@@ -13,35 +13,35 @@ const agentConfigurations = {
   "Phone Screening": {
     name: "Screening Agent",
     description: "Initial candidate screening and basic qualification assessment",
-    duration: "15-20 minutes",
+    duration: "15 minutes",
     skills: ["Communication", "Basic Qualifications", "Cultural Fit"],
     color: "bg-blue-100 text-blue-800 border-blue-200"
   },
   "Technical Assessment": {
     name: "Technical Agent",
     description: "Coding skills, algorithms, and technical problem-solving evaluation",
-    duration: "45-60 minutes", 
+    duration: "30 minutes", 
     skills: ["Coding Skills", "Algorithm Knowledge", "Problem Solving"],
     color: "bg-green-100 text-green-800 border-green-200"
   },
   "System Design": {
     name: "System Design Agent",
     description: "Architecture design, scalability, and system thinking assessment",
-    duration: "60-90 minutes",
+    duration: "30 minutes",
     skills: ["System Architecture", "Scalability", "Database Design"],
     color: "bg-purple-100 text-purple-800 border-purple-200"
   },
   "Behavioral Interview": {
     name: "Behavioral Agent", 
     description: "Leadership, teamwork, and soft skills evaluation",
-    duration: "30-45 minutes",
+    duration: "30 minutes",
     skills: ["Leadership", "Team Collaboration", "Communication"],
     color: "bg-orange-100 text-orange-800 border-orange-200"
   },
   "Final Round": {
     name: "Final Round Agent",
     description: "Comprehensive evaluation and final decision making",
-    duration: "45-60 minutes",
+    duration: "30 minutes",
     skills: ["Overall Assessment", "Cultural Fit", "Decision Making"],
     color: "bg-red-100 text-red-800 border-red-200"
   }
@@ -291,7 +291,6 @@ export default function CreateAgentsPage() {
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     checked={selectedAgents.includes(agent.id)}
-                    onChange={() => handleAgentToggle(agent.id)}
                     className="pointer-events-none"
                   />
                   <Bot className="w-5 h-5 text-blue-500" />

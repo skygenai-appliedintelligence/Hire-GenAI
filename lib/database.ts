@@ -757,4 +757,77 @@ export class DatabaseService {
       agents: byRound.get(r.id) || [],
     }))
   }
+
+  // Update questions list on a specific round_agent by writing to config.questions as JSONB
+  static async updateRoundAgentQuestions(roundAgentId: string, questions: Array<{ id?: string; text: string; type?: string; linkedSkills?: string[]; expectedAnswer?: string }>): Promise<void> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const q = `
+      UPDATE round_agents
+         SET config = jsonb_set(
+           COALESCE(config, '{}'::jsonb),
+           '{questions}',
+           $2::jsonb,
+           true
+         )
+       WHERE id = $1::uuid
+    `
+    await this.query(q, [roundAgentId, JSON.stringify(questions || [])])
+  }
+
+  // Get company_id for a given job
+  static async getJobCompanyId(jobId: string): Promise<string | null> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const q = `SELECT company_id FROM jobs WHERE id = $1::uuid LIMIT 1`
+    const rows = (await this.query(q, [jobId])) as any[]
+    return rows && rows.length > 0 ? rows[0].company_id : null
+  }
+
+  // Create a question row; returns its id
+  static async createQuestion(input: { company_id: string | null; text_md: string; difficulty?: string | null; category?: string | null; metadata?: any }): Promise<string> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const q = `
+      INSERT INTO questions (company_id, text_md, difficulty, category, metadata)
+      VALUES ($1::uuid, $2, $3, $4, $5::jsonb)
+      RETURNING id
+    `
+    const params = [
+      input.company_id ?? null,
+      input.text_md,
+      input.difficulty ?? null,
+      input.category ?? null,
+      JSON.stringify(input.metadata ?? {})
+    ]
+    const rows = (await this.query(q, params)) as any[]
+    if (!rows || rows.length === 0) throw new Error('Failed to insert question')
+    return rows[0].id
+  }
+
+  // Replace all agent_questions for a round_agent with the provided sequence
+  static async setAgentQuestions(roundAgentId: string, companyId: string | null, questions: Array<{ text: string; type?: string; linkedSkills?: string[]; expectedAnswer?: string }>): Promise<void> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    // Clear existing links
+    const del = `DELETE FROM agent_questions WHERE round_agent_id = $1::uuid`
+    await this.query(del, [roundAgentId])
+    if (!questions || questions.length === 0) return
+    // Insert questions and links with seq = index+1
+    let seq = 1
+    for (const q of questions) {
+      const qid = await this.createQuestion({ company_id: companyId, text_md: q.text, category: q.type ?? null, metadata: { linkedSkills: q.linkedSkills ?? [], expectedAnswer: q.expectedAnswer ?? null } })
+      const link = `
+        INSERT INTO agent_questions (round_agent_id, question_id, seq)
+        VALUES ($1::uuid, $2::uuid, $3)
+        ON CONFLICT (round_agent_id, seq) DO UPDATE SET question_id = EXCLUDED.question_id
+      `
+      await this.query(link, [roundAgentId, qid, seq])
+      seq++
+    }
+  }
 }

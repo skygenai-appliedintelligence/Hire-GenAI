@@ -88,6 +88,7 @@ export async function POST(request: NextRequest) {
       const seen = new Set<string>()
       const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').replace(/[\p{P}\p{S}]+/gu, '').trim()
       const existing = Array.isArray(existingQuestions) ? new Set(existingQuestions.map(normalize)) : new Set<string>()
+      // First pass: base templates
       for (const t of shuffled) {
         const q = make(t)
         const key = normalize(q)
@@ -96,6 +97,23 @@ export async function POST(request: NextRequest) {
           seen.add(key)
         }
         if (out.length >= numberOfQuestions) break
+      }
+      // If more questions requested than base templates, generate variations using keywords
+      let kwIndex = 0
+      const kwCycle = kw.length > 0 ? kw : [role]
+      while (out.length < numberOfQuestions) {
+        const t = shuffled[out.length % shuffled.length] || templates[out.length % templates.length]
+        const focusKw = kwCycle[kwIndex % kwCycle.length]
+        kwIndex++
+        const variant = `${t} Please focus specifically on ${focusKw}.`
+        const q = make(variant)
+        const key = normalize(q)
+        if (!seen.has(key) && !existing.has(key)) {
+          out.push(q)
+          seen.add(key)
+        }
+        // Safety to avoid infinite loop in pathological cases
+        if (seen.size > numberOfQuestions * 5) break
       }
 
       return NextResponse.json({ questions: out.slice(0, numberOfQuestions) })
@@ -261,6 +279,7 @@ Only provide the questions, no explanations or additional text. Vary phrasing be
       const seen = new Set<string>()
       const normalize = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').replace(/[\p{P}\p{S}]+/gu, '').trim()
       const existing = Array.isArray(existingQuestions) ? new Set(existingQuestions.map(normalize)) : new Set<string>()
+      // First pass: base templates
       for (const t of templates) {
         const q = make(t)
         const key = normalize(q)
@@ -269,6 +288,22 @@ Only provide the questions, no explanations or additional text. Vary phrasing be
           seen.add(key)
         }
         if (out.length >= numberOfQuestions) break
+      }
+      // Expand with keyword-focused variants if needed
+      let kwIndex = 0
+      const kwCycle = kw.length > 0 ? kw : [role]
+      while (out.length < numberOfQuestions) {
+        const t = templates[out.length % templates.length]
+        const focusKw = kwCycle[kwIndex % kwCycle.length]
+        kwIndex++
+        const variant = `${t} Please focus specifically on ${focusKw}.`
+        const q = make(variant)
+        const key = normalize(q)
+        if (!seen.has(key) && !existing.has(key)) {
+          out.push(q)
+          seen.add(key)
+        }
+        if (seen.size > numberOfQuestions * 5) break
       }
 
       return NextResponse.json({ questions: out.slice(0, numberOfQuestions), fallback: true })
