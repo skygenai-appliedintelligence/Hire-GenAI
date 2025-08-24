@@ -162,21 +162,21 @@ export default function SelectedAgentsPage() {
   const autoGenStarted = useRef(false)
   const persistDoneForJob = useRef<string | null>(null)
 
-  const normalizeQuestionText = (text: string) =>
-    text
-      .toLowerCase()
-      .replace(/\s+/g, " ")
-      .replace(/[\p{P}\p{S}]+/gu, "")
-      .trim()
+  // --- Helpers ---
+  const normalizeQuestionText = (t: string): string => t.trim().replace(/\s+/g, ' ').toLowerCase()
 
-  const dedupeAndLimitQuestions = (existing: Question[], incoming: Question[] = [], max: number = Number.MAX_SAFE_INTEGER, preferIncoming: boolean = false): Question[] => {
-    const result: Question[] = []
+  const dedupeAndLimitQuestions = (
+    existing: Question[],
+    incoming: Question[] = [],
+    max: number = Number.MAX_SAFE_INTEGER,
+    preferIncoming: boolean = false
+  ): Question[] => {
     const seen = new Set<string>()
+    const result: Question[] = []
 
     const first = preferIncoming ? incoming : existing
     const second = preferIncoming ? existing : incoming
 
-    // add primary list first
     for (const q of first) {
       const key = normalizeQuestionText(q.text)
       if (!seen.has(key)) {
@@ -186,7 +186,6 @@ export default function SelectedAgentsPage() {
       if (result.length >= max) return result.slice(0, max)
     }
 
-    // then add secondary list uniques
     for (const q of second) {
       const key = normalizeQuestionText(q.text)
       if (!seen.has(key)) {
@@ -197,6 +196,42 @@ export default function SelectedAgentsPage() {
     }
 
     return result.slice(0, max)
+  }
+
+  // --- Persistence helpers: keep questions permanent until regenerated ---
+  const getJobId = (): string | null => {
+    try {
+      const stored = localStorage.getItem('newJobData')
+      if (!stored) return null
+      const j = JSON.parse(stored)
+      return j?.id || null
+    } catch { return null }
+  }
+
+  const buildKey = (jobId: string, agentId: string, taskId: string) => `jobQuestions:${jobId}:${agentId}:${taskId}`
+
+  const persistQuestions = (jobId: string, agentId: string, taskId: string, questions: Question[]) => {
+    try {
+      const key = buildKey(jobId, agentId, taskId)
+      localStorage.setItem(key, JSON.stringify(questions))
+    } catch {}
+  }
+
+  const restoreQuestions = (jobId: string, agentId: string, taskId: string): Question[] | null => {
+    try {
+      const key = buildKey(jobId, agentId, taskId)
+      const raw = localStorage.getItem(key)
+      if (!raw) return null
+      const arr = JSON.parse(raw)
+      if (!Array.isArray(arr)) return null
+      return arr.filter((q: any) => q && typeof q.text === 'string').map((q: any, i: number) => ({
+        id: q.id || `persisted-${Date.now()}-${i}`,
+        text: q.text,
+        type: q.type || 'situational',
+        linkedSkills: Array.isArray(q.linkedSkills) ? q.linkedSkills : [],
+        expectedAnswer: q.expectedAnswer,
+      }))
+    } catch { return null }
   }
 
   useEffect(() => {
@@ -353,7 +388,7 @@ export default function SelectedAgentsPage() {
           ? Math.min(index, chosenRounds.length - 1)
           : index
 
-        return {
+        const baseAgent = {
           seq,
           agent: {
             id: agentIdStr,
@@ -375,6 +410,7 @@ export default function SelectedAgentsPage() {
             keySkills
           }
         }
+        return baseAgent
       })
       // Sort by computed sequence and then relabel agents sequentially (Agent 1..N)
       const sorted: Agent[] = built
@@ -384,7 +420,18 @@ export default function SelectedAgentsPage() {
           name: `Agent ${i + 1}`,
         }))
 
-      setSelectedAgents(sorted)
+      // Apply any persisted questions per agent/task for this job
+      const jobIdForPersist = getJobId()
+      const withPersist = jobIdForPersist ? sorted.map(a => {
+        const t0 = a.tasks[0]
+        const restored = restoreQuestions(jobIdForPersist, a.id, t0.id)
+        if (restored && restored.length > 0) {
+          return { ...a, tasks: [{ ...t0, questions: restored }] }
+        }
+        return a
+      }) : sorted
+
+      setSelectedAgents(withPersist)
       if (sorted.length > 0) {
         // Prefer tab from URL if present (supports numeric index like ?tab=1)
         const urlTab = searchParams.get('tab')
@@ -549,31 +596,31 @@ export default function SelectedAgentsPage() {
   }
 
   const addAIQuestions = (agentId: string, taskId: string, aiQuestions: string[]) => {
+    // Prepare questions and indexes up-front so we can also persist to DB
+    const jobId = getJobId()
+    const agent = selectedAgents.find(a => a.id === agentId)
+    const agentIndex = Math.max(1, selectedAgents.findIndex(a => a.id === agentId) + 1) // 1-based index used in DB config
+    const preparedQuestions: Question[] = (aiQuestions || []).map((questionText, index) => ({
+      id: `ai-question-${Date.now()}-${index}`,
+      text: questionText,
+      type: agent && agent.interviewRound.name.includes('Technical') ? 'technical' : 
+            (agent && (agent.interviewRound.name.includes('Final') || agent.interviewRound.name.includes('HR'))) ? 'behavioral' : 'situational',
+      linkedSkills: (agent?.keySkills || []).slice(0, Math.min(2, agent?.keySkills.length || 0)).map(skill => skill.id)
+    }))
+    const mergedUniqueLimited = dedupeAndLimitQuestions([], preparedQuestions, preparedQuestions.length, true)
+
+    // Update UI state and localStorage persistence
     setSelectedAgents(prev => prev.map(agent => {
       if (agent.id === agentId) {
         return {
           ...agent,
           tasks: agent.tasks.map(task => {
             if (task.id === taskId) {
-              const newQuestions: Question[] = aiQuestions.map((questionText, index) => ({
-                id: `ai-question-${Date.now()}-${index}`,
-                text: questionText,
-                type: agent.interviewRound.name.includes('Technical') ? 'technical' : 
-                       (agent.interviewRound.name.includes('Final') || agent.interviewRound.name.includes('HR')) ? 'behavioral' : 'situational',
-                linkedSkills: agent.keySkills.slice(0, Math.min(2, agent.keySkills.length)).map(skill => skill.id)
-              }))
-
-              const mergedUniqueLimited = dedupeAndLimitQuestions(
-                task.questions,
-                newQuestions,
-                newQuestions.length,
-                true
-              )
-
               const updatedTask = {
                 ...task,
                 questions: mergedUniqueLimited
               }
+              if (jobId) persistQuestions(jobId, agentId, taskId, mergedUniqueLimited)
               saveToDatabase(agentId, { tasks: [updatedTask] })
               return updatedTask
             }
@@ -583,6 +630,19 @@ export default function SelectedAgentsPage() {
       }
       return agent
     }))
+
+    // Best-effort DB persistence via API (only if we have a job and valid index)
+    if (jobId && Number.isFinite(agentIndex) && agentIndex > 0) {
+      const payload = {
+        agentIndex,
+        questions: mergedUniqueLimited.map(q => ({ id: q.id, text: q.text, type: q.type, linkedSkills: q.linkedSkills, expectedAnswer: q.expectedAnswer }))
+      }
+      void fetch(`/api/jobs/${encodeURIComponent(jobId)}/agent-questions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).catch(() => { /* non-blocking */ })
+    }
   }
 
   const updateQuestion = (agentId: string, taskId: string, questionId: string, updates: Partial<Question>) => {
