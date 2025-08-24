@@ -82,7 +82,19 @@ export default function CreateJobPage() {
       if (prevArr.length === nextArr.length && prevArr.every((v, i) => v === nextArr[i])) {
         return prev
       }
-      return { ...prev, [field]: nextArr }
+      const next = { ...prev, [field]: nextArr }
+      // If we updated interviewRounds, also persist a mapping of round -> skills to localStorage
+      if (field === 'interviewRounds') {
+        try {
+          const mapping: Record<string, string[]> = {}
+          nextArr.forEach(r => {
+            const cfg = (agentConfigurations as any)[r]
+            if (cfg && Array.isArray(cfg.skills)) mapping[r] = cfg.skills
+          })
+          localStorage.setItem('selectedRoundSkills', JSON.stringify(mapping))
+        } catch {}
+      }
+      return next
     })
   }
 
