@@ -278,7 +278,7 @@ export default function JobsPage() {
                       variant="outline"
                       size="sm"
                       className="hover:bg-gray-50 bg-transparent"
-                      onClick={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/jobs/${job.id}/edit`) }}
                     >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
