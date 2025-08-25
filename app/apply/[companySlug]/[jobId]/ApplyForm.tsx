@@ -16,11 +16,26 @@ export default function ApplyForm({ job }: { job: any }) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    fullName: '',
+    // General info
+    firstName: '',
+    lastName: '',
     email: '',
     phone: '',
+    expectedCurrency: 'USD',
+    expectedSalary: '',
+    location: '',
+    // Experience
     yearsOfExperience: '',
     technicalSkills: '',
+    // Cover letter
+    coverLetter: '',
+    // Additional info
+    linkedinUrl: '',
+    portfolioUrl: '',
+    availableStartDate: '',
+    relocate: false,
+    // Legacy fields kept for compatibility with evaluation & pipeline
+    fullName: '',
     whyInterested: '',
     impactfulProject: '',
     availability: '',
@@ -31,7 +46,8 @@ export default function ApplyForm({ job }: { job: any }) {
     setLoading(true)
 
     try {
-      if (!formData.fullName || !formData.email || !formData.phone) {
+      const fullName = formData.fullName || `${formData.firstName} ${formData.lastName}`.trim()
+      if (!fullName || !formData.email || !formData.phone) {
         toast({ title: 'Missing Information', description: 'Please fill in all required fields.', variant: 'destructive' })
         return
       }
@@ -42,6 +58,7 @@ export default function ApplyForm({ job }: { job: any }) {
         id: candidateId,
         jobId: job.id,
         ...formData,
+        fullName,
         submittedAt: new Date().toISOString(),
         status: 'applied',
       }
@@ -52,7 +69,7 @@ export default function ApplyForm({ job }: { job: any }) {
 
       const candidateRecord = {
         id: candidateId,
-        name: formData.fullName,
+        name: fullName,
         email: formData.email,
         phone: formData.phone,
         status: 'qualified',
@@ -64,7 +81,7 @@ export default function ApplyForm({ job }: { job: any }) {
         rejection_count: 0,
         last_rejection_date: null,
         jobId: job.id,
-        application_data: formData,
+        application_data: { ...formData, fullName },
         stages: [
           { name: 'Initial Screening', status: 'pending', score: 0, completed_at: null, feedback: null },
           { name: 'Technical Interview', status: 'pending', score: 0, completed_at: null, feedback: null },
@@ -141,111 +158,117 @@ export default function ApplyForm({ job }: { job: any }) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="fullName" className="flex items-center space-x-2">
-            <span>👤</span>
-            <span>Full Name *</span>
-          </Label>
-          <Input id="fullName" value={formData.fullName} onChange={(e) => setFormData((prev) => ({ ...prev, fullName: e.target.value }))} placeholder="Enter your full name" className="border-gray-300 focus:border-black focus:ring-black" required disabled={loading} />
-        </div>
+    <div className="max-w-3xl mx-auto">
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* General Information */}
+        <section>
+          <h3 className="font-semibold text-slate-900 border-b border-slate-200 pb-3 mb-4">General Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First name *</Label>
+              <Input id="firstName" value={formData.firstName} onChange={(e) => setFormData((p) => ({ ...p, firstName: e.target.value }))} placeholder="John" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600" required disabled={loading} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last name *</Label>
+              <Input id="lastName" value={formData.lastName} onChange={(e) => setFormData((p) => ({ ...p, lastName: e.target.value }))} placeholder="Doe" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600" required disabled={loading} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email *</Label>
+              <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))} placeholder="you@example.com" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600" required disabled={loading} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone *</Label>
+              <Input id="phone" type="tel" value={formData.phone} onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value }))} placeholder="+1 555 000 1111" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600" required disabled={loading} />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Expected salary</Label>
+              <div className="grid grid-cols-[120px_1fr_auto] gap-2">
+                <Select value={formData.expectedCurrency} onValueChange={(v) => setFormData((p) => ({ ...p, expectedCurrency: v }))}>
+                  <SelectTrigger className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600">
+                    <SelectValue placeholder="Currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="INR">INR</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input inputMode="decimal" value={formData.expectedSalary} onChange={(e) => setFormData((p) => ({ ...p, expectedSalary: e.target.value }))} placeholder="1000" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600" />
+                <div className="flex items-center text-slate-500 px-2">/month</div>
+              </div>
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="location">Location</Label>
+              <Input id="location" value={formData.location} onChange={(e) => setFormData((p) => ({ ...p, location: e.target.value }))} placeholder="Berlin, Germany" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600" />
+            </div>
+          </div>
+        </section>
 
-        <div className="space-y-2">
-          <Label htmlFor="email" className="flex items-center space-x-2">
-            <span>📧</span>
-            <span>Email Address *</span>
-          </Label>
-          <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))} placeholder="your.email@example.com" className="border-gray-300 focus:border-black focus:ring-black" required disabled={loading} />
-        </div>
+        {/* Resume & Documents */}
+        <section>
+          <h3 className="font-semibold text-slate-900 border-b border-slate-200 pb-3 mb-4">Resume & Documents</h3>
+          <div className="rounded-md border border-dashed border-slate-300 p-6">
+            <label htmlFor="resume" className="block text-center text-slate-600">
+              <div className="mb-3">Drag & drop file here</div>
+              <div className="inline-flex items-center rounded-md bg-emerald-500 text-white px-3 py-1 text-sm font-semibold">or click to select a file</div>
+            </label>
+            <input id="resume" name="resume" type="file" className="hidden" onChange={() => { /* keep simple; no upload backend yet */ }} />
+          </div>
+        </section>
 
-        <div className="space-y-2">
-          <Label htmlFor="phone" className="flex items-center space-x-2">
-            <span>📞</span>
-            <span>Phone Number *</span>
-          </Label>
-          <Input id="phone" type="tel" value={formData.phone} onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))} placeholder="+1 (555) 123-4567" className="border-gray-300 focus:border-black focus:ring-black" required disabled={loading} />
-        </div>
+        {/* Cover Letter */}
+        <section>
+          <h3 className="font-semibold text-slate-900 border-b border-slate-200 pb-3 mb-4">Cover Letter</h3>
+          <Textarea id="coverLetter" value={formData.coverLetter} onChange={(e) => setFormData((p) => ({ ...p, coverLetter: e.target.value, whyInterested: e.target.value }))} placeholder="Tell us why you're interested in this role and what makes you a great fit..." rows={5} className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600" disabled={loading} />
+        </section>
 
-        <div className="space-y-2">
-          <Label htmlFor="experience" className="flex items-center space-x-2">
-            <span>🎯</span>
-            <span>Years of Experience *</span>
-          </Label>
-          <Select value={formData.yearsOfExperience} onValueChange={(value) => setFormData((prev) => ({ ...prev, yearsOfExperience: value }))} disabled={loading}>
-            <SelectTrigger className="border-gray-300 focus:border-black focus:ring-black">
-              <SelectValue placeholder="Select your experience level" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="0-1">0-1 years</SelectItem>
-              <SelectItem value="2-3">2-3 years</SelectItem>
-              <SelectItem value="4-5">4-5 years</SelectItem>
-              <SelectItem value="6-8">6-8 years</SelectItem>
-              <SelectItem value="9+">9+ years</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Additional Information */}
+        <section>
+          <h3 className="font-semibold text-slate-900 border-b border-slate-200 pb-3 mb-4">Additional Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="linkedin">LinkedIn URL</Label>
+              <Input id="linkedin" value={formData.linkedinUrl} onChange={(e) => setFormData((p) => ({ ...p, linkedinUrl: e.target.value }))} placeholder="https://linkedin.com/in/yourprofile" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="portfolio">Portfolio/Website</Label>
+              <Input id="portfolio" value={formData.portfolioUrl} onChange={(e) => setFormData((p) => ({ ...p, portfolioUrl: e.target.value }))} placeholder="https://yourportfolio.com" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="start">Available Start Date</Label>
+              <Input id="start" type="date" value={formData.availableStartDate} onChange={(e) => setFormData((p) => ({ ...p, availableStartDate: e.target.value, availability: e.target.value }))} className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600" />
+            </div>
+            <div className="flex items-center gap-2 md:col-span-2">
+              <input id="relocate" type="checkbox" checked={formData.relocate} onChange={(e) => setFormData((p) => ({ ...p, relocate: e.target.checked }))} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-600" />
+              <Label htmlFor="relocate" className="cursor-pointer">I am willing to relocate for this position</Label>
+            </div>
+          </div>
+        </section>
 
-        <div className="space-y-2">
-          <Label htmlFor="skills" className="flex items-center space-x-2">
-            <span>💻</span>
-            <span>Technical Skills *</span>
-          </Label>
-          <Textarea id="skills" value={formData.technicalSkills} onChange={(e) => setFormData((prev) => ({ ...prev, technicalSkills: e.target.value }))} placeholder="List your technical skills and proficiency levels (e.g., React, Node.js, Python, AWS, etc.)" rows={4} className="border-gray-300 focus:border-black focus:ring-black" required disabled={loading} />
+        {/* Submit bar */}
+        <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-200">
+          <Button type="button" variant="outline" className="rounded-md border-slate-300 text-slate-700 hover:bg-slate-50" onClick={() => history.back()} disabled={loading}>
+            Cancel
+          </Button>
+          <Button type="submit" className="bg-emerald-600 hover:bg-emerald-600/90 text-white text-base px-5 py-3 rounded-md font-semibold" disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Send className="w-5 h-5 mr-2" />
+                Submit Application
+              </>
+            )}
+          </Button>
         </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="interest" className="flex items-center space-x-2">
-            <span>💡</span>
-            <span>Why are you interested in this role? *</span>
-          </Label>
-          <Textarea id="interest" value={formData.whyInterested} onChange={(e) => setFormData((prev) => ({ ...prev, whyInterested: e.target.value }))} placeholder="Tell us what excites you about this opportunity and how it aligns with your career goals..." rows={4} className="border-gray-300 focus:border-black focus:ring-black" required disabled={loading} />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="project" className="flex items-center space-x-2">
-            <span>🚀</span>
-            <span>Describe your most impactful project *</span>
-          </Label>
-          <Textarea id="project" value={formData.impactfulProject} onChange={(e) => setFormData((prev) => ({ ...prev, impactfulProject: e.target.value }))} placeholder="Share details about a project you led or contributed to significantly. Include technologies used, challenges faced, and impact achieved..." rows={5} className="border-gray-300 focus:border-black focus:ring-black" required disabled={loading} />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="availability" className="flex items-center space-x-2">
-            <span>📅</span>
-            <span>When can you start? *</span>
-          </Label>
-          <Select value={formData.availability} onValueChange={(value) => setFormData((prev) => ({ ...prev, availability: value }))} disabled={loading}>
-            <SelectTrigger className="border-gray-300 focus:border-black focus:ring-black">
-              <SelectValue placeholder="Select your availability" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="immediately">Immediately</SelectItem>
-              <SelectItem value="2-weeks">2 weeks notice</SelectItem>
-              <SelectItem value="1-month">1 month notice</SelectItem>
-              <SelectItem value="2-months">2 months notice</SelectItem>
-              <SelectItem value="negotiable">Negotiable</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Button type="submit" className="w-full bg-black hover:bg-black/90 text-white text-base py-3 rounded-md font-medium" disabled={loading}>
-          {loading ? (
-            <>
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            <>
-              <Send className="w-5 h-5 mr-2" />
-              Apply now
-            </>
-          )}
-        </Button>
       </form>
-      <div className="mt-6 p-4 bg-gray-50 rounded-md border">
+
+      <div className="mt-6 p-4 bg-slate-50 rounded-md border">
         <h4 className="font-semibold mb-2">What happens next?</h4>
-        <ul className="text-sm text-gray-700 space-y-1">
+        <ul className="text-sm text-slate-700 space-y-1">
           <li>• Your application will be reviewed by our AI system</li>
           <li>• If qualified, you'll be redirected to our automated interview pipeline</li>
           <li>• The interview process includes multiple stages tailored to this role</li>

@@ -4,6 +4,7 @@ import React from 'react'
 import { Prisma } from '@prisma/client'
 import Link from 'next/link'
 import { Building2, MapPin, Briefcase, BadgeDollarSign } from 'lucide-react'
+import ApplyForm from './ApplyForm'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -12,8 +13,13 @@ export const runtime = 'nodejs'
 export default async function ApplyCompanyJobPage(props: { params: Promise<{ companySlug: string; jobId: string }> }) {
   const { companySlug, jobId } = await props.params
 
-  // 1) Detect which table to use
-  const rel = await prisma.$queryRaw<any[]>(Prisma.sql`SELECT (to_regclass('public.job_descriptions') IS NOT NULL) AS exists`)
+  // 1) Detect which table to use (avoid regclass type)
+  const rel = await prisma.$queryRaw<any[]>(Prisma.sql`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = 'job_descriptions'
+    ) AS exists
+  `)
   const hasJobDescriptions = !!rel?.[0]?.exists
 
   // 2) Fetch job by ID from the available schema
@@ -43,8 +49,8 @@ export default async function ApplyCompanyJobPage(props: { params: Promise<{ com
     job = rows?.[0] || null
   }
 
+  // If no job found, redirect back to company page
   if (!job) {
-    // No such job -> go back to company page (may show not found UX)
     return redirect(`/${companySlug}`)
   }
 
@@ -60,6 +66,8 @@ export default async function ApplyCompanyJobPage(props: { params: Promise<{ com
     .replace(/\s+/g, '-')
 
   if (canonicalSlug && canonicalSlug !== companySlug.toLowerCase()) {
+    // Only redirect when we actually have a canonical company name from DB
+    // For fallback/mock, canonicalSlug will equal provided slug
     return redirect(`/apply/${canonicalSlug}/${jobId}`)
   }
 
@@ -76,58 +84,33 @@ export default async function ApplyCompanyJobPage(props: { params: Promise<{ com
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">{job.title}</h1>
-        <div>
-          <Link href={`/${companySlug}`} className="inline-flex items-center text-black underline underline-offset-4 hover:opacity-80">
-            <Building2 className="w-4 h-4 mr-2" />
-            {job.company_name}
-          </Link>
-        </div>
-        <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-gray-700">
-          <span className="inline-flex items-center"><MapPin className="w-4 h-4 mr-2" />{job.location || 'Remote'}</span>
-          <span className="inline-flex items-center"><Briefcase className="w-4 h-4 mr-2" />{jobType ? jobType.replace(/\b\w/g, (m: string) => m.toUpperCase()) : 'Full Time'}</span>
-          {expLevel && <span className="inline-flex items-center">Experience: {expLevel[0].toUpperCase() + expLevel.slice(1)}</span>}
-          {job.salary_range && <span className="inline-flex items-center"><BadgeDollarSign className="w-4 h-4 mr-2" />{job.salary_range}</span>}
-        </div>
-      </div>
-
-      {/* Main grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left column */}
-        <div className="lg:col-span-2 space-y-6">
-          <section className="border rounded-md p-6">
-            <h2 className="font-semibold mb-2">About {job.company_name}</h2>
-            <p className="text-sm text-gray-700">{job.company_name} is hiring talented professionals to join the team.</p>
-          </section>
-
-          <section className="border rounded-md p-6">
-            <h2 className="font-semibold mb-2">About the role</h2>
-            <div className="prose max-w-none text-gray-800 text-sm whitespace-pre-line">{job.description || 'Role description coming soon.'}</div>
-            {job.requirements && (
-              <>
-                <h3 className="font-semibold mt-4 mb-2">Requirements</h3>
-                <div className="prose max-w-none text-gray-800 text-sm whitespace-pre-line">{job.requirements}</div>
-              </>
+      {/* Green heading card */}
+      <section className="mb-6 rounded-2xl bg-emerald-600/95 text-white shadow-lg ring-1 ring-emerald-500/20">
+        <div className="px-6 py-6 md:px-8 md:py-8">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Apply for this position</h1>
+          <p className="mt-2 text-emerald-50">Please fill out all required fields to submit your application.</p>
+          <div className="mt-4 inline-flex items-center gap-3 text-emerald-100 text-sm">
+            <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1">{job.title}</span>
+            {job.location && (
+              <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1">{job.location}</span>
             )}
-          </section>
-
-          {/* Application form removed as requested */}
-        </div>
-
-        {/* Right sidebar */}
-        <aside className="border rounded-md p-6 h-fit sticky top-6">
-          <h3 className="font-semibold mb-4">Job Summary</h3>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between"><span className="text-gray-600">Position</span><span className="font-medium text-right">{job.title}</span></div>
-            <div className="flex justify-between"><span className="text-gray-600">Location</span><span className="font-medium text-right">{job.location || 'Remote'}</span></div>
-            <div className="flex justify-between"><span className="text-gray-600">Job Type</span><span className="font-medium text-right">{jobType ? jobType.replace(/\b\w/g, (m: string) => m.toUpperCase()) : 'Full Time'}</span></div>
-            {expLevel && <div className="flex justify-between"><span className="text-gray-600">Experience Level</span><span className="font-medium text-right">{expLevel[0].toUpperCase() + expLevel.slice(1)}</span></div>}
-            {job.salary_range && <div className="flex justify-between"><span className="text-gray-600">Salary</span><span className="font-medium text-right">{job.salary_range}</span></div>}
+            {expLevel && (
+              <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1">{expLevel[0].toUpperCase() + expLevel.slice(1)}</span>
+            )}
           </div>
-        </aside>
-      </div>
+        </div>
+      </section>
+
+      {/* Form card with green accents */}
+      <section className="w-full rounded-2xl border border-emerald-200 bg-white shadow-sm ring-1 ring-emerald-100">
+        <div className="border-b border-emerald-100 bg-emerald-50/60 px-6 py-4 md:px-8">
+          <h2 className="font-semibold text-slate-900">Application Form</h2>
+          <p className="text-sm text-emerald-700">Role: <span className="font-medium">{job.title}</span></p>
+        </div>
+        <div className="p-6 md:p-8">
+          <ApplyForm job={job} />
+        </div>
+      </section>
     </div>
   )
 }

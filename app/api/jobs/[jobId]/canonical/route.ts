@@ -15,8 +15,13 @@ export async function GET(
       return NextResponse.json({ error: 'Missing jobId' }, { status: 400 })
     }
 
-    // Check if legacy table exists (boolean result to avoid regclass type)
-    const rel = await prisma.$queryRaw<any[]>(Prisma.sql`SELECT (to_regclass('public.job_descriptions') IS NOT NULL) AS exists`)
+    // Check if legacy table exists using information_schema (avoid regclass type)
+    const rel = await prisma.$queryRaw<any[]>(Prisma.sql`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = 'job_descriptions'
+      ) AS exists
+    `)
     const hasJobDescriptions = !!rel?.[0]?.exists
 
     let rows: any[] = []

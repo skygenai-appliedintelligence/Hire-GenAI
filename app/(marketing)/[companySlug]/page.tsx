@@ -27,9 +27,14 @@ export default async function CompanyPublicPage({ params }: { params: Promise<{ 
       )
     }
 
-    // Prefer legacy view if present, else fallback to jobs table
-    const rel = await prisma.$queryRaw<any[]>(Prisma.sql`SELECT to_regclass('public.job_descriptions') AS rel`)
-    const hasJobDescriptions = !!rel?.[0]?.rel
+    // Prefer legacy view if present, else fallback to jobs table (avoid regclass type)
+    const rel = await prisma.$queryRaw<any[]>(Prisma.sql`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = 'job_descriptions'
+      ) AS exists
+    `)
+    const hasJobDescriptions = !!rel?.[0]?.exists
 
     const jobs = hasJobDescriptions
       ? await prisma.$queryRaw<any[]>(Prisma.sql`
