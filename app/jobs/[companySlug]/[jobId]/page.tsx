@@ -77,7 +77,7 @@ export default async function JobDetailPage(
   const experience = (job.experience_level || job.level || '').toString();
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(1200px_600px_at_10%_-10%,#eef2ff_0%,transparent_55%),linear-gradient(to_bottom,#f8fafc,white)]">
+    <main className="min-h-screen bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
       {/* Header / Hero */}
       <header className="border-b bg-white/80 backdrop-blur supports-[backdrop-filter]:backdrop-blur">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-6 md:py-10">
@@ -100,15 +100,7 @@ export default async function JobDetailPage(
                 </ol>
               </nav>
 
-              {/* Always-visible header Apply */}
-              <Link
-                href={`/apply/${company}/${jobId}`}
-                aria-label="Apply to this job"
-                data-testid="apply-btn-header"
-                className="inline-flex items-center justify-center rounded-xl bg-emerald-600 text-white px-5 py-3 font-semibold shadow-sm ring-1 ring-emerald-600/20 hover:bg-emerald-600/90 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
-              >
-                Apply Now
-              </Link>
+              {/* Header right-side Apply removed per request */}
             </div>
 
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-slate-900">
@@ -121,7 +113,7 @@ export default async function JobDetailPage(
                 href={`/apply/${company}/${jobId}`}
                 aria-label="Apply to this job"
                 data-testid="apply-btn-inline"
-                className="inline-flex items-center justify-center rounded-xl bg-emerald-600 text-white px-4 py-2 font-semibold shadow-sm ring-1 ring-emerald-600/20 hover:bg-emerald-600/90 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+                className="inline-flex items-center justify-center rounded-xl bg-emerald-600 text-white px-4 py-2 font-semibold shadow-md ring-1 ring-emerald-600/20 hover:bg-emerald-600/90 motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-105 hover:shadow-2xl emerald-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
               >
                 Apply Now
               </Link>
@@ -149,7 +141,7 @@ export default async function JobDetailPage(
                 {job.tools.map((tag: string) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs md:text-sm text-slate-700 shadow-sm"
+                    className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs md:text-sm text-slate-700 shadow-sm transition-colors hover:bg-emerald-50 hover:border-emerald-200"
                   >
                     {tag}
                   </span>
@@ -167,7 +159,7 @@ export default async function JobDetailPage(
             href={`/apply/${company}/${jobId}`}
             aria-label="Apply to this job"
             data-testid="apply-btn-sticky"
-            className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 text-white px-5 py-3 font-semibold shadow-sm ring-1 ring-emerald-600/20 hover:bg-emerald-600/90 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+            className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 text-white px-5 py-3 font-semibold shadow-md ring-1 ring-emerald-600/20 hover:bg-emerald-600/90 motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-105 hover:shadow-2xl emerald-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
           >
             Apply Now
           </Link>
@@ -177,23 +169,22 @@ export default async function JobDetailPage(
       {/* Content Grid */}
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         <div className="grid grid-cols-1 lg:[grid-template-columns:1fr_380px] gap-6 lg:gap-8 isolate">
-          {/* Right column first on mobile (summary), then content */
-          }
+          {/* Right column first on mobile (summary), then content */}
           <aside className="order-1 lg:order-2 lg:sticky lg:top-24 lg:z-20">
             {/* Summary Card */}
             <aside
               aria-labelledby="summary-heading"
-              className="relative z-20 rounded-2xl border border-slate-200/80 bg-white p-6 md:p-8 shadow-md hover:shadow-lg transition-shadow"
+              className="relative z-20 rounded-2xl border border-slate-200/80 bg-white p-5 md:p-6 shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-105 emerald-glow"
             >
               <h2
                 id="summary-heading"
-                className="text-lg md:text-xl font-semibold text-slate-900 mb-5"
+                className="text-lg md:text-xl font-semibold text-slate-900 mb-3"
               >
                 Job Summary
               </h2>
 
               <dl className="text-slate-600 text-sm md:text-base">
-                <div className="grid grid-cols-[160px_1fr] items-start gap-x-6 py-2 first:pt-0 last:pb-0">
+                <div className="grid grid-cols-[160px_1fr] items-start gap-x-6 py-1.5 first:pt-0 last:pb-0">
                   <dt className="text-slate-500 leading-6 whitespace-nowrap flex items-start gap-2">
                     <span className="w-5 shrink-0" aria-hidden></span>
                     <span>Position</span>
@@ -203,7 +194,7 @@ export default async function JobDetailPage(
                   </dd>
                 </div>
 
-                <div className="grid grid-cols-[160px_1fr] items-start gap-x-6 py-2 border-t border-slate-100">
+                <div className="grid grid-cols-[160px_1fr] items-start gap-x-6 py-1.5 border-t border-slate-100">
                   <dt className="text-slate-500 leading-6 whitespace-nowrap flex items-start gap-2">
                     <span className="w-5 shrink-0 text-lg" aria-hidden>📍</span>
                     <span>Location</span>
@@ -234,7 +225,7 @@ export default async function JobDetailPage(
                 </div>
 
                 {(job.salary_range || job.salary || (job.salary_min && job.salary_max)) && (
-                  <div className="grid grid-cols-[160px_1fr] items-start gap-x-6 py-2 border-t border-slate-100">
+                  <div className="grid grid-cols-[160px_1fr] items-start gap-x-6 py-1.5 border-t border-slate-100">
                     <dt className="text-slate-500 leading-6 whitespace-nowrap flex items-start gap-2">
                       <span className="w-5 shrink-0 text-lg" aria-hidden>💰</span>
                       <span>Salary</span>
@@ -265,14 +256,14 @@ export default async function JobDetailPage(
                   href={`/apply/${company}/${jobId}`}
                   aria-label="Apply to this job"
                   data-testid="apply-btn-summary"
-                  className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 text-white px-5 py-3 font-semibold shadow-sm ring-1 ring-emerald-600/20 hover:bg-emerald-600/90 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
+                  className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 text-white px-5 py-2.5 font-semibold shadow-lg ring-1 ring-emerald-600/20 hover:bg-emerald-600/90 motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-105 hover:shadow-2xl emerald-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
                 >
                   Apply Now
                 </Link>
                 <button
                   type="button"
                   aria-label="Save this job"
-                  className="w-full rounded-xl border border-slate-300 bg-white text-slate-700 px-5 py-3 font-semibold hover:bg-slate-50 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                  className="w-full rounded-xl border border-slate-300 bg-white text-slate-700 px-5 py-3 font-semibold hover:bg-slate-50 ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-105 hover:shadow-lg emerald-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
                 >
                   Save Job
                 </button>
@@ -285,7 +276,7 @@ export default async function JobDetailPage(
             {/* About Company */}
             <section
               aria-labelledby="about-company"
-              className="rounded-2xl border border-slate-200 bg-white/80 backdrop-blur p-6 md:p-8 shadow-sm hover:shadow-md transition-transform hover:-translate-y-0.5 relative z-10 lg:z-0"
+              className="rounded-2xl border border-slate-200 bg-white/80 backdrop-blur p-6 md:p-8 shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-105 emerald-glow relative z-10 lg:z-0"
             >
               <h2
                 id="about-company"
@@ -301,7 +292,7 @@ export default async function JobDetailPage(
             {/* About the role */}
             <section
               aria-labelledby="about-role"
-              className="rounded-2xl border border-slate-200 bg-white/80 backdrop-blur p-6 md:p-8 shadow-sm hover:shadow-md transition-transform hover:-translate-y-0.5 relative z-10 lg:z-0"
+              className="rounded-2xl border border-slate-200 bg-white/80 backdrop-blur p-6 md:p-8 shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-105 emerald-glow relative z-10 lg:z-0"
             >
               <h2
                 id="about-role"
