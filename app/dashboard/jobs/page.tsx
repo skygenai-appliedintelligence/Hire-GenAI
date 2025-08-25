@@ -263,7 +263,7 @@ export default function JobsPage() {
                         View Stats
                       </Button>
                     </Link>
-                    <Link href={`/apply/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
+                    <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
                       <Button
                         variant="outline"
                         size="sm"

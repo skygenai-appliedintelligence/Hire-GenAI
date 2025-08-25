@@ -18,8 +18,13 @@ export default async function CompanyJobApplyRedirect(props: { params: Promise<{
   const company = companyRows?.[0]
   if (!company) return redirect(`/${companySlug}`)
 
-  // Detect if legacy table exists; else fallback to jobs JOIN companies
-  const rel = await prisma.$queryRaw<any[]>(Prisma.sql`SELECT (to_regclass('public.job_descriptions') IS NOT NULL) AS exists`)
+  // Detect if legacy table exists; else fallback to jobs JOIN companies (avoid regclass type)
+  const rel = await prisma.$queryRaw<any[]>(Prisma.sql`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = 'job_descriptions'
+    ) AS exists
+  `)
   const hasJobDescriptions = !!rel?.[0]?.exists
 
   let jobs: any[] = []
