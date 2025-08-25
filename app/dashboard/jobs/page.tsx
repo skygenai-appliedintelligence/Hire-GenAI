@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast"
 import { type Job } from "@/lib/job-service"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Edit, Trash2, Briefcase, CheckCircle, XCircle, ExternalLink, BarChart3 } from "lucide-react"
 import Link from "next/link"
@@ -18,12 +19,43 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const { toast } = useToast()
+  const [applyEnabledByJob, setApplyEnabledByJob] = useState<Record<string, boolean>>({})
+  const [tab, setTab] = useState<'all' | 'open' | 'closed'>('all')
 
   useEffect(() => {
     if (company?.id) {
       fetchJobs()
     }
   }, [company])
+
+  // Read Apply Form toggle per job and listen for changes
+  useEffect(() => {
+    const loadStates = () => {
+      setApplyEnabledByJob((prev) => {
+        const next: Record<string, boolean> = { ...prev }
+        for (const j of jobs) {
+          try {
+            const saved = localStorage.getItem(`applyFormEnabled:${j.id}`)
+            next[j.id] = saved === null ? true : saved === 'true'
+          } catch {
+            next[j.id] = true
+          }
+        }
+        return next
+      })
+    }
+    loadStates()
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key) return
+      const m = e.key.match(/^applyFormEnabled:(.+)$/)
+      if (m && e.newValue !== null) {
+        const jobId = m[1]
+        setApplyEnabledByJob((prev) => ({ ...prev, [jobId]: e.newValue === 'true' }))
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [jobs])
 
   const fetchJobs = async () => {
     try {
@@ -174,147 +206,449 @@ export default function JobsPage() {
         </Link>
       </div>
 
-      <div className="grid gap-6">
-        {jobs.length > 0 ? (
-          jobs.map((job) => (
-            <Card
-              key={job.id}
-              className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
-              onClick={() => handleStoreJD(job)}
-            >
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg">{job.title}</CardTitle>
-                    <CardDescription>
-                      {job.location} • {job.employment_type}
-                      {job.salary_range && ` • ${job.salary_range}`}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600 mb-4 line-clamp-2">{job.description}</p>
+      {/* Buckets: Open vs Closed (Apply Form state) */}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as 'all' | 'open' | 'closed')} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="open">Open Form</TabsTrigger>
+          <TabsTrigger value="closed">Closed Form</TabsTrigger>
+        </TabsList>
 
-                {/* Platform Posting Status */}
-                {job.posting_results.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">Platform Status:</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {job.posting_results.map((result, index) => (
-                        <div key={index} className="flex items-center space-x-1 text-xs">
-                          {result.success ? (
-                            <>
-                              <CheckCircle className="w-3 h-3 text-green-600" />
-                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                {result.platform}
-                              </Badge>
-                            </>
-                          ) : (
-                            <>
-                              <XCircle className="w-3 h-3 text-red-600" />
-                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                {result.platform} (Failed)
-                              </Badge>
-                            </>
-                          )}
-                        </div>
-                      ))}
+        {/* All tab: show all jobs with Apply button state respected */}
+        <TabsContent value="all">
+          <div className="grid gap-6">
+            {jobs.length > 0 ? (
+              jobs.map((job) => (
+                <Card
+                  key={job.id}
+                  className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
+                  onClick={() => handleStoreJD(job)}
+                >
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">{job.title}</CardTitle>
+                        <CardDescription>
+                          {job.location} • {job.employment_type}
+                          {job.salary_range && ` • ${job.salary_range}`}
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{job.description}</p>
 
-                {/* Original platforms display for jobs without posting results */}
-                {job.posting_results.length === 0 && job.posted_platforms.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">Posted to:</h4>
-                    <div className="flex space-x-2">
-                      {job.posted_platforms.map((platform) => (
-                        <Badge key={platform} variant="outline">
-                          {platform}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex justify-between items-center">
-                  <div className="text-xs text-gray-500">
-                    Created: {new Date(job.created_at).toLocaleDateString()}
                     {job.posting_results.length > 0 && (
-                      <span className="ml-4">
-                        Posted to {job.posting_results.filter((r) => r.success).length}/{job.posting_results.length}{" "}
-                        platforms
-                      </span>
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Platform Status:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {job.posting_results.map((result, index) => (
+                            <div key={index} className="flex items-center space-x-1 text-xs">
+                              {result.success ? (
+                                <>
+                                  <CheckCircle className="w-3 h-3 text-green-600" />
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                    {result.platform}
+                                  </Badge>
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className="w-3 h-3 text-red-600" />
+                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                    {result.platform} (Failed)
+                                  </Badge>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                  </div>
-                  <div className="flex space-x-2">
-                    <Link href={`/dashboard/jobs/${job.id}`}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <BarChart3 className="h-4 w-4 mr-1" />
-                        View Stats
-                      </Button>
-                    </Link>
-                    <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-blue-600 hover:text-blue-700 bg-transparent hover:bg-blue-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <ExternalLink className="h-4 w-4 mr-1" />
-                        Apply Form
-                      </Button>
-                    </Link>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="bg-transparent hover:bg-gray-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
-                      onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/jobs/${job.id}/edit`) }}
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 shadow-sm hover:shadow-md motion-safe:transition-shadow"
-                      onMouseDown={(e) => e.stopPropagation()}
-                      disabled={deletingId === job.id}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      {deletingId === job.id ? 'Deleting…' : 'Delete'}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        ) : (
-          <Card className="border border-gray-200">
-            <CardContent className="text-center py-12">
-              <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No jobs yet</h3>
-              <p className="text-gray-600 mb-4">Get started by creating your first job description</p>
-              <Link href="/dashboard/jobs/new">
-                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Job
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+
+                    {job.posting_results.length === 0 && job.posted_platforms.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Posted to:</h4>
+                        <div className="flex space-x-2">
+                          {job.posted_platforms.map((platform) => (
+                            <Badge key={platform} variant="outline">
+                              {platform}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center">
+                      <div className="text-xs text-gray-500">
+                        Created: {new Date(job.created_at).toLocaleDateString()}
+                        {job.posting_results.length > 0 && (
+                          <span className="ml-4">
+                            Posted to {job.posting_results.filter((r) => r.success).length}/{job.posting_results.length}{" "}
+                            platforms
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex space-x-2">
+                        <Link href={`/dashboard/jobs/${job.id}`}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <BarChart3 className="h-4 w-4 mr-1" />
+                            View Stats
+                          </Button>
+                        </Link>
+                        {(applyEnabledByJob[job.id] ?? true) ? (
+                          <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-blue-600 hover:text-blue-700 bg-transparent hover:bg-blue-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink className="h-4 w-4 mr-1" />
+                              Apply Form
+                            </Button>
+                          </Link>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled
+                            className="cursor-not-allowed text-red-600 bg-transparent hover:bg-red-50/50 border-red-200/70"
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                            title="Apply Form is disabled"
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            Apply Form
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-transparent hover:bg-gray-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            try { localStorage.setItem('editJobDraft', JSON.stringify(job)) } catch {}
+                            router.push(`/edit/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 shadow-sm hover:shadow-md motion-safe:transition-shadow"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          disabled={deletingId === job.id}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          {deletingId === job.id ? 'Deleting…' : 'Delete'}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card className="border border-gray-200">
+                <CardContent className="text-center py-12">
+                  <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No jobs yet</h3>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Open tab: show jobs with Apply Form enabled (default true) */}
+        <TabsContent value="open">
+          <div className="grid gap-6">
+            {jobs.filter(j => (applyEnabledByJob[j.id] ?? true)).length > 0 ? (
+              jobs.filter(j => (applyEnabledByJob[j.id] ?? true)).map((job) => (
+                <Card
+                  key={job.id}
+                  className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
+                  onClick={() => handleStoreJD(job)}
+                >
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">{job.title}</CardTitle>
+                        <CardDescription>
+                          {job.location} • {job.employment_type}
+                          {job.salary_range && ` • ${job.salary_range}`}
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{job.description}</p>
+
+                    {job.posting_results.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Platform Status:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {job.posting_results.map((result, index) => (
+                            <div key={index} className="flex items-center space-x-1 text-xs">
+                              {result.success ? (
+                                <>
+                                  <CheckCircle className="w-3 h-3 text-green-600" />
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                    {result.platform}
+                                  </Badge>
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className="w-3 h-3 text-red-600" />
+                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                    {result.platform} (Failed)
+                                  </Badge>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {job.posting_results.length === 0 && job.posted_platforms.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Posted to:</h4>
+                        <div className="flex space-x-2">
+                          {job.posted_platforms.map((platform) => (
+                            <Badge key={platform} variant="outline">
+                              {platform}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center">
+                      <div className="text-xs text-gray-500">
+                        Created: {new Date(job.created_at).toLocaleDateString()}
+                        {job.posting_results.length > 0 && (
+                          <span className="ml-4">
+                            Posted to {job.posting_results.filter((r) => r.success).length}/{job.posting_results.length}{" "}
+                            platforms
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex space-x-2">
+                        <Link href={`/dashboard/jobs/${job.id}`}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <BarChart3 className="h-4 w-4 mr-1" />
+                            View Stats
+                          </Button>
+                        </Link>
+                        <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-blue-600 hover:text-blue-700 bg-transparent hover:bg-blue-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            Apply Form
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-transparent hover:bg-gray-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            try { localStorage.setItem('editJobDraft', JSON.stringify(job)) } catch {}
+                            router.push(`/edit/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 shadow-sm hover:shadow-md motion-safe:transition-shadow"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          disabled={deletingId === job.id}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          {deletingId === job.id ? 'Deleting…' : 'Delete'}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card className="border border-gray-200">
+                <CardContent className="text-center py-12">
+                  <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No open-form jobs</h3>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Closed tab: show jobs with Apply Form disabled */}
+        <TabsContent value="closed">
+          <div className="grid gap-6">
+            {jobs.filter(j => !(applyEnabledByJob[j.id] ?? true)).length > 0 ? (
+              jobs.filter(j => !(applyEnabledByJob[j.id] ?? true)).map((job) => (
+                <Card
+                  key={job.id}
+                  className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
+                  onClick={() => handleStoreJD(job)}
+                >
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">{job.title}</CardTitle>
+                        <CardDescription>
+                          {job.location} • {job.employment_type}
+                          {job.salary_range && ` • ${job.salary_range}`}
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{job.description}</p>
+
+                    {job.posting_results.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Platform Status:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {job.posting_results.map((result, index) => (
+                            <div key={index} className="flex items-center space-x-1 text-xs">
+                              {result.success ? (
+                                <>
+                                  <CheckCircle className="w-3 h-3 text-green-600" />
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                    {result.platform}
+                                  </Badge>
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className="w-3 h-3 text-red-600" />
+                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                    {result.platform} (Failed)
+                                  </Badge>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {job.posting_results.length === 0 && job.posted_platforms.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Posted to:</h4>
+                        <div className="flex space-x-2">
+                          {job.posted_platforms.map((platform) => (
+                            <Badge key={platform} variant="outline">
+                              {platform}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center">
+                      <div className="text-xs text-gray-500">
+                        Created: {new Date(job.created_at).toLocaleDateString()}
+                        {job.posting_results.length > 0 && (
+                          <span className="ml-4">
+                            Posted to {job.posting_results.filter((r) => r.success).length}/{job.posting_results.length}{" "}
+                            platforms
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex space-x-2">
+                        <Link href={`/dashboard/jobs/${job.id}`}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <BarChart3 className="h-4 w-4 mr-1" />
+                            View Stats
+                          </Button>
+                        </Link>
+                        {/* Disabled Apply button in closed tab */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled
+                          className="cursor-not-allowed text-red-600 bg-transparent hover:bg-red-50/50 border-red-200/70"
+                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                          title="Apply Form is disabled"
+                        >
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                          Apply Form
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-transparent hover:bg-gray-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            try { localStorage.setItem('editJobDraft', JSON.stringify(job)) } catch {}
+                            router.push(`/edit/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 shadow-sm hover:shadow-md motion-safe:transition-shadow"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          disabled={deletingId === job.id}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          {deletingId === job.id ? 'Deleting…' : 'Delete'}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card className="border border-gray-200">
+                <CardContent className="text-center py-12">
+                  <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No closed-form jobs</h3>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
