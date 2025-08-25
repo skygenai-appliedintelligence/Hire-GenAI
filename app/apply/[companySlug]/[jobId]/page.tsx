@@ -83,26 +83,26 @@ export default async function ApplyCompanyJobPage(props: { params: Promise<{ com
   const expLevel = (job.experience_level || job.level || '').toString()
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10">
+    <div className="mx-auto max-w-6xl px-4 py-10 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
       {/* Green heading card */}
-      <section className="mb-6 rounded-2xl bg-emerald-600/95 text-white shadow-lg ring-1 ring-emerald-500/20">
+      <section className="mb-6 rounded-2xl bg-emerald-600/95 text-white shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-emerald-700/20 motion-safe:transition-shadow motion-safe:duration-300 overflow-hidden emerald-glow relative z-10">
         <div className="px-6 py-6 md:px-8 md:py-8">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Apply for this position</h1>
           <p className="mt-2 text-emerald-50">Please fill out all required fields to submit your application.</p>
           <div className="mt-4 inline-flex items-center gap-3 text-emerald-100 text-sm">
-            <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1">{job.title}</span>
+            <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 transition-colors hover:bg-white/20">{job.title}</span>
             {job.location && (
-              <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1">{job.location}</span>
+              <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 transition-colors hover:bg-white/20">{job.location}</span>
             )}
             {expLevel && (
-              <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1">{expLevel[0].toUpperCase() + expLevel.slice(1)}</span>
+              <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 transition-colors hover:bg-white/20">{expLevel[0].toUpperCase() + expLevel.slice(1)}</span>
             )}
           </div>
         </div>
       </section>
 
       {/* Form card with green accents */}
-      <section className="w-full rounded-2xl border border-emerald-200 bg-white shadow-sm ring-1 ring-emerald-100">
+      <section className="mt-10 w-full rounded-2xl border border-emerald-200 bg-white shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow motion-safe:duration-300 overflow-hidden emerald-glow relative z-0">
         <div className="border-b border-emerald-100 bg-emerald-50/60 px-6 py-4 md:px-8">
           <h2 className="font-semibold text-slate-900">Application Form</h2>
           <p className="text-sm text-emerald-700">Role: <span className="font-medium">{job.title}</span></p>
