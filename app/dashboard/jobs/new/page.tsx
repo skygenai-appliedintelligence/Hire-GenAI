@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -12,14 +12,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Building2, MapPin, DollarSign, Clock, Users, Briefcase, Target, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Building2, Users, Briefcase, Target, CheckCircle, Clock, Bot } from 'lucide-react'
 import { useAuth } from "@/contexts/auth-context"
 
 export default function CreateJobPage() {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { company, user } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentTab, setCurrentTab] = useState("basic")
+  const lastSyncedTabRef = useRef<string | null>(null)
   
   // Form state
   const [formData, setFormData] = useState({
@@ -39,11 +42,20 @@ export default function CreateJobPage() {
     
     // Interview Process
     interviewRounds: [] as string[],
-    interviewDuration: "",
     
     // Platform Selection
     platforms: [] as string[],
   })
+
+  // Initialize tab from URL once on mount to avoid feedback loops
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    const allowed = ['basic', 'details', 'interview', 'platforms']
+    const next = t && allowed.includes(t) ? t : 'basic'
+    lastSyncedTabRef.current = next
+    setCurrentTab(next)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Auto-fill company from auth context
   useEffect(() => {
@@ -57,12 +69,33 @@ export default function CreateJobPage() {
   }
 
   const handleArrayChange = (field: string, value: string, checked: boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: checked 
-        ? [...prev[field as keyof typeof prev] as string[], value]
-        : (prev[field as keyof typeof prev] as string[]).filter(item => item !== value)
-    }))
+    setFormData(prev => {
+      const prevArr = (prev[field as keyof typeof prev] as string[]) || []
+      const set = new Set(prevArr)
+      if (checked) {
+        set.add(value)
+      } else {
+        set.delete(value)
+      }
+      const nextArr = Array.from(set)
+      // Avoid unnecessary state updates
+      if (prevArr.length === nextArr.length && prevArr.every((v, i) => v === nextArr[i])) {
+        return prev
+      }
+      const next = { ...prev, [field]: nextArr }
+      // If we updated interviewRounds, also persist a mapping of round -> skills to localStorage
+      if (field === 'interviewRounds') {
+        try {
+          const mapping: Record<string, string[]> = {}
+          nextArr.forEach(r => {
+            const cfg = (agentConfigurations as any)[r]
+            if (cfg && Array.isArray(cfg.skills)) mapping[r] = cfg.skills
+          })
+          localStorage.setItem('selectedRoundSkills', JSON.stringify(mapping))
+        } catch {}
+      }
+      return next
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,6 +103,12 @@ export default function CreateJobPage() {
     setIsSubmitting(true)
     
     try {
+      // Client-side guard to match API required fields
+      if (!formData.description.trim() || !formData.requirements.trim()) {
+        alert('Please fill in Description and Requirements before creating the job.')
+        setIsSubmitting(false)
+        return
+      }
       const res = await fetch('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -98,8 +137,8 @@ export default function CreateJobPage() {
       const selectedAgents = Array.from({ length: agentsCount }, (_, i) => i + 1) // [1,2,3,...]
       localStorage.setItem('selectedAgents', JSON.stringify(selectedAgents))
 
-      // Redirect to the Selected Agents page
-      router.push('/selected-agents')
+      // Redirect to the Selected Agents page with jobId and default tab=1
+      router.push(`/selected-agents?jobId=${encodeURIComponent(data.jobId)}&tab=1`)
     } catch (error) {
       console.error('Error creating job:', error)
     } finally {
@@ -107,13 +146,44 @@ export default function CreateJobPage() {
     }
   }
 
-  const interviewRoundOptions = [
-    "Phone Screening",
-    "Technical Assessment", 
-    "System Design",
-    "Behavioral Interview",
-    "Final Round"
-  ]
+  // Detailed agent catalog (aligned with /dashboard/agents/create design)
+  const agentConfigurations = {
+    "Phone Screening": {
+      name: "Screening Agent",
+      description: "Initial candidate screening and basic qualification assessment",
+      duration: "15 minutes",
+      skills: ["Communication", "Basic Qualifications", "Cultural Fit"],
+      color: "bg-blue-100 text-blue-800 border-blue-200",
+    },
+    "Technical Assessment": {
+      name: "Technical Agent",
+      description: "Coding skills, algorithms, and technical problem-solving evaluation",
+      duration: "30 minutes",
+      skills: ["Coding Skills", "Algorithm Knowledge", "Problem Solving"],
+      color: "bg-green-100 text-green-800 border-green-200",
+    },
+    "System Design": {
+      name: "System Design Agent",
+      description: "Architecture design, scalability, and system thinking assessment",
+      duration: "30 minutes",
+      skills: ["System Architecture", "Scalability", "Database Design"],
+      color: "bg-purple-100 text-purple-800 border-purple-200",
+    },
+    "Behavioral Interview": {
+      name: "Behavioral Agent",
+      description: "Leadership, teamwork, and soft skills evaluation",
+      duration: "30 minutes",
+      skills: ["Leadership", "Team Collaboration", "Communication"],
+      color: "bg-orange-100 text-orange-800 border-orange-200",
+    },
+    "Final Round": {
+      name: "Final Round Agent",
+      description: "Comprehensive evaluation and final decision making",
+      duration: "30 minutes",
+      skills: ["Overall Assessment", "Cultural Fit", "Decision Making"],
+      color: "bg-red-100 text-red-800 border-red-200",
+    },
+  } as const
 
   const platformOptions = [
     "LinkedIn",
@@ -139,7 +209,20 @@ export default function CreateJobPage() {
       </div>
 
       <form onSubmit={handleSubmit}>
-        <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-6">
+        <Tabs
+          value={currentTab}
+          onValueChange={(val) => {
+            if (val !== currentTab) setCurrentTab(val)
+            const currentUrlTab = searchParams.get('tab')
+            if (currentUrlTab !== val) {
+              const sp = new URLSearchParams(Array.from(searchParams.entries()))
+              sp.set('tab', val)
+              lastSyncedTabRef.current = val
+              router.replace(`${pathname}?${sp.toString()}`)
+            }
+          }}
+          className="space-y-6"
+        >
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="basic">Basic Info</TabsTrigger>
             <TabsTrigger value="details">Job Details</TabsTrigger>
@@ -311,48 +394,58 @@ export default function CreateJobPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
-                  <Label>Interview Rounds *</Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {interviewRoundOptions.map((round) => (
-                      <div key={round} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={round}
-                          checked={formData.interviewRounds.includes(round)}
-                          onCheckedChange={(checked) => 
-                            handleArrayChange('interviewRounds', round, checked as boolean)
-                          }
-                        />
-                        <Label htmlFor={round} className="text-sm font-normal">
-                          {round}
-                        </Label>
-                      </div>
-                    ))}
+                  <Label>Select Agents *</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {Object.entries(agentConfigurations).map(([round, cfg]) => {
+                      const checked = formData.interviewRounds.includes(round)
+                      return (
+                        <Card
+                          key={round}
+                          className={`transition-all duration-200 ${checked ? 'ring-2 ring-blue-500 shadow-md' : 'hover:shadow-md'}`}
+                          onClick={() => handleArrayChange('interviewRounds', round, !checked)}
+                        >
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) => handleArrayChange('interviewRounds', round, e.target.checked)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="h-4 w-4 rounded border border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <Bot className="w-5 h-5 text-blue-500" />
+                              </div>
+                              <Badge className={cfg.color}>{round}</Badge>
+                            </div>
+                            <CardTitle className="text-lg">{cfg.name}</CardTitle>
+                            <CardDescription className="text-sm">
+                              {cfg.description}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <div className="flex items-center text-sm text-gray-600">
+                              <Clock className="w-4 h-4 mr-2" />
+                              <span>{cfg.duration}</span>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center text-sm text-gray-600">
+                                <Briefcase className="w-4 h-4 mr-2" />
+                                <span>Key Skills:</span>
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {cfg.skills.map((skill, i) => (
+                                  <Badge key={i} variant="outline" className="text-xs">
+                                    {skill}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
                   </div>
-                  {formData.interviewRounds.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {formData.interviewRounds.map((round) => (
-                        <Badge key={round} variant="secondary">
-                          {round}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="interviewDuration">Expected Interview Duration</Label>
-                  <Select value={formData.interviewDuration} onValueChange={(value) => handleInputChange('interviewDuration', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select duration" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="30min">30 minutes</SelectItem>
-                      <SelectItem value="45min">45 minutes</SelectItem>
-                      <SelectItem value="1hour">1 hour</SelectItem>
-                      <SelectItem value="1.5hours">1.5 hours</SelectItem>
-                      <SelectItem value="2hours">2 hours</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               </CardContent>
             </Card>
@@ -422,6 +515,8 @@ export default function CreateJobPage() {
                 !formData.location ||
                 !formData.jobType ||
                 !formData.experienceLevel ||
+                !formData.description.trim() ||
+                !formData.requirements.trim() ||
                 formData.interviewRounds.length === 0
               }
               className="min-w-[200px]"
