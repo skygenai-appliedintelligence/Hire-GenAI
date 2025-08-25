@@ -344,7 +344,7 @@ export default function JobStatsPage() {
       </Card>
         </div>
         <div className="flex space-x-2">
-          <Link href={`/apply/${jobId}`} target="_blank">
+          <Link href={`/apply/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${jobId}`} target="_blank">
             <Button variant="outline" size="sm">
               <ExternalLink className="h-4 w-4 mr-2" />
               View Application Form
