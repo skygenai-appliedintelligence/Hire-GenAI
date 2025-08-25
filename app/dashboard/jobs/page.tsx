@@ -151,8 +151,8 @@ export default function JobsPage() {
       }
       localStorage.setItem('newJobData', JSON.stringify(jobData))
 
-      // Redirect to Selected Agents page
-      router.push('/selected-agents')
+      // Redirect to Selected Agents page with jobId so it can fetch JD directly
+      router.push(`/selected-agents?jobId=${encodeURIComponent(job.id)}`)
     } catch (e) {
       console.error('Failed to store JD for selected agents:', e)
       alert('Unable to proceed. Please try again.')
@@ -160,14 +160,14 @@ export default function JobsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Job Descriptions</h1>
           <p className="text-gray-600">Manage your job postings and track their performance across platforms</p>
         </div>
         <Link href="/dashboard/jobs/new">
-          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
             <Plus className="h-4 w-4 mr-2" />
             Create Job
           </Button>
@@ -179,7 +179,7 @@ export default function JobsPage() {
           jobs.map((job) => (
             <Card
               key={job.id}
-              className="border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"
+              className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
               onClick={() => handleStoreJD(job)}
             >
               <CardHeader>
@@ -256,18 +256,18 @@ export default function JobsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="hover:bg-blue-50 hover:text-blue-700 bg-transparent"
+                        className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <BarChart3 className="h-4 w-4 mr-1" />
                         View Stats
                       </Button>
                     </Link>
-                    <Link href={`/apply/${job.id}`} target="_blank">
+                    <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 bg-transparent"
+                        className="text-blue-600 hover:text-blue-700 bg-transparent hover:bg-blue-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <ExternalLink className="h-4 w-4 mr-1" />
@@ -277,8 +277,8 @@ export default function JobsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="hover:bg-gray-50 bg-transparent"
-                      onClick={(e) => e.stopPropagation()}
+                      className="bg-transparent hover:bg-gray-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                      onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/jobs/${job.id}/edit`) }}
                     >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
@@ -287,7 +287,7 @@ export default function JobsPage() {
                       variant="outline"
                       size="sm"
                       onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 shadow-sm hover:shadow-md motion-safe:transition-shadow"
                       onMouseDown={(e) => e.stopPropagation()}
                       disabled={deletingId === job.id}
                     >

@@ -13,35 +13,35 @@ const agentConfigurations = {
   "Phone Screening": {
     name: "Screening Agent",
     description: "Initial candidate screening and basic qualification assessment",
-    duration: "15-20 minutes",
+    duration: "15 minutes",
     skills: ["Communication", "Basic Qualifications", "Cultural Fit"],
     color: "bg-blue-100 text-blue-800 border-blue-200"
   },
   "Technical Assessment": {
     name: "Technical Agent",
     description: "Coding skills, algorithms, and technical problem-solving evaluation",
-    duration: "45-60 minutes", 
+    duration: "30 minutes", 
     skills: ["Coding Skills", "Algorithm Knowledge", "Problem Solving"],
     color: "bg-green-100 text-green-800 border-green-200"
   },
   "System Design": {
     name: "System Design Agent",
     description: "Architecture design, scalability, and system thinking assessment",
-    duration: "60-90 minutes",
+    duration: "30 minutes",
     skills: ["System Architecture", "Scalability", "Database Design"],
     color: "bg-purple-100 text-purple-800 border-purple-200"
   },
   "Behavioral Interview": {
     name: "Behavioral Agent", 
     description: "Leadership, teamwork, and soft skills evaluation",
-    duration: "30-45 minutes",
+    duration: "30 minutes",
     skills: ["Leadership", "Team Collaboration", "Communication"],
     color: "bg-orange-100 text-orange-800 border-orange-200"
   },
   "Final Round": {
     name: "Final Round Agent",
     description: "Comprehensive evaluation and final decision making",
-    duration: "45-60 minutes",
+    duration: "30 minutes",
     skills: ["Overall Assessment", "Cultural Fit", "Decision Making"],
     color: "bg-red-100 text-red-800 border-red-200"
   }
@@ -65,6 +65,8 @@ export default function CreateAgentsPage() {
   const [selectedAgents, setSelectedAgents] = useState<string[]>([])
   const [jobData, setJobData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [roundsFromJob, setRoundsFromJob] = useState<string[] | null>(null)
+  const [showingAll, setShowingAll] = useState<boolean>(false)
 
   useEffect(() => {
     const initializeAgents = () => {
@@ -73,46 +75,31 @@ export default function CreateAgentsPage() {
         const selectedRounds = localStorage.getItem('selectedInterviewRounds')
         const jobDataStr = localStorage.getItem('newJobData')
         
+        // Always show all agents by default
         if (selectedRounds) {
           const rounds = JSON.parse(selectedRounds)
-          if (jobDataStr) {
-            setJobData(JSON.parse(jobDataStr))
-          }
-          
-          // Create agents only for selected interview rounds
-          const agents: Agent[] = rounds.map((roundName: string, index: number) => {
-            const config = agentConfigurations[roundName as keyof typeof agentConfigurations]
-            return {
-              id: `agent-${index + 1}`,
-              roundName,
-              name: config.name,
-              description: config.description,
-              duration: config.duration,
-              skills: config.skills,
-              color: config.color,
-              selected: false
-            }
-          })
-          
-          setAvailableAgents(agents)
-        } else {
-          // Fallback: show all agents if no specific rounds selected
-          const allRounds = Object.keys(agentConfigurations)
-          const agents: Agent[] = allRounds.map((roundName, index) => {
-            const config = agentConfigurations[roundName as keyof typeof agentConfigurations]
-            return {
-              id: `agent-${index + 1}`,
-              roundName,
-              name: config.name,
-              description: config.description,
-              duration: config.duration,
-              skills: config.skills,
-              color: config.color,
-              selected: false
-            }
-          })
-          setAvailableAgents(agents)
+          setRoundsFromJob(Array.isArray(rounds) ? rounds : null)
         }
+        if (jobDataStr) {
+          setJobData(JSON.parse(jobDataStr))
+        }
+
+        const allRounds = Object.keys(agentConfigurations)
+        const agents: Agent[] = allRounds.map((roundName, index) => {
+          const config = agentConfigurations[roundName as keyof typeof agentConfigurations]
+          return {
+            id: `agent-${index + 1}`,
+            roundName,
+            name: config.name,
+            description: config.description,
+            duration: config.duration,
+            skills: config.skills,
+            color: config.color,
+            selected: false
+          }
+        })
+        setAvailableAgents(agents)
+        setShowingAll(true)
         
         setLoading(false)
       } catch (error) {
@@ -123,6 +110,46 @@ export default function CreateAgentsPage() {
 
     initializeAgents()
   }, [])
+
+  const showAllAgents = () => {
+    const allRounds = Object.keys(agentConfigurations)
+    const agents: Agent[] = allRounds.map((roundName, index) => {
+      const config = agentConfigurations[roundName as keyof typeof agentConfigurations]
+      return {
+        id: `agent-${index + 1}`,
+        roundName,
+        name: config.name,
+        description: config.description,
+        duration: config.duration,
+        skills: config.skills,
+        color: config.color,
+        selected: false
+      }
+    })
+    setAvailableAgents(agents)
+    setSelectedAgents([])
+    setShowingAll(true)
+  }
+
+  const showSelectedRoundsAgents = () => {
+    if (!roundsFromJob || roundsFromJob.length === 0) return
+    const agents: Agent[] = roundsFromJob.map((roundName: string, index: number) => {
+      const config = agentConfigurations[roundName as keyof typeof agentConfigurations]
+      return {
+        id: `agent-${index + 1}`,
+        roundName,
+        name: config.name,
+        description: config.description,
+        duration: config.duration,
+        skills: config.skills,
+        color: config.color,
+        selected: false
+      }
+    })
+    setAvailableAgents(agents)
+    setSelectedAgents([])
+    setShowingAll(false)
+  }
 
   const handleAgentToggle = (agentId: string) => {
     setSelectedAgents(prev => 
@@ -226,6 +253,18 @@ export default function CreateAgentsPage() {
             {selectedAgents.length} of {availableAgents.length} agents selected
           </span>
         </div>
+        <div className="flex items-center gap-3">
+          {!showingAll && (
+            <Button onClick={showAllAgents} variant="secondary" size="sm">
+              Show All Agents
+            </Button>
+          )}
+          {showingAll && roundsFromJob && roundsFromJob.length > 0 && (
+            <Button onClick={showSelectedRoundsAgents} variant="outline" size="sm">
+              Show Selected Rounds
+            </Button>
+          )}
+        </div>
         
         {selectedAgents.length > 0 && (
           <Badge variant="secondary" className="bg-green-100 text-green-800">
@@ -252,7 +291,6 @@ export default function CreateAgentsPage() {
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     checked={selectedAgents.includes(agent.id)}
-                    onChange={() => handleAgentToggle(agent.id)}
                     className="pointer-events-none"
                   />
                   <Bot className="w-5 h-5 text-blue-500" />

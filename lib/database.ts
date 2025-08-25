@@ -1,4 +1,3 @@
-import { prisma } from './prisma'
 import crypto from 'crypto'
 
 // Database service for authentication operations using raw SQL
@@ -466,7 +465,7 @@ export class DatabaseService {
 
     const updateUserQuery = `
       UPDATE users 
-      SET notification_preferences = $1::jsonb, updated_at = NOW()
+      SET notification_preferences = $1::jsonb
       WHERE id = $2::uuid
       RETURNING *
     `
@@ -507,5 +506,328 @@ export class DatabaseService {
 
   private static generateToken(): string {
     return crypto.randomBytes(32).toString('hex')
+  }
+
+  // =========================
+  // JOBS
+  // =========================
+  static async getCompanyIdByName(name: string): Promise<string | null> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const q = `SELECT id FROM companies WHERE name = $1 LIMIT 1`
+    const rows = (await this.query(q, [name])) as any[]
+    return rows.length > 0 ? rows[0].id : null
+  }
+
+  static async listJobsByCompanyId(companyId: string, limit = 200): Promise<any[]> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const q = `
+      SELECT id, title, location, employment_type, experience_level, description_md,
+             responsibilities_md, benefits_md, salary_level, created_by, created_at
+      FROM jobs
+      WHERE company_id = $1::uuid
+      ORDER BY created_at DESC
+      LIMIT $2
+    `
+    const rows = (await this.query(q, [companyId, limit])) as any[]
+    return rows
+  }
+
+  static async getJobByIdForCompany(jobId: string, companyId: string): Promise<any | null> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const q = `
+      SELECT id, company_id, title, location, employment_type, experience_level,
+             description_md, responsibilities_md, benefits_md, salary_level,
+             created_by, created_at
+      FROM jobs
+      WHERE id = $1::uuid AND company_id = $2::uuid
+      LIMIT 1
+    `
+    const rows = (await this.query(q, [jobId, companyId])) as any[]
+    return rows.length > 0 ? rows[0] : null
+  }
+
+  static async updateJobForCompany(jobId: string, companyId: string, updates: {
+    title?: string | null
+    location?: string | null
+    employment_type?: 'full_time' | 'part_time' | 'contract' | null
+    experience_level?: 'intern' | 'junior' | 'mid' | 'senior' | 'lead' | 'principal' | null
+    description_md?: string | null
+    responsibilities_md?: string | null
+    benefits_md?: string | null
+    salary_level?: string | null
+  }): Promise<any | null> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+
+    const sets: string[] = []
+    const values: any[] = []
+    let i = 1
+
+    if (updates.title !== undefined) { sets.push(`title = $${i++}`); values.push(updates.title) }
+    if (updates.location !== undefined) { sets.push(`location = $${i++}`); values.push(updates.location) }
+    if (updates.employment_type !== undefined) { sets.push(`employment_type = $${i++}::employment_type`); values.push(updates.employment_type) }
+    if (updates.experience_level !== undefined) { sets.push(`experience_level = $${i++}::experience_level`); values.push(updates.experience_level) }
+    if (updates.description_md !== undefined) { sets.push(`description_md = $${i++}`); values.push(updates.description_md) }
+    if (updates.responsibilities_md !== undefined) { sets.push(`responsibilities_md = $${i++}`); values.push(updates.responsibilities_md) }
+    if (updates.benefits_md !== undefined) { sets.push(`benefits_md = $${i++}`); values.push(updates.benefits_md) }
+    if (updates.salary_level !== undefined) { sets.push(`salary_level = $${i++}`); values.push(updates.salary_level) }
+
+    if (sets.length === 0) return null
+
+    // updated_at may not exist in schema; only set if column exists. We'll skip to avoid errors.
+    values.push(jobId)
+    values.push(companyId)
+
+    const q = `
+      UPDATE jobs
+      SET ${sets.join(', ')}
+      WHERE id = $${i++}::uuid AND company_id = $${i}::uuid
+      RETURNING id, company_id, title, location, employment_type, experience_level,
+                description_md, responsibilities_md, benefits_md, salary_level,
+                created_by, created_at
+    `
+    const rows = (await this.query(q, values)) as any[]
+    return rows.length > 0 ? rows[0] : null
+  }
+
+  static async deleteJobForCompany(jobId: string, companyId: string): Promise<string | null> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const q = `DELETE FROM jobs WHERE id = $1::uuid AND company_id = $2::uuid RETURNING id`
+    const rows = (await this.query(q, [jobId, companyId])) as any[]
+    return rows.length > 0 ? rows[0].id : null
+  }
+
+  static async companyExists(companyId: string): Promise<boolean> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const q = `SELECT 1 FROM companies WHERE id = $1::uuid LIMIT 1`
+    const rows = (await this.query(q, [companyId])) as any[]
+    return rows.length > 0
+  }
+
+  static async userExists(userId: string): Promise<boolean> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const q = `SELECT 1 FROM users WHERE id = $1::uuid LIMIT 1`
+    const rows = (await this.query(q, [userId])) as any[]
+    return rows.length > 0
+  }
+
+  static async createJob(input: {
+    company_id: string
+    title: string
+    location?: string | null
+    description_md?: string | null
+    employment_type?: 'full_time' | 'part_time' | 'contract' | null
+    experience_level?: 'intern' | 'junior' | 'mid' | 'senior' | 'lead' | 'principal' | null
+    responsibilities_md?: string | null
+    benefits_md?: string | null
+    salary_level?: string | null
+    created_by?: string | null
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+
+    const q = `
+      INSERT INTO jobs (
+        company_id, title, location, description_md, status, is_public,
+        employment_type, experience_level, responsibilities_md, benefits_md,
+        salary_level, created_by
+      )
+      VALUES (
+        $1::uuid, $2, $3, $4, 'open', true,
+        $5::employment_type, $6::experience_level, $7, $8,
+        $9, $10::uuid
+      )
+      RETURNING id
+    `
+
+    const params = [
+      input.company_id,
+      input.title,
+      input.location ?? null,
+      input.description_md ?? null,
+      input.employment_type ?? null,
+      input.experience_level ?? null,
+      input.responsibilities_md ?? null,
+      input.benefits_md ?? null,
+      input.salary_level ?? null,
+      input.created_by ?? null,
+    ]
+
+    const rows = (await this.query(q, params)) as any[]
+    if (!rows || rows.length === 0) {
+      throw new Error('Failed to create job')
+    }
+    return rows[0]
+  }
+
+  static async createJobRounds(jobId: string, rounds: Array<{ seq: number; name: string; duration_minutes: number }>) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    if (!rounds || rounds.length === 0) return
+
+    // Insert rounds one-by-one for simplicity in mock/neon
+    const q = `
+      INSERT INTO job_rounds (job_id, seq, name, duration_minutes)
+      VALUES ($1::uuid, $2, $3, $4)
+      ON CONFLICT (job_id, seq) DO NOTHING
+    `
+    for (const r of rounds) {
+      await this.query(q, [jobId, r.seq, r.name, r.duration_minutes])
+    }
+  }
+
+  // Fetch job_rounds for a job (including ids) ordered by seq
+  static async getJobRoundsByJobId(jobId: string): Promise<Array<{ id: string; job_id: string; seq: number; name: string; duration_minutes: number }>> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const q = `
+      SELECT id, job_id, seq, name, duration_minutes
+      FROM job_rounds
+      WHERE job_id = $1::uuid
+      ORDER BY seq ASC
+    `
+    const rows = (await this.query(q, [jobId])) as any[]
+    return rows as any
+  }
+
+  // Create round_agents rows for a specific job_round_id
+  static async createRoundAgents(jobRoundId: string, agents: Array<{ agent_type: string; skill_weights?: any; config?: any }>): Promise<void> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    if (!agents || agents.length === 0) return
+    const q = `
+      INSERT INTO round_agents (job_round_id, agent_type, skill_weights, config)
+      VALUES ($1::uuid, $2, $3::jsonb, $4::jsonb)
+    `
+    for (const a of agents) {
+      await this.query(q, [jobRoundId, a.agent_type, JSON.stringify(a.skill_weights || {}), JSON.stringify(a.config || {})])
+    }
+  }
+
+  // List rounds with their linked agents for a job
+  static async listRoundsWithAgents(jobId: string): Promise<Array<{
+    round_id: string
+    seq: number
+    name: string
+    duration_minutes: number
+    agents: Array<{ id: string; agent_type: string; skill_weights: any; config: any; created_at: string }>
+  }>> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const rounds = await this.getJobRoundsByJobId(jobId)
+    if (!rounds || rounds.length === 0) return []
+
+    const qAgents = `
+      SELECT ra.id, ra.job_round_id, ra.agent_type, ra.skill_weights, ra.config, ra.created_at
+      FROM round_agents ra
+      WHERE ra.job_round_id = ANY($1::uuid[])
+      ORDER BY ra.created_at ASC
+    `
+    const roundIds = rounds.map(r => r.id)
+    const rows = (await this.query(qAgents, [roundIds])) as any[]
+    const byRound = new Map<string, any[]>()
+    for (const row of rows) {
+      const list = byRound.get(row.job_round_id) || []
+      list.push({ id: row.id, agent_type: row.agent_type, skill_weights: row.skill_weights || {}, config: row.config || {}, created_at: row.created_at })
+      byRound.set(row.job_round_id, list)
+    }
+    return rounds.map(r => ({
+      round_id: r.id,
+      seq: r.seq,
+      name: r.name,
+      duration_minutes: r.duration_minutes,
+      agents: byRound.get(r.id) || [],
+    }))
+  }
+
+  // Update questions list on a specific round_agent by writing to config.questions as JSONB
+  static async updateRoundAgentQuestions(roundAgentId: string, questions: Array<{ id?: string; text: string; type?: string; linkedSkills?: string[]; expectedAnswer?: string }>): Promise<void> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const q = `
+      UPDATE round_agents
+         SET config = jsonb_set(
+           COALESCE(config, '{}'::jsonb),
+           '{questions}',
+           $2::jsonb,
+           true
+         )
+       WHERE id = $1::uuid
+    `
+    await this.query(q, [roundAgentId, JSON.stringify(questions || [])])
+  }
+
+  // Get company_id for a given job
+  static async getJobCompanyId(jobId: string): Promise<string | null> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const q = `SELECT company_id FROM jobs WHERE id = $1::uuid LIMIT 1`
+    const rows = (await this.query(q, [jobId])) as any[]
+    return rows && rows.length > 0 ? rows[0].company_id : null
+  }
+
+  // Create a question row; returns its id
+  static async createQuestion(input: { company_id: string | null; text_md: string; difficulty?: string | null; category?: string | null; metadata?: any }): Promise<string> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const q = `
+      INSERT INTO questions (company_id, text_md, difficulty, category, metadata)
+      VALUES ($1::uuid, $2, $3, $4, $5::jsonb)
+      RETURNING id
+    `
+    const params = [
+      input.company_id ?? null,
+      input.text_md,
+      input.difficulty ?? null,
+      input.category ?? null,
+      JSON.stringify(input.metadata ?? {})
+    ]
+    const rows = (await this.query(q, params)) as any[]
+    if (!rows || rows.length === 0) throw new Error('Failed to insert question')
+    return rows[0].id
+  }
+
+  // Replace all agent_questions for a round_agent with the provided sequence
+  static async setAgentQuestions(roundAgentId: string, companyId: string | null, questions: Array<{ text: string; type?: string; linkedSkills?: string[]; expectedAnswer?: string }>): Promise<void> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    // Clear existing links
+    const del = `DELETE FROM agent_questions WHERE round_agent_id = $1::uuid`
+    await this.query(del, [roundAgentId])
+    if (!questions || questions.length === 0) return
+    // Insert questions and links with seq = index+1
+    let seq = 1
+    for (const q of questions) {
+      const qid = await this.createQuestion({ company_id: companyId, text_md: q.text, category: q.type ?? null, metadata: { linkedSkills: q.linkedSkills ?? [], expectedAnswer: q.expectedAnswer ?? null } })
+      const link = `
+        INSERT INTO agent_questions (round_agent_id, question_id, seq)
+        VALUES ($1::uuid, $2::uuid, $3)
+        ON CONFLICT (round_agent_id, seq) DO UPDATE SET question_id = EXCLUDED.question_id
+      `
+      await this.query(link, [roundAgentId, qid, seq])
+      seq++
+    }
   }
 }

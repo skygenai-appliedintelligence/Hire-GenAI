@@ -11,12 +11,12 @@ export default async function CompanyPublicPage({ params }: { params: Promise<{ 
     
     // Use raw SQL query since we don't have generated Prisma models
     // Note: Using name instead of slug since companies table doesn't have slug column
-    const companyQuery = `
+    const companies = await prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT * FROM companies 
-      WHERE LOWER(name) = LOWER($1) OR LOWER(REPLACE(name, ' ', '-')) = LOWER($1)
-      LIMIT 1
-    `
-    const companies = await prisma.$queryRawUnsafe(companyQuery, companySlug) as any[]
+       WHERE LOWER(name) = LOWER(${companySlug})
+          OR LOWER(REPLACE(name, ' ', '-')) = LOWER(${companySlug})
+       LIMIT 1
+    `)
     const company = companies[0]
     
     if (!company) {
@@ -27,13 +27,33 @@ export default async function CompanyPublicPage({ params }: { params: Promise<{ 
       )
     }
 
-    const jobs = await prisma.$queryRaw<any[]>(Prisma.sql`
-      SELECT id, title, location
-        FROM public.job_descriptions
-       WHERE company_name = ${company.name}
-       ORDER BY created_at DESC
-       LIMIT 100
+    // Prefer legacy view if present, else fallback to jobs table (avoid regclass type)
+    const rel = await prisma.$queryRaw<any[]>(Prisma.sql`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = 'job_descriptions'
+      ) AS exists
     `)
+    const hasJobDescriptions = !!rel?.[0]?.exists
+
+    const jobs = hasJobDescriptions
+      ? await prisma.$queryRaw<any[]>(Prisma.sql`
+          SELECT id, title, location
+            FROM public.job_descriptions
+           WHERE company_name = ${company.name}
+           ORDER BY created_at DESC
+           LIMIT 100
+        `)
+      : await prisma.$queryRaw<any[]>(Prisma.sql`
+          SELECT j.id, j.title, j.location
+            FROM public.jobs j
+            JOIN public.companies c ON c.id = j.company_id
+           WHERE c.name = ${company.name}
+             AND j.is_public = true
+             AND LOWER(j.status) IN ('open','active')
+           ORDER BY j.created_at DESC
+           LIMIT 100
+        `)
 
     return (
       <div className="max-w-4xl mx-auto py-12 px-4 space-y-6">
@@ -53,7 +73,7 @@ export default async function CompanyPublicPage({ params }: { params: Promise<{ 
                     <h3 className="font-semibold">{job.title}</h3>
                     <p className="text-sm text-gray-600">{job.location}</p>
                   </div>
-                  <Link href={`/apply/${job.id}`} className="text-emerald-700 hover:underline">
+                  <Link href={`/apply/${companySlug}/${job.id}`} className="text-emerald-700 hover:underline">
                     Apply
                   </Link>
                 </div>

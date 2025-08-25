@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
@@ -17,25 +18,37 @@ interface AIQuestionGeneratorModalProps {
   keySkills: Array<{ id: string; name: string; description: string; weight: number }>
   onQuestionsGenerated: (questions: string[]) => void
   trigger?: React.ReactNode
+  initialJobDescription?: string
+  agentId?: string
+  taskId?: string
+  basePath?: string // default: '/selected-agents'
+  existingQuestions?: string[]
 }
 
 export function AIQuestionGeneratorModal({ 
   agentType, 
   keySkills, 
   onQuestionsGenerated,
-  trigger 
+  trigger,
+  initialJobDescription,
+  agentId,
+  taskId,
+  basePath = '/selected-agents',
+  existingQuestions = []
 }: AIQuestionGeneratorModalProps) {
   const [open, setOpen] = useState(false)
   const [jobDescription, setJobDescription] = useState("")
-  const getRandomQuestionCount = () => {
-    const min = 5
-    const max = 12
-    return Math.floor(Math.random() * (max - min + 1)) + min
-  }
-  const [numberOfQuestions, setNumberOfQuestions] = useState(getRandomQuestionCount())
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  // Keep number input writable by storing as string and validating on submit
+  const [numberOfQuestions, setNumberOfQuestions] = useState<string>("")
   const [questions, setQuestions] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const { toast } = useToast()
+
+  // Use only highlighted skills if available, fallback to all
+  const highlighted = (keySkills || []).filter((s: any) => (s as any).highlighted)
+  const skillsForUI = highlighted.length > 0 ? highlighted : keySkills
 
   // Map agent types to AI service agent types
   const getAgentTypeForAI = (agentType: string) => {
@@ -62,12 +75,32 @@ export function AIQuestionGeneratorModal({
     setLoading(true)
     try {
       const aiAgentType = getAgentTypeForAI(agentType)
-      const skills = keySkills.map(s => s.name)
+      const skills = skillsForUI.map(s => s.name)
+      // Validate number of questions (1-20)
+      const n = parseInt(String(numberOfQuestions).trim(), 10)
+      if (!Number.isFinite(n) || n < 1 || n > 20) {
+        toast({
+          title: "Error",
+          description: "Please enter a valid number of questions between 1 and 20",
+          variant: "destructive",
+        })
+        setLoading(false)
+        return
+      }
+
+      // Avoid repeats across runs by combining existingQuestions (from task) + current modal questions
+      const existing = [
+        ...(existingQuestions || []),
+        ...questions,
+      ]
+
       const generatedQuestions = await AIService.generateStagedInterviewQuestions(
         jobDescription,
         aiAgentType,
-        numberOfQuestions,
-        skills
+        n,
+        skills,
+        existing,
+        agentType // agentName: the visible round name, e.g., "Technical Interview 1"
       )
       
       setQuestions(generatedQuestions)
@@ -104,13 +137,37 @@ export function AIQuestionGeneratorModal({
   const handleClear = () => {
     setJobDescription("")
     setQuestions([])
-    setNumberOfQuestions(getRandomQuestionCount())
+    setNumberOfQuestions("")
   }
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next)
     if (next) {
-      setNumberOfQuestions(getRandomQuestionCount())
+      setNumberOfQuestions("")
+      // Prefill only when jobId is present in URL
+      const jobId = searchParams.get('jobId')
+      if (!jobDescription && initialJobDescription && jobId) {
+        setJobDescription(initialJobDescription)
+      }
+      // Update URL to reflect AI modal open state
+      try {
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('ai', '1')
+        if (agentId) params.set('agent', agentId)
+        if (taskId) params.set('task', taskId)
+        router.replace(`${basePath}?${params.toString()}`, { scroll: false })
+      } catch {}
+    }
+    if (!next) {
+      // Remove AI-related params, keep others (like tab)
+      try {
+        const params = new URLSearchParams(searchParams.toString())
+        params.delete('ai')
+        params.delete('agent')
+        params.delete('task')
+        const qs = params.toString()
+        router.replace(qs ? `${basePath}?${qs}` : basePath, { scroll: false })
+      } catch {}
     }
   }
 
@@ -157,17 +214,17 @@ export function AIQuestionGeneratorModal({
               min={1}
               max={20}
               value={numberOfQuestions}
-              onChange={(e) => setNumberOfQuestions(parseInt(e.target.value) || getRandomQuestionCount())}
+              onChange={(e) => setNumberOfQuestions(e.target.value)}
               className="w-32"
             />
           </div>
 
           {/* Key Skills Display */}
-          {keySkills.length > 0 && (
+          {skillsForUI.length > 0 && (
             <div className="space-y-2">
               <Label>Key Skills for {agentType}</Label>
               <div className="flex flex-wrap gap-2">
-                {keySkills.map((skill) => (
+                {skillsForUI.map((skill) => (
                   <span key={skill.id} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
                     {skill.name}
                   </span>

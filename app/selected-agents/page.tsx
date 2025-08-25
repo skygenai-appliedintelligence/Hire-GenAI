@@ -1,15 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, useRef } from "react"
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useAuth } from '@/contexts/auth-context'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { CheckCircle, Clock, User, ArrowLeft, Home, Plus, Edit2, Trash2, Save, Brain } from 'lucide-react'
 import { AIQuestionGeneratorModal } from "@/components/ai-question-generator-modal"
+import { useToast } from "@/hooks/use-toast"
 
 // Agent Types - Each agent handles ONE specific interview round
 interface KeySkill {
@@ -17,6 +20,7 @@ interface KeySkill {
   name: string
   description: string
   weight: number
+  highlighted?: boolean
 }
 
 interface Question {
@@ -77,13 +81,13 @@ const interviewRounds = [
     interviewer: 'Michael Rodriguez'
   },
   {
-    name: 'HR Interview',
+    name: 'Final Interview',
     duration: '30 minutes',
     interviewer: 'Emily Davis'
   }
 ]
 
-// Default evaluation skills applied to every agent by default
+// Default evaluation skills applied to every agent by default (not highlighted)
 const DEFAULT_EVAL_SKILLS: Array<Pick<KeySkill, 'name' | 'description' | 'weight'>> = [
   { name: 'Communication', description: 'Clear verbal and written communication', weight: 15 },
   { name: 'Problem Solving', description: 'Analytical thinking and approach', weight: 15 },
@@ -101,41 +105,41 @@ const DEFAULT_EVAL_SKILLS: Array<Pick<KeySkill, 'name' | 'description' | 'weight
 const generateKeySkills = (roundName: string): KeySkill[] => {
   const skillSets = {
     'Screening Round': [
-      { name: 'Communication', description: 'Clear verbal and written communication', weight: 30 },
-      { name: 'Cultural Fit', description: 'Alignment with company values', weight: 25 },
-      { name: 'Basic Qualifications', description: 'Meets minimum job requirements', weight: 45 }
+      { name: 'Communication', description: 'Clear verbal and written communication', weight: 30, highlighted: true },
+      { name: 'Cultural Fit', description: 'Alignment with company values', weight: 25, highlighted: true },
+      { name: 'Basic Qualifications', description: 'Meets minimum job requirements', weight: 45, highlighted: true }
     ],
     'Initial Interview': [
-      { name: 'Problem Solving', description: 'Analytical thinking and approach', weight: 35 },
-      { name: 'Experience Relevance', description: 'Past experience alignment', weight: 30 },
-      { name: 'Motivation', description: 'Interest and enthusiasm for role', weight: 35 }
+      { name: 'Problem Solving', description: 'Analytical thinking and approach', weight: 35, highlighted: true },
+      { name: 'Experience Relevance', description: 'Past experience alignment', weight: 30, highlighted: true },
+      { name: 'Motivation', description: 'Interest and enthusiasm for role', weight: 35, highlighted: true }
     ],
     'Technical Interview 1': [
-      { name: 'Coding Skills', description: 'Programming proficiency', weight: 40 },
-      { name: 'Algorithm Knowledge', description: 'Data structures and algorithms', weight: 35 },
-      { name: 'Code Quality', description: 'Clean, maintainable code', weight: 25 }
+      { name: 'Coding Skills', description: 'Programming proficiency', weight: 40, highlighted: true },
+      { name: 'Algorithm Knowledge', description: 'Data structures and algorithms', weight: 35, highlighted: true },
+      { name: 'Problem Solving', description: 'Analytical thinking and approach', weight: 25, highlighted: true }
     ],
     'Technical Interview 2': [
-      { name: 'System Design', description: 'Architecture and scalability', weight: 45 },
-      { name: 'Database Knowledge', description: 'Database design and optimization', weight: 30 },
-      { name: 'Performance Optimization', description: 'Code and system optimization', weight: 25 }
+      { name: 'System Architecture', description: 'Architecture and scalability', weight: 45, highlighted: true },
+      { name: 'Scalability', description: 'Handle growth and performance', weight: 30, highlighted: true },
+      { name: 'Database Design', description: 'Database design and optimization', weight: 25, highlighted: true }
     ],
-    'HR Interview': [
-      { name: 'Leadership Potential', description: 'Leadership qualities and experience', weight: 40 },
-      { name: 'Team Collaboration', description: 'Working effectively in teams', weight: 35 },
-      { name: 'Career Goals', description: 'Long-term career alignment', weight: 25 }
+    'Final Interview': [
+      { name: 'Overall Assessment', description: 'Holistic evaluation across areas', weight: 40, highlighted: true },
+      { name: 'Decision Making', description: 'Judgment and choices', weight: 35, highlighted: true },
+      { name: 'Cultural Fit', description: 'Alignment with company values', weight: 25, highlighted: true }
     ]
   }
 
   const base = skillSets[roundName as keyof typeof skillSets] || skillSets['Screening Round']
 
   // Merge defaults + base, dedupe by name (case-insensitive), keep first weight/description
-  const byName = new Map<string, { name: string; description: string; weight: number }>()
-  const put = (s: { name: string; description: string; weight: number }) => {
+  const byName = new Map<string, { name: string; description: string; weight: number; highlighted?: boolean }>()
+  const put = (s: { name: string; description: string; weight: number; highlighted?: boolean }) => {
     const key = s.name.trim().toLowerCase()
     if (!byName.has(key)) byName.set(key, s)
   }
-  DEFAULT_EVAL_SKILLS.forEach(put)
+  DEFAULT_EVAL_SKILLS.forEach((s) => put({ ...s, highlighted: false }))
   base.forEach(put)
 
   const merged = Array.from(byName.values())
@@ -145,83 +149,39 @@ const generateKeySkills = (roundName: string): KeySkill[] => {
   }))
 }
 
-// Generate dummy questions for each agent type
-const generateQuestions = (roundName: string, keySkills: KeySkill[]): Question[] => {
-  const questionSets = {
-    'Screening Round': [
-      'Tell me about yourself and your background',
-      'Why are you interested in this position?',
-      'What are your salary expectations?',
-      'When can you start?',
-      'What do you know about our company?',
-      'Why are you looking to leave your current role?'
-    ],
-    'Initial Interview': [
-      'Describe a challenging project you worked on',
-      'How do you handle tight deadlines?',
-      'Tell me about a time you had to learn something new quickly',
-      'How do you prioritize your work?',
-      'Describe a situation where you had to work with a difficult team member',
-      'What motivates you in your work?'
-    ],
-    'Technical Interview 1': [
-      'Implement a function to reverse a linked list',
-      'How would you find the duplicate number in an array?',
-      'Explain the difference between stack and heap memory',
-      'Write a function to check if a string is a palindrome',
-      'How would you optimize a slow database query?',
-      'Describe the time complexity of your solution'
-    ],
-    'Technical Interview 2': [
-      'Design a URL shortening service like bit.ly',
-      'How would you design a chat application?',
-      'Explain database indexing and when to use it',
-      'How would you handle millions of concurrent users?',
-      'Design a caching strategy for a web application',
-      'Explain microservices architecture pros and cons'
-    ],
-    'HR Interview': [
-      'Describe your leadership style',
-      'How do you handle conflict in a team?',
-      'Where do you see yourself in 5 years?',
-      'Tell me about a time you had to make a difficult decision',
-      'How do you give and receive feedback?',
-      'What would you do in your first 90 days in this role?'
-    ]
-  }
-
-  const questions = questionSets[roundName as keyof typeof questionSets] || questionSets['Screening Round']
-  return questions.map((question, index) => ({
-    id: `question-${index + 1}`,
-    text: question,
-    type: roundName.includes('Technical') ? 'technical' : roundName.includes('HR') ? 'behavioral' : 'situational' as const,
-    linkedSkills: keySkills.slice(0, Math.min(2, keySkills.length)).map(skill => skill.id)
-  }))
-}
+// No default questions: questions will start empty and be added via modal or manual add
+const generateQuestions = (_roundName: string, _keySkills: KeySkill[]): Question[] => []
 
 export default function SelectedAgentsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { company } = useAuth()
+  const { toast } = useToast()
   const [selectedAgents, setSelectedAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<string>("")
   const [editingQuestion, setEditingQuestion] = useState<string | null>(null)
   const [editingSkill, setEditingSkill] = useState<string | null>(null)
+  const [jobData, setJobData] = useState<any | null>(null)
+  const autoGenStarted = useRef(false)
+  const persistDoneForJob = useRef<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
-  const normalizeQuestionText = (text: string) =>
-    text
-      .toLowerCase()
-      .replace(/\s+/g, " ")
-      .replace(/[\p{P}\p{S}]+/gu, "")
-      .trim()
+  // --- Helpers ---
+  const normalizeQuestionText = (t: string): string => t.trim().replace(/\s+/g, ' ').toLowerCase()
 
-  const dedupeAndLimitQuestions = (existing: Question[], incoming: Question[] = [], max: number = 6, preferIncoming: boolean = false): Question[] => {
-    const result: Question[] = []
+  const dedupeAndLimitQuestions = (
+    existing: Question[],
+    incoming: Question[] = [],
+    max: number = Number.MAX_SAFE_INTEGER,
+    preferIncoming: boolean = false
+  ): Question[] => {
     const seen = new Set<string>()
+    const result: Question[] = []
 
     const first = preferIncoming ? incoming : existing
     const second = preferIncoming ? existing : incoming
 
-    // add primary list first
     for (const q of first) {
       const key = normalizeQuestionText(q.text)
       if (!seen.has(key)) {
@@ -231,7 +191,6 @@ export default function SelectedAgentsPage() {
       if (result.length >= max) return result.slice(0, max)
     }
 
-    // then add secondary list uniques
     for (const q of second) {
       const key = normalizeQuestionText(q.text)
       if (!seen.has(key)) {
@@ -244,19 +203,124 @@ export default function SelectedAgentsPage() {
     return result.slice(0, max)
   }
 
+  // --- Persistence helpers: keep questions permanent until regenerated ---
+  const getJobId = (): string | null => {
+    try {
+      const stored = localStorage.getItem('newJobData')
+      if (!stored) return null
+      const j = JSON.parse(stored)
+      return j?.id || null
+    } catch { return null }
+  }
+
+  const buildKey = (jobId: string, agentId: string, taskId: string) => `jobQuestions:${jobId}:${agentId}:${taskId}`
+
+  const persistQuestions = (jobId: string, agentId: string, taskId: string, questions: Question[]) => {
+    try {
+      const key = buildKey(jobId, agentId, taskId)
+      localStorage.setItem(key, JSON.stringify(questions))
+    } catch {}
+  }
+
+  const restoreQuestions = (jobId: string, agentId: string, taskId: string): Question[] | null => {
+    try {
+      const key = buildKey(jobId, agentId, taskId)
+      const raw = localStorage.getItem(key)
+      if (!raw) return null
+      const arr = JSON.parse(raw)
+      if (!Array.isArray(arr)) return null
+      return arr.filter((q: any) => q && typeof q.text === 'string').map((q: any, i: number) => ({
+        id: q.id || `persisted-${Date.now()}-${i}`,
+        text: q.text,
+        type: q.type || 'situational',
+        linkedSkills: Array.isArray(q.linkedSkills) ? q.linkedSkills : [],
+        expectedAnswer: q.expectedAnswer,
+      }))
+    } catch { return null }
+  }
+
+  useEffect(() => {
+    const initialize = async () => {
+      try {
+        const storedData = localStorage.getItem("newJobData")
+        if (storedData) {
+          setJobData(JSON.parse(storedData))
+        }
+      } catch (error) {
+        console.error('Error loading job data:', error)
+      }
+    }
+    initialize()
+  }, [])
+
+  // If jobId is present in URL and company is known, fetch JD from API and prefer it
+  useEffect(() => {
+    const fetchJD = async () => {
+      const jobId = searchParams.get('jobId')
+      const companyName = company?.name
+      if (!jobId || !companyName) return
+      try {
+        const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}?company=${encodeURIComponent(companyName)}`)
+        const data = await res.json().catch(() => ({}))
+        if (res.ok && data?.ok && data?.job) {
+          const j = data.job
+          // Prefer multiple fields to build a useful JD for AI
+          const jd = [j.description_md, j.description, j.responsibilities_md, j.benefits_md]
+            .filter((x: any) => typeof x === 'string' && x.trim().length > 0)
+            .join('\n\n') || `Role: ${j.title || 'Unknown'}\nCompany: ${companyName}`
+          const next = {
+            id: j.id,
+            title: j.title,
+            company: companyName,
+            description: jd,
+            location: j.location,
+            employment_type: j.employment_type,
+            createdAt: j.created_at,
+          }
+          setJobData(next)
+          // keep local copy in case of reloads
+          try { localStorage.setItem('newJobData', JSON.stringify(next)) } catch {}
+        }
+      } catch (e) {
+        console.warn('Failed to fetch job by id (non-fatal):', (e as any)?.message)
+      }
+    }
+    fetchJD()
+  }, [searchParams, company])
+
   useEffect(() => {
     try {
       // Get selected agent IDs from localStorage
       const storedAgents = localStorage.getItem('selectedAgents')
       // Also get the specific interview rounds the user chose when creating the JD (if available)
       const storedChosenRounds = localStorage.getItem('selectedInterviewRounds')
-      if (!storedAgents) {
+      // Mapping of external round name -> skills selected on the Interview Process page
+      const storedRoundSkills = localStorage.getItem('selectedRoundSkills')
+      // Read job data passed from Jobs page
+      const storedJobData = localStorage.getItem('newJobData')
+      if (storedJobData) {
+        try { setJobData(JSON.parse(storedJobData)) } catch {}
+      }
+      // Parse inputs safely
+      const parsedAgents: any = storedAgents ? (() => { try { return JSON.parse(storedAgents) } catch { return null } })() : null
+      const chosenRounds: string[] = storedChosenRounds ? (() => { try { return JSON.parse(storedChosenRounds) } catch { return [] } })() : []
+      const roundSkillsMap: Record<string, string[]> = storedRoundSkills ? (() => { try { return JSON.parse(storedRoundSkills) } catch { return {} } })() : {}
+
+      // Determine agent count: prefer explicit chosen rounds length, else selectedAgents length
+      const roundsCount = Array.isArray(chosenRounds) ? chosenRounds.length : 0
+      const storedAgentsCount = Array.isArray(parsedAgents) ? parsedAgents.length : (Number.isFinite(parsedAgents) ? Number(parsedAgents) : 0)
+      const agentCount = roundsCount > 0 ? roundsCount : storedAgentsCount
+
+      // If neither is present, redirect to selection
+      if (!agentCount || agentCount <= 0) {
         router.push('/dashboard/agents/create')
         return
       }
 
-      const selectedAgentIds = JSON.parse(storedAgents)
-      const chosenRounds: string[] = storedChosenRounds ? (() => { try { return JSON.parse(storedChosenRounds) } catch { return [] } })() : []
+      // Build selectedAgentIds robustly
+      const selectedAgentIds: any[] = Array.isArray(parsedAgents) && parsedAgents.length >= agentCount
+        ? parsedAgents
+        : Array.from({ length: agentCount }, (_, i) => i + 1)
       
       if (!Array.isArray(selectedAgentIds) || selectedAgentIds.length === 0) {
         router.push('/dashboard/agents/create')
@@ -273,17 +337,23 @@ export default function SelectedAgentsPage() {
             return 2 // Technical Interview 1
           case 'system design':
             return 3 // Technical Interview 2 (closest match)
+          case 'architecture':
+          case 'architecture interview':
+          case 'architecture round':
+          case 'system architecture':
+            return 3 // Treat architecture as System Design round
           case 'behavioral interview':
-            return 4 // HR Interview
+            return 1 // Map behavioral to Initial Interview
           case 'final round':
-            return 1 // Initial Interview (fallback)
+          case 'final interview':
+            return 4 // Final Interview (Agent 5)
           default:
             return -1
         }
       }
 
-      // Generate full agent data for selected IDs
-      const agents: Agent[] = selectedAgentIds.map((agentId: any, index: number) => {
+      // Generate full agent data for selected IDs with a computed sequence for ordering
+      const built = selectedAgentIds.map((agentId: any, index: number) => {
         // Ensure agentId is a string and handle different formats
         const agentIdStr = String(agentId)
         let agentIndex = 0
@@ -318,40 +388,225 @@ export default function SelectedAgentsPage() {
         const roundData = interviewRounds[agentIndex]
         
         // Generate key skills and questions for this agent
-        const keySkills = generateKeySkills(roundData.name)
+        const externalRoundName = Array.isArray(chosenRounds) && chosenRounds.length > 0
+          ? chosenRounds[Math.min(index, chosenRounds.length - 1)] || ''
+          : ''
+        let keySkills = generateKeySkills(roundData.name)
+        // If the user selected a specific round on the previous page and we have a skills mapping for it,
+        // mark only those skills as highlighted here to keep UX consistent.
+        const internalDefaults: Record<string, string[]> = {
+          'Screening Round': ['Communication', 'Basic Qualifications', 'Cultural Fit'],
+          'Initial Interview': ['Problem Solving', 'Experience Relevance', 'Motivation'],
+          'Technical Interview 1': ['Coding Skills', 'Algorithm Knowledge', 'Problem Solving'],
+          'Technical Interview 2': ['System Architecture', 'Scalability', 'Database Design'],
+          'Final Interview': ['Overall Assessment', 'Decision Making', 'Cultural Fit']
+        }
+        // Preferred target list from previous page if present, else our internal defaults
+        let selectedNames = internalDefaults[roundData.name] || []
+        if (externalRoundName && roundSkillsMap && Array.isArray(roundSkillsMap[externalRoundName]) && (roundSkillsMap[externalRoundName] as any).length > 0) {
+          selectedNames = roundSkillsMap[externalRoundName]
+        }
+        const target = new Set(selectedNames.map((n: string) => n.trim().toLowerCase()))
+        // Mark existing matches as highlighted according to desired target
+        keySkills = keySkills.map(s => ({
+          ...s,
+          highlighted: target.has(String(s.name || '').trim().toLowerCase())
+        }))
+        // Append missing desired skills
+        const existing = new Set(keySkills.map(s => String(s.name || '').trim().toLowerCase()))
+        const toAdd = selectedNames.filter(n => !existing.has(String(n || '').trim().toLowerCase()))
+        if (toAdd.length > 0) {
+          const startIndex = keySkills.length
+          const additions: KeySkill[] = toAdd.map((name, idx) => ({
+            id: `skill-added-${Date.now()}-${startIndex + idx}`,
+            name,
+            description: '',
+            weight: 30,
+            highlighted: true,
+          }))
+          keySkills = [...keySkills, ...additions]
+        }
         const questions = generateQuestions(roundData.name, keySkills)
         
-        return {
-          id: agentIdStr,
-          name: agentName,
-          candidateName,
-          interviewRound: {
-            id: `${agentIdStr}-round`,
-            name: roundData.name,
-            duration: roundData.duration,
-            interviewer: roundData.interviewer,
-            status: Math.random() > 0.7 ? 'Completed' : Math.random() > 0.5 ? 'In Progress' : 'Pending'
-          },
-          tasks: [{
-            id: `task-${agentIdStr}`,
-            name: `${roundData.name} Assessment`,
-            description: `Comprehensive evaluation for ${roundData.name}`,
-            questions
-          }],
-          keySkills
-        }
-      })
+        // Compute desired sequence: if chosenRounds supplied, use its position; else fallback to original index
+        const seq = Array.isArray(chosenRounds) && chosenRounds.length > 0
+          ? Math.min(index, chosenRounds.length - 1)
+          : index
 
-      setSelectedAgents(agents)
-      if (agents.length > 0) {
-        setActiveTab(agents[0].id)
+        const baseAgent = {
+          seq,
+          agent: {
+            id: agentIdStr,
+            name: agentName,
+            candidateName,
+            interviewRound: {
+              id: `${agentIdStr}-round`,
+              name: roundData.name,
+              duration: roundData.duration,
+              interviewer: roundData.interviewer,
+              status: Math.random() > 0.7 ? 'Completed' : Math.random() > 0.5 ? 'In Progress' : 'Pending'
+            },
+            tasks: [{
+              id: `task-${agentIdStr}`,
+              name: `${roundData.name} Assessment`,
+              description: `Comprehensive evaluation for ${roundData.name}`,
+              questions
+            }],
+            keySkills
+          }
+        }
+        return baseAgent
+      })
+      // Sort by computed sequence and then relabel agents sequentially (Agent 1..N)
+      const sorted: Agent[] = built
+        .sort((a: any, b: any) => a.seq - b.seq)
+        .map((entry: any, i: number) => ({
+          ...entry.agent,
+          name: `Agent ${i + 1}`,
+        }))
+
+      // Apply any persisted questions per agent/task for this job
+      const jobIdForPersist = getJobId()
+      const withPersist = jobIdForPersist ? sorted.map(a => {
+        const t0 = a.tasks[0]
+        const restored = restoreQuestions(jobIdForPersist, a.id, t0.id)
+        if (restored && restored.length > 0) {
+          return { ...a, tasks: [{ ...t0, questions: restored }] }
+        }
+        return a
+      }) : sorted
+
+      setSelectedAgents(withPersist)
+      if (sorted.length > 0) {
+        // Prefer tab from URL if present (supports numeric index like ?tab=1)
+        const urlTab = searchParams.get('tab')
+        let initialTab = sorted[0].id
+        if (urlTab) {
+          const asNumber = Number(urlTab)
+          if (Number.isInteger(asNumber) && asNumber >= 1 && asNumber <= sorted.length) {
+            initialTab = sorted[asNumber - 1].id
+          } else if (sorted.some(a => a.id === urlTab)) {
+            initialTab = urlTab
+          }
+        }
+        setActiveTab(initialTab)
+        // Ensure URL reflects the active tab while preserving jobId (only if changed)
+        const jobId = searchParams.get('jobId')
+        const qs = new URLSearchParams()
+        if (jobId) qs.set('jobId', jobId)
+        const status = searchParams.get('status')
+        if (status) qs.set('status', status)
+        // Write numeric tab index for readability
+        const numericIndex = Math.max(1, sorted.findIndex(a => a.id === initialTab) + 1)
+        qs.set('tab', String(numericIndex))
+        const nextUrl = `/selected-agents?${qs.toString()}`
+        if (typeof window !== 'undefined' && window.location.search !== `?${qs.toString()}`) {
+          router.replace(nextUrl, { scroll: false })
+        }
+
+        // Persist mapping of selected agents to rounds for this job (best-effort)
+        const persist = async () => {
+          try {
+            const job = JSON.parse(localStorage.getItem('newJobData') || 'null')
+            const jobId = job?.id
+            if (!jobId) return
+            if (persistDoneForJob.current === jobId) { console.debug('[Persist] Skipped: already persisted for', jobId); return }
+            // Group agents by their target round sequence
+            const byRound = new Map<number, Array<{ agent_type: string; skill_weights: any; config: any }>>()
+            sorted.forEach((agent, idx) => {
+              const seq = (agent as any)?.interviewRound?.seq ?? (idx + 1)
+              const list = byRound.get(seq) || []
+              list.push({
+                agent_type: mapRoundToAgentType(agent.interviewRound.name),
+                skill_weights: Object.fromEntries((agent.keySkills || []).map(s => [s.name, s.weight || 1])),
+                config: { index: idx + 1 }
+              })
+              byRound.set(seq, list)
+            })
+            const mappings = Array.from(byRound.entries()).map(([seq, agents]) => ({ roundSeq: seq, agents }))
+            await fetch(`/api/jobs/${encodeURIComponent(jobId)}/round-agents`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mappings }),
+            })
+            persistDoneForJob.current = jobId
+          } catch (e) {
+            console.warn('Persist selected agents failed (non-fatal):', (e as any)?.message)
+          }
+        }
+        persist()
       }
       setLoading(false)
     } catch (error) {
       console.error('Error loading selected agents:', error)
       router.push('/dashboard/agents/create')
     }
-  }, [router])
+  }, [router, searchParams])
+
+  // Helper to map our round names to AI agent types expected by the generator API
+  const mapRoundToAgentType = (roundName: string): string => {
+    const n = (roundName || '').toLowerCase()
+    if (n.includes('screening')) return 'Screening Agent'
+    if (n.includes('technical')) return 'Technical Interview Agent'
+    if (n.includes('initial')) return 'Initial Interview Agent'
+    if (n.includes('final') || n.includes('hr') || n.includes('behavioral')) return 'Behavioral Interview Agent'
+    return 'Screening Agent'
+  }
+
+  // After agents are loaded and job description is available
+  const triggerAIGeneration = async () => {
+      if (autoGenStarted.current) { console.debug('[AI Gen] Skipped: already started'); return }
+      if (!jobData?.description) { console.debug('[AI Gen] Skipped: missing job description'); return }
+      if (!Array.isArray(selectedAgents) || selectedAgents.length === 0) { console.debug('[AI Gen] Skipped: no agents'); return }
+      autoGenStarted.current = true
+
+      try {
+        // Generate sequentially to avoid rate limits
+        const updates: Record<string, Question[]> = {}
+        for (const agent of selectedAgents) {
+          const jd = String(jobData.description || '')
+          const agentType = mapRoundToAgentType(agent.interviewRound.name)
+          const skills = (agent.keySkills || []).map(s => s.name).filter(Boolean)
+          // Default count removed; generation only via modal path
+          const numberOfQuestions = 5
+          console.debug('[AI Gen] Request', { agent: agent.id, agentType, numberOfQuestions, hasJD: jd.length > 0, skills })
+          const res = await fetch('/api/ai/generate-questions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jobDescription: jd, agentType, numberOfQuestions, skills })
+          })
+          if (!res.ok) { console.warn('[AI Gen] API failed for agent', agent.id); continue }
+          const data = await res.json()
+          const aiQs: string[] = Array.isArray(data?.questions) ? data.questions : []
+          console.debug('[AI Gen] Response', { agent: agent.id, count: aiQs.length })
+          if (aiQs.length === 0) continue
+          const newQuestions: Question[] = aiQs.map((q, idx) => ({
+            id: `ai-question-${Date.now()}-${idx}`,
+            text: q,
+            type: agent.interviewRound.name.includes('Technical') ? 'technical' :
+                  (agent.interviewRound.name.includes('Final') || agent.interviewRound.name.includes('HR')) ? 'behavioral' :
+                  agent.interviewRound.name.includes('Initial') ? 'situational' : 'situational',
+            linkedSkills: agent.keySkills.slice(0, Math.min(2, agent.keySkills.length)).map(s => s.id)
+          }))
+          updates[agent.id] = newQuestions
+        }
+
+        // Single state update to minimize re-renders
+        setSelectedAgents(prev => prev.map(a => {
+          const add = updates[a.id]
+          if (!add) return a
+          const t0 = a.tasks[0]
+          const merged = dedupeAndLimitQuestions(t0.questions, add, add.length, true)
+          return { ...a, tasks: [{ ...t0, questions: merged }] }
+        }))
+      } catch (e) {
+        console.warn('Auto AI question generation failed (non-fatal):', (e as any)?.message)
+      }
+  }
+
+  // Auto-generation disabled: questions will only be generated via the AI modal or manual actions.
+
+  // (Removed) job fetching and inline editing for job summary
 
   const saveToDatabase = (agentId: string, data: any) => {
     // Simulate database save
@@ -388,31 +643,31 @@ export default function SelectedAgentsPage() {
   }
 
   const addAIQuestions = (agentId: string, taskId: string, aiQuestions: string[]) => {
+    // Prepare questions and indexes up-front so we can also persist to DB
+    const jobId = getJobId()
+    const agent = selectedAgents.find(a => a.id === agentId)
+    const agentIndex = Math.max(1, selectedAgents.findIndex(a => a.id === agentId) + 1) // 1-based index used in DB config
+    const preparedQuestions: Question[] = (aiQuestions || []).map((questionText, index) => ({
+      id: `ai-question-${Date.now()}-${index}`,
+      text: questionText,
+      type: agent && agent.interviewRound.name.includes('Technical') ? 'technical' : 
+            (agent && (agent.interviewRound.name.includes('Final') || agent.interviewRound.name.includes('HR'))) ? 'behavioral' : 'situational',
+      linkedSkills: (agent?.keySkills || []).slice(0, Math.min(2, agent?.keySkills.length || 0)).map(skill => skill.id)
+    }))
+    const mergedUniqueLimited = dedupeAndLimitQuestions([], preparedQuestions, preparedQuestions.length, true)
+
+    // Update UI state and localStorage persistence
     setSelectedAgents(prev => prev.map(agent => {
       if (agent.id === agentId) {
         return {
           ...agent,
           tasks: agent.tasks.map(task => {
             if (task.id === taskId) {
-              const newQuestions: Question[] = aiQuestions.map((questionText, index) => ({
-                id: `ai-question-${Date.now()}-${index}`,
-                text: questionText,
-                type: agent.interviewRound.name.includes('Technical') ? 'technical' : 
-                       agent.interviewRound.name.includes('HR') ? 'behavioral' : 'situational',
-                linkedSkills: agent.keySkills.slice(0, Math.min(2, agent.keySkills.length)).map(skill => skill.id)
-              }))
-
-              const mergedUniqueLimited = dedupeAndLimitQuestions(
-                task.questions,
-                newQuestions,
-                newQuestions.length,
-                true
-              )
-
               const updatedTask = {
                 ...task,
                 questions: mergedUniqueLimited
               }
+              if (jobId) persistQuestions(jobId, agentId, taskId, mergedUniqueLimited)
               saveToDatabase(agentId, { tasks: [updatedTask] })
               return updatedTask
             }
@@ -422,6 +677,19 @@ export default function SelectedAgentsPage() {
       }
       return agent
     }))
+
+    // Best-effort DB persistence via API (only if we have a job and valid index)
+    if (jobId && Number.isFinite(agentIndex) && agentIndex > 0) {
+      const payload = {
+        agentIndex,
+        questions: mergedUniqueLimited.map(q => ({ id: q.id, text: q.text, type: q.type, linkedSkills: q.linkedSkills, expectedAnswer: q.expectedAnswer }))
+      }
+      void fetch(`/api/jobs/${encodeURIComponent(jobId)}/agent-questions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).catch(() => { /* non-blocking */ })
+    }
   }
 
   const updateQuestion = (agentId: string, taskId: string, questionId: string, updates: Partial<Question>) => {
@@ -532,6 +800,17 @@ export default function SelectedAgentsPage() {
     }
   }
 
+  const getStatusClasses = (status: string) => {
+    switch (status) {
+      case 'Completed':
+        return 'bg-green-50 text-green-700 border border-green-200'
+      case 'In Progress':
+        return 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+      default:
+        return 'bg-gray-50 text-gray-700 border border-gray-200'
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Completed':
@@ -551,6 +830,76 @@ export default function SelectedAgentsPage() {
     router.push('/dashboard')
   }
 
+  const handleSubmitAll = async () => {
+    if (submitting) return
+    setSubmitting(true)
+    try {
+      const jobId = getJobId() || searchParams.get('jobId')
+      if (!jobId) {
+        toast({ title: 'Error', description: 'Missing job. Please create or load a job before submitting.', variant: 'destructive' })
+        setSubmitting(false)
+        return
+      }
+
+      // Persist round-agent mappings (sequence + agent types + skill weights)
+      const mappings = selectedAgents.map((agent, idx) => ({
+        roundSeq: (agent as any)?.interviewRound?.seq ?? (idx + 1),
+        agents: [
+          {
+            agent_type: mapRoundToAgentType(agent.interviewRound.name),
+            skill_weights: Object.fromEntries((agent.keySkills || []).map(s => [s.name, s.weight || 1])),
+            config: { index: idx + 1 },
+          }
+        ],
+      }))
+      const roundAgentsRes = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/round-agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mappings }),
+      })
+      let errText = ''
+      if (!roundAgentsRes.ok) {
+        try { const j = await roundAgentsRes.json(); errText = j?.error || '' } catch {}
+        throw new Error(`Failed to save round agents (${roundAgentsRes.status}). ${errText}`.trim())
+      }
+
+      // Persist questions for each agent's first task and require success
+      for (let idx = 0; idx < selectedAgents.length; idx++) {
+        const agent = selectedAgents[idx]
+        const t0 = agent.tasks?.[0]
+        const questions = (t0?.questions || []).map(q => ({
+          id: q.id,
+          text: q.text,
+          type: q.type,
+          linkedSkills: q.linkedSkills,
+          expectedAnswer: q.expectedAnswer,
+        }))
+        const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/agent-questions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agentIndex: idx + 1, questions }),
+        })
+        if (!res.ok) {
+          let msg = ''
+          try { const j = await res.json(); msg = j?.error || '' } catch {}
+          throw new Error(`Failed to save questions for Agent ${idx + 1} (${res.status}). ${msg}`.trim())
+        }
+      }
+
+      // Navigate to success page preserving existing query params
+      const idx = Math.max(1, selectedAgents.findIndex(a => a.id === activeTab) + 1)
+      const qs = new URLSearchParams(searchParams.toString())
+      qs.set('jobId', String(jobId))
+      qs.set('tab', String(idx))
+      router.push(`/selected-agents/submit-successful?${qs.toString()}`)
+    } catch (e: any) {
+      console.warn('Submit failed:', e?.message)
+      toast({ title: 'Failed to submit', description: e?.message || 'Please try again.', variant: 'destructive' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto max-w-7xl p-6 flex items-center justify-center min-h-screen">
@@ -558,6 +907,14 @@ export default function SelectedAgentsPage() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading selected agents...</p>
         </div>
+
+      {/* Success Banner */}
+      {searchParams.get('status') === 'submit-successful' && (
+        <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
+          <AlertTitle>Submission successful</AlertTitle>
+          <AlertDescription>Agents and questions submitted successfully.</AlertDescription>
+        </Alert>
+      )}
       </div>
     )
   }
@@ -579,30 +936,63 @@ export default function SelectedAgentsPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-7xl p-6 space-y-8">
-      {/* Header */}
-      <div className="text-center space-y-4">
-        <div className="bg-green-100 border border-green-400 text-green-700 px-6 py-4 rounded-lg inline-block">
-          <CheckCircle className="w-6 h-6 inline mr-2" />
-          Successfully configured {selectedAgents.length} specialized AI agents!
+    <div className="mx-auto max-w-6xl px-4 py-6">
+      {/* Top Actions Bar */}
+      <div className="sticky top-0 z-30 mb-4 flex items-center justify-between bg-indigo-50 border border-indigo-200 shadow-sm py-2 px-2 rounded-md">
+        <div className="text-sm font-medium text-gray-700">Selected Agents</div>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleSubmitAll}
+            size="sm"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed"
+            disabled={submitting}
+            aria-busy={submitting}
+          >
+            <Save className={`w-4 h-4 ${submitting ? 'animate-pulse' : ''}`} />
+            {submitting ? 'Submitting…' : 'Submit All'}
+          </Button>
+          <Button
+            onClick={handleGoToDashboard}
+            size="sm"
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+          >
+            <Home className="w-4 h-4" />
+            Go to Dashboard
+          </Button>
         </div>
-        
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
-          Agent Management Dashboard
-        </h1>
-        <p className="text-lg text-gray-600">
-          Configure tasks, questions, and key skills for each specialized agent
-        </p>
       </div>
 
+      {/* Page Header */}
+      <div className="mb-6">
+        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight">Agent Management Dashboard</h1>
+        <p className="text-sm md:text-base text-gray-600 mt-1">Configure tasks, questions, and key skills for each specialized agent</p>
+      </div>
+
+      {/* Job Summary removed as requested */}
+
       {/* Agent Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2 h-auto p-2">
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => {
+          setActiveTab(v)
+          const jobId = searchParams.get('jobId')
+          const qs = new URLSearchParams()
+          if (jobId) qs.set('jobId', jobId)
+          const status = searchParams.get('status')
+          if (status) qs.set('status', status)
+          // Persist numeric tab index in URL if possible
+          const idx = selectedAgents.findIndex(a => a.id === v)
+          qs.set('tab', String(Math.max(1, idx + 1)))
+          router.replace(`/selected-agents?${qs.toString()}`, { scroll: false })
+        }}
+        className="w-full"
+      >
+        <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2 h-auto p-2 bg-gray-50/80 border rounded-lg">
           {selectedAgents.map((agent) => (
             <TabsTrigger 
               key={agent.id} 
               value={agent.id}
-              className="flex flex-col items-center p-4 h-auto data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
+              className="flex flex-col items-center p-4 h-auto rounded-md border border-transparent hover:border-gray-200 hover:bg-white data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
             >
               <User className="w-5 h-5 mb-2" />
               <span className="font-semibold">{agent.name}</span>
@@ -615,7 +1005,7 @@ export default function SelectedAgentsPage() {
           <TabsContent key={agent.id} value={agent.id} className="space-y-6">
             {/* Agent Overview */}
             <Card>
-              <CardHeader>
+              <CardHeader className="p-6 pb-3">
                 <CardTitle className="flex items-center gap-2">
                   <User className="w-6 h-6 text-blue-500" />
                   {agent.name} - {agent.interviewRound.name}
@@ -624,8 +1014,8 @@ export default function SelectedAgentsPage() {
                   Candidate: {agent.candidateName} | Duration: {agent.interviewRound.duration} | Interviewer: {agent.interviewRound.interviewer}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${getStatusColor(agent.interviewRound.status)}`}>
+              <CardContent className="p-6 pt-0">
+                <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusClasses(agent.interviewRound.status)}`}>
                   {getStatusIcon(agent.interviewRound.status)}
                   <span className="ml-2">{agent.interviewRound.status}</span>
                 </div>
@@ -634,26 +1024,35 @@ export default function SelectedAgentsPage() {
 
             {/* Key Skills Section */}
             <Card>
-              <CardHeader>
+              <CardHeader className="p-6 pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <CardTitle>Key Skills for Evaluation</CardTitle>
-                    <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                      {agent.keySkills.length} skills
-                    </span>
+                    {(() => {
+                      const highlightedCount = (agent.keySkills || []).filter(s => s.highlighted).length
+                      const label = highlightedCount > 0 ? `${highlightedCount} highlighted` : `${agent.keySkills.length} skills`
+                      return (
+                        <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                          {label}
+                        </span>
+                      )
+                    })()}
                   </div>
-                  <Button onClick={() => addKeySkill(agent.id)} size="sm" className="bg-blue-600 text-white hover:bg-blue-700">
+                  <Button onClick={() => addKeySkill(agent.id)} size="sm" className="bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
                     <Plus className="w-4 h-4 mr-2" />
                     Add Skill
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
-                  {agent.keySkills.map((skill) => (
+              <CardContent className="p-6 pt-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1 scroll-smooth">
+                  {(() => {
+                    const highlighted = (agent.keySkills || []).filter(s => s.highlighted)
+                    const skillsToShow = highlighted.length > 0 ? highlighted : agent.keySkills
+                    return skillsToShow.map((skill) => (
                     <div
                       key={skill.id}
-                      className="relative rounded-lg p-3 space-y-2 border border-blue-100 bg-gradient-to-br from-white to-blue-50/60 hover:from-white hover:to-blue-100/70 shadow-sm hover:shadow-md transition-colors duration-200"
+                      className={`relative rounded-lg p-3 space-y-2 border shadow-sm hover:shadow-md transition-colors duration-200 ${skill.highlighted ? 'border-blue-100 bg-gradient-to-br from-white to-blue-50/60 hover:from-white hover:to-blue-100/70' : 'border-gray-100 bg-white'}`}
                     >
                       <div className="flex items-center justify-between">
                         {editingSkill === skill.id ? (
@@ -698,7 +1097,8 @@ export default function SelectedAgentsPage() {
                         </div>
                       )}
                     </div>
-                  ))}
+                    ))
+                  })()}
                 </div>
               </CardContent>
             </Card>
@@ -706,32 +1106,27 @@ export default function SelectedAgentsPage() {
             {/* Tasks & Questions Section */}
             {agent.tasks.map((task) => (
               <Card key={task.id}>
-                <CardHeader>
+                <CardHeader className="p-6 pb-3">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Tasks & Questions</CardTitle>
-                      <CardDescription>{task.description}</CardDescription>
-                    </div>
                     <div className="flex gap-2">
+                      <Button onClick={() => addQuestion(agent.id, task.id)} size="sm" variant="outline">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Question
+                      </Button>
                       <AIQuestionGeneratorModal
                         agentType={agent.interviewRound.name}
                         keySkills={agent.keySkills}
                         onQuestionsGenerated={(questions) => addAIQuestions(agent.id, task.id, questions)}
-                        trigger={
-                          <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-                            <Brain className="w-4 h-4 mr-2" />
-                            AI Generate
-                          </Button>
-                        }
+                        initialJobDescription={jobData?.description || ''}
+                        agentId={agent.id}
+                        taskId={task.id}
+                        basePath="/selected-agents"
+                        existingQuestions={(agent.tasks || []).flatMap(t => (t.questions || []).map(q => q.text))}
                       />
-                      <Button onClick={() => addQuestion(agent.id, task.id)} size="sm">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Question
-                      </Button>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-6 pt-0">
                   <div className="space-y-4">
                     {task.questions.map((question, index) => (
                       <div key={question.id} className="border rounded-lg p-4 space-y-3">
@@ -759,21 +1154,25 @@ export default function SelectedAgentsPage() {
                                 <div className="space-y-2">
                                   <Label>Linked Skills:</Label>
                                   <div className="flex flex-wrap gap-2">
-                                    {agent.keySkills.map((skill) => (
-                                      <label key={skill.id} className="flex items-center gap-2 text-sm">
-                                        <input
-                                          type="checkbox"
-                                          checked={question.linkedSkills.includes(skill.id)}
-                                          onChange={(e) => {
-                                            const linkedSkills = e.target.checked
-                                              ? [...question.linkedSkills, skill.id]
-                                              : question.linkedSkills.filter(id => id !== skill.id)
-                                            updateQuestion(agent.id, task.id, question.id, { linkedSkills })
-                                          }}
-                                        />
-                                        {skill.name}
-                                      </label>
-                                    ))}
+                                    {(() => {
+                                      const highlighted = (agent.keySkills || []).filter(s => s.highlighted)
+                                      const list = highlighted.length > 0 ? highlighted : agent.keySkills
+                                      return list.map((skill) => (
+                                        <label key={skill.id} className="flex items-center gap-2 text-sm">
+                                          <input
+                                            type="checkbox"
+                                            checked={question.linkedSkills.includes(skill.id)}
+                                            onChange={(e) => {
+                                              const linkedSkills = e.target.checked
+                                                ? [...question.linkedSkills, skill.id]
+                                                : question.linkedSkills.filter(id => id !== skill.id)
+                                              updateQuestion(agent.id, task.id, question.id, { linkedSkills })
+                                            }}
+                                          />
+                                          {skill.name}
+                                        </label>
+                                      ))
+                                    })()}
                                   </div>
                                 </div>
                               </div>
@@ -824,28 +1223,7 @@ export default function SelectedAgentsPage() {
           </TabsContent>
         ))}
       </Tabs>
-
-      {/* Action Buttons */}
-      <div className="flex justify-center gap-4 pt-6">
-        <Button 
-          onClick={handleBackToSelection}
-          variant="outline"
-          size="lg"
-          className="flex items-center gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Selection
-        </Button>
-        
-        <Button 
-          onClick={handleGoToDashboard}
-          size="lg"
-          className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
-        >
-          <Home className="w-4 h-4" />
-          Go to Dashboard
-        </Button>
-      </div>
+      
     </div>
   )
 }
