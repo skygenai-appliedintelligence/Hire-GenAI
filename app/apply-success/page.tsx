@@ -55,20 +55,20 @@ export default async function ApplySuccessPage({
   const backHref = job && canonicalSlug && jobId ? `/jobs/${canonicalSlug}/${encodeURIComponent(jobId)}` : "/dashboard";
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50/40 to-white px-4 sm:px-6 lg:px-8 py-12">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40 px-4 sm:px-6 lg:px-8 py-12">
       <div
         role="status"
         aria-live="polite"
-        className="mx-auto w-full max-w-xl rounded-2xl border bg-white p-8 shadow-sm"
+        className="mx-auto w-full max-w-xl rounded-2xl border bg-white p-8 shadow-sm ring-1 ring-emerald-100 motion-safe:transition-all motion-safe:duration-300 hover:shadow-md hover:-translate-y-0.5"
       >
         {/* Success badge */}
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 shadow-sm">
           {/* Check icon (SVG, Tailwind friendly) */}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
             fill="currentColor"
-            className="h-8 w-8"
+            className="h-8 w-8 animate-pulse"
             aria-hidden="true"
           >
             <path
@@ -98,14 +98,14 @@ export default async function ApplySuccessPage({
           <Link
             href="/dashboard"
             aria-label="View my applications"
-            className="inline-flex w-full items-center justify-center rounded-xl bg-indigo-600 text-white px-5 py-3 font-semibold shadow-sm hover:bg-indigo-600/90 hover:-translate-y-0.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+            className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 text-white px-5 py-3 font-semibold shadow-sm motion-safe:transition hover:bg-emerald-600/90 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
           >
             View My Applications
           </Link>
           <Link
             href={backHref}
             aria-label="Back to job"
-            className="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+            className="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-700 motion-safe:transition hover:bg-emerald-50 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
           >
             Back to Job
           </Link>
