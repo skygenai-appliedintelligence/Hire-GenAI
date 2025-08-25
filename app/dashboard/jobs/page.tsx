@@ -160,7 +160,7 @@ export default function JobsPage() {
   }
 
   return (
-    <div className="space-y-6 mx-auto max-w-6xl px-4 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
+    <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Job Descriptions</h1>
@@ -179,7 +179,7 @@ export default function JobsPage() {
           jobs.map((job) => (
             <Card
               key={job.id}
-              className="border border-emerald-200 bg-white shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow cursor-pointer"
+              className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
               onClick={() => handleStoreJD(job)}
             >
               <CardHeader>
@@ -256,7 +256,7 @@ export default function JobsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="bg-transparent text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                        className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <BarChart3 className="h-4 w-4 mr-1" />
@@ -267,7 +267,7 @@ export default function JobsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="bg-transparent text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                        className="text-blue-600 hover:text-blue-700 bg-transparent hover:bg-blue-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <ExternalLink className="h-4 w-4 mr-1" />
@@ -277,7 +277,7 @@ export default function JobsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="bg-transparent text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                      className="bg-transparent hover:bg-gray-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
                       onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/jobs/${job.id}/edit`) }}
                     >
                       <Edit className="h-4 w-4 mr-1" />
@@ -287,7 +287,7 @@ export default function JobsPage() {
                       variant="outline"
                       size="sm"
                       onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-red-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 shadow-sm hover:shadow-md motion-safe:transition-shadow"
                       onMouseDown={(e) => e.stopPropagation()}
                       disabled={deletingId === job.id}
                     >
