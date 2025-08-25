@@ -51,8 +51,25 @@ export default function ApplyForm({ job }: { job: any }) {
 
     try {
       const fullName = formData.fullName || `${formData.firstName} ${formData.lastName}`.trim()
-      if (!fullName || !formData.email || !formData.phone) {
-        toast({ title: 'Missing Information', description: 'Please fill in all required fields.', variant: 'destructive' })
+      // Validate all inputs except cover letter
+      const missing: string[] = []
+      if (!formData.firstName.trim()) missing.push('First name')
+      if (!formData.lastName.trim()) missing.push('Last name')
+      if (!formData.email.trim()) missing.push('Email')
+      if (!formData.phone.trim()) missing.push('Phone')
+      // Expected salary and location
+      if (!formData.expectedSalary.trim()) missing.push('Expected salary')
+      if (!formData.location.trim()) missing.push('Location')
+      // Additional info (LinkedIn and Portfolio optional)
+      if (!formData.availableStartDate.trim()) missing.push('Available start date')
+      // Resume required
+      if (!resumeFile && !resumeMeta) missing.push('Resume')
+
+      if (!fullName) missing.push('Full name')
+
+      if (missing.length > 0) {
+        toast({ title: 'Missing Information', description: `Please fill: ${missing.join(', ')}.`, variant: 'destructive' })
+        setLoading(false)
         return
       }
 
@@ -188,7 +205,7 @@ export default function ApplyForm({ job }: { job: any }) {
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* General Information */}
         <section>
-          <h3 className="font-semibold text-slate-900 border-b border-slate-200 pb-3 mb-4">General Information</h3>
+          <h3 className="font-semibold text-slate-900 border-b border-slate-200 pb-3 mb-4">General Information (all required)</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="firstName">First name *</Label>
@@ -207,7 +224,7 @@ export default function ApplyForm({ job }: { job: any }) {
               <Input id="phone" type="tel" value={formData.phone} onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value }))} placeholder="+1 555 000 1111" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" required disabled={loading} />
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label>Expected salary</Label>
+              <Label>Expected salary *</Label>
               <div className="grid grid-cols-[120px_1fr_auto] gap-2">
                 <Select value={formData.expectedCurrency} onValueChange={(v) => setFormData((p) => ({ ...p, expectedCurrency: v }))}>
                   <SelectTrigger className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400">
@@ -219,24 +236,25 @@ export default function ApplyForm({ job }: { job: any }) {
                     <SelectItem value="INR">INR</SelectItem>
                   </SelectContent>
                 </Select>
-                <Input inputMode="decimal" value={formData.expectedSalary} onChange={(e) => setFormData((p) => ({ ...p, expectedSalary: e.target.value }))} placeholder="1000" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" />
+                <Input inputMode="decimal" value={formData.expectedSalary} onChange={(e) => setFormData((p) => ({ ...p, expectedSalary: e.target.value }))} placeholder="1000" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" required disabled={loading} />
                 <div className="flex items-center text-slate-500 px-2">/month</div>
               </div>
             </div>
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="location">Location</Label>
-              <Input id="location" value={formData.location} onChange={(e) => setFormData((p) => ({ ...p, location: e.target.value }))} placeholder="Berlin, Germany" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" />
+              <Label htmlFor="location">Location *</Label>
+              <Input id="location" value={formData.location} onChange={(e) => setFormData((p) => ({ ...p, location: e.target.value }))} placeholder="Berlin, Germany" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" required disabled={loading} />
             </div>
           </div>
         </section>
 
         {/* Resume & Documents */}
         <section>
-          <h3 className="font-semibold text-slate-900 border-b border-slate-200 pb-3 mb-4">Resume & Documents</h3>
+          <h3 className="font-semibold text-slate-900 border-b border-slate-200 pb-3 mb-4">Resume & Documents (required)</h3>
           <div
             className={`rounded-md border border-dashed p-6 cursor-pointer active:cursor-wait shadow-sm hover:shadow-lg ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow motion-safe:duration-300 overflow-hidden emerald-glow ${isDragging ? 'border-emerald-500 bg-emerald-50/60' : 'border-slate-300 hover:border-emerald-400/70 hover:bg-emerald-50/40'}`}
             role="button"
             aria-label="Upload resume"
+            aria-required="true"
             onClick={() => fileInputRef.current?.click()}
             onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
             onDragLeave={() => setIsDragging(false)}
@@ -324,15 +342,15 @@ export default function ApplyForm({ job }: { job: any }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="linkedin">LinkedIn URL</Label>
-              <Input id="linkedin" value={formData.linkedinUrl} onChange={(e) => setFormData((p) => ({ ...p, linkedinUrl: e.target.value }))} placeholder="https://linkedin.com/in/yourprofile" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" />
+              <Input id="linkedin" value={formData.linkedinUrl} onChange={(e) => setFormData((p) => ({ ...p, linkedinUrl: e.target.value }))} placeholder="https://linkedin.com/in/yourprofile" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" disabled={loading} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="portfolio">Portfolio/Website</Label>
-              <Input id="portfolio" value={formData.portfolioUrl} onChange={(e) => setFormData((p) => ({ ...p, portfolioUrl: e.target.value }))} placeholder="https://yourportfolio.com" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" />
+              <Input id="portfolio" value={formData.portfolioUrl} onChange={(e) => setFormData((p) => ({ ...p, portfolioUrl: e.target.value }))} placeholder="https://yourportfolio.com" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" disabled={loading} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="start">Available Start Date</Label>
-              <Input id="start" type="date" value={formData.availableStartDate} onChange={(e) => setFormData((p) => ({ ...p, availableStartDate: e.target.value, availability: e.target.value }))} className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" />
+              <Label htmlFor="start">Available Start Date *</Label>
+              <Input id="start" type="date" value={formData.availableStartDate} onChange={(e) => setFormData((p) => ({ ...p, availableStartDate: e.target.value, availability: e.target.value }))} className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" required disabled={loading} />
             </div>
             <div className="flex items-center gap-2 md:col-span-2">
               <input id="relocate" type="checkbox" checked={formData.relocate} onChange={(e) => setFormData((p) => ({ ...p, relocate: e.target.checked }))} className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-600 transition-transform duration-150 hover:scale-105" />

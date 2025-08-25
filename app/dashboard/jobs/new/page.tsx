@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Building2, Users, Briefcase, Target, CheckCircle, Clock, Bot } from 'lucide-react'
+import { Switch } from "@/components/ui/switch"
 import { useAuth } from "@/contexts/auth-context"
 
 export default function CreateJobPage() {
@@ -23,6 +24,7 @@ export default function CreateJobPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentTab, setCurrentTab] = useState("basic")
   const lastSyncedTabRef = useRef<string | null>(null)
+  const [applyEnabled, setApplyEnabled] = useState<boolean>(true)
   
   // Form state
   const [formData, setFormData] = useState({
@@ -47,6 +49,57 @@ export default function CreateJobPage() {
     platforms: [] as string[],
   })
 
+  // Prefill when editing: if jobId is present in URL, fetch job and populate form
+  useEffect(() => {
+    const jobId = searchParams.get('jobId')
+    if (!jobId) return
+    ;(async () => {
+      try {
+        // Try localStorage first for instant prefill
+        const draft = typeof window !== 'undefined' ? localStorage.getItem('editJobDraft') : null
+        if (draft) {
+          const j = JSON.parse(draft)
+          if (j?.id === jobId) {
+            setFormData(prev => ({
+              ...prev,
+              jobTitle: j.title || prev.jobTitle,
+              company: company?.name || prev.company,
+              location: j.location || prev.location,
+              jobType: j.employment_type || prev.jobType,
+              description: j.description || prev.description,
+              requirements: j.requirements || prev.requirements,
+              salaryRange: j.salary_range || prev.salaryRange,
+              interviewRounds: Array.isArray(j.interview_rounds) ? j.interview_rounds : prev.interviewRounds,
+            }))
+          }
+        }
+        // Also fetch from API to ensure latest (requires company query param)
+        if (company?.name) {
+          const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}?company=${encodeURIComponent(company.name)}`)
+          const data = await res.json().catch(() => ({}))
+          if (res.ok && data?.job) {
+            const j = data.job
+            setFormData(prev => ({
+              ...prev,
+              jobTitle: j.title || prev.jobTitle,
+              company: company?.name || prev.company,
+              location: j.location || prev.location,
+              jobType: j.employment_type || prev.jobType,
+              description: j.description_md || j.summary || j.description || prev.description,
+              requirements: j.responsibilities_md || j.requirements || prev.requirements,
+              benefits: j.benefits_md || prev.benefits,
+              salaryRange: j.salary_level || j.salary_label || j.salary_range || prev.salaryRange,
+              interviewRounds: Array.isArray(j.interview_rounds) ? j.interview_rounds : prev.interviewRounds,
+            }))
+          }
+        }
+      } catch (e) {
+        console.warn('Prefill failed:', e)
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, company?.name])
+
   // Initialize tab from URL once on mount to avoid feedback loops
   useEffect(() => {
     const t = searchParams.get('tab')
@@ -63,6 +116,17 @@ export default function CreateJobPage() {
       setFormData(prev => ({ ...prev, company: company.name }))
     }
   }, [company?.name])
+
+  // Read persisted Apply Form toggle for this jobId (edit flow only)
+  useEffect(() => {
+    const jobId = searchParams.get('jobId')
+    if (!jobId) return
+    try {
+      const saved = localStorage.getItem(`applyFormEnabled:${jobId}`)
+      if (saved !== null) setApplyEnabled(saved === 'true')
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -109,36 +173,62 @@ export default function CreateJobPage() {
         setIsSubmitting(false)
         return
       }
-      const res = await fetch('/api/jobs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const jobId = searchParams.get('jobId')
+      if (jobId) {
+        // Edit flow: PATCH existing job
+        const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}?company=${encodeURIComponent(company?.name || '')}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: formData.jobTitle,
+            location: formData.location,
+            employment_type: formData.jobType,
+            experience_level: formData.experienceLevel,
+            description_md: formData.description,
+            responsibilities_md: formData.requirements,
+            benefits_md: formData.benefits,
+            salary_level: formData.salaryRange,
+          }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok || !data?.ok) {
+          throw new Error(data?.error || 'Failed to update job')
+        }
+        try { localStorage.removeItem('editJobDraft') } catch {}
+        router.push('/dashboard/jobs')
+      } else {
+        // Create flow: POST new job
+        const res = await fetch('/api/jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...formData,
+            companyId: company?.id, // Pass companyId directly
+            createdBy: user?.id || null,
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok || !data?.ok) {
+          throw new Error(data?.error || 'Failed to create job')
+        }
+
+        // Store minimal info for downstream pages
+        const jobData = {
           ...formData,
-          companyId: company?.id, // Pass companyId directly
-          createdBy: user?.id || null,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || 'Failed to create job')
+          id: data.jobId,
+          createdAt: new Date().toISOString(),
+        }
+        localStorage.setItem('newJobData', JSON.stringify(jobData))
+        localStorage.setItem('selectedInterviewRounds', JSON.stringify(formData.interviewRounds))
+
+        // Derive selectedAgents from the number of selected interview rounds
+        const agentsCount = Array.isArray(formData.interviewRounds) ? formData.interviewRounds.length : 0
+        const selectedAgents = Array.from({ length: agentsCount }, (_, i) => i + 1) // [1,2,3,...]
+        localStorage.setItem('selectedAgents', JSON.stringify(selectedAgents))
+
+        // Redirect to the Selected Agents page with jobId and default tab=1
+        router.push(`/selected-agents?jobId=${encodeURIComponent(data.jobId)}&tab=1`)
       }
-
-      // Store minimal info for downstream pages
-      const jobData = {
-        ...formData,
-        id: data.jobId,
-        createdAt: new Date().toISOString(),
-      }
-      localStorage.setItem('newJobData', JSON.stringify(jobData))
-      localStorage.setItem('selectedInterviewRounds', JSON.stringify(formData.interviewRounds))
-
-      // Derive selectedAgents from the number of selected interview rounds
-      const agentsCount = Array.isArray(formData.interviewRounds) ? formData.interviewRounds.length : 0
-      const selectedAgents = Array.from({ length: agentsCount }, (_, i) => i + 1) // [1,2,3,...]
-      localStorage.setItem('selectedAgents', JSON.stringify(selectedAgents))
-
-      // Redirect to the Selected Agents page with jobId and default tab=1
-      router.push(`/selected-agents?jobId=${encodeURIComponent(data.jobId)}&tab=1`)
     } catch (error) {
       console.error('Error creating job:', error)
     } finally {
@@ -204,8 +294,34 @@ export default function CreateJobPage() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
-        <h1 className="text-3xl font-bold">Create New Job</h1>
-        <p className="text-gray-600 mt-2">Fill out the details to create a comprehensive job posting</p>
+        <h1 className="text-3xl font-bold">{searchParams.get('jobId') ? 'Edit Job' : 'Create New Job'}</h1>
+        <p className="text-gray-600 mt-2">{searchParams.get('jobId') ? 'Review and update the job details' : 'Fill out the details to create a comprehensive job posting'}</p>
+
+        {/* Top bar toggle to enable/disable Apply Form globally */}
+        <div className="mt-4 flex items-center justify-between rounded-md border border-gray-200 bg-white px-4 py-3">
+          <div className="text-sm">
+            <div className="font-medium">Apply Form</div>
+            <div className="text-gray-500">This controls Apply Form availability for this job only</div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className={`text-sm ${applyEnabled ? 'text-emerald-600' : 'text-red-600'}`}>
+              {applyEnabled ? 'Enabled' : 'Disabled'}
+            </span>
+            <Switch
+              checked={applyEnabled}
+              onCheckedChange={(val) => {
+                setApplyEnabled(val)
+                try {
+                  const jobId = searchParams.get('jobId')
+                  if (jobId) {
+                    localStorage.setItem(`applyFormEnabled:${jobId}`, String(val))
+                  }
+                } catch {}
+              }}
+              aria-label="Toggle Apply Form availability"
+            />
+          </div>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -384,13 +500,17 @@ export default function CreateJobPage() {
           <TabsContent value="interview" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Interview Process
-                </CardTitle>
-                <CardDescription>
-                  Configure the interview rounds and process for this position
-                </CardDescription>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Interview Process
+                    </CardTitle>
+                    <CardDescription>
+                      Configure the interview rounds and process for this position
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
@@ -524,12 +644,12 @@ export default function CreateJobPage() {
               {isSubmitting ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Creating Job...
+                  {searchParams.get('jobId') ? 'Saving Changes...' : 'Creating Job...'}
                 </>
               ) : (
                 <>
                   <CheckCircle className="mr-2 h-4 w-4" />
-                  Create Job & Setup Agents
+                  {searchParams.get('jobId') ? 'Save Changes' : 'Create Job & Setup Agents'}
                 </>
               )}
             </Button>
