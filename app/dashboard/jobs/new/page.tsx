@@ -24,27 +24,58 @@ export default function CreateJobPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentTab, setCurrentTab] = useState("basic")
   const lastSyncedTabRef = useRef<string | null>(null)
-  const [applyEnabled, setApplyEnabled] = useState<boolean>(true)
   
+  // Apply Form availability toggle (per job)
+  const [applyEnabled, setApplyEnabled] = useState<boolean>(true)
+
   // Form state
   const [formData, setFormData] = useState({
     // Basic Information
     jobTitle: "",
     company: "",
     location: "",
-    jobType: "full-time",
-    experienceLevel: "entry",
-    
-    // Job Details
+    jobType: "full-time", // maps Work Arrangement
+    experienceLevel: "entry", // maps Level/Seniority
+
+    // New sections: Requirements
+    education: "",
+    years: "",
+    technical: "",
+    domain: "",
+    soft: "",
+    languages: "",
+    mustHave: "",
+    niceToHave: "",
+
+    // New section: Responsibilities
+    day: "",
+    project: "",
+    collaboration: "",
+    scope: "",
+
+    // New section: Compensation
+    salaryMin: "",
+    salaryMax: "",
+    period: "Monthly",
+    bonus: "",
+    perks: "",
+    timeOff: "",
+
+    // New section: Logistics
+    joining: "",
+    travel: "",
+    visa: "",
+
+    // Legacy fields kept for API compatibility (will be compiled before submit)
     description: "",
     requirements: "",
     responsibilities: "",
     benefits: "",
     salaryRange: "",
-    
+
     // Interview Process
     interviewRounds: [] as string[],
-    
+
     // Platform Selection
     platforms: [] as string[],
   })
@@ -103,7 +134,7 @@ export default function CreateJobPage() {
   // Initialize tab from URL once on mount to avoid feedback loops
   useEffect(() => {
     const t = searchParams.get('tab')
-    const allowed = ['basic', 'details', 'interview', 'platforms']
+    const allowed = ['basic', 'requirements', 'responsibilities', 'compensation', 'logistics', 'interview', 'platforms']
     const next = t && allowed.includes(t) ? t : 'basic'
     lastSyncedTabRef.current = next
     setCurrentTab(next)
@@ -165,52 +196,74 @@ export default function CreateJobPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
-    
+
     try {
-      // Client-side guard to match API required fields
-      if (!formData.description.trim() || !formData.requirements.trim()) {
-        alert('Please fill in Description and Requirements before creating the job.')
+      // Compile description and requirements from new sections to match API contract
+      const compiledRequirementsParts: string[] = []
+      if (formData.education) compiledRequirementsParts.push(`Education: ${formData.education}`)
+      if (formData.years) compiledRequirementsParts.push(`Experience: ${formData.years}`)
+      if (formData.technical) compiledRequirementsParts.push(`Technical: ${formData.technical}`)
+      if (formData.domain) compiledRequirementsParts.push(`Domain: ${formData.domain}`)
+      if (formData.soft) compiledRequirementsParts.push(`Soft Skills: ${formData.soft}`)
+      if (formData.languages) compiledRequirementsParts.push(`Languages: ${formData.languages}`)
+      if (formData.mustHave) compiledRequirementsParts.push(`Must-have:\n${formData.mustHave}`)
+      if (formData.niceToHave) compiledRequirementsParts.push(`Nice-to-have:\n${formData.niceToHave}`)
+      const compiledRequirements = compiledRequirementsParts.join('\n\n')
+
+      const compiledDescriptionParts: string[] = []
+      if (formData.day) compiledDescriptionParts.push(`Day-to-day:\n${formData.day}`)
+      if (formData.project) compiledDescriptionParts.push(`Projects/Strategic:\n${formData.project}`)
+      if (formData.collaboration) compiledDescriptionParts.push(`Collaboration:\n${formData.collaboration}`)
+      if (formData.scope) compiledDescriptionParts.push(`Decision-making scope:\n${formData.scope}`)
+      const compensationBits: string[] = []
+      if (formData.salaryMin || formData.salaryMax) {
+        const min = formData.salaryMin ? Number(formData.salaryMin) : undefined
+        const max = formData.salaryMax ? Number(formData.salaryMax) : undefined
+        const range = [min, max].filter(v => typeof v === 'number' && !Number.isNaN(v as number)) as number[]
+        if (range.length > 0) compensationBits.push(`Salary: ${range.join(' - ')} (${formData.period || 'Monthly'})`)
+      }
+      if (formData.bonus) compensationBits.push(`Bonus/Incentives: ${formData.bonus}`)
+      if (formData.perks) compensationBits.push(`Perks: ${formData.perks}`)
+      if (formData.timeOff) compensationBits.push(`Time Off: ${formData.timeOff}`)
+      if (compensationBits.length) compiledDescriptionParts.push(compensationBits.join('\n'))
+      const logisticsBits: string[] = []
+      if (formData.joining) logisticsBits.push(`Joining timeline: ${formData.joining}`)
+      if (formData.travel) logisticsBits.push(`Travel: ${formData.travel}`)
+      if (formData.visa) logisticsBits.push(`Visa/Work auth: ${formData.visa}`)
+      if (logisticsBits.length) compiledDescriptionParts.push(logisticsBits.join('\n'))
+      const compiledDescription = compiledDescriptionParts.join('\n\n')
+
+      // Basic mandatory checks
+      if (!formData.jobTitle || !formData.location || !formData.jobType) {
+        alert('Please complete required fields: Job Title, Location, Work Arrangement.')
         setIsSubmitting(false)
         return
       }
-      const jobId = searchParams.get('jobId')
-      if (jobId) {
-        // Edit flow: PATCH existing job
-        const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}?company=${encodeURIComponent(company?.name || '')}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: formData.jobTitle,
-            location: formData.location,
-            employment_type: formData.jobType,
-            experience_level: formData.experienceLevel,
-            description_md: formData.description,
-            responsibilities_md: formData.requirements,
-            benefits_md: formData.benefits,
-            salary_level: formData.salaryRange,
-          }),
-        })
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok || !data?.ok) {
-          throw new Error(data?.error || 'Failed to update job')
-        }
-        try { localStorage.removeItem('editJobDraft') } catch {}
-        router.push('/dashboard/jobs')
-      } else {
-        // Create flow: POST new job
-        const res = await fetch('/api/jobs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...formData,
-            companyId: company?.id, // Pass companyId directly
-            createdBy: user?.id || null,
-          }),
-        })
-        const data = await res.json()
-        if (!res.ok || !data?.ok) {
-          throw new Error(data?.error || 'Failed to create job')
-        }
+
+      // Optional sanity check for salary range
+      const minNum = formData.salaryMin ? Number(formData.salaryMin) : undefined
+      const maxNum = formData.salaryMax ? Number(formData.salaryMax) : undefined
+      if (typeof minNum === 'number' && typeof maxNum === 'number' && !Number.isNaN(minNum) && !Number.isNaN(maxNum) && minNum > maxNum) {
+        alert('Salary Min should not exceed Salary Max.')
+        setIsSubmitting(false)
+        return
+      }
+
+      const res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          description: compiledDescription || formData.description || '',
+          requirements: compiledRequirements || formData.requirements || '',
+          companyId: company?.id, // Pass companyId directly
+          createdBy: user?.id || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || 'Failed to create job')
+      }
 
         // Store minimal info for downstream pages
         const jobData = {
@@ -228,7 +281,7 @@ export default function CreateJobPage() {
 
         // Redirect to the Selected Agents page with jobId and default tab=1
         router.push(`/selected-agents?jobId=${encodeURIComponent(data.jobId)}&tab=1`)
-      }
+      
     } catch (error) {
       console.error('Error creating job:', error)
     } finally {
@@ -339,11 +392,14 @@ export default function CreateJobPage() {
           }}
           className="space-y-6"
         >
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="basic">Basic Info</TabsTrigger>
-            <TabsTrigger value="details">Job Details</TabsTrigger>
-            <TabsTrigger value="interview">Interview Process</TabsTrigger>
-            <TabsTrigger value="platforms">Platforms</TabsTrigger>
+          <TabsList className="w-full flex flex-wrap items-center justify-between gap-2 p-1 rounded-lg border bg-muted/40 text-muted-foreground my-2 h-[56px]">
+            <TabsTrigger value="basic" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm rounded-md whitespace-nowrap">Basic Info</TabsTrigger>
+            <TabsTrigger value="requirements" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm rounded-md whitespace-nowrap">Requirements</TabsTrigger>
+            <TabsTrigger value="responsibilities" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm rounded-md whitespace-nowrap">Responsibilities</TabsTrigger>
+            <TabsTrigger value="compensation" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm rounded-md whitespace-nowrap">Compensation</TabsTrigger>
+            <TabsTrigger value="logistics" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm rounded-md whitespace-nowrap">Logistics</TabsTrigger>
+            <TabsTrigger value="interview" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm rounded-md whitespace-nowrap">Interview Process</TabsTrigger>
+            <TabsTrigger value="platforms" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm rounded-md whitespace-nowrap">Platforms</TabsTrigger>
           </TabsList>
 
           <TabsContent value="basic" className="space-y-6">
@@ -393,15 +449,16 @@ export default function CreateJobPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="jobType">Job Type *</Label>
+                    <Label htmlFor="jobType">Work Arrangement *</Label>
                     <Select value={formData.jobType} onValueChange={(value) => handleInputChange('jobType', value)}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select job type" />
+                        <SelectValue placeholder="Select work arrangement" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="full-time">Full-time</SelectItem>
                         <SelectItem value="part-time">Part-time</SelectItem>
                         <SelectItem value="contract">Contract</SelectItem>
+                        <SelectItem value="internship">Internship</SelectItem>
                         <SelectItem value="freelance">Freelance</SelectItem>
                       </SelectContent>
                     </Select>
@@ -409,16 +466,18 @@ export default function CreateJobPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="experienceLevel">Experience Level *</Label>
+                  <Label htmlFor="experienceLevel">Job Level / Seniority</Label>
                   <Select value={formData.experienceLevel} onValueChange={(value) => handleInputChange('experienceLevel', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select experience level" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="entry">Entry Level (0-2 years)</SelectItem>
-                      <SelectItem value="mid">Mid Level (3-5 years)</SelectItem>
-                      <SelectItem value="senior">Senior Level (6-10 years)</SelectItem>
-                      <SelectItem value="lead">Lead/Principal (10+ years)</SelectItem>
+                      <SelectItem value="junior">Junior</SelectItem>
+                      <SelectItem value="mid">Mid</SelectItem>
+                      <SelectItem value="senior">Senior</SelectItem>
+                      <SelectItem value="lead">Lead</SelectItem>
+                      <SelectItem value="manager">Manager</SelectItem>
+                      <SelectItem value="director">Director</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -426,72 +485,198 @@ export default function CreateJobPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="details" className="space-y-6">
+          <TabsContent value="requirements" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Target className="h-5 w-5" />
-                  Job Details
+                  Requirements
                 </CardTitle>
                 <CardDescription>
-                  Provide detailed information about the role and requirements
+                  Describe the background and skills expected
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="education">Educational Background</Label>
+                    <Input id="education" placeholder="e.g., BSc CS; Azure Certs" value={formData.education} onChange={(e)=>handleInputChange('education', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="years">Years of Experience</Label>
+                    <Input id="years" placeholder="e.g., 5–8 years (min 5)" value={formData.years} onChange={(e)=>handleInputChange('years', e.target.value)} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="technical">Technical Skills</Label>
+                  <Textarea id="technical" placeholder="Hard skills, tools, languages, platforms" value={formData.technical} onChange={(e)=>handleInputChange('technical', e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="domain">Domain Knowledge</Label>
+                  <Textarea id="domain" placeholder="Industry-specific expertise" value={formData.domain} onChange={(e)=>handleInputChange('domain', e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="soft">Soft Skills</Label>
+                  <Textarea id="soft" placeholder="Communication, leadership, problem-solving, adaptability" value={formData.soft} onChange={(e)=>handleInputChange('soft', e.target.value)} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="languages">Languages</Label>
+                    <Input id="languages" placeholder="e.g., English (required), Mandarin (nice-to-have)" value={formData.languages} onChange={(e)=>handleInputChange('languages', e.target.value)} />
+                  </div>
+                  <div className="space-y-2"></div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="mustHave">Must‑Have Skills</Label>
+                    <Textarea id="mustHave" placeholder="List must-haves, one per line" value={formData.mustHave} onChange={(e)=>handleInputChange('mustHave', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="niceToHave">Nice‑to‑Have Skills</Label>
+                    <Textarea id="niceToHave" placeholder="List nice-to-haves, one per line" value={formData.niceToHave} onChange={(e)=>handleInputChange('niceToHave', e.target.value)} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="responsibilities" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Responsibilities
+                </CardTitle>
+                <CardDescription>
+                  Outline what the role will do
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="description">Job Description *</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Describe the role, team, and what the candidate will be working on..."
-                    className="min-h-[120px]"
-                    value={formData.description}
-                    onChange={(e) => handleInputChange('description', e.target.value)}
-                    required
-                  />
+                  <Label htmlFor="day">Day‑to‑Day Duties</Label>
+                  <Textarea id="day" placeholder="Regular tasks (one per line)" value={formData.day} onChange={(e)=>handleInputChange('day', e.target.value)} />
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="requirements">Requirements *</Label>
-                  <Textarea
-                    id="requirements"
-                    placeholder="List the required skills, experience, and qualifications..."
-                    className="min-h-[120px]"
-                    value={formData.requirements}
-                    onChange={(e) => handleInputChange('requirements', e.target.value)}
-                    required
-                  />
+                  <Label htmlFor="project">Project / Strategic Duties</Label>
+                  <Textarea id="project" placeholder="Long‑term contributions (one per line)" value={formData.project} onChange={(e)=>handleInputChange('project', e.target.value)} />
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="responsibilities">Key Responsibilities</Label>
-                  <Textarea
-                    id="responsibilities"
-                    placeholder="Outline the main responsibilities and duties..."
-                    className="min-h-[100px]"
-                    value={formData.responsibilities}
-                    onChange={(e) => handleInputChange('responsibilities', e.target.value)}
-                  />
+                  <Label htmlFor="collaboration">Team Collaboration / Stakeholders</Label>
+                  <Textarea id="collaboration" placeholder="Cross‑functional interactions (one per line)" value={formData.collaboration} onChange={(e)=>handleInputChange('collaboration', e.target.value)} />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="scope">Decision‑Making Scope</Label>
+                  <Textarea id="scope" placeholder="Budget, people management, strategic influence" value={formData.scope} onChange={(e)=>handleInputChange('scope', e.target.value)} />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-                <div className="grid grid-cols-2 gap-4">
+          <TabsContent value="compensation" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Compensation & Benefits
+                </CardTitle>
+                <CardDescription>
+                  Share ranges only if you intend to publish them
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="benefits">Benefits & Perks</Label>
-                    <Textarea
-                      id="benefits"
-                      placeholder="Health insurance, 401k, flexible hours..."
-                      value={formData.benefits}
-                      onChange={(e) => handleInputChange('benefits', e.target.value)}
-                    />
+                    <Label htmlFor="salaryMin">Salary Min</Label>
+                    <Input id="salaryMin" type="number" placeholder="e.g., 6000" value={formData.salaryMin} onChange={(e)=>handleInputChange('salaryMin', e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="salaryRange">Salary Range</Label>
-                    <Input
-                      id="salaryRange"
-                      placeholder="e.g. $120,000 - $150,000"
-                      value={formData.salaryRange}
-                      onChange={(e) => handleInputChange('salaryRange', e.target.value)}
-                    />
+                    <Label htmlFor="salaryMax">Salary Max</Label>
+                    <Input id="salaryMax" type="number" placeholder="e.g., 9000" value={formData.salaryMax} onChange={(e)=>handleInputChange('salaryMax', e.target.value)} />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="period">Period</Label>
+                    <Select value={formData.period} onValueChange={(value)=>handleInputChange('period', value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Monthly">Monthly</SelectItem>
+                        <SelectItem value="Yearly">Yearly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bonus">Bonus / Incentives</Label>
+                  <Input id="bonus" placeholder="e.g., 10% annual bonus; RSUs" value={formData.bonus} onChange={(e)=>handleInputChange('bonus', e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="perks">Perks & Benefits</Label>
+                  <Textarea id="perks" placeholder="Health, insurance, stock options, learning budget, wellness" value={formData.perks} onChange={(e)=>handleInputChange('perks', e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="timeOff">Time Off Policy</Label>
+                  <Input id="timeOff" placeholder="e.g., 18 AL, sick leave, parental leave" value={formData.timeOff} onChange={(e)=>handleInputChange('timeOff', e.target.value)} />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="logistics" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Briefcase className="h-5 w-5" />
+                  Logistics
+                </CardTitle>
+                <CardDescription>
+                  Final details to help candidates plan
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="joining">Joining Timeline</Label>
+                    <Input id="joining" placeholder="e.g., Within 30 days" value={formData.joining} onChange={(e)=>handleInputChange('joining', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="travel">Travel Requirements</Label>
+                    <Input id="travel" placeholder="e.g., Up to 20%" value={formData.travel} onChange={(e)=>handleInputChange('travel', e.target.value)} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="visa">Work Authorization / Visa</Label>
+                  <Input id="visa" placeholder="e.g., Open to sponsorship / PR required" value={formData.visa} onChange={(e)=>handleInputChange('visa', e.target.value)} />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="responsibilities" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Interview Process
+                </CardTitle>
+                <CardDescription>
+                  Configure the interview rounds and process for this position
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="joining">Joining Timeline</Label>
+                    <Input id="joining" placeholder="e.g., Within 30 days" value={formData.joining} onChange={(e)=>handleInputChange('joining', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="travel">Travel Requirements</Label>
+                    <Input id="travel" placeholder="e.g., Up to 20%" value={formData.travel} onChange={(e)=>handleInputChange('travel', e.target.value)} />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="visa">Work Authorization / Visa</Label>
+                  <Input id="visa" placeholder="e.g., Open to sponsorship / PR required" value={formData.visa} onChange={(e)=>handleInputChange('visa', e.target.value)} />
                 </div>
               </CardContent>
             </Card>
@@ -635,8 +820,6 @@ export default function CreateJobPage() {
                 !formData.location ||
                 !formData.jobType ||
                 !formData.experienceLevel ||
-                !formData.description.trim() ||
-                !formData.requirements.trim() ||
                 formData.interviewRounds.length === 0
               }
               className="min-w-[200px]"

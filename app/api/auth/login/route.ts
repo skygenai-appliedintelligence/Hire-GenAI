@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
-import { signJwt } from '@/lib/jwt'
+
 import { loginSchema } from '@/lib/validation'
 import { createErrorResponse, createSuccessResponse } from '@/lib/errors'
 import { ErrorCodes } from '@/lib/errors'
@@ -20,15 +19,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { email, phone, password } = validation.data
+    const { email, password } = validation.data
 
     // Find user
     const user = await prisma.user.findFirst({
       where: {
-        OR: [
-          ...(email ? [{ email }] : []),
-          ...(phone ? [{ phone }] : [])
-        ]
+        ...(email ? { email } : {})
       }
     })
 
@@ -36,41 +32,17 @@ export async function POST(request: NextRequest) {
       return createErrorResponse(ErrorCodes.INVALID_CREDENTIALS, 401)
     }
 
-    if (!user.verified) {
-      return createErrorResponse(ErrorCodes.UNVERIFIED, 401)
-    }
+    // With the current schema, password-based login is not supported.
+    // Users should authenticate via the OTP flow which manages verification
+    // using the `email_identities` table.
+    return createErrorResponse(
+      ErrorCodes.VALIDATION_ERROR,
+      400,
+      'Password login is not supported. Please use the OTP login flow.'
+    )
 
-    if (!user.passwordHash) {
-      return createErrorResponse(ErrorCodes.INVALID_CREDENTIALS, 401)
-    }
-
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.passwordHash)
-    if (!isValidPassword) {
-      return createErrorResponse(ErrorCodes.INVALID_CREDENTIALS, 401)
-    }
-
-    // Generate JWT token
-    const token = await signJwt({
-      userId: user.id,
-      email: user.email,
-      phone: user.phone,
-      verified: user.verified
-    })
-
-    // Create response with cookie
-    const response = NextResponse.json({ ok: true, token })
-    
-    // Set HttpOnly cookie
-    response.cookies.set('auth-token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60 // 7 days
-    })
-
-    return response
+    // If password login is later supported, implement password verification
+    // against the appropriate table/field and then issue JWT + cookie here.
   } catch (error) {
     console.error('Login error:', error)
     return createErrorResponse(ErrorCodes.INTERNAL_ERROR, 500)
