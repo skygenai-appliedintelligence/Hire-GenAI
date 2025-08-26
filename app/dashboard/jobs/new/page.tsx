@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useLayoutEffect } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,7 +13,6 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Building2, Users, Briefcase, Target, CheckCircle, Clock, Bot } from 'lucide-react'
-import { Switch } from "@/components/ui/switch"
 import { useAuth } from "@/contexts/auth-context"
 
 export default function CreateJobPage() {
@@ -21,63 +20,155 @@ export default function CreateJobPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { company, user } = useAuth()
+  const isEditing = !!searchParams.get('jobId')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentTab, setCurrentTab] = useState("basic")
   const lastSyncedTabRef = useRef<string | null>(null)
+  const statusInitializedRef = useRef(false)
   
-  // Apply Form availability toggle (per job)
-  const [applyEnabled, setApplyEnabled] = useState<boolean>(true)
+  // Job status: open | on_hold | closed | cancelled
+
+  // Helper: parse varied salary labels into structured fields
+  const normalizeStatus = (val?: string | null): 'open' | 'on_hold' | 'closed' | 'cancelled' | undefined => {
+    if (!val) return undefined
+    const v = String(val).toLowerCase().trim()
+    if (v === 'open') return 'open'
+    if (v === 'closed' || v === 'close') return 'closed'
+    if (v === 'on_hold' || v === 'on-hold' || v === 'onhold' || v === 'hold' || v === 'on hold') return 'on_hold'
+    if (v === 'cancelled' || v === 'canceled' || v === 'cancel' || v === 'cancelled ') return 'cancelled'
+    return undefined
+  }
+
+  // Map UI employment type to DB enum
+  const toDbEmploymentType = (raw?: string | null): 'full_time' | 'part_time' | 'contract' | undefined => {
+    const v = (raw || '').toLowerCase().trim()
+    if (v === 'full-time' || v === 'full_time' || v === 'full time') return 'full_time'
+    if (v === 'part-time' || v === 'part_time' || v === 'part time') return 'part_time'
+    if (v === 'contract' || v === 'freelance' || v === 'contractor') return 'contract'
+    return undefined
+  }
+
+  // Map UI experience level to DB enum
+  const toDbExperienceLevel = (
+    raw?: string | null
+  ): 'intern' | 'junior' | 'mid' | 'senior' | 'lead' | 'principal' | undefined => {
+    const v = (raw || '').toLowerCase().trim()
+    if (v === 'intern' || v === 'internship') return 'intern'
+    if (v === 'entry' || v === 'junior' || v === 'fresher') return 'junior'
+    if (v === 'mid' || v === 'mid-level' || v === 'mid level') return 'mid'
+    if (v === 'senior' || v === 'sr') return 'senior'
+    if (v === 'lead') return 'lead'
+    if (v === 'principal' || v === 'staff') return 'principal'
+    return undefined
+  }
+  const parseSalaryLabel = (labelRaw: string) => {
+    const label = (labelRaw || '').toLowerCase()
+    if (!label) return {}
+    // Determine period hint
+    let period: 'Monthly' | 'Yearly' | undefined
+    if (/(year|annual|per\s*year|yr|yoy|lpa)/i.test(labelRaw)) period = 'Yearly'
+    else if (/(month|per\s*month|mo)/i.test(labelRaw)) period = 'Monthly'
+
+    // Extract up to 2 numbers (allow commas/decimals)
+    const nums = Array.from(labelRaw.matchAll(/([\d]+[\d,]*\.?\d*)/g)).map(m => m[1].replace(/,/g, ''))
+    if (nums.length === 0) return { period }
+
+    // Handle LPA (Lakhs per annum) -> convert to absolute if possible
+    const isLpa = /lpa/.test(label)
+    const toNumber = (s: string) => {
+      const n = parseFloat(s)
+      if (Number.isNaN(n)) return undefined
+      if (isLpa) return Math.round(n * 100000) // 1 LPA = 100,000
+      return n
+    }
+    const [minS, maxS] = [nums[0], nums[1]]
+    const min = toNumber(minS)
+    const max = maxS !== undefined ? toNumber(maxS) : undefined
+    return { min: min !== undefined ? String(min) : undefined, max: max !== undefined ? String(max) : undefined, period }
+  }
 
   // Form state
-  const [formData, setFormData] = useState({
-    // Basic Information
-    jobTitle: "",
-    company: "",
-    location: "",
-    jobType: "full-time", // maps Work Arrangement
-    experienceLevel: "entry", // maps Level/Seniority
+  const [formData, setFormData] = useState(() => {
+    // Determine initial status from localStorage synchronously to avoid flicker to "open"
+    let initialStatus: 'open' | 'on_hold' | 'closed' | 'cancelled' = 'open'
+    try {
+      if (typeof window !== 'undefined') {
+        const sp = new URLSearchParams(window.location.search)
+        const jobId = sp.get('jobId')
+        if (jobId) {
+          const saved = localStorage.getItem(`jobStatus:${jobId}`)
+          const norm = ((): 'open' | 'on_hold' | 'closed' | 'cancelled' | undefined => {
+            const v = saved?.toLowerCase().trim()
+            if (v === 'open') return 'open'
+            if (v === 'closed' || v === 'close') return 'closed'
+            if (v === 'on_hold' || v === 'on-hold' || v === 'onhold' || v === 'hold' || v === 'on hold') return 'on_hold'
+            if (v === 'cancelled' || v === 'canceled' || v === 'cancel') return 'cancelled'
+            return undefined
+          })()
+          if (typeof window !== 'undefined') {
+            console.log('[Job Edit] Initial status sync read', { jobId, saved, norm })
+          }
+          if (norm) initialStatus = norm
+          else {
+            const afe = localStorage.getItem(`applyFormEnabled:${jobId}`)
+            console.log('[Job Edit] Deriving from applyFormEnabled', { jobId, afe })
+            if (afe === 'true') initialStatus = 'open'
+            else if (afe === 'false') initialStatus = 'on_hold'
+          }
+        }
+      }
+    } catch {}
+    return {
+      // Basic Information
+      jobTitle: "",
+      company: "",
+      location: "",
+      jobType: "full-time", // maps Work Arrangement
+      experienceLevel: "entry", // maps Level/Seniority
+      status: initialStatus, // job status
 
-    // New sections: Requirements
-    education: "",
-    years: "",
-    technical: "",
-    domain: "",
-    soft: "",
-    languages: "",
-    mustHave: "",
-    niceToHave: "",
+      // New sections: Requirements
+      education: "",
+      years: "",
+      technical: "",
+      domain: "",
+      soft: "",
+      languages: "",
+      mustHave: "",
+      niceToHave: "",
 
-    // New section: Responsibilities
-    day: "",
-    project: "",
-    collaboration: "",
-    scope: "",
+      // New section: Responsibilities
+      day: "",
+      project: "",
+      collaboration: "",
+      scope: "",
 
-    // New section: Compensation
-    salaryMin: "",
-    salaryMax: "",
-    period: "Monthly",
-    bonus: "",
-    perks: "",
-    timeOff: "",
+      // New section: Compensation
+      salaryMin: "",
+      salaryMax: "",
+      period: "Monthly",
+      bonus: "",
+      perks: "",
+      timeOff: "",
 
-    // New section: Logistics
-    joining: "",
-    travel: "",
-    visa: "",
+      // New section: Logistics
+      joining: "",
+      travel: "",
+      visa: "",
 
-    // Legacy fields kept for API compatibility (will be compiled before submit)
-    description: "",
-    requirements: "",
-    responsibilities: "",
-    benefits: "",
-    salaryRange: "",
+      // Legacy fields kept for API compatibility (will be compiled before submit)
+      description: "",
+      requirements: "",
+      responsibilities: "",
+      benefits: "",
+      salaryRange: "",
 
-    // Interview Process
-    interviewRounds: [] as string[],
+      // Interview Process
+      interviewRounds: [] as string[],
 
-    // Platform Selection
-    platforms: [] as string[],
+      // Platform Selection
+      platforms: [] as string[],
+    }
   })
 
   // Prefill when editing: if jobId is present in URL, fetch job and populate form
@@ -91,37 +182,162 @@ export default function CreateJobPage() {
         if (draft) {
           const j = JSON.parse(draft)
           if (j?.id === jobId) {
-            setFormData(prev => ({
-              ...prev,
-              jobTitle: j.title || prev.jobTitle,
-              company: company?.name || prev.company,
-              location: j.location || prev.location,
-              jobType: j.employment_type || prev.jobType,
-              description: j.description || prev.description,
-              requirements: j.requirements || prev.requirements,
-              salaryRange: j.salary_range || prev.salaryRange,
-              interviewRounds: Array.isArray(j.interview_rounds) ? j.interview_rounds : prev.interviewRounds,
-            }))
+            setFormData(prev => {
+              let savedStatus: string | null = null
+              try {
+                savedStatus = localStorage.getItem(`jobStatus:${jobId}`)
+              } catch {}
+              const normalized = normalizeStatus(savedStatus)
+              const next = {
+                ...prev,
+                jobTitle: j.title || prev.jobTitle,
+                company: company?.name || prev.company,
+                location: j.location || prev.location,
+                jobType: j.employment_type || prev.jobType,
+                status: (normalized as any) || (normalizeStatus(j.status) as any) || prev.status,
+                description: j.description || prev.description,
+                requirements: j.requirements || prev.requirements,
+                salaryRange: j.salary_range || prev.salaryRange,
+                interviewRounds: Array.isArray(j.interview_rounds) ? j.interview_rounds : prev.interviewRounds,
+                platforms: Array.isArray(j.posted_platforms) ? j.posted_platforms : prev.platforms,
+              }
+              // Best-effort backfill for new granular sections if empty
+              // 1) If requirements missing but description present, copy it over
+              if (!next.requirements && next.description) next.requirements = next.description
+              // 2) Map requirements -> granular
+              if (!next.technical && next.requirements) next.technical = next.requirements
+              if (!next.soft && next.requirements) next.soft = next.requirements
+              if (!next.mustHave && next.requirements) next.mustHave = next.requirements
+              // 3) Map description -> Day-to-Day and related
+              if (!next.day && next.description) next.day = next.description
+              if (!next.project && next.day) next.project = next.day
+              if (!next.collaboration && next.day) next.collaboration = next.day
+              if (!next.scope && next.day) next.scope = next.day
+              // Mark status initialized ONLY if we used a saved status.
+              // If no saved status existed (we fell back to API/draft), do NOT mark initialized yet,
+              // so we don't persist API 'open' into localStorage.
+              if (normalized) {
+                statusInitializedRef.current = true
+              }
+              return next
+            })
+            // Persist selected interview rounds and derive salary details if possible
+            try {
+              const rounds: string[] = Array.isArray(j.interview_rounds) ? j.interview_rounds : []
+              if (rounds.length) {
+                localStorage.setItem('selectedInterviewRounds', JSON.stringify(rounds))
+              }
+              const label = j.salary_label || j.salary_range || ''
+              const m = String(label).match(/(\d[\d,\.]*)\s*[-–]\s*(\d[\d,\.]*)\s*(?:\((Monthly|Yearly)\))?/i)
+              if (m) {
+                const toNum = (s: string) => String(s).replace(/[,]/g, '')
+                const min = toNum(m[1])
+                const max = toNum(m[2])
+                const period = (m[3] as 'Monthly' | 'Yearly') || 'Monthly'
+                setFormData(prev => ({ ...prev, salaryMin: min, salaryMax: max, period }))
+              } else {
+                const p = parseSalaryLabel(label)
+                if (p.min || p.max || p.period) {
+                  setFormData(prev => ({ ...prev, salaryMin: p.min ?? prev.salaryMin, salaryMax: p.max ?? prev.salaryMax, period: (p.period as any) ?? prev.period }))
+                }
+              }
+            } catch {}
+            // Persist status from draft only if nothing saved yet
+            try {
+              const existing = localStorage.getItem(`jobStatus:${jobId}`)
+              if (!existing && j.status) localStorage.setItem(`jobStatus:${jobId}`, j.status)
+            } catch {}
+            // Persist round -> skills mapping for downstream pages
+            try {
+              const rounds: string[] = Array.isArray(j.interview_rounds) ? j.interview_rounds : []
+              const mapping: Record<string, string[]> = {}
+              rounds.forEach(r => {
+                const cfg = (agentConfigurations as any)[r]
+                if (cfg && Array.isArray(cfg.skills)) mapping[r] = cfg.skills
+              })
+              if (Object.keys(mapping).length) {
+                localStorage.setItem('selectedRoundSkills', JSON.stringify(mapping))
+              }
+            } catch {}
           }
         }
         // Also fetch from API to ensure latest (requires company query param)
         if (company?.name) {
-          const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}?company=${encodeURIComponent(company.name)}`)
+          const res = await fetch(
+            `/api/jobs/${encodeURIComponent(jobId)}?company=${encodeURIComponent(company.name)}`,
+            { cache: 'no-store' }
+          )
           const data = await res.json().catch(() => ({}))
           if (res.ok && data?.job) {
             const j = data.job
-            setFormData(prev => ({
-              ...prev,
-              jobTitle: j.title || prev.jobTitle,
-              company: company?.name || prev.company,
-              location: j.location || prev.location,
-              jobType: j.employment_type || prev.jobType,
-              description: j.description_md || j.summary || j.description || prev.description,
-              requirements: j.responsibilities_md || j.requirements || prev.requirements,
-              benefits: j.benefits_md || prev.benefits,
-              salaryRange: j.salary_level || j.salary_label || j.salary_range || prev.salaryRange,
-              interviewRounds: Array.isArray(j.interview_rounds) ? j.interview_rounds : prev.interviewRounds,
-            }))
+            setFormData(prev => {
+              let savedStatus: string | null = null
+              try {
+                savedStatus = localStorage.getItem(`jobStatus:${jobId}`)
+              } catch {}
+              const normalized = normalizeStatus(savedStatus)
+              const next = {
+                ...prev,
+                jobTitle: j.title || prev.jobTitle,
+                company: company?.name || prev.company,
+                location: j.location || prev.location,
+                jobType: j.employment_type || prev.jobType,
+                status: (normalized as any) || (normalizeStatus(j.status) as any) || prev.status,
+                description: j.description_md || j.summary || j.description || prev.description,
+                requirements: j.responsibilities_md || j.requirements || prev.requirements,
+                benefits: j.benefits_md || prev.benefits,
+                salaryRange: j.salary_level || j.salary_label || j.salary_range || prev.salaryRange,
+                interviewRounds: Array.isArray(j.interview_rounds) ? j.interview_rounds : prev.interviewRounds,
+                platforms: Array.isArray(j.posted_platforms) ? j.posted_platforms : prev.platforms,
+              }
+              // Best-effort backfill for new granular sections if empty
+              if (!next.technical && next.requirements) next.technical = next.requirements
+              if (!next.day && next.description) next.day = next.description
+              // Mark status initialized after deriving it and persist server truth to localStorage
+              statusInitializedRef.current = true
+              return next
+            })
+            try {
+              const serverStatus = normalizeStatus(j.status)
+              if (serverStatus) {
+                localStorage.setItem(`jobStatus:${jobId}`, serverStatus)
+                const enabled = serverStatus === 'open'
+                localStorage.setItem(`applyFormEnabled:${jobId}`, String(enabled))
+              }
+            } catch {}
+            // Persist selected interview rounds and derive salary details if possible
+            try {
+              const rounds: string[] = Array.isArray(j.interview_rounds) ? j.interview_rounds : []
+              if (rounds.length) {
+                localStorage.setItem('selectedInterviewRounds', JSON.stringify(rounds))
+              }
+              const label = j.salary_level || j.salary_label || j.salary_range || ''
+              const m = String(label).match(/(\d[\d,\.]*)\s*[-–]\s*(\d[\d,\.]*)\s*(?:\((Monthly|Yearly)\))?/i)
+              if (m) {
+                const toNum = (s: string) => String(s).replace(/[,]/g, '')
+                const min = toNum(m[1])
+                const max = toNum(m[2])
+                const period = (m[3] as 'Monthly' | 'Yearly') || 'Monthly'
+                setFormData(prev => ({ ...prev, salaryMin: min, salaryMax: max, period }))
+              } else {
+                const p = parseSalaryLabel(label)
+                if (p.min || p.max || p.period) {
+                  setFormData(prev => ({ ...prev, salaryMin: p.min ?? prev.salaryMin, salaryMax: p.max ?? prev.salaryMax, period: (p.period as any) ?? prev.period }))
+                }
+              }
+            } catch {}
+            // Persist round -> skills mapping for downstream pages
+            try {
+              const rounds: string[] = Array.isArray(j.interview_rounds) ? j.interview_rounds : []
+              const mapping: Record<string, string[]> = {}
+              rounds.forEach(r => {
+                const cfg = (agentConfigurations as any)[r]
+                if (cfg && Array.isArray(cfg.skills)) mapping[r] = cfg.skills
+              })
+              if (Object.keys(mapping).length) {
+                localStorage.setItem('selectedRoundSkills', JSON.stringify(mapping))
+              }
+            } catch {}
           }
         }
       } catch (e) {
@@ -148,18 +364,66 @@ export default function CreateJobPage() {
     }
   }, [company?.name])
 
-  // Read persisted Apply Form toggle for this jobId (edit flow only)
+  // Synchronously apply saved status before paint to prevent showing a wrong default
+  useLayoutEffect(() => {
+    try {
+      const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+      const jobId = sp?.get('jobId')
+      if (!jobId) return
+      const raw = localStorage.getItem(`jobStatus:${jobId}`)
+      const savedStatus = normalizeStatus(raw)
+      if (savedStatus) {
+        console.log('[Job Edit] useLayoutEffect applying status before paint', { jobId, status: savedStatus })
+        setFormData(prev => ({ ...prev, status: savedStatus }))
+        statusInitializedRef.current = true
+      }
+    } catch {}
+  }, [])
+
+  // Read persisted Job Status if available (fallback when API/draft lacks status)
   useEffect(() => {
     const jobId = searchParams.get('jobId')
     if (!jobId) return
     try {
-      const saved = localStorage.getItem(`applyFormEnabled:${jobId}`)
-      if (saved !== null) setApplyEnabled(saved === 'true')
+      const raw = localStorage.getItem(`jobStatus:${jobId}`)
+      const savedStatus = normalizeStatus(raw)
+      if (savedStatus) {
+        console.log('[Job Edit] Prefill applying persisted status', { jobId, status: savedStatus })
+        setFormData(prev => ({ ...prev, status: savedStatus }))
+        statusInitializedRef.current = true
+      }
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
+  // Apply Form availability follows status:
+  // Open => enabled (true), On Hold/Closed => disabled (false)
+  useEffect(() => {
+    const jobId = searchParams.get('jobId')
+    if (!jobId) return
+    if (!statusInitializedRef.current) return
+    const enabled = formData.status === 'open'
+    try {
+      console.log('[Job Edit] Persisting due to status change/effect', { jobId, status: formData.status, enabled })
+      localStorage.setItem(`applyFormEnabled:${jobId}`, String(enabled))
+      localStorage.setItem(`jobStatus:${jobId}`, formData.status)
+    } catch {}
+  }, [formData.status, searchParams])
+
   const handleInputChange = (field: string, value: string) => {
+    if (field === 'status') {
+      // Mark initialized and persist immediately so it survives navigation
+      statusInitializedRef.current = true
+      try {
+        const jobId = searchParams.get('jobId')
+        if (jobId) {
+          console.log('[Job Edit] User changed status', { jobId, value })
+          localStorage.setItem(`jobStatus:${jobId}`, value)
+          const enabled = value === 'open'
+          localStorage.setItem(`applyFormEnabled:${jobId}`, String(enabled))
+        }
+      } catch {}
+    }
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
@@ -233,11 +497,13 @@ export default function CreateJobPage() {
       if (logisticsBits.length) compiledDescriptionParts.push(logisticsBits.join('\n'))
       const compiledDescription = compiledDescriptionParts.join('\n\n')
 
-      // Basic mandatory checks
-      if (!formData.jobTitle || !formData.location || !formData.jobType) {
-        alert('Please complete required fields: Job Title, Location, Work Arrangement.')
-        setIsSubmitting(false)
-        return
+      // Basic mandatory checks for create only
+      if (!isEditing) {
+        if (!formData.jobTitle || !formData.location || !formData.jobType) {
+          alert('Please complete required fields: Job Title, Location, Work Arrangement.')
+          setIsSubmitting(false)
+          return
+        }
       }
 
       // Optional sanity check for salary range
@@ -249,38 +515,75 @@ export default function CreateJobPage() {
         return
       }
 
-      const res = await fetch('/api/jobs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          description: compiledDescription || formData.description || '',
-          requirements: compiledRequirements || formData.requirements || '',
-          companyId: company?.id, // Pass companyId directly
-          createdBy: user?.id || null,
-        }),
-      })
-      const data = await res.json()
+      let res: Response
+      let data: any
+      if (isEditing) {
+        // PATCH update for edit flow
+        const jobId = searchParams.get('jobId')!
+        // Build minimal updates supported by API
+        const updates: any = {}
+        if (formData.jobTitle) updates.title = formData.jobTitle
+        if (formData.location) updates.location = formData.location
+        const mappedEmpType = toDbEmploymentType(formData.jobType)
+        if (mappedEmpType) updates.employment_type = mappedEmpType
+        if (formData.status) updates.status = formData.status
+        const mappedLevel = toDbExperienceLevel(formData.experienceLevel)
+        if (mappedLevel) updates.experience_level = mappedLevel
+        if (compiledDescription || formData.description) updates.description_md = compiledDescription || formData.description || ''
+        if (compiledRequirements || formData.requirements) updates.responsibilities_md = compiledRequirements || formData.requirements || ''
+        // Optionally map perks/timeOff to benefits_md
+        const benefits = [formData.perks, formData.timeOff].filter(Boolean).join('\n')
+        if (benefits) updates.benefits_md = benefits
+        // Salary proxy
+        if (formData.salaryMin || formData.salaryMax || formData.period) {
+          updates.salary_level = `${formData.salaryMin || ''}-${formData.salaryMax || ''} (${formData.period || 'Monthly'})`
+        }
+        res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}?company=${encodeURIComponent(company?.name || '')}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        })
+        data = await res.json()
+      } else {
+        // POST create flow
+        res = await fetch('/api/jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...formData,
+            description: compiledDescription || formData.description || '',
+            requirements: compiledRequirements || formData.requirements || '',
+            companyId: company?.id, // Pass companyId directly
+            createdBy: user?.id || null,
+          }),
+        })
+        data = await res.json()
+      }
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || 'Failed to create job')
       }
 
-        // Store minimal info for downstream pages
-        const jobData = {
-          ...formData,
-          id: data.jobId,
-          createdAt: new Date().toISOString(),
+        if (!isEditing) {
+          // Store minimal info for downstream pages (create flow)
+          const jobData = {
+            ...formData,
+            id: data.jobId,
+            createdAt: new Date().toISOString(),
+          }
+          localStorage.setItem('newJobData', JSON.stringify(jobData))
+          localStorage.setItem('selectedInterviewRounds', JSON.stringify(formData.interviewRounds))
+
+          // Derive selectedAgents from the number of selected interview rounds
+          const agentsCount = Array.isArray(formData.interviewRounds) ? formData.interviewRounds.length : 0
+          const selectedAgents = Array.from({ length: agentsCount }, (_, i) => i + 1)
+          localStorage.setItem('selectedAgents', JSON.stringify(selectedAgents))
+
+          // Redirect to the Selected Agents page
+          router.push(`/selected-agents?jobId=${encodeURIComponent(data.jobId)}&tab=1`)
+        } else {
+          // Stay on page and show success for edit
+          alert('Changes saved successfully.')
         }
-        localStorage.setItem('newJobData', JSON.stringify(jobData))
-        localStorage.setItem('selectedInterviewRounds', JSON.stringify(formData.interviewRounds))
-
-        // Derive selectedAgents from the number of selected interview rounds
-        const agentsCount = Array.isArray(formData.interviewRounds) ? formData.interviewRounds.length : 0
-        const selectedAgents = Array.from({ length: agentsCount }, (_, i) => i + 1) // [1,2,3,...]
-        localStorage.setItem('selectedAgents', JSON.stringify(selectedAgents))
-
-        // Redirect to the Selected Agents page with jobId and default tab=1
-        router.push(`/selected-agents?jobId=${encodeURIComponent(data.jobId)}&tab=1`)
       
     } catch (error) {
       console.error('Error creating job:', error)
@@ -350,29 +653,27 @@ export default function CreateJobPage() {
         <h1 className="text-3xl font-bold">{searchParams.get('jobId') ? 'Edit Job' : 'Create New Job'}</h1>
         <p className="text-gray-600 mt-2">{searchParams.get('jobId') ? 'Review and update the job details' : 'Fill out the details to create a comprehensive job posting'}</p>
 
-        {/* Top bar toggle to enable/disable Apply Form globally */}
+        {/* Top bar Job Status selector */}
         <div className="mt-4 flex items-center justify-between rounded-md border border-gray-200 bg-white px-4 py-3">
           <div className="text-sm">
-            <div className="font-medium">Apply Form</div>
-            <div className="text-gray-500">This controls Apply Form availability for this job only</div>
+            <div className="font-medium">Job Status</div>
+            <div className="text-gray-500">Set whether the job is open, on hold, or closed</div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className={`text-sm ${applyEnabled ? 'text-emerald-600' : 'text-red-600'}`}>
-              {applyEnabled ? 'Enabled' : 'Disabled'}
-            </span>
-            <Switch
-              checked={applyEnabled}
-              onCheckedChange={(val) => {
-                setApplyEnabled(val)
-                try {
-                  const jobId = searchParams.get('jobId')
-                  if (jobId) {
-                    localStorage.setItem(`applyFormEnabled:${jobId}`, String(val))
-                  }
-                } catch {}
-              }}
-              aria-label="Toggle Apply Form availability"
-            />
+          <div className="flex items-center gap-3 min-w-[220px]">
+            <Select
+              value={formData.status}
+              onValueChange={(val) => handleInputChange('status', val)}
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="on_hold">On Hold</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </div>
@@ -814,13 +1115,16 @@ export default function CreateJobPage() {
             <Button 
               type="submit" 
               disabled={
-                isSubmitting ||
-                !formData.jobTitle ||
-                !company?.name ||
-                !formData.location ||
-                !formData.jobType ||
-                !formData.experienceLevel ||
-                formData.interviewRounds.length === 0
+                isSubmitting || (
+                  !isEditing && (
+                    !formData.jobTitle ||
+                    !company?.name ||
+                    !formData.location ||
+                    !formData.jobType ||
+                    !formData.experienceLevel ||
+                    formData.interviewRounds.length === 0
+                  )
+                )
               }
               className="min-w-[200px]"
             >
