@@ -20,7 +20,16 @@ export default function JobsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const { toast } = useToast()
   const [applyEnabledByJob, setApplyEnabledByJob] = useState<Record<string, boolean>>({})
-  const [tab, setTab] = useState<'all' | 'open' | 'closed'>('all')
+  const [tab, setTab] = useState<'open' | 'on_hold' | 'closed' | 'cancelled'>('open')
+  const [statusByJob, setStatusByJob] = useState<Record<string, 'open' | 'on_hold' | 'closed' | 'cancelled'>>({})
+
+  const normalizeStatus = (s: string | undefined | null): 'open' | 'on_hold' | 'closed' | 'cancelled' => {
+    const v = String(s || '').trim().toLowerCase()
+    if (v === 'closed') return 'closed'
+    if (v === 'on hold' || v === 'on_hold' || v === 'on-hold' || v === 'onhold' || v === 'hold' || v === 'paused' || v === 'pause') return 'on_hold'
+    if (v === 'cancelled' || v === 'canceled' || v === 'cancel') return 'cancelled'
+    return 'open'
+  }
 
   useEffect(() => {
     if (company?.id) {
@@ -51,6 +60,39 @@ export default function JobsPage() {
       if (m && e.newValue !== null) {
         const jobId = m[1]
         setApplyEnabledByJob((prev) => ({ ...prev, [jobId]: e.newValue === 'true' }))
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [jobs])
+
+  // Read Job Status per job and listen for changes
+  useEffect(() => {
+    const loadStatuses = () => {
+      setStatusByJob((prev) => {
+        const next: Record<string, 'open' | 'on_hold' | 'closed' | 'cancelled'> = { ...prev }
+        for (const j of jobs) {
+          try {
+            const saved = localStorage.getItem(`jobStatus:${j.id}`)
+            if (saved) next[j.id] = normalizeStatus(saved)
+            else next[j.id] = normalizeStatus((j as any).status)
+          } catch {
+            next[j.id] = normalizeStatus((j as any).status)
+          }
+        }
+        return next
+      })
+    }
+    loadStatuses()
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key) return
+      const m = e.key.match(/^jobStatus:(.+)$/)
+      if (m) {
+        const jobId = m[1]
+        const newVal = e.newValue
+        if (newVal !== null) {
+          setStatusByJob((prev) => ({ ...prev, [jobId]: normalizeStatus(newVal) }))
+        }
       }
     }
     window.addEventListener('storage', onStorage)
@@ -125,18 +167,18 @@ export default function JobsPage() {
     }
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: 'open' | 'on_hold' | 'closed' | 'cancelled') => {
     switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800"
-      case "draft":
-        return "bg-gray-100 text-gray-800"
-      case "paused":
-        return "bg-yellow-100 text-yellow-800"
-      case "closed":
-        return "bg-red-100 text-red-800"
+      case 'open':
+        return 'bg-green-100 text-green-800'
+      case 'on_hold':
+        return 'bg-yellow-100 text-yellow-800'
+      case 'closed':
+        return 'bg-red-100 text-red-800'
+      case 'cancelled':
+        return 'bg-gray-200 text-gray-800'
       default:
-        return "bg-gray-100 text-gray-800"
+        return 'bg-gray-100 text-gray-800'
     }
   }
 
@@ -206,173 +248,21 @@ export default function JobsPage() {
         </Link>
       </div>
 
-      {/* Buckets: Open vs Closed (Apply Form state) */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as 'all' | 'open' | 'closed')} className="space-y-4">
+      {/* Buckets: by status */}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as 'open' | 'on_hold' | 'closed' | 'cancelled')} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="open">Open Form</TabsTrigger>
-          <TabsTrigger value="closed">Closed Form</TabsTrigger>
+          <TabsTrigger value="open">Open</TabsTrigger>
+          <TabsTrigger value="on_hold">On Hold</TabsTrigger>
+          <TabsTrigger value="closed">Closed</TabsTrigger>
+          <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
         </TabsList>
+        
 
-        {/* All tab: show all jobs with Apply button state respected */}
-        <TabsContent value="all">
-          <div className="grid gap-6">
-            {jobs.length > 0 ? (
-              jobs.map((job) => (
-                <Card
-                  key={job.id}
-                  className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
-                  onClick={() => handleStoreJD(job)}
-                >
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">{job.title}</CardTitle>
-                        <CardDescription>
-                          {job.location} • {job.employment_type}
-                          {job.salary_range && ` • ${job.salary_range}`}
-                        </CardDescription>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{job.description}</p>
-
-                    {job.posting_results.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Platform Status:</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {job.posting_results.map((result, index) => (
-                            <div key={index} className="flex items-center space-x-1 text-xs">
-                              {result.success ? (
-                                <>
-                                  <CheckCircle className="w-3 h-3 text-green-600" />
-                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                    {result.platform}
-                                  </Badge>
-                                </>
-                              ) : (
-                                <>
-                                  <XCircle className="w-3 h-3 text-red-600" />
-                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                    {result.platform} (Failed)
-                                  </Badge>
-                                </>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {job.posting_results.length === 0 && job.posted_platforms.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Posted to:</h4>
-                        <div className="flex space-x-2">
-                          {job.posted_platforms.map((platform) => (
-                            <Badge key={platform} variant="outline">
-                              {platform}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex justify-between items-center">
-                      <div className="text-xs text-gray-500">
-                        Created: {new Date(job.created_at).toLocaleDateString()}
-                        {job.posting_results.length > 0 && (
-                          <span className="ml-4">
-                            Posted to {job.posting_results.filter((r) => r.success).length}/{job.posting_results.length}{" "}
-                            platforms
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex space-x-2">
-                        <Link href={`/dashboard/jobs/${job.id}`}>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <BarChart3 className="h-4 w-4 mr-1" />
-                            View Stats
-                          </Button>
-                        </Link>
-                        {(applyEnabledByJob[job.id] ?? true) ? (
-                          <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-blue-600 hover:text-blue-700 bg-transparent hover:bg-blue-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <ExternalLink className="h-4 w-4 mr-1" />
-                              Apply Form
-                            </Button>
-                          </Link>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled
-                            className="cursor-not-allowed text-red-600 bg-transparent hover:bg-red-50/50 border-red-200/70"
-                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
-                            title="Apply Form is disabled"
-                          >
-                            <ExternalLink className="h-4 w-4 mr-1" />
-                            Apply Form
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="bg-transparent hover:bg-gray-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            try { localStorage.setItem('editJobDraft', JSON.stringify(job)) } catch {}
-                            router.push(`/edit/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
-                          }}
-                        >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 shadow-sm hover:shadow-md motion-safe:transition-shadow"
-                          onMouseDown={(e) => e.stopPropagation()}
-                          disabled={deletingId === job.id}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          {deletingId === job.id ? 'Deleting…' : 'Delete'}
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
-              <Card className="border border-gray-200">
-                <CardContent className="text-center py-12">
-                  <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No jobs yet</h3>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* Open tab: show jobs with Apply Form enabled (default true) */}
+        {/* Open tab: show jobs with status === open */}
         <TabsContent value="open">
           <div className="grid gap-6">
-            {jobs.filter(j => (applyEnabledByJob[j.id] ?? true)).length > 0 ? (
-              jobs.filter(j => (applyEnabledByJob[j.id] ?? true)).map((job) => (
+            {jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'open').length > 0 ? (
+              jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'open').map((job) => (
                 <Card
                   key={job.id}
                   className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
@@ -388,7 +278,7 @@ export default function JobsPage() {
                         </CardDescription>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
+                        {(() => { const effective = (statusByJob[job.id] ?? normalizeStatus((job as any).status)); return <Badge className={getStatusColor(effective)}>{effective}</Badge> })()}
                       </div>
                     </div>
                   </CardHeader>
@@ -457,6 +347,7 @@ export default function JobsPage() {
                             View Stats
                           </Button>
                         </Link>
+                        {/* Apply button enabled for open status */}
                         <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
                           <Button
                             variant="outline"
@@ -475,7 +366,7 @@ export default function JobsPage() {
                           onClick={(e) => {
                             e.stopPropagation()
                             try { localStorage.setItem('editJobDraft', JSON.stringify(job)) } catch {}
-                            router.push(`/edit/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
+                            router.push(`/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
                           }}
                         >
                           <Edit className="h-4 w-4 mr-1" />
@@ -501,18 +392,18 @@ export default function JobsPage() {
               <Card className="border border-gray-200">
                 <CardContent className="text-center py-12">
                   <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No open-form jobs</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No open jobs</h3>
                 </CardContent>
               </Card>
             )}
           </div>
         </TabsContent>
 
-        {/* Closed tab: show jobs with Apply Form disabled */}
-        <TabsContent value="closed">
+        {/* Cancelled tab: show jobs with status === cancelled */}
+        <TabsContent value="cancelled">
           <div className="grid gap-6">
-            {jobs.filter(j => !(applyEnabledByJob[j.id] ?? true)).length > 0 ? (
-              jobs.filter(j => !(applyEnabledByJob[j.id] ?? true)).map((job) => (
+            {jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'cancelled').length > 0 ? (
+              jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'cancelled').map((job) => (
                 <Card
                   key={job.id}
                   className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
@@ -528,7 +419,263 @@ export default function JobsPage() {
                         </CardDescription>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
+                        {(() => { const effective = (statusByJob[job.id] ?? normalizeStatus((job as any).status)); return <Badge className={getStatusColor(effective)}>{effective}</Badge> })()}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{job.description}</p>
+
+                    {job.posting_results.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Platform Status:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {job.posting_results.map((result, index) => (
+                            <div key={index} className="flex items-center space-x-1 text-xs">
+                              {result.success ? (
+                                <>
+                                  <CheckCircle className="w-3 h-3 text-green-600" />
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                    {result.platform}
+                                  </Badge>
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className="w-3 h-3 text-red-600" />
+                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                    {result.platform} (Failed)
+                                  </Badge>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center">
+                      <div className="text-xs text-gray-500">
+                        Created: {new Date(job.created_at).toLocaleDateString()}
+                        {job.posting_results.length > 0 && (
+                          <span className="ml-4">
+                            Posted to {job.posting_results.filter((r) => r.success).length}/{job.posting_results.length}{" "}
+                            platforms
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex space-x-2">
+                        <Link href={`/dashboard/jobs/${job.id}`}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <BarChart3 className="h-4 w-4 mr-1" />
+                            View Stats
+                          </Button>
+                        </Link>
+                        {/* Disabled Apply in non-open statuses */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled
+                          className="cursor-not-allowed text-red-600 bg-transparent hover:bg-red-50/50 border-red-200/70"
+                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                          title="Apply Form is disabled for this status"
+                        >
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                          Apply Form
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-transparent hover:bg-gray-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            try { localStorage.setItem('editJobDraft', JSON.stringify(job)) } catch {}
+                            router.push(`/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 shadow-sm hover:shadow-md motion-safe:transition-shadow"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          disabled={deletingId === job.id}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          {deletingId === job.id ? 'Deleting…' : 'Delete'}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card className="border border-gray-200">
+                <CardContent className="text-center py-12">
+                  <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No cancelled jobs</h3>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* On Hold tab: show jobs with status === on_hold */}
+        <TabsContent value="on_hold">
+          <div className="grid gap-6">
+            {jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'on_hold').length > 0 ? (
+              jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'on_hold').map((job) => (
+                <Card
+                  key={job.id}
+                  className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
+                  onClick={() => handleStoreJD(job)}
+                >
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">{job.title}</CardTitle>
+                        <CardDescription>
+                          {job.location} • {job.employment_type}
+                          {job.salary_range && ` • ${job.salary_range}`}
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {(() => { const effective = (statusByJob[job.id] ?? normalizeStatus((job as any).status)); return <Badge className={getStatusColor(effective)}>{effective}</Badge> })()}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{job.description}</p>
+
+                    {job.posting_results.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Platform Status:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {job.posting_results.map((result, index) => (
+                            <div key={index} className="flex items-center space-x-1 text-xs">
+                              {result.success ? (
+                                <>
+                                  <CheckCircle className="w-3 h-3 text-green-600" />
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                    {result.platform}
+                                  </Badge>
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className="w-3 h-3 text-red-600" />
+                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                    {result.platform} (Failed)
+                                  </Badge>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center">
+                      <div className="text-xs text-gray-500">
+                        Created: {new Date(job.created_at).toLocaleDateString()}
+                        {job.posting_results.length > 0 && (
+                          <span className="ml-4">
+                            Posted to {job.posting_results.filter((r) => r.success).length}/{job.posting_results.length}{" "}
+                            platforms
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex space-x-2">
+                        <Link href={`/dashboard/jobs/${job.id}`}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <BarChart3 className="h-4 w-4 mr-1" />
+                            View Stats
+                          </Button>
+                        </Link>
+                        {/* Disabled Apply in non-open statuses */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled
+                          className="cursor-not-allowed text-red-600 bg-transparent hover:bg-red-50/50 border-red-200/70"
+                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                          title="Apply Form is disabled for this status"
+                        >
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                          Apply Form
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-transparent hover:bg-gray-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            try { localStorage.setItem('editJobDraft', JSON.stringify(job)) } catch {}
+                            router.push(`/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 shadow-sm hover:shadow-md motion-safe:transition-shadow"
+                          onMouseDown={(e) => e.stopPropagation()}
+                          disabled={deletingId === job.id}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          {deletingId === job.id ? 'Deleting…' : 'Delete'}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card className="border border-gray-200">
+                <CardContent className="text-center py-12">
+                  <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No on-hold jobs</h3>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Closed tab: show jobs with status === closed */}
+        <TabsContent value="closed">
+          <div className="grid gap-6">
+            {jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'closed').length > 0 ? (
+              jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'closed').map((job) => (
+                <Card
+                  key={job.id}
+                  className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
+                  onClick={() => handleStoreJD(job)}
+                >
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">{job.title}</CardTitle>
+                        <CardDescription>
+                          {job.location} • {job.employment_type}
+                          {job.salary_range && ` • ${job.salary_range}`}
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {(() => { const effective = (statusByJob[job.id] ?? normalizeStatus((job as any).status)); return <Badge className={getStatusColor(effective)}>{effective}</Badge> })()}
                       </div>
                     </div>
                   </CardHeader>
@@ -597,14 +744,14 @@ export default function JobsPage() {
                             View Stats
                           </Button>
                         </Link>
-                        {/* Disabled Apply button in closed tab */}
+                        {/* Disabled Apply in non-open statuses */}
                         <Button
                           variant="outline"
                           size="sm"
                           disabled
                           className="cursor-not-allowed text-red-600 bg-transparent hover:bg-red-50/50 border-red-200/70"
                           onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
-                          title="Apply Form is disabled"
+                          title="Apply Form is disabled for this status"
                         >
                           <ExternalLink className="h-4 w-4 mr-1" />
                           Apply Form
@@ -616,7 +763,7 @@ export default function JobsPage() {
                           onClick={(e) => {
                             e.stopPropagation()
                             try { localStorage.setItem('editJobDraft', JSON.stringify(job)) } catch {}
-                            router.push(`/edit/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
+                            router.push(`/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
                           }}
                         >
                           <Edit className="h-4 w-4 mr-1" />
