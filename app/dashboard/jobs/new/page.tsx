@@ -24,6 +24,9 @@ export default function CreateJobPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [currentTab, setCurrentTab] = useState("basic")
   const lastSyncedTabRef = useRef<string | null>(null)
+  
+  // Apply Form availability toggle (per job)
+  const [applyEnabled, setApplyEnabled] = useState<boolean>(true)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -278,7 +281,7 @@ export default function CreateJobPage() {
 
         // Redirect to the Selected Agents page with jobId and default tab=1
         router.push(`/selected-agents?jobId=${encodeURIComponent(data.jobId)}&tab=1`)
-      }
+      
     } catch (error) {
       console.error('Error creating job:', error)
     } finally {
