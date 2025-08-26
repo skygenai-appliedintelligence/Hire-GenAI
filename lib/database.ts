@@ -544,7 +544,7 @@ export class DatabaseService {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
     }
     const q = `
-      SELECT id, title, location, employment_type, experience_level, description_md,
+      SELECT id, title, location, status, employment_type, experience_level, description_md,
              responsibilities_md, benefits_md, salary_level, created_by, created_at
       FROM jobs
       WHERE company_id = $1::uuid
@@ -560,7 +560,7 @@ export class DatabaseService {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
     }
     const q = `
-      SELECT id, company_id, title, location, employment_type, experience_level,
+      SELECT id, company_id, title, location, status, employment_type, experience_level,
              description_md, responsibilities_md, benefits_md, salary_level,
              created_by, created_at
       FROM jobs
@@ -574,6 +574,7 @@ export class DatabaseService {
   static async updateJobForCompany(jobId: string, companyId: string, updates: {
     title?: string | null
     location?: string | null
+    status?: 'open' | 'on_hold' | 'closed' | 'cancelled' | null
     employment_type?: 'full_time' | 'part_time' | 'contract' | null
     experience_level?: 'intern' | 'junior' | 'mid' | 'senior' | 'lead' | 'principal' | null
     description_md?: string | null
@@ -591,6 +592,7 @@ export class DatabaseService {
 
     if (updates.title !== undefined) { sets.push(`title = $${i++}`); values.push(updates.title) }
     if (updates.location !== undefined) { sets.push(`location = $${i++}`); values.push(updates.location) }
+    if (updates.status !== undefined) { sets.push(`status = $${i++}`); values.push(updates.status) }
     if (updates.employment_type !== undefined) { sets.push(`employment_type = $${i++}::employment_type`); values.push(updates.employment_type) }
     if (updates.experience_level !== undefined) { sets.push(`experience_level = $${i++}::experience_level`); values.push(updates.experience_level) }
     if (updates.description_md !== undefined) { sets.push(`description_md = $${i++}`); values.push(updates.description_md) }

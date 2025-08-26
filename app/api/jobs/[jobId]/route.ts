@@ -77,6 +77,7 @@ export async function GET(req: Request, ctx: { params: { id?: string; jobId?: st
         company_id: row.company_id,
         title: row.title,
         location: row.location,
+        status: (row as any).status ?? 'open',
         employment_type: row.employment_type,
         experience_level: row.experience_level,
         description_md: row.description_md,
@@ -96,7 +97,7 @@ export async function GET(req: Request, ctx: { params: { id?: string; jobId?: st
     if (!company?.id) return NextResponse.json({ ok: false, error: 'Company not found' }, { status: 404 })
     const { data, error } = await sb
       .from('jobs')
-      .select('id, company_id, title, location, employment_type, experience_level, description_md, responsibilities_md, benefits_md, salary_level, created_by, created_at, updated_at')
+      .select('id, company_id, title, location, status, employment_type, experience_level, description_md, responsibilities_md, benefits_md, salary_level, created_by, created_at, updated_at')
       .eq('id', id)
       .eq('company_id', company.id)
       .single()
@@ -126,6 +127,7 @@ export async function PATCH(req: Request, ctx: { params: { id?: string; jobId?: 
     if ('title' in body) updates.title = (body.title ?? null)
     if ('location' in body) updates.location = (body.location ?? null)
     if ('employment_type' in body) updates.employment_type = (body.employment_type ?? null)
+    if ('status' in body) updates.status = (body.status ?? null)
     if ('experience_level' in body) updates.experience_level = (body.experience_level ?? null)
     if ('description_md' in body) updates.description_md = (body.description_md ?? null)
     if ('responsibilities_md' in body) updates.responsibilities_md = (body.responsibilities_md ?? null)
@@ -153,7 +155,7 @@ export async function PATCH(req: Request, ctx: { params: { id?: string; jobId?: 
       .update(updates)
       .eq('id', id)
       .eq('company_id', company.id)
-      .select('id, company_id, title, location, employment_type, experience_level, description_md, responsibilities_md, benefits_md, salary_level, created_by, created_at, updated_at')
+      .select('id, company_id, title, location, status, employment_type, experience_level, description_md, responsibilities_md, benefits_md, salary_level, created_by, created_at, updated_at')
       .single()
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
     if (!data) return NextResponse.json({ ok: false, error: 'Job not found' }, { status: 404 })
