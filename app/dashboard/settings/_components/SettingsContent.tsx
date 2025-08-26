@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
+import { MockAuthService } from "@/lib/mock-auth"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,7 +13,7 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
-import { User, Building, Bell, Shield, CreditCard, Users as UsersIcon, Plus, Trash } from "lucide-react"
+import { User, Building, Bell, CreditCard, Users as UsersIcon, Plus, Trash } from "lucide-react"
 
 export default function SettingsContent({ section }: { section?: string }) {
   const router = useRouter()
@@ -21,12 +22,13 @@ export default function SettingsContent({ section }: { section?: string }) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
 
-  const current = (section || pathname.split("/").pop() || "profile") as
+  const lastSegment = (section || pathname.split("/").pop() || "profile") as string
+  const allowedSections = ["profile", "company", "team", "notifications", "billing"] as const
+  const current = (allowedSections.includes(lastSegment as any) ? lastSegment : "profile") as
     | "profile"
     | "company"
     | "team"
     | "notifications"
-    | "security"
     | "billing"
 
   const [profileData, setProfileData] = useState({
@@ -50,6 +52,19 @@ export default function SettingsContent({ section }: { section?: string }) {
     interviewReminders: true,
     weeklyReports: false,
   })
+
+  // Allow edit on Profile tab for bsadmin username OR users with admin role
+  const [isAdminRole, setIsAdminRole] = useState(false)
+  useEffect(() => {
+    const session = MockAuthService.getCurrentUser()
+    const role = (session as any)?.user?.role
+    setIsAdminRole(role === 'company_admin' || role === 'admin')
+  }, [])
+  const isBsadmin = (
+    ((user as any)?.email?.split("@")[0]?.toLowerCase?.() === "bsadmin") ||
+    ((user as any)?.full_name?.toLowerCase?.() === "bsadmin")
+  )
+  const canEditSection = (isBsadmin || isAdminRole) && current === "profile"
 
   // Team management state
   const [membersLoading, setMembersLoading] = useState(false)
@@ -265,8 +280,14 @@ export default function SettingsContent({ section }: { section?: string }) {
         <p className="text-gray-600">Manage your account and application preferences</p>
       </div>
 
+      {!canEditSection && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-900 p-3 text-sm">
+          Read-only access. Only admins (or user "bsadmin") can edit the Profile section.
+        </div>
+      )}
+
       <Tabs value={current} onValueChange={(v) => router.push(`/dashboard/settings/${v}`)} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="profile" className="flex items-center space-x-2">
             <User className="h-4 w-4" />
             <span>Profile</span>
@@ -283,7 +304,6 @@ export default function SettingsContent({ section }: { section?: string }) {
             <Bell className="h-4 w-4" />
             <span>Notifications</span>
           </TabsTrigger>
-          
           <TabsTrigger value="billing" className="flex items-center space-x-2">
             <CreditCard className="h-4 w-4" />
             <span>Billing</span>
@@ -304,6 +324,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                     id="name"
                     value={profileData.name}
                     onChange={(e) => setProfileData((prev) => ({ ...prev, name: e.target.value }))}
+                    disabled={!canEditSection}
                     className="linkedin-input"
                   />
                 </div>
@@ -314,6 +335,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                     type="email"
                     value={profileData.email}
                     onChange={(e) => setProfileData((prev) => ({ ...prev, email: e.target.value }))}
+                    disabled={!canEditSection}
                     className="linkedin-input"
                   />
                 </div>
@@ -325,6 +347,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                     id="phone"
                     value={profileData.phone}
                     onChange={(e) => setProfileData((prev) => ({ ...prev, phone: e.target.value }))}
+                    disabled={!canEditSection}
                     className="linkedin-input"
                   />
                 </div>
@@ -334,7 +357,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                     value={profileData.timezone}
                     onValueChange={(value) => setProfileData((prev) => ({ ...prev, timezone: value }))}
                   >
-                    <SelectTrigger className="linkedin-input">
+                    <SelectTrigger className="linkedin-input" disabled={!canEditSection}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -347,7 +370,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                 </div>
               </div>
               <div className="flex justify-end">
-                <Button onClick={handleSaveProfile} disabled={loading} className="linkedin-button">
+                <Button onClick={handleSaveProfile} disabled={!canEditSection || loading} className="linkedin-button">
                   {loading ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
@@ -367,19 +390,21 @@ export default function SettingsContent({ section }: { section?: string }) {
                   placeholder="Member email"
                   value={newMember.email}
                   onChange={(e) => setNewMember((p) => ({ ...p, email: e.target.value }))}
+                  disabled={!canEditSection}
                   className="linkedin-input"
                 />
                 <Input
                   placeholder="Full name (optional)"
                   value={newMember.name}
                   onChange={(e) => setNewMember((p) => ({ ...p, name: e.target.value }))}
+                  disabled={!canEditSection}
                   className="linkedin-input"
                 />
                 <Select
                   value={newMember.role}
                   onValueChange={(v) => setNewMember((p) => ({ ...p, role: v as any }))}
                 >
-                  <SelectTrigger className="linkedin-input">
+                  <SelectTrigger className="linkedin-input" disabled={!canEditSection}>
                     <SelectValue placeholder="Role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -387,7 +412,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                     <SelectItem value="company_admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button onClick={addMember} disabled={membersLoading} className="linkedin-button">
+                <Button onClick={addMember} disabled={!canEditSection || membersLoading} className="linkedin-button">
                   <Plus className="h-4 w-4 mr-1" /> Add
                 </Button>
               </div>
@@ -406,8 +431,8 @@ export default function SettingsContent({ section }: { section?: string }) {
                       <div className="text-sm text-gray-600">{m.email}</div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Select value={m.role} onValueChange={(v) => updateRole(m.email, v as any)}>
-                        <SelectTrigger className="w-40">
+                      <Select value={m.role} onValueChange={(v) => { if (canEditSection) updateRole(m.email, v as any) }}>
+                        <SelectTrigger className="w-40" disabled={!canEditSection}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -415,7 +440,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                           <SelectItem value="company_admin">Admin</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Button variant="outline" onClick={() => removeMember(m.email)}>
+                      <Button variant="outline" onClick={() => removeMember(m.email)} disabled={!canEditSection}>
                         <Trash className="h-4 w-4" />
                       </Button>
                     </div>
@@ -439,6 +464,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                   id="companyName"
                   value={companyData.name}
                   onChange={(e) => setCompanyData((prev) => ({ ...prev, name: e.target.value }))}
+                  disabled={!canEditSection}
                   className="linkedin-input"
                 />
               </div>
@@ -449,6 +475,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                     id="website"
                     value={companyData.website}
                     onChange={(e) => setCompanyData((prev) => ({ ...prev, website: e.target.value }))}
+                    disabled={!canEditSection}
                     className="linkedin-input"
                   />
                 </div>
@@ -458,7 +485,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                     value={companyData.industry}
                     onValueChange={(value) => setCompanyData((prev) => ({ ...prev, industry: value }))}
                   >
-                    <SelectTrigger className="linkedin-input">
+                    <SelectTrigger className="linkedin-input" disabled={!canEditSection}>
                       <SelectValue placeholder="Select industry" />
                     </SelectTrigger>
                     <SelectContent>
@@ -477,7 +504,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                   value={companyData.size}
                   onValueChange={(value) => setCompanyData((prev) => ({ ...prev, size: value }))}
                 >
-                  <SelectTrigger className="linkedin-input">
+                  <SelectTrigger className="linkedin-input" disabled={!canEditSection}>
                     <SelectValue placeholder="Select company size" />
                   </SelectTrigger>
                   <SelectContent>
@@ -495,12 +522,13 @@ export default function SettingsContent({ section }: { section?: string }) {
                   id="description"
                   value={companyData.description}
                   onChange={(e) => setCompanyData((prev) => ({ ...prev, description: e.target.value }))}
+                  disabled={!canEditSection}
                   rows={4}
                   className="linkedin-input"
                 />
               </div>
               <div className="flex justify-end">
-                <Button onClick={handleSaveCompany} disabled={loading} className="linkedin-button">
+                <Button onClick={handleSaveCompany} disabled={!canEditSection || loading} className="linkedin-button">
                   {loading ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
@@ -524,6 +552,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                   id="emailNotifications"
                   checked={notifications.emailNotifications}
                   onCheckedChange={(checked) => setNotifications((prev) => ({ ...prev, emailNotifications: checked }))}
+                  disabled={!canEditSection}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -535,6 +564,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                   id="candidateUpdates"
                   checked={notifications.candidateUpdates}
                   onCheckedChange={(checked) => setNotifications((prev) => ({ ...prev, candidateUpdates: checked }))}
+                  disabled={!canEditSection}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -546,6 +576,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                   id="interviewReminders"
                   checked={notifications.interviewReminders}
                   onCheckedChange={(checked) => setNotifications((prev) => ({ ...prev, interviewReminders: checked }))}
+                  disabled={!canEditSection}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -557,6 +588,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                   id="weeklyReports"
                   checked={notifications.weeklyReports}
                   onCheckedChange={(checked) => setNotifications((prev) => ({ ...prev, weeklyReports: checked }))}
+                  disabled={!canEditSection}
                 />
               </div>
             </CardContent>
@@ -584,9 +616,9 @@ export default function SettingsContent({ section }: { section?: string }) {
                 </div>
               </div>
               <div className="flex space-x-4">
-                <Button variant="outline">Change Plan</Button>
-                <Button variant="outline">Update Payment Method</Button>
-                <Button variant="outline">Download Invoice</Button>
+                <Button variant="outline" disabled={!canEditSection}>Change Plan</Button>
+                <Button variant="outline" disabled={!canEditSection}>Update Payment Method</Button>
+                <Button variant="outline" disabled={!canEditSection}>Download Invoice</Button>
               </div>
             </CardContent>
           </Card>

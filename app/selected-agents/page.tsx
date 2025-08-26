@@ -902,7 +902,7 @@ export default function SelectedAgentsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto max-w-7xl p-6 flex items-center justify-center min-h-screen">
+      <div className="container mx-auto max-w-7xl p-6 flex items-center justify-center min-h-screen bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading selected agents...</p>
@@ -921,12 +921,12 @@ export default function SelectedAgentsPage() {
 
   if (selectedAgents.length === 0) {
     return (
-      <div className="container mx-auto max-w-7xl p-6 flex items-center justify-center min-h-screen">
+      <div className="container mx-auto max-w-7xl p-6 flex items-center justify-center min-h-screen bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
         <div className="text-center">
           <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">No Agents Selected</h2>
           <p className="text-gray-600 mb-6">Please go back and select some agents first.</p>
-          <Button onClick={handleBackToSelection}>
+          <Button onClick={handleBackToSelection} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Agent Selection
           </Button>
@@ -936,15 +936,15 @@ export default function SelectedAgentsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
+    <div className="mx-auto max-w-6xl px-4 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
       {/* Top Actions Bar */}
-      <div className="sticky top-0 z-30 mb-4 flex items-center justify-between bg-indigo-50 border border-indigo-200 shadow-sm py-2 px-2 rounded-md">
+      <div className="sticky top-0 z-30 mb-4 flex items-center justify-between bg-emerald-50/80 border border-emerald-200 shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white py-2 px-2 rounded-md motion-safe:transition-shadow emerald-glow">
         <div className="text-sm font-medium text-gray-700">Selected Agents</div>
         <div className="flex gap-2">
           <Button
             onClick={handleSubmitAll}
             size="sm"
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white disabled:opacity-70 disabled:cursor-not-allowed motion-safe:transition-shadow emerald-glow"
             disabled={submitting}
             aria-busy={submitting}
           >
@@ -954,7 +954,7 @@ export default function SelectedAgentsPage() {
           <Button
             onClick={handleGoToDashboard}
             size="sm"
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
           >
             <Home className="w-4 h-4" />
             Go to Dashboard
@@ -987,12 +987,12 @@ export default function SelectedAgentsPage() {
         }}
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2 h-auto p-2 bg-gray-50/80 border rounded-lg">
+        <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2 h-auto p-2 bg-emerald-50/70 border border-emerald-200 rounded-lg ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow">
           {selectedAgents.map((agent) => (
             <TabsTrigger 
               key={agent.id} 
               value={agent.id}
-              className="flex flex-col items-center p-4 h-auto rounded-md border border-transparent hover:border-gray-200 hover:bg-white data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
+              className="flex flex-col items-center p-4 h-auto rounded-md border border-transparent hover:border-gray-200 hover:bg-white shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-900"
             >
               <User className="w-5 h-5 mb-2" />
               <span className="font-semibold">{agent.name}</span>
@@ -1004,7 +1004,7 @@ export default function SelectedAgentsPage() {
         {selectedAgents.map((agent) => (
           <TabsContent key={agent.id} value={agent.id} className="space-y-6">
             {/* Agent Overview */}
-            <Card>
+            <Card className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
               <CardHeader className="p-6 pb-3">
                 <CardTitle className="flex items-center gap-2">
                   <User className="w-6 h-6 text-blue-500" />
@@ -1038,7 +1038,7 @@ export default function SelectedAgentsPage() {
                       )
                     })()}
                   </div>
-                  <Button onClick={() => addKeySkill(agent.id)} size="sm" className="bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
+                  <Button onClick={() => addKeySkill(agent.id)} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
                     <Plus className="w-4 h-4 mr-2" />
                     Add Skill
                   </Button>
@@ -1105,11 +1105,11 @@ export default function SelectedAgentsPage() {
 
             {/* Tasks & Questions Section */}
             {agent.tasks.map((task) => (
-              <Card key={task.id}>
+              <Card key={task.id} className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
                 <CardHeader className="p-6 pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex gap-2">
-                      <Button onClick={() => addQuestion(agent.id, task.id)} size="sm" variant="outline">
+                      <Button onClick={() => addQuestion(agent.id, task.id)} size="sm" variant="outline" className="bg-transparent hover:bg-gray-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
                         <Plus className="w-4 h-4 mr-2" />
                         Add Question
                       </Button>
