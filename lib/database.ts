@@ -515,9 +515,28 @@ export class DatabaseService {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
     }
-    const q = `SELECT id FROM companies WHERE name = $1 LIMIT 1`
+    const q = `
+      SELECT id
+      FROM companies
+      WHERE trim(name) ILIKE trim($1)
+      LIMIT 1
+    `
     const rows = (await this.query(q, [name])) as any[]
     return rows.length > 0 ? rows[0].id : null
+  }
+
+  static async createCompanyByName(name: string): Promise<string> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    const q = `
+      INSERT INTO companies (name, status, verified, created_at)
+      VALUES (trim($1), 'active', false, NOW())
+      RETURNING id
+    `
+    const rows = (await this.query(q, [name])) as any[]
+    if (!rows || rows.length === 0) throw new Error('Failed to create company')
+    return rows[0].id as string
   }
 
   static async listJobsByCompanyId(companyId: string, limit = 200): Promise<any[]> {
@@ -635,6 +654,33 @@ export class DatabaseService {
     benefits_md?: string | null
     salary_level?: string | null
     created_by?: string | null
+    // New optional columns
+    level?: 'intern' | 'junior' | 'mid' | 'senior' | 'lead' | 'principal' | null
+    location_city?: string | null
+    location_country?: string | null
+    work_mode?: string | null
+    education?: string | null
+    years_experience_min?: number | null
+    years_experience_max?: number | null
+    technical_must?: string[] | null
+    technical_nice?: string[] | null
+    domain_knowledge?: string[] | null
+    soft_skills?: string[] | null
+    languages_required?: string[] | null
+    duties_day_to_day?: string[] | null
+    duties_strategic?: string[] | null
+    team_collaboration?: string[] | null
+    decision_scope?: string | null
+    salary_currency?: string | null
+    salary_min?: number | null
+    salary_max?: number | null
+    salary_period?: string | null
+    bonus_incentives?: string | null
+    perks_benefits?: string[] | null
+    time_off_policy?: string | null
+    joining_timeline?: string | null
+    travel_requirements?: string | null
+    visa_work_auth?: string | null
   }) {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
@@ -644,12 +690,26 @@ export class DatabaseService {
       INSERT INTO jobs (
         company_id, title, location, description_md, status, is_public,
         employment_type, experience_level, responsibilities_md, benefits_md,
-        salary_level, created_by
+        salary_level, created_by,
+        level, location_city, location_country, work_mode, education,
+        years_experience_min, years_experience_max,
+        technical_must, technical_nice, domain_knowledge, soft_skills, languages_required,
+        duties_day_to_day, duties_strategic, team_collaboration,
+        decision_scope, salary_currency, salary_min, salary_max, salary_period,
+        bonus_incentives, perks_benefits, time_off_policy, joining_timeline,
+        travel_requirements, visa_work_auth
       )
       VALUES (
         $1::uuid, $2, $3, $4, 'open', true,
         $5::employment_type, $6::experience_level, $7, $8,
-        $9, $10::uuid
+        $9, $10::uuid,
+        $11, $12, $13, $14, $15,
+        $16, $17,
+        $18::text[], $19::text[], $20::text[], $21::text[], $22::text[],
+        $23::text[], $24::text[], $25::text[],
+        $26, $27, $28, $29, $30,
+        $31, $32::text[], $33, $34,
+        $35, $36
       )
       RETURNING id
     `
@@ -665,6 +725,32 @@ export class DatabaseService {
       input.benefits_md ?? null,
       input.salary_level ?? null,
       input.created_by ?? null,
+      input.level ?? null,
+      input.location_city ?? null,
+      input.location_country ?? null,
+      input.work_mode ?? null,
+      input.education ?? null,
+      input.years_experience_min ?? null,
+      input.years_experience_max ?? null,
+      input.technical_must ?? [],
+      input.technical_nice ?? [],
+      input.domain_knowledge ?? [],
+      input.soft_skills ?? [],
+      input.languages_required ?? [],
+      input.duties_day_to_day ?? [],
+      input.duties_strategic ?? [],
+      input.team_collaboration ?? [],
+      input.decision_scope ?? null,
+      input.salary_currency ?? null,
+      input.salary_min ?? null,
+      input.salary_max ?? null,
+      input.salary_period ?? null,
+      input.bonus_incentives ?? null,
+      input.perks_benefits ?? [],
+      input.time_off_policy ?? null,
+      input.joining_timeline ?? null,
+      input.travel_requirements ?? null,
+      input.visa_work_auth ?? null,
     ]
 
     const rows = (await this.query(q, params)) as any[]
