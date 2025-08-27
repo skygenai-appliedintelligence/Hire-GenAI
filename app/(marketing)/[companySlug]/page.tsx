@@ -45,7 +45,7 @@ export default async function CompanyPublicPage({ params }: { params: Promise<{ 
            LIMIT 100
         `)
       : await prisma.$queryRaw<any[]>(Prisma.sql`
-          SELECT j.id, j.title, j.location
+          SELECT j.id, j.title, j.location_text
             FROM public.jobs j
             JOIN public.companies c ON c.id = j.company_id
            WHERE c.name = ${company.name}

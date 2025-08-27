@@ -76,14 +76,33 @@ export async function GET(req: Request, ctx: { params: { id?: string; jobId?: st
         id: row.id,
         company_id: row.company_id,
         title: row.title,
-        location: row.location,
+        description: row.description_md,
+        location_text: row.location_text,
         status: (row as any).status ?? 'open',
         employment_type: row.employment_type,
-        experience_level: row.experience_level,
-        description_md: row.description_md,
-        responsibilities_md: row.responsibilities_md,
-        benefits_md: row.benefits_md,
-        salary_level: row.salary_level,
+        level: row.level,
+        education: row.education,
+        years_experience_min: row.years_experience_min,
+        years_experience_max: row.years_experience_max,
+        technical_skills: row.technical_skills,
+        domain_knowledge: row.domain_knowledge,
+        soft_skills: row.soft_skills,
+        languages: row.languages,
+        must_have_skills: row.must_have_skills,
+        nice_to_have_skills: row.nice_to_have_skills,
+        duties_day_to_day: row.duties_day_to_day,
+        duties_strategic: row.duties_strategic,
+        stakeholders: row.stakeholders,
+        decision_scope: row.decision_scope,
+        salary_min: row.salary_min,
+        salary_max: row.salary_max,
+        salary_period: row.salary_period,
+        bonus_incentives: row.bonus_incentives,
+        perks_benefits: row.perks_benefits,
+        time_off_policy: row.time_off_policy,
+        joining_timeline: row.joining_timeline,
+        travel_requirements: row.travel_requirements,
+        visa_requirements: row.visa_requirements,
         created_by: row.created_by,
         created_at: row.created_at,
         updated_at: (row as any).updated_at ?? null,
@@ -123,16 +142,41 @@ export async function PATCH(req: Request, ctx: { params: { id?: string; jobId?: 
       return NextResponse.json({ ok: false, error: 'Invalid body' }, { status: 400 })
     }
 
+    // Helper to parse comma-separated strings into arrays
+    const parseArray = (str: string): string[] => {
+      if (!str || typeof str !== 'string') return []
+      return str.split(',').map(s => s.trim()).filter(Boolean)
+    }
+
     const updates: any = {}
     if ('title' in body) updates.title = (body.title ?? null)
-    if ('location' in body) updates.location = (body.location ?? null)
+    if ('description' in body) updates.description_md = (body.description ?? null)
+    if ('location_text' in body) updates.location_text = (body.location_text ?? null)
     if ('employment_type' in body) updates.employment_type = (body.employment_type ?? null)
     if ('status' in body) updates.status = (body.status ?? null)
-    if ('experience_level' in body) updates.experience_level = (body.experience_level ?? null)
-    if ('description_md' in body) updates.description_md = (body.description_md ?? null)
-    if ('responsibilities_md' in body) updates.responsibilities_md = (body.responsibilities_md ?? null)
-    if ('benefits_md' in body) updates.benefits_md = (body.benefits_md ?? null)
-    if ('salary_level' in body) updates.salary_level = (body.salary_level ?? null)
+    if ('level' in body) updates.level = (body.level ?? null)
+    if ('education' in body) updates.education = (body.education ?? null)
+    if ('years_experience_min' in body) updates.years_experience_min = body.years_experience_min ? parseInt(body.years_experience_min) : null
+    if ('years_experience_max' in body) updates.years_experience_max = body.years_experience_max ? parseInt(body.years_experience_max) : null
+    if ('technical_skills' in body) updates.technical_skills = parseArray(body.technical_skills)
+    if ('domain_knowledge' in body) updates.domain_knowledge = parseArray(body.domain_knowledge)
+    if ('soft_skills' in body) updates.soft_skills = parseArray(body.soft_skills)
+    if ('languages' in body) updates.languages = parseArray(body.languages)
+    if ('must_have_skills' in body) updates.must_have_skills = parseArray(body.must_have_skills)
+    if ('nice_to_have_skills' in body) updates.nice_to_have_skills = parseArray(body.nice_to_have_skills)
+    if ('duties_day_to_day' in body) updates.duties_day_to_day = parseArray(body.duties_day_to_day)
+    if ('duties_strategic' in body) updates.duties_strategic = parseArray(body.duties_strategic)
+    if ('stakeholders' in body) updates.stakeholders = parseArray(body.stakeholders)
+    if ('decision_scope' in body) updates.decision_scope = (body.decision_scope ?? null)
+    if ('salary_min' in body) updates.salary_min = body.salary_min ? parseFloat(body.salary_min) : null
+    if ('salary_max' in body) updates.salary_max = body.salary_max ? parseFloat(body.salary_max) : null
+    if ('salary_period' in body) updates.salary_period = (body.salary_period ?? null)
+    if ('bonus_incentives' in body) updates.bonus_incentives = (body.bonus_incentives ?? null)
+    if ('perks_benefits' in body) updates.perks_benefits = parseArray(body.perks_benefits)
+    if ('time_off_policy' in body) updates.time_off_policy = (body.time_off_policy ?? null)
+    if ('joining_timeline' in body) updates.joining_timeline = (body.joining_timeline ?? null)
+    if ('travel_requirements' in body) updates.travel_requirements = (body.travel_requirements ?? null)
+    if ('visa_requirements' in body) updates.visa_requirements = (body.visa_requirements ?? null)
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ ok: false, error: 'No updatable fields provided' }, { status: 400 })
