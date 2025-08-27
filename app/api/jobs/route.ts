@@ -130,7 +130,17 @@ export async function POST(req: Request) {
     }
     const salaryMinNum = raw.salaryMin ? Number(raw.salaryMin) : null
     const salaryMaxNum = raw.salaryMax ? Number(raw.salaryMax) : null
-    const salaryPeriod = (raw.period || '').toLowerCase().includes('year') ? 'yearly' : (raw.period ? 'monthly' : null)
+    // Ensure salary_period is always a valid enum value
+    const salaryPeriod = (() => {
+      const period = (raw.period || '').toLowerCase()
+      if (period.includes('year')) return 'yearly'
+      if (period.includes('month')) return 'monthly'
+      if (period.includes('week')) return 'weekly'
+      if (period.includes('day')) return 'daily'
+      if (period.includes('hour')) return 'hourly'
+      // Default to 'monthly' if no valid period is found
+      return 'monthly'
+    })()
 
     // Try to split location into city, country
     const loc = (raw.location || '').split(',')
