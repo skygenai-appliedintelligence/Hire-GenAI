@@ -41,11 +41,11 @@ export default async function JobDetailPage(
              array_to_string(j.duties_day_to_day, E'\n• ') AS requirements,
              CASE 
                WHEN j.salary_min IS NOT NULL AND j.salary_max IS NOT NULL 
-               THEN CONCAT(j.salary_min, ' - ', j.salary_max, ' ', COALESCE(j.salary_period, ''))
+               THEN CONCAT(j.salary_min, ' - ', j.salary_max, ' ', COALESCE(j.salary_period::text, ''))
                WHEN j.salary_min IS NOT NULL 
-               THEN CONCAT('From ', j.salary_min, ' ', COALESCE(j.salary_period, ''))
+               THEN CONCAT('From ', j.salary_min, ' ', COALESCE(j.salary_period::text, ''))
                WHEN j.salary_max IS NOT NULL 
-               THEN CONCAT('Up to ', j.salary_max, ' ', COALESCE(j.salary_period, ''))
+               THEN CONCAT('Up to ', j.salary_max, ' ', COALESCE(j.salary_period::text, ''))
                ELSE NULL
              END AS salary_range,
              CASE 
