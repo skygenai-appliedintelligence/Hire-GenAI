@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Building2, Users, Briefcase, Target, CheckCircle, Clock, Bot } from 'lucide-react'
 import { useAuth } from "@/contexts/auth-context"
+import { parseJobDescription, renderLinkedInJobDescription } from "@/lib/job-description-parser"
 
 export default function CreateJobPage() {
   const router = useRouter()
@@ -192,7 +193,7 @@ export default function CreateJobPage() {
                 ...prev,
                 jobTitle: j.title || prev.jobTitle,
                 company: company?.name || prev.company,
-                location: j.location || prev.location,
+                location: j.location_text || prev.location,
                 jobType: j.employment_type || prev.jobType,
                 status: (normalized as any) || (normalizeStatus(j.status) as any) || prev.status,
                 description: j.description || prev.description,
@@ -280,7 +281,7 @@ export default function CreateJobPage() {
                 ...prev,
                 jobTitle: j.title || prev.jobTitle,
                 company: company?.name || prev.company,
-                location: j.location || prev.location,
+                location: j.location_text || prev.location,
                 jobType: j.employment_type || prev.jobType,
                 status: (normalized as any) || (normalizeStatus(j.status) as any) || prev.status,
                 description: j.description_md || j.summary || j.description || prev.description,
@@ -462,40 +463,62 @@ export default function CreateJobPage() {
     setIsSubmitting(true)
 
     try {
-      // Compile description and requirements from new sections to match API contract
-      const compiledRequirementsParts: string[] = []
-      if (formData.education) compiledRequirementsParts.push(`Education: ${formData.education}`)
-      if (formData.years) compiledRequirementsParts.push(`Experience: ${formData.years}`)
-      if (formData.technical) compiledRequirementsParts.push(`Technical: ${formData.technical}`)
-      if (formData.domain) compiledRequirementsParts.push(`Domain: ${formData.domain}`)
-      if (formData.soft) compiledRequirementsParts.push(`Soft Skills: ${formData.soft}`)
-      if (formData.languages) compiledRequirementsParts.push(`Languages: ${formData.languages}`)
-      if (formData.mustHave) compiledRequirementsParts.push(`Must-have:\n${formData.mustHave}`)
-      if (formData.niceToHave) compiledRequirementsParts.push(`Nice-to-have:\n${formData.niceToHave}`)
-      const compiledRequirements = compiledRequirementsParts.join('\n\n')
+      // Generate structured description in the new format
+      const generateStructuredDescription = () => {
+        const salaryRange = formData.salaryMin && formData.salaryMax 
+          ? `₹${parseInt(formData.salaryMin).toLocaleString()} – ₹${parseInt(formData.salaryMax).toLocaleString()} per ${formData.period?.toLowerCase() || 'month'}`
+          : 'Competitive salary'
+        
+        const workArrangement = formData.jobType?.replace(/[_-]/g, '-') || 'Full-time'
+        const location = formData.location || 'Remote'
+        
+        return `// Basic Information
+Job Title* → ${formData.jobTitle || 'Position Title'}
+Company* → ${company?.name || 'Company'}
+Location* → ${location}
+Work Arrangement* → ${workArrangement}, ${location.toLowerCase().includes('remote') ? 'Remote' : 'Onsite'}
+Job Level / Seniority → ${formData.experienceLevel || 'As per experience'}
 
-      const compiledDescriptionParts: string[] = []
-      if (formData.day) compiledDescriptionParts.push(`Day-to-day:\n${formData.day}`)
-      if (formData.project) compiledDescriptionParts.push(`Projects/Strategic:\n${formData.project}`)
-      if (formData.collaboration) compiledDescriptionParts.push(`Collaboration:\n${formData.collaboration}`)
-      if (formData.scope) compiledDescriptionParts.push(`Decision-making scope:\n${formData.scope}`)
-      const compensationBits: string[] = []
-      if (formData.salaryMin || formData.salaryMax) {
-        const min = formData.salaryMin ? Number(formData.salaryMin) : undefined
-        const max = formData.salaryMax ? Number(formData.salaryMax) : undefined
-        const range = [min, max].filter(v => typeof v === 'number' && !Number.isNaN(v as number)) as number[]
-        if (range.length > 0) compensationBits.push(`Salary: ${range.join(' - ')} (${formData.period || 'Monthly'})`)
+About the Role
+We are seeking a ${formData.jobTitle || 'professional'} to join ${company?.name || 'our team'}. This role involves ${formData.day ? formData.day.split(',')[0]?.trim() : 'contributing to our team\'s success'} while collaborating with ${formData.collaboration ? formData.collaboration.split(',').slice(0,2).join(' and ') : 'cross-functional teams'} to deliver business impact.
+
+🔹 Key Responsibilities
+${formData.day ? formData.day.split(/[,\n]/).map((d: string) => d.trim()).filter(Boolean).map((duty: string) => `${duty.charAt(0).toUpperCase() + duty.slice(1)}.`).join('\n') : 'Develop and maintain solutions as per business requirements.'}
+${formData.project ? formData.project.split(/[,\n]/).map((d: string) => d.trim()).filter(Boolean).map((duty: string) => `${duty.charAt(0).toUpperCase() + duty.slice(1)}.`).join('\n') : 'Drive strategic initiatives and process improvements.'}
+${formData.collaboration ? `Collaborate with ${formData.collaboration.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).join(', ')}.` : 'Collaborate with cross-functional teams.'}
+${formData.scope ? `${formData.scope}.` : 'Provide technical guidance and mentorship.'}
+
+🔹 Requirements
+Education & Certifications
+${formData.education || 'Bachelor\'s degree in relevant field or equivalent experience.'}
+
+Experience
+${formData.years || 'Experience as per role requirements'}
+
+Technical Skills (Must-Have)
+${formData.technical ? formData.technical.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).join('\n') : 'Technical skills as per job requirements'}
+${formData.mustHave ? formData.mustHave.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).join('\n') : ''}
+
+Nice-to-Have Skills
+${formData.niceToHave ? formData.niceToHave.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).join('\n') : 'Additional skills welcome'}
+
+${formData.domain ? `Domain Knowledge\n${formData.domain}\n\n` : ''}Soft Skills
+${formData.soft ? formData.soft.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).join('\n') : 'Strong communication and stakeholder management\nProblem-solving and adaptability\nLeadership and team collaboration'}
+
+${formData.languages ? `Languages\n${formData.languages.split(/[,\n]/).map((l: string) => l.trim()).filter(Boolean).join('\n')}\n\n` : ''}🔹 Compensation & Benefits
+💰 Salary Range: ${salaryRange}
+${formData.bonus ? `🎁 Bonus: ${formData.bonus}` : '🎁 Bonus: Performance-based incentives'}
+${formData.perks ? `✨ Perks: ${formData.perks.split(/[,\n]/).map((p: string) => p.trim()).filter(Boolean).join(', ')}` : '✨ Perks: Health insurance, flexible working hours, wellness programs'}
+${formData.timeOff ? `🌴 Time Off Policy: ${formData.timeOff}` : '🌴 Time Off Policy: Competitive leave policy'}
+
+🔹 Logistics
+Joining Timeline: ${formData.joining || 'Within 30 days'}
+${formData.travel ? `Travel Requirements: ${formData.travel}` : 'Travel Requirements: Minimal travel as per project needs'}
+Work Authorization: ${formData.visa || 'Work authorization required'}`
       }
-      if (formData.bonus) compensationBits.push(`Bonus/Incentives: ${formData.bonus}`)
-      if (formData.perks) compensationBits.push(`Perks: ${formData.perks}`)
-      if (formData.timeOff) compensationBits.push(`Time Off: ${formData.timeOff}`)
-      if (compensationBits.length) compiledDescriptionParts.push(compensationBits.join('\n'))
-      const logisticsBits: string[] = []
-      if (formData.joining) logisticsBits.push(`Joining timeline: ${formData.joining}`)
-      if (formData.travel) logisticsBits.push(`Travel: ${formData.travel}`)
-      if (formData.visa) logisticsBits.push(`Visa/Work auth: ${formData.visa}`)
-      if (logisticsBits.length) compiledDescriptionParts.push(logisticsBits.join('\n'))
-      const compiledDescription = compiledDescriptionParts.join('\n\n')
+
+      const compiledDescription = generateStructuredDescription()
+      const compiledRequirements = formData.requirements || 'As per job requirements'
 
       // Basic mandatory checks for create only
       if (!isEditing) {
@@ -773,12 +796,12 @@ export default function CreateJobPage() {
                       <SelectValue placeholder="Select experience level" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="intern">Intern</SelectItem>
                       <SelectItem value="junior">Junior</SelectItem>
                       <SelectItem value="mid">Mid</SelectItem>
                       <SelectItem value="senior">Senior</SelectItem>
                       <SelectItem value="lead">Lead</SelectItem>
-                      <SelectItem value="manager">Manager</SelectItem>
-                      <SelectItem value="director">Director</SelectItem>
+                      <SelectItem value="principal">Principal</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -953,35 +976,7 @@ export default function CreateJobPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="responsibilities" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Interview Process
-                </CardTitle>
-                <CardDescription>
-                  Configure the interview rounds and process for this position
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="joining">Joining Timeline</Label>
-                    <Input id="joining" placeholder="e.g., Within 30 days" value={formData.joining} onChange={(e)=>handleInputChange('joining', e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="travel">Travel Requirements</Label>
-                    <Input id="travel" placeholder="e.g., Up to 20%" value={formData.travel} onChange={(e)=>handleInputChange('travel', e.target.value)} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="visa">Work Authorization / Visa</Label>
-                  <Input id="visa" placeholder="e.g., Open to sponsorship / PR required" value={formData.visa} onChange={(e)=>handleInputChange('visa', e.target.value)} />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          
 
           <TabsContent value="interview" className="space-y-6">
             <Card>

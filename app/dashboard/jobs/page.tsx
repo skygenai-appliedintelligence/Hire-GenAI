@@ -114,7 +114,7 @@ export default function JobsPage() {
           title: j.title,
           description: j.summary || j.description || '',
           requirements: j.requirements || '',
-          location: j.location || '',
+          location: j.location_text || '',
           salary_range: j.salary_label || j.salary_range || '',
           employment_type: j.employment_type || '',
           status: j.status || 'open',
@@ -283,7 +283,36 @@ export default function JobsPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{job.description}</p>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-3">{(() => {
+                      // Extract "About the Role" section from structured description format
+                      const description = job.description || ''
+                      
+                      // Try new structured format first
+                      const aboutRoleMatch = description.match(/About the Role\s*\n(.+?)(?=\n🔹|\n$|$)/s)
+                      if (aboutRoleMatch && aboutRoleMatch[1]) {
+                        return aboutRoleMatch[1].trim()
+                      }
+                      
+                      // Fallback: try old markdown format
+                      const oldFormatMatch = description.match(/## About the Role\s*\n(.+?)(?=\n##|\n$|$)/s)
+                      if (oldFormatMatch && oldFormatMatch[1]) {
+                        return oldFormatMatch[1].trim()
+                      }
+                      
+                      // Final fallback: show first meaningful content after Basic Information
+                      const afterBasicInfo = description.split('About the Role')[1]
+                      if (afterBasicInfo) {
+                        const cleanContent = afterBasicInfo.split('🔹')[0]?.trim() || afterBasicInfo.split('\n\n')[0]?.trim()
+                        if (cleanContent && cleanContent.length > 10) {
+                          return cleanContent.length > 200 ? cleanContent.substring(0, 200) + '...' : cleanContent
+                        }
+                      }
+                      
+                      // Ultimate fallback: show first meaningful content without headers
+                      const cleanDesc = description.replace(/^\/\/ Basic Information[\s\S]*?(?=About the Role|$)/, '').replace(/##[^\n]*\n/g, '').trim()
+                      const firstLine = cleanDesc.split('\n')[0] || description
+                      return firstLine.length > 200 ? firstLine.substring(0, 200) + '...' : firstLine
+                    })()}</p>
 
                     {job.posting_results.length > 0 && (
                       <div className="mb-4">
@@ -424,7 +453,36 @@ export default function JobsPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{job.description}</p>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-3">{(() => {
+                      // Extract "About the Role" section from structured description format
+                      const description = job.description || ''
+                      
+                      // Try new structured format first
+                      const aboutRoleMatch = description.match(/About the Role\s*\n(.+?)(?=\n🔹|\n$|$)/s)
+                      if (aboutRoleMatch && aboutRoleMatch[1]) {
+                        return aboutRoleMatch[1].trim()
+                      }
+                      
+                      // Fallback: try old markdown format
+                      const oldFormatMatch = description.match(/## About the Role\s*\n(.+?)(?=\n##|\n$|$)/s)
+                      if (oldFormatMatch && oldFormatMatch[1]) {
+                        return oldFormatMatch[1].trim()
+                      }
+                      
+                      // Final fallback: show first meaningful content after Basic Information
+                      const afterBasicInfo = description.split('About the Role')[1]
+                      if (afterBasicInfo) {
+                        const cleanContent = afterBasicInfo.split('🔹')[0]?.trim() || afterBasicInfo.split('\n\n')[0]?.trim()
+                        if (cleanContent && cleanContent.length > 10) {
+                          return cleanContent.length > 200 ? cleanContent.substring(0, 200) + '...' : cleanContent
+                        }
+                      }
+                      
+                      // Ultimate fallback: show first meaningful content without headers
+                      const cleanDesc = description.replace(/^\/\/ Basic Information[\s\S]*?(?=About the Role|$)/, '').replace(/##[^\n]*\n/g, '').trim()
+                      const firstLine = cleanDesc.split('\n')[0] || description
+                      return firstLine.length > 200 ? firstLine.substring(0, 200) + '...' : firstLine
+                    })()}</p>
 
                     {job.posting_results.length > 0 && (
                       <div className="mb-4">
@@ -552,7 +610,36 @@ export default function JobsPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{job.description}</p>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-3">{(() => {
+                      // Extract "About the Role" section from structured description format
+                      const description = job.description || ''
+                      
+                      // Try new structured format first
+                      const aboutRoleMatch = description.match(/About the Role\s*\n(.+?)(?=\n🔹|\n$|$)/s)
+                      if (aboutRoleMatch && aboutRoleMatch[1]) {
+                        return aboutRoleMatch[1].trim()
+                      }
+                      
+                      // Fallback: try old markdown format
+                      const oldFormatMatch = description.match(/## About the Role\s*\n(.+?)(?=\n##|\n$|$)/s)
+                      if (oldFormatMatch && oldFormatMatch[1]) {
+                        return oldFormatMatch[1].trim()
+                      }
+                      
+                      // Final fallback: show first meaningful content after Basic Information
+                      const afterBasicInfo = description.split('About the Role')[1]
+                      if (afterBasicInfo) {
+                        const cleanContent = afterBasicInfo.split('🔹')[0]?.trim() || afterBasicInfo.split('\n\n')[0]?.trim()
+                        if (cleanContent && cleanContent.length > 10) {
+                          return cleanContent.length > 200 ? cleanContent.substring(0, 200) + '...' : cleanContent
+                        }
+                      }
+                      
+                      // Ultimate fallback: show first meaningful content without headers
+                      const cleanDesc = description.replace(/^\/\/ Basic Information[\s\S]*?(?=About the Role|$)/, '').replace(/##[^\n]*\n/g, '').trim()
+                      const firstLine = cleanDesc.split('\n')[0] || description
+                      return firstLine.length > 200 ? firstLine.substring(0, 200) + '...' : firstLine
+                    })()}</p>
 
                     {job.posting_results.length > 0 && (
                       <div className="mb-4">
@@ -680,7 +767,36 @@ export default function JobsPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{job.description}</p>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-3">{(() => {
+                      // Extract "About the Role" section from structured description format
+                      const description = job.description || ''
+                      
+                      // Try new structured format first
+                      const aboutRoleMatch = description.match(/About the Role\s*\n(.+?)(?=\n🔹|\n$|$)/s)
+                      if (aboutRoleMatch && aboutRoleMatch[1]) {
+                        return aboutRoleMatch[1].trim()
+                      }
+                      
+                      // Fallback: try old markdown format
+                      const oldFormatMatch = description.match(/## About the Role\s*\n(.+?)(?=\n##|\n$|$)/s)
+                      if (oldFormatMatch && oldFormatMatch[1]) {
+                        return oldFormatMatch[1].trim()
+                      }
+                      
+                      // Final fallback: show first meaningful content after Basic Information
+                      const afterBasicInfo = description.split('About the Role')[1]
+                      if (afterBasicInfo) {
+                        const cleanContent = afterBasicInfo.split('🔹')[0]?.trim() || afterBasicInfo.split('\n\n')[0]?.trim()
+                        if (cleanContent && cleanContent.length > 10) {
+                          return cleanContent.length > 200 ? cleanContent.substring(0, 200) + '...' : cleanContent
+                        }
+                      }
+                      
+                      // Ultimate fallback: show first meaningful content without headers
+                      const cleanDesc = description.replace(/^\/\/ Basic Information[\s\S]*?(?=About the Role|$)/, '').replace(/##[^\n]*\n/g, '').trim()
+                      const firstLine = cleanDesc.split('\n')[0] || description
+                      return firstLine.length > 200 ? firstLine.substring(0, 200) + '...' : firstLine
+                    })()}</p>
 
                     {job.posting_results.length > 0 && (
                       <div className="mb-4">

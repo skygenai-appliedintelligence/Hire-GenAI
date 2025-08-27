@@ -121,6 +121,62 @@ export default function CreateJDPage() {
     return allMandatoryFilled && cityCountryValid
   }
 
+  const generateStructuredDescription = () => {
+    const location = formData.cityCountry || formData.locationType
+    const salaryRange = formData.salaryMin && formData.salaryMax 
+      ? `₹${parseInt(formData.salaryMin).toLocaleString()} – ₹${parseInt(formData.salaryMax).toLocaleString()} per annum`
+      : 'Competitive salary'
+    
+    return `// Basic Information
+Job Title* → ${formData.jobTitle}
+Company* → ${formData.companyOverview ? formData.companyOverview.split('.')[0] : 'Company'}
+Location* → ${location}
+Work Arrangement* → ${formData.employmentType}, ${formData.locationType}
+Job Level / Seniority → ${formData.experienceRequired}
+
+About the Role
+${formData.jobSummary}
+
+🔹 Key Responsibilities
+${formData.keyResponsibilities}
+
+🔹 Requirements
+Education & Certifications
+${formData.requiredQualifications}
+
+Experience
+${formData.experienceRequired}
+
+Technical Skills (Must-Have)
+${formData.skillsRequired}
+
+Nice-to-Have Skills
+${formData.preferredQualifications || 'Additional skills welcome'}
+
+${formData.toolsTechStack ? `Domain Knowledge
+${formData.toolsTechStack}
+
+` : ''}Soft Skills
+Strong communication and problem-solving abilities
+Team collaboration and adaptability
+
+🔹 Compensation & Benefits
+💰 Salary Range: ${salaryRange}
+${formData.perksAndBenefits ? `✨ Perks: ${formData.perksAndBenefits}
+` : ''}🌴 Time Off Policy: Competitive leave policy
+
+🔹 Logistics
+Joining Timeline: ${formData.jobPostingDate ? 'Immediate' : 'Within 30 days'}
+${formData.travelRequirements ? `Travel Requirements: ${formData.travelRequirements}
+` : ''}Work Authorization: ${formData.howToApply}
+
+${formData.diversityStatement ? `🔹 Diversity & Inclusion
+${formData.diversityStatement}
+
+` : ''}${formData.careerPath ? `🔹 Career Growth
+${formData.careerPath}` : ''}`
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -131,16 +187,18 @@ export default function CreateJDPage() {
     setIsSubmitting(true)
 
     try {
+      const structuredDescription = generateStructuredDescription()
+      
       const payload = {
         jobTitle: formData.jobTitle,
-        company: formData.company || 'Company',
+        company: formData.companyOverview ? formData.companyOverview.split('.')[0] : 'Company',
         location: formData.cityCountry || (formData.locationType ?? 'Remote'),
         jobType: formData.employmentType,
-        description: formData.jobSummary,
+        description: structuredDescription,
         requirements: formData.requiredQualifications,
         responsibilities: formData.keyResponsibilities,
-        benefits: formData.benefits,
-        salaryRange: formData.salary,
+        benefits: formData.perksAndBenefits,
+        salaryRange: formData.salaryMin && formData.salaryMax ? `${formData.salaryMin}-${formData.salaryMax}` : '',
         interviewRounds: [],
         platforms: [],
       }

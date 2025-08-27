@@ -69,7 +69,9 @@ function normalizeExperience(value?: string | null): 'intern' | 'junior' | 'mid'
   if (['entry', 'junior', 'new_grad', 'newgrad', 'entry_level'].includes(v)) return 'junior'
   if (['mid', 'mid_level', 'intermediate'].includes(v)) return 'mid'
   if (['senior', 'sr', 'senior_level'].includes(v)) return 'senior'
-  if (['lead', 'staff', 'principal'].includes(v)) return 'lead'
+  if (['lead'].includes(v)) return 'lead'
+  if (['staff'].includes(v)) return 'senior'
+  if (['principal', 'principal_engineer'].includes(v)) return 'principal'
   return null
 }
 
@@ -101,9 +103,7 @@ export async function POST(req: Request) {
     // companyId not strictly required; we'll resolve by name if needed
     if (!raw.location || !raw.location.trim()) missing.push('location')
     if (!raw.jobType || !raw.jobType.trim()) missing.push('jobType')
-    if (!body.experienceLevel) missing.push('experienceLevel')
-    if (!body.description) missing.push('description')
-    if (!body.requirements) missing.push('requirements')
+    // experience level is optional in new schema (level is nullable)
     if (missing.length) {
       return NextResponse.json({ error: `Missing required fields: ${missing.join(', ')}` }, { status: 400 })
     }
@@ -113,9 +113,10 @@ export async function POST(req: Request) {
     const expLevel = normalizeExperience(body.experienceLevel)
 
     // Derivations for new columns
-    const parseList = (s?: string | null): string[] => {
+    const parseList = (s?: string | string[] | null): string[] => {
       if (!s) return []
-      return s
+      const rawStr = Array.isArray(s) ? s.join(',') : s
+      return rawStr
         .split(/\r?\n|,/)
         .map(t => t.trim())
         .filter(Boolean)
@@ -136,17 +137,75 @@ export async function POST(req: Request) {
     const location_city = loc.length >= 1 ? loc[0].trim() || null : null
     const location_country = loc.length >= 2 ? loc[loc.length - 1].trim() || null : null
 
-    // Map arrays
-    const technical_must = parseList(raw.mustHave || raw.technical)
-    const technical_nice = parseList(raw.niceToHave)
+    // Map arrays - using correct form field names
+    const technical_skills = parseList(raw.technical)
+    const must_have_skills = parseList(raw.mustHave)
+    const nice_to_have_skills = parseList(raw.niceToHave)
     const domain_knowledge = parseList(raw.domain)
     const soft_skills = parseList(raw.soft)
-    const languages_required = parseList(raw.languages)
+    const languages_list = parseList(raw.languages)
 
     const duties_day_to_day = parseList(raw.day)
     const duties_strategic = parseList(raw.project)
-    const team_collaboration = parseList(raw.collaboration)
+    const stakeholders = parseList(raw.collaboration)
     const perks_benefits = parseList(raw.perks)
+
+    // Generate job description in new structured format
+    const generateJobDescription = () => {
+      const locationText = raw.location?.trim() || 'Remote'
+      const empType = (employment || 'full_time').replace('_', '-')
+      const level = expLevel || 'As per experience'
+      const salaryRange = salaryMinNum && salaryMaxNum 
+        ? `₹${salaryMinNum.toLocaleString()} – ₹${salaryMaxNum.toLocaleString()} per ${salaryPeriod || 'month'}`
+        : 'Competitive salary'
+      
+      return `// Basic Information
+Job Title* → ${body.jobTitle || 'Position Title'}
+Company* → ${body.company || 'Company'}
+Location* → ${locationText}
+Work Arrangement* → ${empType}, ${locationText.toLowerCase().includes('remote') ? 'Remote' : 'Onsite'}
+Job Level / Seniority → ${level}
+
+About the Role
+We are seeking a ${body.jobTitle || 'professional'} to join ${body.company || 'our team'}. This role involves ${duties_day_to_day.length > 0 ? duties_day_to_day[0] : 'contributing to our team\'s success'} while collaborating with ${stakeholders.length > 0 ? stakeholders.slice(0,2).join(' and ') : 'cross-functional teams'} to deliver business impact.
+
+🔹 Key Responsibilities
+${duties_day_to_day.length > 0 ? duties_day_to_day.map(duty => `${duty.charAt(0).toUpperCase() + duty.slice(1)}.`).join('\n') : 'Develop and maintain solutions as per business requirements.'}
+${duties_strategic.length > 0 ? duties_strategic.map(duty => `${duty.charAt(0).toUpperCase() + duty.slice(1)}.`).join('\n') : 'Drive strategic initiatives and process improvements.'}
+${stakeholders.length > 0 ? `Collaborate with ${stakeholders.join(', ')}.` : 'Collaborate with cross-functional teams.'}
+Provide technical guidance and mentorship.
+
+🔹 Requirements
+Education & Certifications
+${raw.education || 'Bachelor\'s degree in relevant field or equivalent experience.'}
+
+Experience
+${parseYears(raw.years).min && parseYears(raw.years).max ? `${parseYears(raw.years).min}–${parseYears(raw.years).max} years total experience` : parseYears(raw.years).min ? `${parseYears(raw.years).min}+ years experience` : 'Experience as per role requirements'}
+
+Technical Skills (Must-Have)
+${[...must_have_skills, ...technical_skills].length > 0 ? [...must_have_skills, ...technical_skills].join('\n') : 'Technical skills as per job requirements'}
+
+Nice-to-Have Skills
+${nice_to_have_skills.length > 0 ? nice_to_have_skills.join('\n') : 'Additional skills welcome'}
+
+Soft Skills
+Strong communication and stakeholder management
+Problem-solving and adaptability
+Leadership and team collaboration
+
+🔹 Compensation & Benefits
+💰 Salary Range: ${salaryRange}
+🎁 Bonus: Performance-based incentives
+✨ Perks: ${perks_benefits.length > 0 ? perks_benefits.join(', ') : 'Health insurance, flexible working hours, wellness programs'}
+🌴 Time Off Policy: Competitive leave policy
+
+🔹 Logistics
+Joining Timeline: ${raw.joining || 'Within 30 days'}
+${raw.travel ? `Travel Requirements: ${raw.travel}` : 'Travel Requirements: Minimal travel as per project needs'}
+Work Authorization: ${raw.visa || 'Work authorization required'}`
+    }
+
+    const generatedDescription = generateJobDescription()
 
     // Resolve company: prefer companyId, but fall back to looking up by company name if needed
     if (!body.companyId && !body.company) {
@@ -202,33 +261,25 @@ export async function POST(req: Request) {
       try {
         created = await DatabaseService.createJob({
           company_id: effectiveCompanyId!,
+          company_name: body.company || null,
           title: body.jobTitle,
-          location: raw.location?.trim() || null,
-          description_md: body.description,
-          employment_type: employment || 'full_time',
-          experience_level: expLevel,
-          responsibilities_md: body.responsibilities || null,
-          benefits_md: body.benefits || null,
-          salary_level: body.salaryRange || null,
-          created_by: createdBySafe,
-          // New optional columns
-          level: expLevel as any, // if you have a distinct job_level, this aligns with experience_level
-          location_city,
-          location_country,
-          work_mode: null, // no distinct field in form yet
+          description_md: generatedDescription,
+          location_text: raw.location!.trim(),
+          employment_type: (employment || 'full_time') as any,
+          level: expLevel || 'mid',
           education: raw.education || null,
           years_experience_min: parseYears(raw.years).min,
           years_experience_max: parseYears(raw.years).max,
-          technical_must,
-          technical_nice,
+          technical_skills: parseList(raw.technical),
           domain_knowledge,
           soft_skills,
-          languages_required,
+          languages: languages_list,
+          must_have_skills,
+          nice_to_have_skills,
           duties_day_to_day,
           duties_strategic,
-          team_collaboration,
+          stakeholders,
           decision_scope: raw.scope || null,
-          salary_currency: null,
           salary_min: salaryMinNum,
           salary_max: salaryMaxNum,
           salary_period: salaryPeriod as any,
@@ -237,7 +288,9 @@ export async function POST(req: Request) {
           time_off_policy: raw.timeOff || null,
           joining_timeline: raw.joining || null,
           travel_requirements: raw.travel || null,
-          visa_work_auth: raw.visa || null,
+          visa_requirements: raw.visa || null,
+          is_public: true,
+          created_by: createdBySafe,
         })
       } catch (e: any) {
         const msg = String(e?.message || '')
@@ -248,33 +301,25 @@ export async function POST(req: Request) {
         // Retry without created_by when foreign key violates (user id not in users table)
         created = await DatabaseService.createJob({
           company_id: effectiveCompanyId!,
+          company_name: body.company || null,
           title: body.jobTitle,
-          location: raw.location?.trim() || null,
-          description_md: body.description,
-          employment_type: employment || 'full_time',
-          experience_level: expLevel,
-          responsibilities_md: body.responsibilities || null,
-          benefits_md: body.benefits || null,
-          salary_level: body.salaryRange || null,
-          created_by: null,
-          // New optional columns (same as above)
-          level: expLevel as any,
-          location_city,
-          location_country,
-          work_mode: null,
+          description_md: generatedDescription,
+          location_text: raw.location!.trim(),
+          employment_type: (employment || 'full_time') as any,
+          level: expLevel || 'mid',
           education: raw.education || null,
           years_experience_min: parseYears(raw.years).min,
           years_experience_max: parseYears(raw.years).max,
-          technical_must,
-          technical_nice,
+          technical_skills: parseList(raw.technical),
           domain_knowledge,
           soft_skills,
-          languages_required,
+          languages: languages_list,
+          must_have_skills,
+          nice_to_have_skills,
           duties_day_to_day,
           duties_strategic,
-          team_collaboration,
+          stakeholders,
           decision_scope: raw.scope || null,
-          salary_currency: null,
           salary_min: salaryMinNum,
           salary_max: salaryMaxNum,
           salary_period: salaryPeriod as any,
@@ -283,7 +328,9 @@ export async function POST(req: Request) {
           time_off_policy: raw.timeOff || null,
           joining_timeline: raw.joining || null,
           travel_requirements: raw.travel || null,
-          visa_work_auth: raw.visa || null,
+          visa_requirements: raw.visa || null,
+          is_public: true,
+          created_by: null,
         })
       }
 
@@ -443,17 +490,18 @@ export async function GET(req: Request) {
         } catch {
           interviewRounds = []
         }
+        const salary_label = (r.salary_min || r.salary_max) ? `${r.salary_min ?? ''}${r.salary_min && r.salary_max ? ' - ' : ''}${r.salary_max ?? ''} ${r.salary_period || ''}`.trim() : null
         jobsOut.push({
           id: r.id,
           title: r.title,
           company_name: companyName,
-          location: r.location,
+          location: r.location_text,
           employment_type: r.employment_type,
-          experience_level: r.experience_level,
-          summary: r.description_md,
-          responsibilities: r.responsibilities_md,
-          benefits: r.benefits_md,
-          salary_label: r.salary_level,
+          experience_level: r.level,
+          summary: null,
+          responsibilities: null,
+          benefits: null,
+          salary_label,
           created_by: r.created_by,
           created_at: r.created_at,
           interview_rounds: interviewRounds,
