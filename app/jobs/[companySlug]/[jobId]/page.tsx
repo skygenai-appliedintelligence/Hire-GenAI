@@ -39,15 +39,7 @@ export default async function JobDetailPage(
              COALESCE(j.location_text, 'Remote') AS location,
              j.education AS description,
              array_to_string(j.duties_day_to_day, E'\n• ') AS requirements,
-             CASE 
-               WHEN j.salary_min IS NOT NULL AND j.salary_max IS NOT NULL 
-               THEN CONCAT(j.salary_min, ' - ', j.salary_max, ' ', COALESCE(j.salary_period, ''))
-               WHEN j.salary_min IS NOT NULL 
-               THEN CONCAT('From ', j.salary_min, ' ', COALESCE(j.salary_period, ''))
-               WHEN j.salary_max IS NOT NULL 
-               THEN CONCAT('Up to ', j.salary_max, ' ', COALESCE(j.salary_period, ''))
-               ELSE NULL
-             END AS salary_range,
+             NULL AS salary_range,
              CASE 
                WHEN array_length(j.perks_benefits, 1) > 0 
                THEN array_to_string(j.perks_benefits, E'\n• ')
@@ -201,11 +193,11 @@ export default async function JobDetailPage(
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         <div className="grid grid-cols-1 lg:[grid-template-columns:1fr_380px] gap-6 lg:gap-8 isolate">
           {/* Right column first on mobile (summary), then content */}
-          <aside className="order-1 lg:order-2 lg:sticky lg:top-24 lg:z-20">
+          <aside className="order-1 lg:order-2 lg:sticky lg:top-6 lg:z-20 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:overflow-x-hidden lg:pb-6 lg:pt-1">
             {/* Summary Card */}
             <aside
               aria-labelledby="summary-heading"
-              className="relative z-20 rounded-2xl border border-slate-200/80 bg-white p-5 md:p-6 shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-105 emerald-glow"
+              className="relative z-20 rounded-2xl border border-slate-200/80 bg-white p-5 md:p-6 shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-[1.02] emerald-glow lg:sticky lg:top-6 w-full transform-gpu will-change-transform"
             >
               <h2
                 id="summary-heading"
@@ -304,58 +296,6 @@ export default async function JobDetailPage(
 
           {/* Left Column - Content Cards */}
           <div className="order-2 lg:order-1 space-y-6">
-            {/* About Company */}
-            <section
-              aria-labelledby="about-company"
-              className="rounded-2xl border border-slate-200 bg-white/80 backdrop-blur p-6 md:p-8 shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-105 emerald-glow relative z-10 lg:z-0"
-            >
-              <h2
-                id="about-company"
-                className="text-lg md:text-xl font-semibold text-slate-900 mb-3"
-              >
-                About {job.company_name || company}
-              </h2>
-              <div className="space-y-3">
-                {job.company_description ? (
-                  <div className="prose max-w-none text-slate-700 text-sm whitespace-pre-line">
-                    {job.company_description}
-                  </div>
-                ) : (
-                  <p className="text-slate-600 leading-relaxed">
-                    {job.company_name || company} is hiring talented professionals to join the team.
-                  </p>
-                )}
-                
-                {(job.company_industry || job.company_size || job.company_website) && (
-                  <div className="flex flex-wrap gap-4 pt-2 text-sm text-slate-600">
-                    {job.company_industry && (
-                      <span className="inline-flex items-center gap-1">
-                        <span className="text-emerald-600">🏢</span>
-                        {job.company_industry}
-                      </span>
-                    )}
-                    {job.company_size && (
-                      <span className="inline-flex items-center gap-1">
-                        <span className="text-emerald-600">👥</span>
-                        {job.company_size} employees
-                      </span>
-                    )}
-                    {job.company_website && (
-                      <a 
-                        href={job.company_website} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 hover:underline"
-                      >
-                        <span>🌐</span>
-                        Website
-                      </a>
-                    )}
-                  </div>
-                )}
-              </div>
-            </section>
-
             {/* About the role */}
             <section
               aria-labelledby="about-role"
