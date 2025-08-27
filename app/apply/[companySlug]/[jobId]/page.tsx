@@ -33,13 +33,13 @@ export default async function ApplyCompanyJobPage(props: { params: Promise<{ com
     const rows = await prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT j.id,
              j.title,
-             j.location,
+             j.location_text,
              j.description_md AS description,
              NULL::text       AS requirements,
              NULL::text       AS salary_range,
              j.status,
              COALESCE(j.employment_type::text, 'full_time') AS employment_type,
-             j.experience_level::text AS experience_level,
+             j.level::text AS experience_level,
              c.name           AS company_name
         FROM public.jobs j
         JOIN public.companies c ON c.id = j.company_id

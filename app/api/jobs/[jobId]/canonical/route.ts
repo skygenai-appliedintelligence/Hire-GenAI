@@ -7,12 +7,19 @@ export const runtime = 'nodejs'
 
 export async function GET(
   _req: Request,
-  { params }: { params: { jobId: string } }
+  ctx: { params: { jobId: string } } | { params: Promise<{ jobId: string }> }
 ) {
   try {
-    const { jobId } = params
+    const raw = (ctx as any).params
+    const { jobId } = raw?.then ? await raw : raw
     if (!jobId) {
       return NextResponse.json({ error: 'Missing jobId' }, { status: 400 })
+    }
+
+    // Validate UUID to avoid enum/uuid cast errors
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(jobId)
+    if (!isUuid) {
+      return NextResponse.json({ error: 'Invalid jobId' }, { status: 400 })
     }
 
     // Check if legacy table exists using information_schema (avoid regclass type)
