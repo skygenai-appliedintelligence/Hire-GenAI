@@ -36,16 +36,47 @@ export default async function JobDetailPage(
     const rows = await prisma.$queryRaw<any[]>(Prisma.sql`
       SELECT j.id,
              j.title,
-             j.location,
-             j.description_md AS description,
-             NULL::text       AS requirements,
-             NULL::text       AS salary_range,
+             COALESCE(j.location_text, 'Remote') AS location,
+             j.education AS description,
+             array_to_string(j.duties_day_to_day, E'\n• ') AS requirements,
+             CASE 
+               WHEN j.salary_min IS NOT NULL AND j.salary_max IS NOT NULL 
+               THEN CONCAT(j.salary_min, ' - ', j.salary_max, ' ', COALESCE(j.salary_period::text, ''))
+               WHEN j.salary_min IS NOT NULL 
+               THEN CONCAT('From ', j.salary_min, ' ', COALESCE(j.salary_period::text, ''))
+               WHEN j.salary_max IS NOT NULL 
+               THEN CONCAT('Up to ', j.salary_max, ' ', COALESCE(j.salary_period::text, ''))
+               ELSE NULL
+             END AS salary_range,
+             CASE 
+               WHEN array_length(j.perks_benefits, 1) > 0 
+               THEN array_to_string(j.perks_benefits, E'\n• ')
+               ELSE j.bonus_incentives
+             END AS benefits,
              j.status,
+             j.is_public,
+             j.created_at,
              COALESCE(j.employment_type::text, 'full_time') AS employment_type,
-             j.experience_level::text AS experience_level,
-             c.name           AS company_name
+             COALESCE(j.level::text, 'mid') AS experience_level,
+             j.technical_skills,
+             j.must_have_skills,
+             j.nice_to_have_skills,
+             j.soft_skills,
+             j.languages,
+             j.duties_strategic,
+             j.stakeholders,
+             j.decision_scope,
+             j.time_off_policy,
+             j.joining_timeline,
+             j.travel_requirements,
+             j.visa_requirements,
+             COALESCE(c.name, j.company_name) AS company_name,
+             c.description_md AS company_description,
+             c.website_url AS company_website,
+             c.industry AS company_industry,
+             c.size_band AS company_size
         FROM public.jobs j
-        JOIN public.companies c ON c.id = j.company_id
+        LEFT JOIN public.companies c ON c.id = j.company_id
        WHERE j.id = CAST(${jobId} AS uuid)
        LIMIT 1
     `);
@@ -284,9 +315,45 @@ export default async function JobDetailPage(
               >
                 About {job.company_name || company}
               </h2>
-              <p className="text-slate-600 leading-relaxed">
-                {job.company_name || company} is hiring talented professionals to join the team.
-              </p>
+              <div className="space-y-3">
+                {job.company_description ? (
+                  <div className="prose max-w-none text-slate-700 text-sm whitespace-pre-line">
+                    {job.company_description}
+                  </div>
+                ) : (
+                  <p className="text-slate-600 leading-relaxed">
+                    {job.company_name || company} is hiring talented professionals to join the team.
+                  </p>
+                )}
+                
+                {(job.company_industry || job.company_size || job.company_website) && (
+                  <div className="flex flex-wrap gap-4 pt-2 text-sm text-slate-600">
+                    {job.company_industry && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-emerald-600">🏢</span>
+                        {job.company_industry}
+                      </span>
+                    )}
+                    {job.company_size && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-emerald-600">👥</span>
+                        {job.company_size} employees
+                      </span>
+                    )}
+                    {job.company_website && (
+                      <a 
+                        href={job.company_website} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 hover:underline"
+                      >
+                        <span>🌐</span>
+                        Website
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
             </section>
 
             {/* About the role */}
@@ -300,23 +367,223 @@ export default async function JobDetailPage(
               >
                 About the role
               </h2>
-              <div className="prose max-w-none text-slate-700 text-sm whitespace-pre-line mb-4">
-                {job.description || 'Role description coming soon.'}
-              </div>
-              <h3 className="text-base md:text-lg font-semibold text-slate-900 mb-2">
-                Key Responsibilities
-              </h3>
-              {job.requirements ? (
-                <div className="prose max-w-none text-slate-700 text-sm whitespace-pre-line">
-                  {job.requirements}
+              
+              {/* Job Description */}
+              {job.description && (
+                <div className="mb-6">
+                  <h3 className="text-base md:text-lg font-semibold text-slate-900 mb-2">
+                    Education & Background
+                  </h3>
+                  <div className="prose max-w-none text-slate-700 text-sm whitespace-pre-line">
+                    {job.description}
+                  </div>
                 </div>
-              ) : (
-                <ul className="list-disc pl-5 space-y-2 text-slate-600">
-                  <li>Analyze business requirements and process workflows.</li>
-                  <li>Design and develop solutions collaboratively with stakeholders.</li>
-                  <li>Plan and execute testing across stages.</li>
-                  <li>Provide production support and enhancements.</li>
-                </ul>
+              )}
+              
+              {/* Day-to-Day Responsibilities */}
+              <div className="mb-6">
+                <h3 className="text-base md:text-lg font-semibold text-slate-900 mb-2">
+                  Day-to-Day Responsibilities
+                </h3>
+                {job.requirements ? (
+                  <div className="prose max-w-none text-slate-700 text-sm">
+                    <ul className="list-disc pl-5 space-y-1">
+                      {job.requirements.split('\n').filter(Boolean).map((item: string, idx: number) => (
+                        <li key={idx}>{item.replace(/^•\s*/, '')}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <ul className="list-disc pl-5 space-y-2 text-slate-600">
+                    <li>Analyze business requirements and process workflows.</li>
+                    <li>Design and develop solutions collaboratively with stakeholders.</li>
+                    <li>Plan and execute testing across stages.</li>
+                    <li>Provide production support and enhancements.</li>
+                  </ul>
+                )}
+              </div>
+
+              {/* Strategic Duties */}
+              {job.duties_strategic && Array.isArray(job.duties_strategic) && job.duties_strategic.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-base md:text-lg font-semibold text-slate-900 mb-2">
+                    Strategic Responsibilities
+                  </h3>
+                  <ul className="list-disc pl-5 space-y-1 text-slate-700 text-sm">
+                    {job.duties_strategic.map((duty: string, idx: number) => (
+                      <li key={idx}>{duty}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Required Skills */}
+              {((job.technical_skills && job.technical_skills.length > 0) || 
+                (job.must_have_skills && job.must_have_skills.length > 0)) && (
+                <div className="mb-6">
+                  <h3 className="text-base md:text-lg font-semibold text-slate-900 mb-2">
+                    Required Skills
+                  </h3>
+                  <div className="space-y-3">
+                    {job.technical_skills && job.technical_skills.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-slate-800 mb-1">Technical Skills</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {job.technical_skills.map((skill: string, idx: number) => (
+                            <span key={idx} className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-md text-xs">
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {job.must_have_skills && job.must_have_skills.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-slate-800 mb-1">Must-Have Skills</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {job.must_have_skills.map((skill: string, idx: number) => (
+                            <span key={idx} className="px-2 py-1 bg-red-100 text-red-800 rounded-md text-xs">
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Nice-to-Have Skills */}
+              {job.nice_to_have_skills && job.nice_to_have_skills.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-base md:text-lg font-semibold text-slate-900 mb-2">
+                    Nice-to-Have Skills
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {job.nice_to_have_skills.map((skill: string, idx: number) => (
+                      <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-xs">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Soft Skills & Languages */}
+              {((job.soft_skills && job.soft_skills.length > 0) || 
+                (job.languages && job.languages.length > 0)) && (
+                <div className="mb-6">
+                  <h3 className="text-base md:text-lg font-semibold text-slate-900 mb-2">
+                    Additional Requirements
+                  </h3>
+                  <div className="space-y-3">
+                    {job.soft_skills && job.soft_skills.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-slate-800 mb-1">Soft Skills</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {job.soft_skills.map((skill: string, idx: number) => (
+                            <span key={idx} className="px-2 py-1 bg-purple-100 text-purple-800 rounded-md text-xs">
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {job.languages && job.languages.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-slate-800 mb-1">Languages</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {job.languages.map((lang: string, idx: number) => (
+                            <span key={idx} className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-md text-xs">
+                              {lang}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Benefits */}
+              {job.benefits && (
+                <div className="mb-6">
+                  <h3 className="text-base md:text-lg font-semibold text-slate-900 mb-2">
+                    Benefits & Perks
+                  </h3>
+                  <div className="prose max-w-none text-slate-700 text-sm">
+                    {job.benefits.includes('\n') ? (
+                      <ul className="list-disc pl-5 space-y-1">
+                        {job.benefits.split('\n').filter(Boolean).map((benefit: string, idx: number) => (
+                          <li key={idx}>{benefit.replace(/^•\s*/, '')}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="whitespace-pre-line">{job.benefits}</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Stakeholders & Collaboration */}
+              {job.stakeholders && Array.isArray(job.stakeholders) && job.stakeholders.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-base md:text-lg font-semibold text-slate-900 mb-2">
+                    Collaboration & Stakeholders
+                  </h3>
+                  <ul className="list-disc pl-5 space-y-1 text-slate-700 text-sm">
+                    {job.stakeholders.map((stakeholder: string, idx: number) => (
+                      <li key={idx}>{stakeholder}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Additional Job Details */}
+              {(job.decision_scope || job.time_off_policy || job.joining_timeline || job.travel_requirements || job.visa_requirements) && (
+                <div className="mb-6">
+                  <h3 className="text-base md:text-lg font-semibold text-slate-900 mb-2">
+                    Additional Details
+                  </h3>
+                  <div className="space-y-2 text-slate-700 text-sm">
+                    {job.decision_scope && (
+                      <div>
+                        <span className="font-medium">Decision Scope:</span> {job.decision_scope}
+                      </div>
+                    )}
+                    {job.time_off_policy && (
+                      <div>
+                        <span className="font-medium">Time Off Policy:</span> {job.time_off_policy}
+                      </div>
+                    )}
+                    {job.joining_timeline && (
+                      <div>
+                        <span className="font-medium">Joining Timeline:</span> {job.joining_timeline}
+                      </div>
+                    )}
+                    {job.travel_requirements && (
+                      <div>
+                        <span className="font-medium">Travel Requirements:</span> {job.travel_requirements}
+                      </div>
+                    )}
+                    {job.visa_requirements && (
+                      <div>
+                        <span className="font-medium">Visa Requirements:</span> {job.visa_requirements}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Job Posted Date */}
+              {job.created_at && (
+                <div className="text-xs text-slate-500 pt-4 border-t border-slate-100">
+                  Posted on {new Date(job.created_at).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </div>
               )}
             </section>
           </div>

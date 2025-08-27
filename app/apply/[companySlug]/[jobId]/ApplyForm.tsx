@@ -139,7 +139,21 @@ export default function ApplyForm({ job }: { job: any }) {
       localStorage.setItem('interviewCandidates', JSON.stringify(existingCandidates))
 
       const jobDescription = job?.description || 'Senior Full Stack Developer position requiring React, Node.js, and cloud experience'
-      const evaluation = await AIInterviewService.evaluateApplication(application, jobDescription)
+      // Use server API to evaluate via OpenAI when available
+      let evaluation: { qualified: boolean; score: number; reasoning: string; feedback: string }
+      try {
+        const res = await fetch('/api/applications/evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ application, jobDescription }),
+        })
+        if (!res.ok) throw new Error('Evaluation failed')
+        const data = await res.json()
+        evaluation = data?.result || { qualified: false, score: 0, reasoning: '', feedback: 'Evaluation failed.' }
+      } catch {
+        // Fallback to local evaluation (mock) if API fails
+        evaluation = await AIInterviewService.evaluateApplication(application, jobDescription)
+      }
 
       if (evaluation.qualified) {
         application.status = 'qualified'
@@ -190,7 +204,31 @@ export default function ApplyForm({ job }: { job: any }) {
         const updatedCandidates = existingCandidates.map((cand: any) => (cand.id === candidateId ? candidateRecord : cand))
         localStorage.setItem('interviewCandidates', JSON.stringify(updatedCandidates))
 
+        // Persist evaluation details for a dedicated result page
+        try {
+          const evaluationsKey = 'applicationEvaluations'
+          const evalList = JSON.parse(localStorage.getItem(evaluationsKey) || '[]')
+          const evalRecord = {
+            candidateId,
+            jobId: job.id,
+            jobTitle: job?.title || 'Your job',
+            candidateName: fullName,
+            createdAt: new Date().toISOString(),
+            qualified: evaluation.qualified,
+            score: evaluation.score,
+            reasoning: evaluation.reasoning,
+            feedback: evaluation.feedback,
+          }
+          const newList = [...evalList.filter((e: any) => e.candidateId !== candidateId), evalRecord]
+          localStorage.setItem(evaluationsKey, JSON.stringify(newList))
+        } catch {}
+
         toast({ title: 'Application Received', description: evaluation.feedback, variant: 'destructive' })
+
+        // Navigate to the Not Qualified page to show detailed analysis
+        setTimeout(() => {
+          router.push(`/apply/not-qualified?candidateId=${encodeURIComponent(candidateId)}`)
+        }, 900)
       }
     } catch (error: any) {
       console.error('Application submission error:', error)

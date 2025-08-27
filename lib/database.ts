@@ -544,8 +544,8 @@ export class DatabaseService {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
     }
     const q = `
-      SELECT id, title, location, status, employment_type, experience_level, description_md,
-             responsibilities_md, benefits_md, salary_level, created_by, created_at
+      SELECT id, title, location_text, status, employment_type, level,
+             salary_min, salary_max, salary_period, created_by, created_at
       FROM jobs
       WHERE company_id = $1::uuid
       ORDER BY created_at DESC
@@ -560,8 +560,14 @@ export class DatabaseService {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
     }
     const q = `
-      SELECT id, company_id, title, location, status, employment_type, experience_level,
-             description_md, responsibilities_md, benefits_md, salary_level,
+      SELECT id, company_id, title, description_md, location_text, status, employment_type, level,
+             education, years_experience_min, years_experience_max,
+             technical_skills, domain_knowledge, soft_skills, languages,
+             must_have_skills, nice_to_have_skills,
+             duties_day_to_day, duties_strategic, stakeholders,
+             decision_scope, salary_min, salary_max, salary_period, bonus_incentives,
+             perks_benefits, time_off_policy, joining_timeline, travel_requirements,
+             visa_requirements,
              created_by, created_at
       FROM jobs
       WHERE id = $1::uuid AND company_id = $2::uuid
@@ -573,17 +579,44 @@ export class DatabaseService {
 
   static async updateJobForCompany(jobId: string, companyId: string, updates: {
     title?: string | null
-    location?: string | null
+    description_md?: string | null
+    location_text?: string | null
     status?: 'open' | 'on_hold' | 'closed' | 'cancelled' | null
     employment_type?: 'full_time' | 'part_time' | 'contract' | null
-    experience_level?: 'intern' | 'junior' | 'mid' | 'senior' | 'lead' | 'principal' | null
-    description_md?: string | null
-    responsibilities_md?: string | null
-    benefits_md?: string | null
-    salary_level?: string | null
+    level?: 'intern' | 'junior' | 'mid' | 'senior' | 'lead' | 'principal' | null
+    education?: string | null
+    years_experience_min?: number | null
+    years_experience_max?: number | null
+    technical_skills?: string[] | null
+    domain_knowledge?: string[] | null
+    soft_skills?: string[] | null
+    languages?: string[] | null
+    must_have_skills?: string[] | null
+    nice_to_have_skills?: string[] | null
+    duties_day_to_day?: string[] | null
+    duties_strategic?: string[] | null
+    stakeholders?: string[] | null
+    decision_scope?: string | null
+    salary_min?: number | null
+    salary_max?: number | null
+    salary_period?: string | null
+    bonus_incentives?: string | null
+    perks_benefits?: string[] | null
+    time_off_policy?: string | null
+    joining_timeline?: string | null
+    travel_requirements?: string | null
+    visa_requirements?: string | null
   }): Promise<any | null> {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+
+    // Helper: convert JS string[] to Postgres text[] literal
+    const toPgArray = (arr?: string[] | null): string | null => {
+      if (!arr) return null
+      if (arr.length === 0) return '{}'
+      const escaped = arr.map(s => (s ?? '').replace(/"/g, '\\"')).map(s => `"${s}"`).join(',')
+      return `{${escaped}}`
     }
 
     const sets: string[] = []
@@ -591,14 +624,33 @@ export class DatabaseService {
     let i = 1
 
     if (updates.title !== undefined) { sets.push(`title = $${i++}`); values.push(updates.title) }
-    if (updates.location !== undefined) { sets.push(`location = $${i++}`); values.push(updates.location) }
+    if (updates.description_md !== undefined) { sets.push(`description_md = $${i++}`); values.push(updates.description_md) }
+    if (updates.location_text !== undefined) { sets.push(`location_text = $${i++}`); values.push(updates.location_text) }
     if (updates.status !== undefined) { sets.push(`status = $${i++}`); values.push(updates.status) }
     if (updates.employment_type !== undefined) { sets.push(`employment_type = $${i++}::employment_type`); values.push(updates.employment_type) }
-    if (updates.experience_level !== undefined) { sets.push(`experience_level = $${i++}::experience_level`); values.push(updates.experience_level) }
-    if (updates.description_md !== undefined) { sets.push(`description_md = $${i++}`); values.push(updates.description_md) }
-    if (updates.responsibilities_md !== undefined) { sets.push(`responsibilities_md = $${i++}`); values.push(updates.responsibilities_md) }
-    if (updates.benefits_md !== undefined) { sets.push(`benefits_md = $${i++}`); values.push(updates.benefits_md) }
-    if (updates.salary_level !== undefined) { sets.push(`salary_level = $${i++}`); values.push(updates.salary_level) }
+    if (updates.level !== undefined) { sets.push(`level = $${i++}::job_level`); values.push(updates.level) }
+    if (updates.education !== undefined) { sets.push(`education = $${i++}`); values.push(updates.education) }
+    if (updates.years_experience_min !== undefined) { sets.push(`years_experience_min = $${i++}`); values.push(updates.years_experience_min) }
+    if (updates.years_experience_max !== undefined) { sets.push(`years_experience_max = $${i++}`); values.push(updates.years_experience_max) }
+    if (updates.technical_skills !== undefined) { sets.push(`technical_skills = $${i++}::text[]`); values.push(toPgArray(updates.technical_skills as any)) }
+    if (updates.domain_knowledge !== undefined) { sets.push(`domain_knowledge = $${i++}::text[]`); values.push(toPgArray(updates.domain_knowledge as any)) }
+    if (updates.soft_skills !== undefined) { sets.push(`soft_skills = $${i++}::text[]`); values.push(toPgArray(updates.soft_skills as any)) }
+    if (updates.languages !== undefined) { sets.push(`languages = $${i++}::text[]`); values.push(toPgArray(updates.languages as any)) }
+    if (updates.must_have_skills !== undefined) { sets.push(`must_have_skills = $${i++}::text[]`); values.push(toPgArray(updates.must_have_skills as any)) }
+    if (updates.nice_to_have_skills !== undefined) { sets.push(`nice_to_have_skills = $${i++}::text[]`); values.push(toPgArray(updates.nice_to_have_skills as any)) }
+    if (updates.duties_day_to_day !== undefined) { sets.push(`duties_day_to_day = $${i++}::text[]`); values.push(toPgArray(updates.duties_day_to_day as any)) }
+    if (updates.duties_strategic !== undefined) { sets.push(`duties_strategic = $${i++}::text[]`); values.push(toPgArray(updates.duties_strategic as any)) }
+    if (updates.stakeholders !== undefined) { sets.push(`stakeholders = $${i++}::text[]`); values.push(toPgArray(updates.stakeholders as any)) }
+    if (updates.decision_scope !== undefined) { sets.push(`decision_scope = $${i++}`); values.push(updates.decision_scope) }
+    if (updates.salary_min !== undefined) { sets.push(`salary_min = $${i++}`); values.push(updates.salary_min) }
+    if (updates.salary_max !== undefined) { sets.push(`salary_max = $${i++}`); values.push(updates.salary_max) }
+    if (updates.salary_period !== undefined) { sets.push(`salary_period = $${i++}`); values.push(updates.salary_period) }
+    if (updates.bonus_incentives !== undefined) { sets.push(`bonus_incentives = $${i++}`); values.push(updates.bonus_incentives) }
+    if (updates.perks_benefits !== undefined) { sets.push(`perks_benefits = $${i++}::text[]`); values.push(toPgArray(updates.perks_benefits as any)) }
+    if (updates.time_off_policy !== undefined) { sets.push(`time_off_policy = $${i++}`); values.push(updates.time_off_policy) }
+    if (updates.joining_timeline !== undefined) { sets.push(`joining_timeline = $${i++}`); values.push(updates.joining_timeline) }
+    if (updates.travel_requirements !== undefined) { sets.push(`travel_requirements = $${i++}`); values.push(updates.travel_requirements) }
+    if (updates.visa_requirements !== undefined) { sets.push(`visa_requirements = $${i++}`); values.push(updates.visa_requirements) }
 
     if (sets.length === 0) return null
 
@@ -610,8 +662,8 @@ export class DatabaseService {
       UPDATE jobs
       SET ${sets.join(', ')}
       WHERE id = $${i++}::uuid AND company_id = $${i}::uuid
-      RETURNING id, company_id, title, location, employment_type, experience_level,
-                description_md, responsibilities_md, benefits_md, salary_level,
+      RETURNING id, company_id, title, location_text, employment_type, level,
+                salary_min, salary_max, salary_period,
                 created_by, created_at
     `
     const rows = (await this.query(q, values)) as any[]
@@ -646,113 +698,110 @@ export class DatabaseService {
   }
 
   static async createJob(input: {
-    company_id: string
+    company_id?: string | null
+    company_name?: string | null
     title: string
-    location?: string | null
     description_md?: string | null
-    employment_type?: 'full_time' | 'part_time' | 'contract' | null
-    experience_level?: 'intern' | 'junior' | 'mid' | 'senior' | 'lead' | 'principal' | null
-    responsibilities_md?: string | null
-    benefits_md?: string | null
-    salary_level?: string | null
-    created_by?: string | null
-    // New optional columns
+    location_text: string
+    employment_type: 'full_time' | 'part_time' | 'contract'
     level?: 'intern' | 'junior' | 'mid' | 'senior' | 'lead' | 'principal' | null
-    location_city?: string | null
-    location_country?: string | null
-    work_mode?: string | null
     education?: string | null
     years_experience_min?: number | null
     years_experience_max?: number | null
-    technical_must?: string[] | null
-    technical_nice?: string[] | null
+    technical_skills?: string[] | null
     domain_knowledge?: string[] | null
     soft_skills?: string[] | null
-    languages_required?: string[] | null
+    languages?: string[] | null
+    must_have_skills?: string[] | null
+    nice_to_have_skills?: string[] | null
     duties_day_to_day?: string[] | null
     duties_strategic?: string[] | null
-    team_collaboration?: string[] | null
+    stakeholders?: string[] | null
     decision_scope?: string | null
-    salary_currency?: string | null
     salary_min?: number | null
     salary_max?: number | null
-    salary_period?: string | null
+    salary_period?: 'monthly' | 'yearly' | 'weekly' | 'daily' | null
     bonus_incentives?: string | null
     perks_benefits?: string[] | null
     time_off_policy?: string | null
     joining_timeline?: string | null
     travel_requirements?: string | null
-    visa_work_auth?: string | null
+    visa_requirements?: string | null
+    is_public?: boolean | null
+    created_by?: string | null
   }) {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
     }
 
+    // Helper: convert JS string[] to Postgres text[] literal (e.g., '{"a","b"}')
+    const toPgArray = (arr?: string[] | null): string | null => {
+      if (!arr || arr.length === 0) return '{}'
+      // Escape quotes and commas inside values, wrap each in quotes
+      const escaped = arr
+        .map(s => (s ?? ''))
+        .map(s => s.replace(/"/g, '\\"'))
+        .map(s => `"${s}"`)
+        .join(',')
+      return `{${escaped}}`
+    }
+
     const q = `
       INSERT INTO jobs (
-        company_id, title, location, description_md, status, is_public,
-        employment_type, experience_level, responsibilities_md, benefits_md,
-        salary_level, created_by,
-        level, location_city, location_country, work_mode, education,
+        company_id, company_name, title, description_md, location_text, employment_type, level, education,
         years_experience_min, years_experience_max,
-        technical_must, technical_nice, domain_knowledge, soft_skills, languages_required,
-        duties_day_to_day, duties_strategic, team_collaboration,
-        decision_scope, salary_currency, salary_min, salary_max, salary_period,
-        bonus_incentives, perks_benefits, time_off_policy, joining_timeline,
-        travel_requirements, visa_work_auth
+        technical_skills, domain_knowledge, soft_skills, languages,
+        must_have_skills, nice_to_have_skills,
+        duties_day_to_day, duties_strategic, stakeholders,
+        decision_scope, salary_min, salary_max, salary_period, bonus_incentives,
+        perks_benefits, time_off_policy, joining_timeline, travel_requirements, visa_requirements,
+        status, is_public, created_by
       )
       VALUES (
-        $1::uuid, $2, $3, $4, 'open', true,
-        $5::employment_type, $6::experience_level, $7, $8,
-        $9, $10::uuid,
-        $11, $12, $13, $14, $15,
-        $16, $17,
-        $18::text[], $19::text[], $20::text[], $21::text[], $22::text[],
-        $23::text[], $24::text[], $25::text[],
-        $26, $27, $28, $29, $30,
-        $31, $32::text[], $33, $34,
-        $35, $36
+        $1::uuid, $2, $3, $4, $5, $6::employment_type, $7::job_level, $8,
+        $9, $10,
+        $11::text[], $12::text[], $13::text[], $14::text[],
+        $15::text[], $16::text[],
+        $17::text[], $18::text[], $19::text[],
+        $20, $21, $22, $23::salary_period, $24,
+        $25::text[], $26, $27, $28, $29,
+        'open', COALESCE($30, true), $31::uuid
       )
       RETURNING id
     `
 
     const params = [
-      input.company_id,
+      input.company_id ?? null,
+      input.company_name ?? null,
       input.title,
-      input.location ?? null,
       input.description_md ?? null,
-      input.employment_type ?? null,
-      input.experience_level ?? null,
-      input.responsibilities_md ?? null,
-      input.benefits_md ?? null,
-      input.salary_level ?? null,
-      input.created_by ?? null,
+      input.location_text,
+      input.employment_type,
       input.level ?? null,
-      input.location_city ?? null,
-      input.location_country ?? null,
-      input.work_mode ?? null,
       input.education ?? null,
       input.years_experience_min ?? null,
       input.years_experience_max ?? null,
-      input.technical_must ?? [],
-      input.technical_nice ?? [],
-      input.domain_knowledge ?? [],
-      input.soft_skills ?? [],
-      input.languages_required ?? [],
-      input.duties_day_to_day ?? [],
-      input.duties_strategic ?? [],
-      input.team_collaboration ?? [],
+      toPgArray(input.technical_skills),
+      toPgArray(input.domain_knowledge),
+      toPgArray(input.soft_skills),
+      toPgArray(input.languages),
+      toPgArray(input.must_have_skills),
+      toPgArray(input.nice_to_have_skills),
+      toPgArray(input.duties_day_to_day),
+      toPgArray(input.duties_strategic),
+      toPgArray(input.stakeholders),
       input.decision_scope ?? null,
-      input.salary_currency ?? null,
       input.salary_min ?? null,
       input.salary_max ?? null,
       input.salary_period ?? null,
       input.bonus_incentives ?? null,
-      input.perks_benefits ?? [],
+      toPgArray(input.perks_benefits),
       input.time_off_policy ?? null,
       input.joining_timeline ?? null,
       input.travel_requirements ?? null,
-      input.visa_work_auth ?? null,
+      input.visa_requirements ?? null,
+      input.is_public ?? true,
+      input.created_by ?? null,
     ]
 
     const rows = (await this.query(q, params)) as any[]

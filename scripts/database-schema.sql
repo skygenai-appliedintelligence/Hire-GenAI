@@ -46,6 +46,10 @@ DO $$ BEGIN
   CREATE TYPE experience_level AS ENUM ('intern','junior','mid','senior','lead','principal');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DO $$ BEGIN
+  CREATE TYPE job_level AS ENUM ('intern','junior','mid','senior','lead','principal');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- Skill evaluation matrix enum (categorical levels)
 DO $$ BEGIN
   CREATE TYPE skill_level AS ENUM ('no_skill','low_skill','some_skill','high_skill','expert_skill');

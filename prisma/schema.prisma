@@ -21,6 +21,7 @@ model Company {
   // Relations
   domains     CompanyDomain[]
   users       User[]
+  jobs        Job[]
 
   @@map("companies")
 }
@@ -53,6 +54,7 @@ model User {
   roles           UserRole[]
   email_identities EmailIdentity[]
   sessions        Session[]
+  created_jobs    Job[]
 
   @@map("users")
 }
@@ -105,4 +107,45 @@ model Session {
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("sessions")
+}
+
+model Job {
+  id                   String            @id @default(cuid())
+  company_id           String
+  title                String
+  level                String?
+  location             String?
+  description_md       String?
+  status               String            @default("open")
+  is_public            Boolean           @default(true)
+  visible_from         DateTime?
+  visible_until        DateTime?
+  created_by           String?
+  created_at           DateTime          @default(now())
+  employment_type      EmploymentType    @default(FULL_TIME)
+  experience_level     ExperienceLevel?
+  responsibilities_md  String?
+  benefits_md          String?
+  salary_level         String?
+
+  // Relations
+  company Company @relation(fields: [company_id], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [created_by], references: [id])
+
+  @@map("jobs")
+}
+
+enum EmploymentType {
+  FULL_TIME @map("full_time")
+  PART_TIME @map("part_time")
+  CONTRACT  @map("contract")
+}
+
+enum ExperienceLevel {
+  INTERN    @map("intern")
+  JUNIOR    @map("junior")
+  MID       @map("mid")
+  SENIOR    @map("senior")
+  LEAD      @map("lead")
+  PRINCIPAL @map("principal")
 }

@@ -273,7 +273,7 @@ export default function SelectedAgentsPage() {
             title: j.title,
             company: companyName,
             description: jd,
-            location: j.location,
+            location: j.location_text,
             employment_type: j.employment_type,
             createdAt: j.created_at,
           }
