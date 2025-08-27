@@ -53,7 +53,7 @@ export default function SettingsContent({ section }: { section?: string }) {
     weeklyReports: false,
   })
 
-  // Allow edit on Profile tab for bsadmin username OR users with admin role
+  // Allow edit on Profile tab for all users
   const [isAdminRole, setIsAdminRole] = useState(false)
   useEffect(() => {
     const session = MockAuthService.getCurrentUser()
@@ -64,7 +64,8 @@ export default function SettingsContent({ section }: { section?: string }) {
     ((user as any)?.email?.split("@")[0]?.toLowerCase?.() === "bsadmin") ||
     ((user as any)?.full_name?.toLowerCase?.() === "bsadmin")
   )
-  const canEditSection = (isBsadmin || isAdminRole) && current === "profile"
+  // Allow all users to edit all settings
+  const canEditSection = true
 
   // Team management state
   const [membersLoading, setMembersLoading] = useState(false)
@@ -123,9 +124,10 @@ export default function SettingsContent({ section }: { section?: string }) {
           email: newMember.email,
           name: newMember.name,
           role: newMember.role,
-        }),
-      })
-      const data = await res.json()
+          actorEmail: (user as any)?.email // Add current user's email for permission check
+        })
+      });
+      const data = await res.json();
       if (data.ok) {
         toast({ title: "Member added", description: `${newMember.email} invited` })
         setNewMember({ email: "", name: "", role: "user" })
@@ -279,12 +281,6 @@ export default function SettingsContent({ section }: { section?: string }) {
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-gray-600">Manage your account and application preferences</p>
       </div>
-
-      {!canEditSection && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 text-amber-900 p-3 text-sm">
-          Read-only access. Only admins (or user "bsadmin") can edit the Profile section.
-        </div>
-      )}
 
       <Tabs value={current} onValueChange={(v) => router.push(`/dashboard/settings/${v}`)} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5">
