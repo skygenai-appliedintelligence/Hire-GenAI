@@ -22,6 +22,23 @@ async function getCandidateNameMode() {
   }
 }
 
+async function getApplicationsColumnMode() {
+  const q = `
+    SELECT column_name FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'applications'
+      AND column_name IN ('first_name','last_name','email','phone')
+  `
+  const rows = (await (DatabaseService as any)["query"]?.call(DatabaseService, q, [])
+    .catch(() => [])) as Array<{ column_name: string }>
+  const cols = new Set((rows || []).map(r => r.column_name))
+  return {
+    hasFirst: cols.has('first_name'),
+    hasLast: cols.has('last_name'),
+    hasEmail: cols.has('email'),
+    hasPhone: cols.has('phone'),
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!DatabaseService.isDatabaseConfigured()) {
@@ -76,8 +93,9 @@ export async function POST(req: NextRequest) {
 
       // Name fields
       if (mode.hasFullName && fullNameInput) { updates.push(`full_name = $${i++}`); params.push(fullNameInput) }
-      if (!mode.hasFullName && mode.hasFirst) { updates.push(`first_name = $${i++}`); params.push(firstName || null) }
-      if (!mode.hasFullName && mode.hasLast) { updates.push(`last_name = $${i++}`); params.push(lastName || null) }
+      // Also set first/last if columns exist (even when full_name exists) to keep both populated
+      if (mode.hasFirst) { updates.push(`first_name = $${i++}`); params.push(firstName || null) }
+      if (mode.hasLast) { updates.push(`last_name = $${i++}`); params.push(lastName || null) }
 
       // Optional contact/location
       if (candidate.phone !== undefined) { updates.push(`phone = $${i++}`); params.push(candidate.phone || null) }
@@ -99,10 +117,9 @@ export async function POST(req: NextRequest) {
       let p = 2
 
       if (mode.hasFullName) { columns.push('full_name'); placeholders.push(`$${p++}`); values.push(fullNameInput || null) }
-      else {
-        if (mode.hasFirst) { columns.push('first_name'); placeholders.push(`$${p++}`); values.push(firstName || null) }
-        if (mode.hasLast) { columns.push('last_name'); placeholders.push(`$${p++}`); values.push(lastName || null) }
-      }
+      // Always try to set first/last if columns exist as well
+      if (mode.hasFirst) { columns.push('first_name'); placeholders.push(`$${p++}`); values.push(firstName || null) }
+      if (mode.hasLast) { columns.push('last_name'); placeholders.push(`$${p++}`); values.push(lastName || null) }
       if (candidate.phone !== undefined) { columns.push('phone'); placeholders.push(`$${p++}`); values.push(candidate.phone || null) }
       if (candidate.location !== undefined) { columns.push('location'); placeholders.push(`$${p++}`); values.push(candidate.location || null) }
       if (fileId) { columns.push('resume_file_id'); placeholders.push(`$${p++}::uuid`); values.push(fileId) }
@@ -124,12 +141,22 @@ export async function POST(req: NextRequest) {
     // Insert minimal fields that are present in our schema
     let applicationId: string | null = null
     try {
+      const appCols = await getApplicationsColumnMode()
+      const cols = ['candidate_id','job_id','status','source','created_at']
+      const vals = ['$1::uuid','$2::uuid', `'applied'`, '$3', 'NOW()']
+      const params: any[] = [candidateId, String(jobId), source]
+      let idx = 4
+      if (appCols.hasFirst) { cols.push('first_name'); vals.push(`$${idx++}`); params.push(firstName || null) }
+      if (appCols.hasLast) { cols.push('last_name'); vals.push(`$${idx++}`); params.push(lastName || null) }
+      if (appCols.hasEmail) { cols.push('email'); vals.push(`$${idx++}`); params.push(String(candidate.email).toLowerCase()) }
+      if (appCols.hasPhone) { cols.push('phone'); vals.push(`$${idx++}`); params.push(candidate.phone || null) }
+
       const insertAppQ = `
-        INSERT INTO applications (candidate_id, job_id, status, source, created_at)
-        VALUES ($1::uuid, $2::uuid, 'applied', $3, NOW())
+        INSERT INTO applications (${cols.join(',')})
+        VALUES (${vals.join(',')})
         RETURNING id
       `
-      const appRows = await (DatabaseService as any)["query"].call(DatabaseService, insertAppQ, [candidateId, String(jobId), source]) as any[]
+      const appRows = await (DatabaseService as any)["query"].call(DatabaseService, insertAppQ, params) as any[]
       applicationId = appRows?.[0]?.id || null
     } catch (e) {
       // If applications table shape differs, at least return the candidate
