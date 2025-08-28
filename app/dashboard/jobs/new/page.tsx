@@ -202,18 +202,6 @@ export default function CreateJobPage() {
                 interviewRounds: Array.isArray(j.interview_rounds) ? j.interview_rounds : prev.interviewRounds,
                 platforms: Array.isArray(j.posted_platforms) ? j.posted_platforms : prev.platforms,
               }
-              // Best-effort backfill for new granular sections if empty
-              // 1) If requirements missing but description present, copy it over
-              if (!next.requirements && next.description) next.requirements = next.description
-              // 2) Map requirements -> granular
-              if (!next.technical && next.requirements) next.technical = next.requirements
-              if (!next.soft && next.requirements) next.soft = next.requirements
-              if (!next.mustHave && next.requirements) next.mustHave = next.requirements
-              // 3) Map description -> Day-to-Day and related
-              if (!next.day && next.description) next.day = next.description
-              if (!next.project && next.day) next.project = next.day
-              if (!next.collaboration && next.day) next.collaboration = next.day
-              if (!next.scope && next.day) next.scope = next.day
               // Mark status initialized ONLY if we used a saved status.
               // If no saved status existed (we fell back to API/draft), do NOT mark initialized yet,
               // so we don't persist API 'open' into localStorage.
@@ -277,6 +265,15 @@ export default function CreateJobPage() {
                 savedStatus = localStorage.getItem(`jobStatus:${jobId}`)
               } catch {}
               const normalized = normalizeStatus(savedStatus)
+              // helpers to stringify arrays
+              const joinComma = (a: any): string => Array.isArray(a) ? a.join(', ') : (a ?? '')
+              const joinLines = (a: any): string => Array.isArray(a) ? a.join('\n') : (a ?? '')
+              const toPeriod = (p?: string | null): 'Monthly' | 'Yearly' | undefined => {
+                const v = (p || '').toLowerCase()
+                if (v.includes('year')) return 'Yearly'
+                if (v.includes('month')) return 'Monthly'
+                return undefined
+              }
               const next = {
                 ...prev,
                 jobTitle: j.title || prev.jobTitle,
@@ -290,10 +287,34 @@ export default function CreateJobPage() {
                 salaryRange: j.salary_level || j.salary_label || j.salary_range || prev.salaryRange,
                 interviewRounds: Array.isArray(j.interview_rounds) ? j.interview_rounds : prev.interviewRounds,
                 platforms: Array.isArray(j.posted_platforms) ? j.posted_platforms : prev.platforms,
+                // Requirements tab
+                education: j.education ?? prev.education,
+                years: (j.years_experience_min != null || j.years_experience_max != null)
+                  ? `${j.years_experience_min ?? ''}${j.years_experience_max != null ? `-${j.years_experience_max}` : ''}`
+                  : prev.years,
+                technical: joinLines(j.technical_skills) || prev.technical,
+                domain: joinLines(j.domain_knowledge) || prev.domain,
+                soft: joinLines(j.soft_skills) || prev.soft,
+                languages: joinComma(j.languages) || prev.languages,
+                mustHave: joinLines(j.must_have_skills) || prev.mustHave,
+                niceToHave: joinLines(j.nice_to_have_skills) || prev.niceToHave,
+                // Responsibilities tab
+                day: joinLines(j.duties_day_to_day) || prev.day,
+                project: joinLines(j.duties_strategic) || prev.project,
+                collaboration: joinComma(j.stakeholders) || prev.collaboration,
+                scope: j.decision_scope ?? prev.scope,
+                // Compensation tab
+                salaryMin: j.salary_min != null ? String(j.salary_min) : prev.salaryMin,
+                salaryMax: j.salary_max != null ? String(j.salary_max) : prev.salaryMax,
+                period: toPeriod(j.salary_period) || prev.period,
+                bonus: j.bonus_incentives ?? prev.bonus,
+                perks: joinLines(j.perks_benefits) || prev.perks,
+                timeOff: j.time_off_policy ?? prev.timeOff,
+                // Logistics tab
+                joining: j.joining_timeline ?? prev.joining,
+                travel: j.travel_requirements ?? prev.travel,
+                visa: j.visa_requirements ?? prev.visa,
               }
-              // Best-effort backfill for new granular sections if empty
-              if (!next.technical && next.requirements) next.technical = next.requirements
-              if (!next.day && next.description) next.day = next.description
               // Mark status initialized after deriving it and persist server truth to localStorage
               statusInitializedRef.current = true
               return next
@@ -604,8 +625,8 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
           // Redirect to the Selected Agents page
           router.push(`/selected-agents?jobId=${encodeURIComponent(data.jobId)}&tab=1`)
         } else {
-          // Stay on page and show success for edit
-          alert('Changes saved successfully.')
+          // Redirect to jobs list after saving changes in edit mode
+          router.push('/dashboard/jobs')
         }
       
     } catch (error) {
