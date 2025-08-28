@@ -73,7 +73,8 @@ export default function ApplyForm({ job }: { job: any }) {
         return
       }
 
-      const candidateId = `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      // candidateId will be assigned after backend persistence
+      let candidateId = `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
       // If a resume file is selected, upload it first
       let uploadedResume: { name: string; size: number; type: string; url: string } | null = null
@@ -100,43 +101,43 @@ export default function ApplyForm({ job }: { job: any }) {
         fullName,
         submittedAt: new Date().toISOString(),
         status: 'applied',
-        // Attach resume with URL if uploaded, else include basic metadata if present
-        ...((uploadedResume || resumeMeta)
-          ? { resume: (uploadedResume || resumeMeta) as any }
-          : {}),
+        ...((uploadedResume || resumeMeta) ? { resume: (uploadedResume || resumeMeta) as any } : {}),
       }
 
-      const existingApplications = JSON.parse(localStorage.getItem('candidateApplications') || '[]')
-      existingApplications.push(application)
-      localStorage.setItem('candidateApplications', JSON.stringify(existingApplications))
-
-      const candidateRecord = {
-        id: candidateId,
-        name: fullName,
-        email: formData.email,
-        phone: formData.phone,
-        status: 'qualified',
-        pipeline_progress: 0,
-        current_stage: 0,
-        applied_date: new Date().toISOString(),
-        source: 'direct_application',
-        resume_score: Math.floor(Math.random() * 30) + 70,
-        rejection_count: 0,
-        last_rejection_date: null,
-        jobId: job.id,
-        application_data: { ...formData, fullName, ...((uploadedResume || resumeMeta) ? { resume: (uploadedResume || resumeMeta) } : {}) },
-        stages: [
-          { name: 'Initial Screening', status: 'pending', score: 0, completed_at: null, feedback: null },
-          { name: 'Technical Interview', status: 'pending', score: 0, completed_at: null, feedback: null },
-          { name: 'HR Round', status: 'pending', score: 0, completed_at: null, feedback: null },
-          { name: 'Final Result', status: 'pending', score: 0, completed_at: null, feedback: null },
-        ],
-        final_recommendation: null,
+      // Persist to backend: candidates, files link, and applications
+      try {
+        const res = await fetch('/api/applications/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId: job.id,
+            candidate: {
+              firstName: formData.firstName,
+              lastName: formData.lastName,
+              fullName,
+              email: formData.email,
+              phone: formData.phone,
+              location: formData.location,
+            },
+            resume: uploadedResume || resumeMeta,
+            source: 'direct_application',
+          }),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err?.error || 'Failed to save application')
+        }
+        const { candidateId: savedCandidateId } = await res.json()
+        if (savedCandidateId) {
+          candidateId = savedCandidateId
+          application.id = savedCandidateId
+        }
+      } catch (err: any) {
+        console.error('Backend persistence failed:', err)
+        toast({ title: 'Submission failed', description: err?.message || 'Could not save your application. Please try again.', variant: 'destructive' })
+        setLoading(false)
+        return
       }
-
-      const existingCandidates = JSON.parse(localStorage.getItem('interviewCandidates') || '[]')
-      existingCandidates.push(candidateRecord)
-      localStorage.setItem('interviewCandidates', JSON.stringify(existingCandidates))
 
       const jobDescription = job?.description || 'Senior Full Stack Developer position requiring React, Node.js, and cloud experience'
       // Use server API to evaluate via OpenAI when available
@@ -157,26 +158,19 @@ export default function ApplyForm({ job }: { job: any }) {
 
       if (evaluation.qualified) {
         application.status = 'qualified'
-        candidateRecord.status = 'qualified'
-        candidateRecord.resume_score = evaluation.score
 
+        // Create interview pipeline (local UX flow)
         const pipeline = await AIInterviewService.createInterviewPipeline(candidateId, job.id)
         const existingPipelines = JSON.parse(localStorage.getItem('interviewPipelines') || '[]')
         existingPipelines.push(pipeline)
         localStorage.setItem('interviewPipelines', JSON.stringify(existingPipelines))
-
-        const updatedApplications = existingApplications.map((app: CandidateApplication) => (app.id === candidateId ? application : app))
-        localStorage.setItem('candidateApplications', JSON.stringify(updatedApplications))
-
-        const updatedCandidates = existingCandidates.map((cand: any) => (cand.id === candidateId ? candidateRecord : cand))
-        localStorage.setItem('interviewCandidates', JSON.stringify(updatedCandidates))
 
         const activityLog = {
           id: `activity_${Date.now()}`,
           company_id: job?.company_id || 'company_1',
           action: 'New Application Received',
           details: {
-            candidate_name: formData.fullName,
+            candidate_name: fullName,
             job_title: job?.title || 'Senior Full Stack Developer',
             status: 'qualified',
             source: 'direct_application',
@@ -196,13 +190,6 @@ export default function ApplyForm({ job }: { job: any }) {
         }, 1500)
       } else {
         application.status = 'unqualified'
-        candidateRecord.status = 'rejected'
-
-        const updatedApplications = existingApplications.map((app: CandidateApplication) => (app.id === candidateId ? application : app))
-        localStorage.setItem('candidateApplications', JSON.stringify(updatedApplications))
-
-        const updatedCandidates = existingCandidates.map((cand: any) => (cand.id === candidateId ? candidateRecord : cand))
-        localStorage.setItem('interviewCandidates', JSON.stringify(updatedCandidates))
 
         // Persist evaluation details for a dedicated result page
         try {
