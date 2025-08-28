@@ -202,11 +202,11 @@ export default async function JobDetailPage(
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         <div className="grid grid-cols-1 lg:[grid-template-columns:1fr_380px] gap-6 lg:gap-8 isolate">
           {/* Right column first on mobile (summary), then content */}
-          <aside className="order-1 lg:order-2 lg:sticky lg:top-6 lg:z-20 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:overflow-x-hidden lg:pb-6 lg:pt-1">
+          <aside className="order-1 lg:order-2 lg:sticky lg:top-6 lg:z-20 lg:self-start lg:pb-6 lg:pt-1">
             {/* Summary Card */}
             <aside
               aria-labelledby="summary-heading"
-              className="relative z-20 rounded-2xl border border-slate-200/80 bg-white p-5 md:p-6 shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-[1.02] emerald-glow lg:sticky lg:top-6 w-full transform-gpu will-change-transform"
+              className="relative z-20 rounded-2xl border border-slate-200/80 bg-white p-5 md:p-6 shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-[1.02] emerald-glow w-full transform-gpu will-change-transform"
             >
               <h2
                 id="summary-heading"
