@@ -145,7 +145,7 @@ export default function QualifiedCandidatesInterviewFlowPage() {
   const [tabValue, setTabValue] = useState<string>("screening")
 
   return (
-    <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
+    <div className="max-w-7xl mx-auto px-4 space-y-6 py-6 overflow-x-hidden bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Qualified Candidates - Interview Flow</h1>
         <Link href="/dashboard/analytics" className="text-sm text-blue-600 hover:underline">
@@ -154,12 +154,12 @@ export default function QualifiedCandidatesInterviewFlowPage() {
       </div>
 
       {/* Summary metric cards for each bucket */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         {buckets.map((b) => (
           <button
             key={b.key}
             onClick={() => setTabValue(b.key)}
-            className={`text-left group focus:outline-none`}
+            className={`w-full text-left group focus:outline-none`}
             aria-label={`Open ${b.label}`}
           >
             <Card
@@ -189,19 +189,19 @@ export default function QualifiedCandidatesInterviewFlowPage() {
                 <CardTitle>{b.agent}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="overflow-hidden rounded-lg border border-gray-200">
-                  <Table>
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <Table className="table-auto w-full">
                     <TableHeader>
                       <TableRow className="bg-gray-50">
-                        <TableHead>Candidate Name</TableHead>
-                        <TableHead>Applied JD</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>CV Link</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Report</TableHead>
-                        <TableHead>Action</TableHead>
-                        <TableHead>Resend Link</TableHead>
+                        <TableHead className="px-3 py-2 text-sm align-middle">Candidate Name</TableHead>
+                        <TableHead className="px-3 py-2 text-sm align-middle">Applied JD</TableHead>
+                        <TableHead className="px-3 py-2 text-sm align-middle">Email</TableHead>
+                        <TableHead className="px-3 py-2 text-sm align-middle">Phone</TableHead>
+                        <TableHead className="px-3 py-2 text-sm align-middle">CV Link</TableHead>
+                        <TableHead className="px-3 py-2 text-sm align-middle">Status</TableHead>
+                        <TableHead className="px-3 py-2 text-sm align-middle">Report</TableHead>
+                        <TableHead className="px-3 py-2 text-sm align-middle whitespace-nowrap">Action</TableHead>
+                        <TableHead className="px-3 py-2 text-sm align-middle whitespace-nowrap">Resend Link</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -211,16 +211,18 @@ export default function QualifiedCandidatesInterviewFlowPage() {
                         const canResend = row.status === "Pending" || row.status === "Expired"
                         return (
                           <TableRow key={row.id} className={idx % 2 === 1 ? "bg-gray-50" : undefined}>
-                            <TableCell className="font-medium">{row.candidateName}</TableCell>
-                            <TableCell>{row.appliedJD}</TableCell>
-                            <TableCell>{row.email}</TableCell>
-                            <TableCell>{row.phone}</TableCell>
-                            <TableCell>
+                            <TableCell className="px-3 py-2 text-sm align-middle font-medium truncate">{row.candidateName}</TableCell>
+                            <TableCell className="px-3 py-2 text-sm align-middle truncate">{row.appliedJD}</TableCell>
+                            <TableCell className="px-3 py-2 text-sm align-middle">
+                              <span className="block max-w-[220px] truncate">{row.email}</span>
+                            </TableCell>
+                            <TableCell className="px-3 py-2 text-sm align-middle">{row.phone}</TableCell>
+                            <TableCell className="px-3 py-2 text-sm align-middle">
                               <Link href={row.cvUrl} target="_blank" className="text-blue-600 hover:underline">
                                 View CV
                               </Link>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="px-3 py-2 text-sm align-middle">
                               <span
                                 className={
                                   row.status === "Qualified"
@@ -235,10 +237,10 @@ export default function QualifiedCandidatesInterviewFlowPage() {
                                 {row.status}
                               </span>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
                               <Button variant="outline" size="sm">Show Report & Interview Details</Button>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
                               <Button
                                 size="sm"
                                 className={
@@ -251,7 +253,7 @@ export default function QualifiedCandidatesInterviewFlowPage() {
                                 Processed to Next Round
                               </Button>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
                               <Button
                                 size="sm"
                                 className={

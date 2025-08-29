@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { Header } from "@/components/dashboard/header"
@@ -14,6 +14,7 @@ export default function DashboardLayout({
 }) {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
     if (!loading && !user) {
@@ -37,7 +38,7 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-gray-50">
       <div className="flex">
         <Sidebar />
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <Header />
           <main className="p-6">{children}</main>
         </div>

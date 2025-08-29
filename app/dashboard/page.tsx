@@ -36,8 +36,25 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     if (!company?.id) return
 
-    // Fetch job statistics
-    const { data: jobs } = await supabase.from("job_descriptions").select("*").eq("company_id", company.id)
+    // Fetch jobs via internal API (same source as Jobs page)
+    let openJobsCount = 0
+    try {
+      const companyName = company?.name ? encodeURIComponent(company.name) : ''
+      const url = companyName ? `/api/jobs?company=${companyName}` : '/api/jobs'
+      const res = await fetch(url)
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data?.ok && Array.isArray(data.jobs)) {
+        openJobsCount = data.jobs.filter((j: any) => {
+          const v = String(j.status || '').trim().toLowerCase()
+          if (v === 'closed') return false
+          if (['on hold','on_hold','on-hold','onhold','hold','paused','pause'].includes(v)) return false
+          if (['cancelled','canceled','cancel'].includes(v)) return false
+          return true // treat anything else as open
+        }).length
+      }
+    } catch (e) {
+      console.error('Failed to load jobs for dashboard:', e)
+    }
 
     // Fetch candidate statistics
     const { data: candidates } = await supabase
@@ -61,7 +78,7 @@ export default function DashboardPage() {
       .limit(10)
 
     setStats({
-      totalJobs: jobs?.length || 0,
+      totalJobs: openJobsCount,
       activeCandidates: candidates?.length || 0,
       scheduledInterviews: interviews?.length || 0,
       successRate: 85, // This would be calculated based on actual data

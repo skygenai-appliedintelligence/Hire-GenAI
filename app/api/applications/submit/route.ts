@@ -39,6 +39,25 @@ async function getApplicationsColumnMode() {
   }
 }
 
+async function getApplicationsTypes() {
+  const q = `
+    SELECT column_name, data_type, udt_name FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'applications'
+      AND column_name IN ('candidate_id','job_id','resume_file_id','status','source','created_at')
+  `
+  const rows = (await (DatabaseService as any)["query"]?.call(DatabaseService, q, [])
+    .catch(() => [])) as Array<{ column_name: string, data_type: string, udt_name: string }>
+  const map: Record<string, { isUuid: boolean, exists: boolean }> = {}
+  for (const r of rows) {
+    map[r.column_name] = { exists: true, isUuid: (r.udt_name === 'uuid') }
+  }
+  return {
+    candidateId: map['candidate_id'] || { exists: false, isUuid: false },
+    jobId: map['job_id'] || { exists: false, isUuid: false },
+    resumeFileId: map['resume_file_id'] || { exists: false, isUuid: false },
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     if (!DatabaseService.isDatabaseConfigured()) {
@@ -142,14 +161,42 @@ export async function POST(req: NextRequest) {
     let applicationId: string | null = null
     try {
       const appCols = await getApplicationsColumnMode()
-      const cols = ['candidate_id','job_id','status','source','created_at']
-      const vals = ['$1::uuid','$2::uuid', `'applied'`, '$3', 'NOW()']
-      const params: any[] = [candidateId, String(jobId), source]
-      let idx = 4
-      if (appCols.hasFirst) { cols.push('first_name'); vals.push(`$${idx++}`); params.push(firstName || null) }
-      if (appCols.hasLast) { cols.push('last_name'); vals.push(`$${idx++}`); params.push(lastName || null) }
-      if (appCols.hasEmail) { cols.push('email'); vals.push(`$${idx++}`); params.push(String(candidate.email).toLowerCase()) }
-      if (appCols.hasPhone) { cols.push('phone'); vals.push(`$${idx++}`); params.push(candidate.phone || null) }
+      const types = await getApplicationsTypes()
+
+      const cols: string[] = []
+      const vals: string[] = []
+      const params: any[] = []
+      let p = 1
+
+      // candidate_id
+      if (types.candidateId.exists) {
+        cols.push('candidate_id')
+        vals.push(types.candidateId.isUuid ? `$${p++}::uuid` : `$${p++}`)
+        params.push(candidateId)
+      }
+      // job_id
+      if (types.jobId.exists) {
+        cols.push('job_id')
+        vals.push(types.jobId.isUuid ? `$${p++}::uuid` : `$${p++}`)
+        params.push(String(jobId))
+      }
+      // status/source/created_at
+      cols.push('status'); vals.push(`'applied'`)
+      if (typeof source !== 'undefined') { cols.push('source'); vals.push(`$${p++}`); params.push(source) }
+      cols.push('created_at'); vals.push('NOW()')
+      // Optional person/contact columns
+      if (appCols.hasFirst) { cols.push('first_name'); vals.push(`$${p++}`); params.push(firstName || null) }
+      if (appCols.hasLast) { cols.push('last_name'); vals.push(`$${p++}`); params.push(lastName || null) }
+      if (appCols.hasEmail) { cols.push('email'); vals.push(`$${p++}`); params.push(String(candidate.email).toLowerCase()) }
+      if (appCols.hasPhone) { cols.push('phone'); vals.push(`$${p++}`); params.push(candidate.phone || null) }
+      // Optional resume_file_id if column exists and we have fileId
+      if (types.resumeFileId.exists && fileId) {
+        cols.push('resume_file_id')
+        vals.push(types.resumeFileId.isUuid ? `$${p++}::uuid` : `$${p++}`)
+        params.push(fileId)
+      }
+
+      if (cols.length === 0) throw new Error('applications table not compatible')
 
       const insertAppQ = `
         INSERT INTO applications (${cols.join(',')})
@@ -158,8 +205,8 @@ export async function POST(req: NextRequest) {
       `
       const appRows = await (DatabaseService as any)["query"].call(DatabaseService, insertAppQ, params) as any[]
       applicationId = appRows?.[0]?.id || null
-    } catch (e) {
-      // If applications table shape differs, at least return the candidate
+    } catch (e: any) {
+      console.error('Applications insert failed:', e?.message || e)
       applicationId = null
     }
 
