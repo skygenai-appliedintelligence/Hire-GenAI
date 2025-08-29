@@ -17,6 +17,7 @@ export default function ApplyForm({ job }: { job: any }) {
   const [loading, setLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [resumeMeta, setResumeMeta] = useState<{ name: string; size: number; type: string; url?: string } | null>(null)
+  const [uploadedResume, setUploadedResume] = useState<any>(null)
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [formData, setFormData] = useState({
@@ -73,27 +74,43 @@ export default function ApplyForm({ job }: { job: any }) {
         return
       }
 
-      // candidateId will be assigned after backend persistence
-      let candidateId = `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-
-      // If a resume file is selected, upload it first
-      let uploadedResume: { name: string; size: number; type: string; url: string } | null = null
+      // Upload resume first
+      let resumeUploadResult: any = null
       if (resumeFile) {
         try {
+          const candidateId = `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
           const fd = new FormData()
           fd.append('file', resumeFile)
-          const res = await fetch('/api/uploads', { method: 'POST', body: fd })
-          if (!res.ok) throw new Error('Upload failed')
-          const data = await res.json()
-          uploadedResume = { name: data.name, size: data.size, type: data.type, url: data.url }
-        } catch (err) {
-          console.error(err)
-          toast({ title: 'Upload failed', description: 'Please try again or use a smaller file.', variant: 'destructive' })
+          fd.append('candidateId', candidateId)
+
+          const res = await fetch('/api/resumes/upload', { 
+            method: 'POST', 
+            body: fd 
+          })
+          
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}))
+            throw new Error(err?.error || 'Failed to upload resume')
+          }
+          
+          resumeUploadResult = await res.json()
+          setUploadedResume(resumeUploadResult)
+          
+          toast({ 
+            title: 'Resume uploaded successfully!', 
+            description: `${resumeUploadResult.filename} uploaded to cloud storage` 
+          })
+        } catch (err: any) {
+          console.error('Resume upload failed:', err)
+          toast({ title: 'Upload failed', description: err?.message || 'Could not upload resume. Please try again.', variant: 'destructive' })
           setLoading(false)
           return
         }
       }
 
+      // Use the candidate ID from resume upload
+      const candidateId = resumeUploadResult?.candidateId || `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      
       const application: CandidateApplication = {
         id: candidateId,
         jobId: job.id,
@@ -101,42 +118,7 @@ export default function ApplyForm({ job }: { job: any }) {
         fullName,
         submittedAt: new Date().toISOString(),
         status: 'applied',
-        ...((uploadedResume || resumeMeta) ? { resume: (uploadedResume || resumeMeta) as any } : {}),
-      }
-
-      // Persist to backend: candidates, files link, and applications
-      try {
-        const res = await fetch('/api/applications/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jobId: job.id,
-            candidate: {
-              firstName: formData.firstName,
-              lastName: formData.lastName,
-              fullName,
-              email: formData.email,
-              phone: formData.phone,
-              location: formData.location,
-            },
-            resume: uploadedResume || resumeMeta,
-            source: 'direct_application',
-          }),
-        })
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}))
-          throw new Error(err?.error || 'Failed to save application')
-        }
-        const { candidateId: savedCandidateId } = await res.json()
-        if (savedCandidateId) {
-          candidateId = savedCandidateId
-          application.id = savedCandidateId
-        }
-      } catch (err: any) {
-        console.error('Backend persistence failed:', err)
-        toast({ title: 'Submission failed', description: err?.message || 'Could not save your application. Please try again.', variant: 'destructive' })
-        setLoading(false)
-        return
+        resumeUrl: resumeUploadResult?.fileUrl,
       }
 
       const jobDescription = job?.description || 'Senior Full Stack Developer position requiring React, Node.js, and cloud experience'
@@ -337,11 +319,22 @@ export default function ApplyForm({ job }: { job: any }) {
                 <span className="inline-flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-emerald-700 border border-emerald-200">{resumeMeta.name}</span>
                 <span className="text-slate-400">•</span>
                 <span>{Math.round(resumeMeta.size / 1024)} KB</span>
+                {uploadedResume && (
+                  <a
+                    href={uploadedResume.fileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-2 inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700 hover:bg-emerald-100"
+                  >
+                    📄 Download
+                  </a>
+                )}
                 <button
                   type="button"
                   onClick={() => {
                     setResumeFile(null)
                     setResumeMeta(null)
+                    setUploadedResume(null)
                     if (fileInputRef.current) fileInputRef.current.value = ''
                     toast({ title: 'Removed', description: 'Resume selection cleared.' })
                   }}
