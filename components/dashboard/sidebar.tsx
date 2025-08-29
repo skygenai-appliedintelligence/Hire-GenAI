@@ -21,17 +21,17 @@ export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <div className="w-64 bg-white shadow-sm border-r border-gray-200">
-      <div className="p-6">
+    <div className="w-52 bg-white shadow-sm border-r border-gray-200">
+      <div className="p-4">
         <Link href="/">
-          <h1 className="text-xl font-bold">
+          <h1 className="text-lg font-bold">
             <span className="text-slate-800">Hire</span>
             <span className="sr-text-gradient">GenAI</span>
           </h1>
         </Link>
       </div>
-      <nav className="mt-6">
-        <div className="px-3">
+      <nav className="mt-4">
+        <div className="px-2">
           {navigation.map((item) => {
             const isActive =
               pathname === item.href ||
@@ -50,7 +50,7 @@ export function Sidebar() {
               >
                 <item.icon
                   className={cn(
-                    "mr-3 h-5 w-5",
+                    "mr-2.5 h-5 w-5",
                     isActive ? "text-emerald-500" : "text-gray-400 group-hover:text-emerald-500",
                   )}
                 />
