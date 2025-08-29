@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -8,6 +9,7 @@ import { TrendingUp, TrendingDown, Users, Briefcase, Calendar, Target } from "lu
 
 export default function AnalyticsPage() {
   const { company } = useAuth()
+  const router = useRouter()
   const [analytics, setAnalytics] = useState({
     totalApplications: 156,
     qualifiedCandidates: 89,
@@ -40,7 +42,7 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
         <p className="text-gray-600">Track your recruitment performance and insights</p>
@@ -48,7 +50,17 @@ export default function AnalyticsPage() {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="linkedin-card">
+        <Card
+          className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
+          role="button"
+          tabIndex={0}
+          onClick={() => router.push("/dashboard/analytics/applications")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              router.push("/dashboard/analytics/applications")
+            }
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Applications</CardTitle>
             <Users className="h-4 w-4 text-blue-600" />
@@ -65,7 +77,17 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="linkedin-card">
+        <Card
+          className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
+          role="button"
+          tabIndex={0}
+          onClick={() => router.push("/dashboard/analytics/qualified")}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              router.push("/dashboard/analytics/qualified")
+            }
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Qualified Candidates</CardTitle>
             <Target className="h-4 w-4 text-green-600" />
@@ -78,7 +100,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="linkedin-card">
+        <Card className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Interviews Completed</CardTitle>
             <Calendar className="h-4 w-4 text-purple-600" />
@@ -95,7 +117,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="linkedin-card">
+        <Card className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Successful Hires</CardTitle>
             <Briefcase className="h-4 w-4 text-orange-600" />
@@ -115,7 +137,7 @@ export default function AnalyticsPage() {
 
       {/* Additional Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="linkedin-card">
+        <Card className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
           <CardHeader>
             <CardTitle>Top Candidate Sources</CardTitle>
             <CardDescription>Where your best candidates are coming from</CardDescription>
@@ -140,7 +162,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="linkedin-card">
+        <Card className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
           <CardHeader>
             <CardTitle>Recruitment Efficiency</CardTitle>
             <CardDescription>Key performance indicators</CardDescription>
