@@ -121,6 +121,49 @@ export default function ApplyForm({ job }: { job: any }) {
         resumeUrl: resumeUploadResult?.fileUrl,
       }
 
+      // Persist into DB applications table (server-side) so analytics can use real data
+      try {
+        const submitPayload = {
+          jobId: job.id,
+          candidate: {
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            fullName,
+            email: formData.email,
+            phone: formData.phone,
+            location: formData.location,
+          },
+          resume: resumeUploadResult?.fileUrl
+            ? {
+                url: resumeUploadResult.fileUrl,
+                name: resumeUploadResult.filename || resumeMeta?.name || 'resume',
+                type: resumeFile?.type || resumeMeta?.type,
+                size: resumeFile?.size || resumeMeta?.size,
+              }
+            : (resumeMeta
+                ? {
+                    url: (resumeMeta as any).url, // optional if available
+                    name: resumeMeta.name,
+                    type: resumeMeta.type,
+                    size: resumeMeta.size,
+                  }
+                : null),
+          source: 'direct_application',
+        }
+
+        const submitRes = await fetch('/api/applications/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(submitPayload),
+        })
+        const submitData = await submitRes.json().catch(() => ({}))
+        if (!submitRes.ok || submitData?.error) {
+          console.warn('Application DB submit failed:', submitData?.error)
+        }
+      } catch (err) {
+        console.warn('Application DB submit error:', err)
+      }
+
       const jobDescription = job?.description || 'Senior Full Stack Developer position requiring React, Node.js, and cloud experience'
       // Use server API to evaluate via OpenAI when available
       let evaluation: { qualified: boolean; score: number; reasoning: string; feedback: string }
