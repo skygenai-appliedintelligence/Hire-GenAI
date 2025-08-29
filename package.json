@@ -10,7 +10,10 @@
     "setup": "node scripts/setup-env.js",
     "git:push": "powershell -ExecutionPolicy Bypass -File scripts/git-push.ps1",
     "push": "npm run git:push",
-    "push:force": "npm run git:push -- -Force"
+    "push:force": "npm run git:push -- -Force",
+    "prisma:pull": "dotenv -e .env.local -- npx prisma db pull",
+    "prisma:push": "dotenv -e .env.local -- npx prisma db push",
+    "prisma:generate": "dotenv -e .env.local -- npx prisma generate"
   },
   "dependencies": {
     "@ai-sdk/openai": "latest",
@@ -45,6 +48,7 @@
     "@radix-ui/react-tooltip": "1.1.6",
     "@supabase/supabase-js": "latest",
     "@types/pg": "^8.15.5",
+    "@vercel/blob": "^1.1.1",
     "ai": "latest",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
@@ -75,11 +79,11 @@
   "devDependencies": {
     "@babel/eslint-parser": "^7.28.0",
     "@types/node": "^22",
-    "prisma": "^5.22.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9.33.0",
     "postcss": "^8.5",
+    "prisma": "^5.22.0",
     "tailwindcss": "^3.4.17",
     "typescript": "^5"
   },
