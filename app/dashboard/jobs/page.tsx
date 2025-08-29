@@ -365,7 +365,7 @@ export default function JobsPage() {
                         )}
                       </div>
                       <div className="flex space-x-2">
-                        <Link href={`/dashboard/jobs/${job.id}`}>
+                        <Link href={`/dashboard/analytics`}>
                           <Button
                             variant="outline"
                             size="sm"
@@ -522,7 +522,7 @@ export default function JobsPage() {
                         )}
                       </div>
                       <div className="flex space-x-2">
-                        <Link href={`/dashboard/jobs/${job.id}`}>
+                        <Link href={`/dashboard/analytics`}>
                           <Button
                             variant="outline"
                             size="sm"
@@ -679,7 +679,7 @@ export default function JobsPage() {
                         )}
                       </div>
                       <div className="flex space-x-2">
-                        <Link href={`/dashboard/jobs/${job.id}`}>
+                        <Link href={`/dashboard/analytics`}>
                           <Button
                             variant="outline"
                             size="sm"
@@ -849,7 +849,7 @@ export default function JobsPage() {
                         )}
                       </div>
                       <div className="flex space-x-2">
-                        <Link href={`/dashboard/jobs/${job.id}`}>
+                        <Link href={`/dashboard/analytics`}>
                           <Button
                             variant="outline"
                             size="sm"
