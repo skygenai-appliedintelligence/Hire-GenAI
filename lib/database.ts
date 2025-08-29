@@ -967,4 +967,101 @@ export class DatabaseService {
       seq++
     }
   }
+
+  // =========================
+  // FILES AND CANDIDATES
+  // =========================
+  
+  // Create file record
+  static async createFile(data: {
+    storage_key: string
+    content_type?: string
+    size_bytes?: bigint
+    company_id?: string
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+
+    const q = `
+      INSERT INTO files (storage_key, content_type, size_bytes, company_id, created_at)
+      VALUES ($1, $2, $3, $4::uuid, NOW())
+      RETURNING *
+    `
+    const rows = await this.query(q, [
+      data.storage_key,
+      data.content_type || null,
+      data.size_bytes || null,
+      data.company_id || null
+    ]) as any[]
+
+    if (rows.length === 0) {
+      throw new Error('Failed to create file record')
+    }
+
+    return rows[0]
+  }
+
+  // Create or update candidate
+  static async upsertCandidate(data: {
+    email: string
+    first_name?: string
+    last_name?: string
+    resume_file_id?: string
+    resume_url?: string
+    resume_name?: string
+    resume_size?: string
+    resume_type?: string
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+
+    // Check if candidate exists
+    const existingQuery = `SELECT * FROM candidates WHERE email = $1 LIMIT 1`
+    const existing = await this.query(existingQuery, [data.email.toLowerCase()]) as any[]
+
+    if (existing.length > 0) {
+      // Update existing candidate
+      const updateQuery = `
+        UPDATE candidates 
+        SET resume_file_id = $2::uuid, resume_url = $3, resume_name = $4, 
+            resume_size = $5, resume_type = $6
+        WHERE email = $1
+        RETURNING *
+      `
+      const updated = await this.query(updateQuery, [
+        data.email.toLowerCase(),
+        data.resume_file_id || null,
+        data.resume_url || null,
+        data.resume_name || null,
+        data.resume_size || null,
+        data.resume_type || null
+      ]) as any[]
+
+      return updated[0]
+    } else {
+      // Create new candidate
+      const insertQuery = `
+        INSERT INTO candidates (
+          email, first_name, last_name, resume_file_id, resume_url, 
+          resume_name, resume_size, resume_type, created_at
+        )
+        VALUES ($1, $2, $3, $4::uuid, $5, $6, $7, $8, NOW())
+        RETURNING *
+      `
+      const created = await this.query(insertQuery, [
+        data.email.toLowerCase(),
+        data.first_name || 'Unknown',
+        data.last_name || 'Candidate',
+        data.resume_file_id || null,
+        data.resume_url || null,
+        data.resume_name || null,
+        data.resume_size || null,
+        data.resume_type || null
+      ]) as any[]
+
+      return created[0]
+    }
+  }
 }
