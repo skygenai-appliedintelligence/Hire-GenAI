@@ -79,24 +79,45 @@ export async function POST(req: NextRequest) {
     const lastName = (candidate.lastName || '').trim()
     const fullNameInput = (candidate.fullName || `${firstName} ${lastName}`.trim()).trim()
 
-    // 1) Save file (if provided) into files table and get file_id
+    // 1) Resolve resume file_id without creating duplicates
+    // Prefer resume.fileId if provided; otherwise, try to reuse existing files row by storage_key
     let fileId: string | null = null
-    if (resume?.url) {
-      const insertFileQ = `
-        INSERT INTO files (storage_key, content_type, size_bytes, created_at)
-        VALUES ($1, $2, $3, NOW())
-        RETURNING id
-      `
-      const fileRows = await (DatabaseService as any)["query"].call(DatabaseService, insertFileQ, [
-        String(resume.url),
-        resume.type ? String(resume.type) : null,
-        resume.size != null ? Number(resume.size) : null,
-      ]) as any[]
-      fileId = fileRows?.[0]?.id || null
+    if (resume?.fileId) {
+      fileId = String(resume.fileId)
+    } else if (resume?.url) {
+      // Try to find existing files row
+      const findFileQ = `SELECT id FROM files WHERE storage_key = $1 LIMIT 1`
+      const existingFile = await (DatabaseService as any)["query"].call(DatabaseService, findFileQ, [String(resume.url)]) as any[]
+      if (existingFile?.length) {
+        fileId = existingFile[0].id
+      } else {
+        const insertFileQ = `
+          INSERT INTO files (storage_key, content_type, size_bytes, created_at)
+          VALUES ($1, $2, $3, NOW())
+          RETURNING id
+        `
+        const fileRows = await (DatabaseService as any)["query"].call(DatabaseService, insertFileQ, [
+          String(resume.url),
+          resume.type ? String(resume.type) : null,
+          resume.size != null ? Number(resume.size) : null,
+        ]) as any[]
+        fileId = fileRows?.[0]?.id || null
+      }
     }
 
     // 2) Upsert candidate by email
     const mode = await getCandidateNameMode()
+    // Probe for optional resume columns on candidates
+    const candColsRows = await (DatabaseService as any)["query"].call(
+      DatabaseService,
+      `
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'candidates'
+          AND column_name IN ('resume_file_id','resume_url','resume_name','resume_size','resume_type','location','phone','first_name','last_name','full_name')
+      `,
+      []
+    ).catch(() => []) as Array<{ column_name: string }>
+    const candCols = new Set((candColsRows || []).map(r => r.column_name))
 
     // Find existing candidate
     const findQ = `SELECT * FROM candidates WHERE email = $1 LIMIT 1`
@@ -119,7 +140,11 @@ export async function POST(req: NextRequest) {
       // Optional contact/location
       if (candidate.phone !== undefined) { updates.push(`phone = $${i++}`); params.push(candidate.phone || null) }
       if (candidate.location !== undefined) { updates.push(`location = $${i++}`); params.push(candidate.location || null) }
-      if (fileId) { updates.push(`resume_file_id = $${i++}::uuid`); params.push(fileId) }
+      if (fileId && candCols.has('resume_file_id')) { updates.push(`resume_file_id = $${i++}::uuid`); params.push(fileId) }
+      if (candCols.has('resume_url') && resume?.url) { updates.push(`resume_url = $${i++}`); params.push(String(resume.url)) }
+      if (candCols.has('resume_name') && (resume?.name || resume?.filename)) { updates.push(`resume_name = $${i++}`); params.push(String(resume.name || resume.filename)) }
+      if (candCols.has('resume_size') && (resume?.size != null)) { updates.push(`resume_size = $${i++}`); params.push(String(Number(resume.size))) }
+      if (candCols.has('resume_type') && resume?.type) { updates.push(`resume_type = $${i++}`); params.push(String(resume.type)) }
 
       if (updates.length > 0) {
         const updateQ = `UPDATE candidates SET ${updates.join(', ')} WHERE id = $${i}::uuid RETURNING id`
@@ -139,9 +164,13 @@ export async function POST(req: NextRequest) {
       // Always try to set first/last if columns exist as well
       if (mode.hasFirst) { columns.push('first_name'); placeholders.push(`$${p++}`); values.push(firstName || null) }
       if (mode.hasLast) { columns.push('last_name'); placeholders.push(`$${p++}`); values.push(lastName || null) }
-      if (candidate.phone !== undefined) { columns.push('phone'); placeholders.push(`$${p++}`); values.push(candidate.phone || null) }
-      if (candidate.location !== undefined) { columns.push('location'); placeholders.push(`$${p++}`); values.push(candidate.location || null) }
-      if (fileId) { columns.push('resume_file_id'); placeholders.push(`$${p++}::uuid`); values.push(fileId) }
+      if (candidate.phone !== undefined && candCols.has('phone')) { columns.push('phone'); placeholders.push(`$${p++}`); values.push(candidate.phone || null) }
+      if (candidate.location !== undefined && candCols.has('location')) { columns.push('location'); placeholders.push(`$${p++}`); values.push(candidate.location || null) }
+      if (fileId && candCols.has('resume_file_id')) { columns.push('resume_file_id'); placeholders.push(`$${p++}::uuid`); values.push(fileId) }
+      if (candCols.has('resume_url') && resume?.url) { columns.push('resume_url'); placeholders.push(`$${p++}`); values.push(String(resume.url)) }
+      if (candCols.has('resume_name') && (resume?.name || resume?.filename)) { columns.push('resume_name'); placeholders.push(`$${p++}`); values.push(String(resume.name || resume.filename)) }
+      if (candCols.has('resume_size') && (resume?.size != null)) { columns.push('resume_size'); placeholders.push(`$${p++}`); values.push(String(Number(resume.size))) }
+      if (candCols.has('resume_type') && resume?.type) { columns.push('resume_type'); placeholders.push(`$${p++}`); values.push(String(resume.type)) }
 
       const insertQ = `
         INSERT INTO candidates (${columns.join(', ')})
@@ -156,55 +185,62 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to persist candidate' }, { status: 500 })
     }
 
-    // 3) Create application row
+    // 3) Create application row (idempotent on candidate_id+job_id)
     // Insert minimal fields that are present in our schema
     let applicationId: string | null = null
     try {
-      const appCols = await getApplicationsColumnMode()
-      const types = await getApplicationsTypes()
+      // First, check if an application already exists for this candidate+job
+      const existingAppQ = `SELECT id FROM applications WHERE candidate_id = $1::uuid AND job_id = $2::uuid LIMIT 1`
+      const existingApp = await (DatabaseService as any)["query"].call(DatabaseService, existingAppQ, [candidateId, String(jobId)]) as any[]
+      if (existingApp?.length) {
+        applicationId = existingApp[0].id
+      } else {
+        const appCols = await getApplicationsColumnMode()
+        const types = await getApplicationsTypes()
 
-      const cols: string[] = []
-      const vals: string[] = []
-      const params: any[] = []
-      let p = 1
+        const cols: string[] = []
+        const vals: string[] = []
+        const params: any[] = []
+        let p = 1
 
-      // candidate_id
-      if (types.candidateId.exists) {
-        cols.push('candidate_id')
-        vals.push(types.candidateId.isUuid ? `$${p++}::uuid` : `$${p++}`)
-        params.push(candidateId)
-      }
-      // job_id
-      if (types.jobId.exists) {
-        cols.push('job_id')
-        vals.push(types.jobId.isUuid ? `$${p++}::uuid` : `$${p++}`)
-        params.push(String(jobId))
-      }
-      // status/source/created_at
-      cols.push('status'); vals.push(`'applied'`)
-      if (typeof source !== 'undefined') { cols.push('source'); vals.push(`$${p++}`); params.push(source) }
-      cols.push('created_at'); vals.push('NOW()')
-      // Optional person/contact columns
-      if (appCols.hasFirst) { cols.push('first_name'); vals.push(`$${p++}`); params.push(firstName || null) }
-      if (appCols.hasLast) { cols.push('last_name'); vals.push(`$${p++}`); params.push(lastName || null) }
-      if (appCols.hasEmail) { cols.push('email'); vals.push(`$${p++}`); params.push(String(candidate.email).toLowerCase()) }
-      if (appCols.hasPhone) { cols.push('phone'); vals.push(`$${p++}`); params.push(candidate.phone || null) }
-      // Optional resume_file_id if column exists and we have fileId
-      if (types.resumeFileId.exists && fileId) {
-        cols.push('resume_file_id')
-        vals.push(types.resumeFileId.isUuid ? `$${p++}::uuid` : `$${p++}`)
-        params.push(fileId)
-      }
+        // candidate_id
+        if (types.candidateId.exists) {
+          cols.push('candidate_id')
+          vals.push(types.candidateId.isUuid ? `$${p++}::uuid` : `$${p++}`)
+          params.push(candidateId)
+        }
+        // job_id
+        if (types.jobId.exists) {
+          cols.push('job_id')
+          vals.push(types.jobId.isUuid ? `$${p++}::uuid` : `$${p++}`)
+          params.push(String(jobId))
+        }
+        // status/source/created_at
+        cols.push('status'); vals.push(`'applied'`)
+        if (typeof source !== 'undefined') { cols.push('source'); vals.push(`$${p++}`); params.push(source) }
+        cols.push('created_at'); vals.push('NOW()')
+        // Optional person/contact columns
+        if (appCols.hasFirst) { cols.push('first_name'); vals.push(`$${p++}`); params.push(firstName || null) }
+        if (appCols.hasLast) { cols.push('last_name'); vals.push(`$${p++}`); params.push(lastName || null) }
+        if (appCols.hasEmail) { cols.push('email'); vals.push(`$${p++}`); params.push(String(candidate.email).toLowerCase()) }
+        if (appCols.hasPhone) { cols.push('phone'); vals.push(`$${p++}`); params.push(candidate.phone || null) }
+        // Optional resume_file_id if column exists and we have fileId
+        if (types.resumeFileId.exists && fileId) {
+          cols.push('resume_file_id')
+          vals.push(types.resumeFileId.isUuid ? `$${p++}::uuid` : `$${p++}`)
+          params.push(fileId)
+        }
 
       if (cols.length === 0) throw new Error('applications table not compatible')
 
-      const insertAppQ = `
-        INSERT INTO applications (${cols.join(',')})
-        VALUES (${vals.join(',')})
-        RETURNING id
-      `
-      const appRows = await (DatabaseService as any)["query"].call(DatabaseService, insertAppQ, params) as any[]
-      applicationId = appRows?.[0]?.id || null
+        const insertAppQ = `
+          INSERT INTO applications (${cols.join(',')})
+          VALUES (${vals.join(',')})
+          RETURNING id
+        `
+        const appRows = await (DatabaseService as any)["query"].call(DatabaseService, insertAppQ, params) as any[]
+        applicationId = appRows?.[0]?.id || null
+      }
     } catch (e: any) {
       console.error('Applications insert failed:', e?.message || e)
       applicationId = null
