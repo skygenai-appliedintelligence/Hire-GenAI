@@ -6,11 +6,11 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const candidateId = formData.get('candidateId') as string
+    const candidateId = (formData.get('candidateId') as string) || ''
 
-    if (!file || !candidateId) {
+    if (!file) {
       return NextResponse.json(
-        { error: 'File and candidateId are required' },
+        { error: 'File is required' },
         { status: 400 }
       )
     }
@@ -46,21 +46,43 @@ export async function POST(request: NextRequest) {
       size_bytes: BigInt(file.size),
     })
 
-    // Update or create candidate with resume file reference
-    const candidate = await DatabaseService.upsertCandidate({
-      email: candidateId, // Using candidateId as email for now
-      first_name: 'Unknown',
-      last_name: 'Candidate',
-      resume_file_id: file_record.id,
-      resume_url: blob.url,
-      resume_name: file.name,
-      resume_size: file.size.toString(),
-      resume_type: file.type,
-    })
+    // Link candidate to this file via candidate_documents IF candidateId is a valid UUID
+    const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
+    if (candidateId && uuidRegex.test(candidateId)) {
+      const linkQ = `
+        INSERT INTO candidate_documents (candidate_id, file_id, doc_type, title, created_at)
+        VALUES ($1::uuid, $2::uuid, 'resume', $3, NOW())
+        ON CONFLICT DO NOTHING
+      `
+      await (DatabaseService as any)["query"].call(DatabaseService, linkQ, [candidateId, file_record.id, file.name])
+
+      // Optionally update candidate resume_* columns if they exist
+      try {
+        const colsQ = `
+          SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'candidates'
+            AND column_name IN ('resume_file_id','resume_url','resume_name','resume_size','resume_type')
+        `
+        const rows = await (DatabaseService as any)["query"].call(DatabaseService, colsQ, []) as Array<{ column_name: string }>
+        const setParts: string[] = []
+        const params: any[] = []
+        let p = 1
+        const have = new Set(rows.map(r => r.column_name))
+        if (have.has('resume_file_id')) { setParts.push(`resume_file_id = $${p++}::uuid`); params.push(file_record.id) }
+        if (have.has('resume_url')) { setParts.push(`resume_url = $${p++}`); params.push(blob.url) }
+        if (have.has('resume_name')) { setParts.push(`resume_name = $${p++}`); params.push(file.name) }
+        if (have.has('resume_size')) { setParts.push(`resume_size = $${p++}`); params.push(String(file.size)) }
+        if (have.has('resume_type')) { setParts.push(`resume_type = $${p++}`); params.push(file.type) }
+        if (setParts.length) {
+          const updQ = `UPDATE candidates SET ${setParts.join(', ')} WHERE id = $${p}::uuid`
+          await (DatabaseService as any)["query"].call(DatabaseService, updQ, [...params, candidateId])
+        }
+      } catch {}
+    }
 
     return NextResponse.json({
       id: file_record.id,
-      candidateId: candidate.id,
+      candidateId: candidateId && uuidRegex.test(candidateId) ? candidateId : null,
       fileUrl: blob.url,
       filename: file.name,
       fileSize: file.size,
