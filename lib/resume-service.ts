@@ -1,10 +1,5 @@
-import { PrismaClient } from '@prisma/client'
-import { createServerClient, isServerSupabaseConfigured } from './supabase'
-
-// Use centralized server-side Supabase client (handles env validation)
-const supabase = createServerClient()
-
-const prisma = new PrismaClient()
+import { put } from '@vercel/blob'
+import { DatabaseService } from './database'
 
 export interface ResumeUploadResult {
   id: string
@@ -22,53 +17,33 @@ export class ResumeService {
     candidateId: string
   ): Promise<ResumeUploadResult> {
     try {
-      if (!isServerSupabaseConfigured) {
-        throw new Error(
-          'Supabase storage is not configured. Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local and create a public bucket named "resumes".'
-        )
-      }
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${candidateId}-${Date.now()}.${fileExt}`
-      const filePath = `resumes/${fileName}`
+      // Upload to Vercel Blob and get a public URL
+      const fileName = `${candidateId}-${Date.now()}-${file.name}`
+      const blob = await put(fileName, file, { access: 'public' })
 
-      // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('resumes')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        })
-
-      if (uploadError) {
-        throw new Error(`Upload failed: ${uploadError.message}`)
-      }
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('resumes')
-        .getPublicUrl(filePath)
-
-      // Save metadata to database
-      const resume = await prisma.resume.create({
-        data: {
-          candidate_id: candidateId,
-          filename: fileName,
-          original_name: file.name,
-          file_size: file.size,
-          mime_type: file.type,
-          storage_url: urlData.publicUrl
-        }
+      // Save file metadata to files table
+      const fileRow = await DatabaseService.createFile({
+        storage_key: blob.url,
+        content_type: file.type,
+        size_bytes: BigInt(file.size),
       })
 
+      // Link candidate to file in candidate_documents
+      const linkQ = `
+        INSERT INTO candidate_documents (candidate_id, file_id, doc_type, title, created_at)
+        VALUES ($1::uuid, $2::uuid, 'resume', $3, NOW())
+        ON CONFLICT DO NOTHING
+      `
+      await (DatabaseService as any)["query"].call(DatabaseService, linkQ, [candidateId, fileRow.id, file.name])
+
       return {
-        id: resume.id,
-        filename: resume.filename,
-        originalName: resume.original_name,
-        fileSize: resume.file_size,
-        mimeType: resume.mime_type,
-        storageUrl: resume.storage_url,
-        createdAt: resume.created_at
+        id: fileRow.id,
+        filename: fileName,
+        originalName: file.name,
+        fileSize: Number(fileRow.size_bytes ?? 0),
+        mimeType: fileRow.content_type || file.type,
+        storageUrl: fileRow.storage_key,
+        createdAt: fileRow.created_at,
       }
     } catch (error) {
       console.error('Resume upload error:', error)
@@ -78,19 +53,22 @@ export class ResumeService {
 
   static async getResumesByCandidate(candidateId: string): Promise<ResumeUploadResult[]> {
     try {
-      const resumes = await prisma.resume.findMany({
-        where: { candidate_id: candidateId },
-        orderBy: { created_at: 'desc' }
-      })
-
-      return resumes.map(resume => ({
-        id: resume.id,
-        filename: resume.filename,
-        originalName: resume.original_name,
-        fileSize: resume.file_size,
-        mimeType: resume.mime_type,
-        storageUrl: resume.storage_url,
-        createdAt: resume.created_at
+      const q = `
+        SELECT f.id, f.storage_key, f.content_type, f.size_bytes, cd.title, cd.created_at
+        FROM candidate_documents cd
+        JOIN files f ON f.id = cd.file_id
+        WHERE cd.candidate_id = $1::uuid AND cd.doc_type = 'resume'
+        ORDER BY cd.created_at DESC
+      `
+      const rows = await (DatabaseService as any)["query"].call(DatabaseService, q, [candidateId]) as any[]
+      return rows.map(r => ({
+        id: r.id,
+        filename: String(r.storage_key).split('/').pop() || 'resume',
+        originalName: r.title || 'resume',
+        fileSize: Number(r.size_bytes ?? 0),
+        mimeType: r.content_type || 'application/octet-stream',
+        storageUrl: r.storage_key,
+        createdAt: r.created_at,
       }))
     } catch (error) {
       console.error('Get resumes error:', error)
@@ -100,20 +78,18 @@ export class ResumeService {
 
   static async getResumeById(resumeId: string): Promise<ResumeUploadResult | null> {
     try {
-      const resume = await prisma.resume.findUnique({
-        where: { id: resumeId }
-      })
-
-      if (!resume) return null
-
+      const q = `SELECT * FROM files WHERE id = $1::uuid LIMIT 1`
+      const rows = await (DatabaseService as any)["query"].call(DatabaseService, q, [resumeId]) as any[]
+      if (!rows || rows.length === 0) return null
+      const f = rows[0]
       return {
-        id: resume.id,
-        filename: resume.filename,
-        originalName: resume.original_name,
-        fileSize: resume.file_size,
-        mimeType: resume.mime_type,
-        storageUrl: resume.storage_url,
-        createdAt: resume.created_at
+        id: f.id,
+        filename: String(f.storage_key).split('/').pop() || 'resume',
+        originalName: String(f.storage_key).split('/').pop() || 'resume',
+        fileSize: Number(f.size_bytes ?? 0),
+        mimeType: f.content_type || 'application/octet-stream',
+        storageUrl: f.storage_key,
+        createdAt: f.created_at,
       }
     } catch (error) {
       console.error('Get resume by ID error:', error)
@@ -123,29 +99,11 @@ export class ResumeService {
 
   static async deleteResume(resumeId: string): Promise<void> {
     try {
-      const resume = await prisma.resume.findUnique({
-        where: { id: resumeId }
-      })
-
-      if (!resume) {
-        throw new Error('Resume not found')
-      }
-
-      // Delete from Supabase Storage
-      const filePath = `resumes/${resume.filename}`
-      const { error: deleteError } = await supabase.storage
-        .from('resumes')
-        .remove([filePath])
-
-      if (deleteError) {
-        console.error('Storage deletion error:', deleteError)
-        // Continue with database deletion even if storage deletion fails
-      }
-
-      // Delete from database
-      await prisma.resume.delete({
-        where: { id: resumeId }
-      })
+      // Remove link from candidate_documents then delete the file record
+      const delLink = `DELETE FROM candidate_documents WHERE file_id = $1::uuid AND doc_type = 'resume'`
+      await (DatabaseService as any)["query"].call(DatabaseService, delLink, [resumeId])
+      const delFile = `DELETE FROM files WHERE id = $1::uuid`
+      await (DatabaseService as any)["query"].call(DatabaseService, delFile, [resumeId])
     } catch (error) {
       console.error('Delete resume error:', error)
       throw error
