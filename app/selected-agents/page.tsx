@@ -1158,19 +1158,19 @@ export default function SelectedAgentsPage() {
                                       const highlighted = (agent.keySkills || []).filter(s => s.highlighted)
                                       const list = highlighted.length > 0 ? highlighted : agent.keySkills
                                       return list.map((skill) => (
-                                        <label key={skill.id} className="flex items-center gap-2 text-sm">
-                                          <input
-                                            type="checkbox"
-                                            checked={question.linkedSkills.includes(skill.id)}
-                                            onChange={(e) => {
-                                              const linkedSkills = e.target.checked
-                                                ? [...question.linkedSkills, skill.id]
-                                                : question.linkedSkills.filter(id => id !== skill.id)
-                                              updateQuestion(agent.id, task.id, question.id, { linkedSkills })
-                                            }}
-                                          />
-                                          {skill.name}
-                                        </label>
+                                      <label key={skill.id} className="flex items-center gap-2 text-sm">
+                                        <input
+                                          type="checkbox"
+                                          checked={question.linkedSkills.includes(skill.id)}
+                                          onChange={(e) => {
+                                            const linkedSkills = e.target.checked
+                                              ? [...question.linkedSkills, skill.id]
+                                              : question.linkedSkills.filter(id => id !== skill.id)
+                                            updateQuestion(agent.id, task.id, question.id, { linkedSkills })
+                                          }}
+                                        />
+                                        {skill.name}
+                                      </label>
                                       ))
                                     })()}
                                   </div>
@@ -1179,19 +1179,26 @@ export default function SelectedAgentsPage() {
                             ) : (
                               <div className="space-y-2">
                                 <p className="text-gray-900">{question.text}</p>
-                                {question.linkedSkills.length > 0 && (
-                                  <div className="flex flex-wrap gap-1">
-                                    <span className="text-sm text-gray-600">Linked skills:</span>
-                                    {question.linkedSkills.map((skillId) => {
-                                      const skill = agent.keySkills.find(s => s.id === skillId)
-                                      return skill ? (
-                                        <span key={skillId} className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
-                                          {skill.name}
-                                        </span>
-                                      ) : null
-                                    })}
-                                  </div>
-                                )}
+                                {(() => {
+                                  const selected = (agent.keySkills || []).filter(s => s.highlighted)
+                                  if (selected.length === 0) return null
+                                  return (
+                                    <div className="flex flex-wrap items-center gap-1">
+                                      <span className="text-sm text-gray-600 mr-1">Key Skill Evaluation:</span>
+                                      {selected.map((skill) => (
+                                      <span
+                                        key={skill.id}
+                                        className="px-2 py-1 rounded text-xs border bg-yellow-100 text-yellow-800 border-yellow-200 font-medium"
+                                      >
+                                        {skill.name}
+                                        {typeof skill.weight === 'number' ? (
+                                          <span className="ml-1 opacity-70">({skill.weight})</span>
+                                        ) : null}
+                                      </span>
+                                      ))}
+                                    </div>
+                                  )
+                                })()}
                               </div>
                             )}
                           </div>
