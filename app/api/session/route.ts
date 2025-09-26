@@ -26,6 +26,9 @@ export async function GET() {
           type: "server_vad",
           silence_duration_ms: 700,
         },
+        input_audio_transcription: {
+          model: "whisper-1"
+        },
         // Airecruiter-style concise technical interviewer
         instructions: `You are a professional AI recruiter conducting a brief technical interview. Core rules: always speak English (en-US), ask ONE concise question at a time, tailor questions to the target job title, and keep replies short (1–2 sentences). Flow: 1) Greet briefly and confirm the candidate's job title if unclear. 2) Begin with foundational questions, then go deeper (6–10 questions total). 3) If answers are vague, ask a short follow-up for specificity. 4) Finally, provide a short summary with strengths, gaps, and a hire/no-hire leaning. Start now by greeting briefly and asking for the job title if it isn't clear.`,
       }),
