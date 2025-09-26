@@ -372,7 +372,7 @@ export default function CreateJobPage() {
   // Initialize tab from URL once on mount to avoid feedback loops
   useEffect(() => {
     const t = searchParams.get('tab')
-    const allowed = ['basic', 'requirements', 'responsibilities', 'compensation', 'logistics', 'interview', 'platforms']
+    const allowed = ['basic', 'requirements', 'responsibilities', 'compensation', 'logistics', 'resume-screening', 'interview']
     const next = t && allowed.includes(t) ? t : 'basic'
     lastSyncedTabRef.current = next
     setCurrentTab(next)
@@ -737,14 +737,16 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
           }}
           className="space-y-6"
         >
-          <TabsList className="w-full flex flex-wrap items-center justify-between gap-2 p-1 rounded-lg border bg-muted/40 text-muted-foreground my-2 h-[56px]">
-            <TabsTrigger value="basic" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm rounded-md whitespace-nowrap">Basic Info</TabsTrigger>
-            <TabsTrigger value="requirements" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm rounded-md whitespace-nowrap">Requirements</TabsTrigger>
-            <TabsTrigger value="responsibilities" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm rounded-md whitespace-nowrap">Responsibilities</TabsTrigger>
-            <TabsTrigger value="compensation" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm rounded-md whitespace-nowrap">Compensation</TabsTrigger>
-            <TabsTrigger value="logistics" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm rounded-md whitespace-nowrap">Logistics</TabsTrigger>
-            <TabsTrigger value="interview" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm rounded-md whitespace-nowrap">Interview Process</TabsTrigger>
-            <TabsTrigger value="platforms" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-4 py-2 text-sm rounded-md whitespace-nowrap">Platforms</TabsTrigger>
+          <TabsList className="w-full flex items-center gap-2 p-1 rounded-lg border bg-muted/40 text-muted-foreground my-2 h-[56px] overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-2 flex-nowrap">
+              <TabsTrigger value="basic" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Basic Info</TabsTrigger>
+              <TabsTrigger value="requirements" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Requirements</TabsTrigger>
+              <TabsTrigger value="responsibilities" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Responsibilities</TabsTrigger>
+              <TabsTrigger value="compensation" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Compensation</TabsTrigger>
+              <TabsTrigger value="logistics" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Logistics</TabsTrigger>
+              <TabsTrigger value="resume-screening" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Resume Screening</TabsTrigger>
+              <TabsTrigger value="interview" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Interview Process</TabsTrigger>
+            </div>
           </TabsList>
 
           <TabsContent value="basic" className="space-y-6">
@@ -1073,45 +1075,44 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
             </Card>
           </TabsContent>
 
-          <TabsContent value="platforms" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Platform Selection
-                </CardTitle>
-                <CardDescription>
-                  Choose where you want to publish this job posting
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <Label>Publishing Platforms *</Label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {platformOptions.map((platform) => (
-                      <div key={platform} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={platform}
-                          checked={formData.platforms.includes(platform)}
-                          onCheckedChange={(checked) => 
-                            handleArrayChange('platforms', platform, checked as boolean)
-                          }
-                        />
-                        <Label htmlFor={platform} className="text-sm font-normal">
-                          {platform}
-                        </Label>
-                      </div>
-                    ))}
+          <TabsContent value="resume-screening" className="space-y-6">
+            <Card className="border-0 shadow-sm bg-gradient-to-br from-white to-gray-50">
+              <CardContent className="p-8">
+                <div className="flex flex-col items-center justify-center text-center">
+                  <div className="bg-emerald-50 p-4 rounded-full mb-6 shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-10 w-10 text-emerald-600">
+                      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                    </svg>
                   </div>
-                  {formData.platforms.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {formData.platforms.map((platform) => (
-                        <Badge key={platform} variant="outline">
-                          {platform}
-                        </Badge>
-                      ))}
+                  <h3 className="text-xl font-semibold text-gray-900 mb-3">Resume Screening</h3>
+                  <p className="text-gray-600 mb-8 max-w-lg leading-relaxed">
+                    Our AI will automatically screen and rank resumes based on job requirements, saving you time and effort in the hiring process.
+                  </p>
+                  <Button className="bg-emerald-500 hover:bg-emerald-600 px-8 py-6 text-base font-medium shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">
+                    Configure Screening Criteria
+                  </Button>
+                  <div className="mt-8 pt-6 border-t border-gray-100 w-full">
+                    <div className="flex items-center justify-center gap-8 text-sm text-gray-500">
+                      <div className="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>AI-Powered Analysis</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Time-Saving</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Accurate Matching</span>
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
