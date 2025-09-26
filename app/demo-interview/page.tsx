@@ -10,11 +10,17 @@ export default function DemoInterviewPage() {
   const userVideoRef = useRef<HTMLVideoElement | null>(null)
   const avatarVideoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const agentAudioRef = useRef<HTMLAudioElement | null>(null)
   const [micOn, setMicOn] = useState(true)
   const [camOn, setCamOn] = useState(true)
   const [initializing, setInitializing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // framing: lock to fill (cover)
+  const [agentReady, setAgentReady] = useState(false)
+  const [sessionInfo, setSessionInfo] = useState<any>(null)
+  const pcRef = useRef<RTCPeerConnection | null>(null)
+  const dcRef = useRef<RTCDataChannel | null>(null)
+  const agentTextBufferRef = useRef<string>("")
 
   // Request permissions on explicit user action
   const requestPermissions = async () => {
@@ -35,6 +41,16 @@ export default function DemoInterviewPage() {
         userVideoRef.current.srcObject = stream
         await userVideoRef.current.play().catch(() => {})
       }
+      // Initialize AI agent session
+      const resp = await fetch('/api/session')
+      if (!resp.ok) {
+        const j = await resp.json().catch(() => ({}))
+        throw new Error(j?.error || 'Failed to init AI agent session')
+      }
+      const data = await resp.json()
+      setSessionInfo(data)
+      await initRealtimeConnection(data, stream)
+      setAgentReady(true)
     } catch (e: any) {
       setError("Please allow camera and microphone to try the demo interview.")
     } finally {
@@ -42,11 +58,118 @@ export default function DemoInterviewPage() {
     }
   }
 
+  // Initialize WebRTC connection with OpenAI Realtime using ephemeral session
+  const initRealtimeConnection = async (session: any, localStream: MediaStream) => {
+    // Close any existing connection
+    pcRef.current?.close()
+    pcRef.current = null
+
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }],
+    })
+    pcRef.current = pc
+
+    // Prepare remote audio stream; keep avatar MP4 playing visually
+    const remoteStream = new MediaStream()
+    if (agentAudioRef.current) {
+      agentAudioRef.current.srcObject = remoteStream
+      agentAudioRef.current.autoplay = true
+      agentAudioRef.current.muted = false
+    }
+    pc.ontrack = (event) => {
+      try {
+        if (event.streams && event.streams[0]) {
+          event.streams[0].getTracks().forEach((t) => remoteStream.addTrack(t))
+        } else if (event.track) {
+          remoteStream.addTrack(event.track)
+        }
+        // Ensure audio element plays
+        agentAudioRef.current?.play().catch(() => {})
+      } catch {}
+    }
+
+    // Add local microphone
+    localStream.getAudioTracks().forEach((track) => pc.addTrack(track, localStream))
+
+    // Ensure we also receive audio/video from the agent
+    pc.addTransceiver('audio', { direction: 'recvonly' })
+    pc.addTransceiver('video', { direction: 'recvonly' })
+
+    // Data channel for events: ask the agent to start the interview
+    const dc = pc.createDataChannel('oai-events')
+    dcRef.current = dc
+    dc.onopen = () => {
+      try {
+        const startMsg = {
+          type: 'response.create',
+          response: {
+            modalities: ['audio'],
+            instructions: "Please greet the candidate and ask which job title they are interviewing for. Wait for their answer before continuing with role-specific questions.",
+          },
+        }
+        dc.send(JSON.stringify(startMsg))
+      } catch {}
+    }
+    dc.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data)
+        // Agent text streaming (delta)
+        if (msg.type === 'response.output_text.delta' && typeof msg.delta === 'string') {
+          agentTextBufferRef.current += msg.delta
+        }
+        // Agent text done
+        if (msg.type === 'response.output_text.done') {
+          console.log('[Agent]', agentTextBufferRef.current)
+          agentTextBufferRef.current = ''
+        }
+        // User speech transcription completed
+        if (msg.type === 'input_audio_transcription.completed' && msg.transcript) {
+          console.log('[You]', msg.transcript)
+        }
+        // Turn markers (optional debug)
+        if (msg.type === 'response.completed') {
+          // Finalize any remaining buffer just in case
+          if (agentTextBufferRef.current) {
+            console.log('[Agent]', agentTextBufferRef.current)
+            agentTextBufferRef.current = ''
+          }
+        }
+      } catch (e) {
+        // Non-JSON payloads
+      }
+    }
+
+    const offer = await pc.createOffer()
+    await pc.setLocalDescription(offer)
+
+    const baseUrl = 'https://api.openai.com/v1/realtime'
+    const model = session?.model || 'gpt-4o-realtime-preview'
+    const clientSecret = session?.client_secret?.value
+    if (!clientSecret) throw new Error('Missing realtime client secret from session response')
+
+    const sdpResponse = await fetch(`${baseUrl}?model=${encodeURIComponent(model)}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${clientSecret}`,
+        'Content-Type': 'application/sdp',
+      },
+      body: offer.sdp || '',
+    })
+    if (!sdpResponse.ok) {
+      const txt = await sdpResponse.text()
+      throw new Error(`Realtime SDP exchange failed: ${txt}`)
+    }
+    const answerSdp = await sdpResponse.text()
+    await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp })
+  }
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       streamRef.current?.getTracks().forEach(t => t.stop())
       streamRef.current = null
+      pcRef.current?.close()
+      pcRef.current = null
     }
   }, [])
 
@@ -125,6 +248,8 @@ export default function DemoInterviewPage() {
                 playsInline
                 autoPlay
               />
+              {/* Hidden audio element to play agent voice while avatar video keeps playing visually */}
+              <audio ref={agentAudioRef} className="hidden" />
               <div className="absolute left-2 bottom-2 text-[10px] md:text-xs text-white/90">
                 Olivia
               </div>
@@ -143,6 +268,15 @@ export default function DemoInterviewPage() {
               <PhoneOff className="h-5 w-5" />
             </Button>
           </div>
+
+          {/* Agent status badge */}
+          {agentReady && (
+            <div className="absolute right-4 bottom-6 bg-emerald-600 text-white text-xs px-3 py-1 rounded-full shadow">
+              Agent Connected
+            </div>
+          )}
+
+          
 
           {/* Overlays */}
           {initializing && (
