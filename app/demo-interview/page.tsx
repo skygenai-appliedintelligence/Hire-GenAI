@@ -47,6 +47,109 @@ export default function DemoInterviewPage() {
   
   // Track pending user items that need transcript updates
   const pendingUserItems = useRef<Map<string, number>>(new Map())
+  
+  // Handler functions like OpenAI reference implementation
+  const handleTranscriptionCompleted = (event: any) => {
+    if (event.type === 'conversation.item.input_audio_transcription.completed') {
+      // User speech transcription completed
+      const itemId = event.item_id
+      const finalTranscript = !event.transcript || event.transcript === "\n" ? "[inaudible]" : event.transcript
+      if (itemId && finalTranscript) {
+        console.log('[You]', finalTranscript)
+        setConversation(prev => {
+          const last = prev[prev.length - 1]
+          if (last && last.role === 'user' && last.text === finalTranscript) return prev
+          const next = [...prev, { role: 'user' as const, text: finalTranscript, t: Date.now() }]
+          try {
+            const payload = { id: 'latest', createdAt: Date.now(), conversation: next }
+            localStorage.setItem('demoInterview:latest', JSON.stringify(payload))
+          } catch {}
+          return next
+        })
+      }
+    } else if (event.type === 'response.audio_transcript.done') {
+      // Agent speech transcription completed - DON'T LOG TO CONSOLE (so candidate can't see questions early)
+      const text = agentTextBufferRef.current
+      if (text) {
+        agentTextBufferRef.current = ''
+        setConversation(prev => {
+          const next = [...prev, { role: 'agent' as const, text, t: Date.now() }]
+          try {
+            const payload = { id: 'latest', createdAt: Date.now(), conversation: next }
+            localStorage.setItem('demoInterview:latest', JSON.stringify(payload))
+          } catch {}
+          return next
+        })
+      }
+    }
+  }
+  
+  const handleTranscriptionDelta = (event: any) => {
+    // For agent transcription deltas, accumulate in buffer
+    if (event.type === 'response.audio_transcript.delta' && typeof event.delta === 'string') {
+      agentTextBufferRef.current += event.delta
+    }
+  }
+  
+  const handleHistoryAdded = (item: any) => {
+    if (!item || item.type !== 'message') return
+    const { id: itemId, role, content = [] } = item
+    
+    if (itemId && role) {
+      const isUser = role === "user"
+      let text = extractMessageText(content)
+      
+      if (isUser && !text) {
+        // Track for later transcription
+        pendingUserItems.current.set(itemId, Date.now())
+        console.log('[addTranscriptMessage] user item created, status:', item.status)
+        text = "[Transcribing...]"
+      } else if (!isUser) {
+        console.log('[addTranscriptMessage] assistant item created, status:', item.status)
+      }
+      
+      if (text && text !== "[Transcribing...]") {
+        console.log(isUser ? '[You]' : '[Agent]', text)
+        setConversation(prev => {
+          const last = prev[prev.length - 1]
+          if (last && last.role === role && last.text === text) return prev
+          const next = [...prev, { role: role as 'agent' | 'user', text, t: Date.now() }]
+          try {
+            const payload = { id: 'latest', createdAt: Date.now(), conversation: next }
+            localStorage.setItem('demoInterview:latest', JSON.stringify(payload))
+          } catch {}
+          return next
+        })
+      }
+    }
+  }
+  
+  const handleHistoryUpdated = (items: any[]) => {
+    console.log('[handleHistoryUpdated]', items)
+    items.forEach((item: any) => {
+      if (!item || item.type !== 'message') return
+      const { id: itemId, content = [] } = item
+      const text = extractMessageText(content)
+      
+      if (text) {
+        // Update existing conversation item with new text
+        setConversation(prev => {
+          const updated = prev.map(convItem => {
+            // Find matching item and update text if different
+            if (convItem.t && Math.abs(convItem.t - Date.now()) < 30000) { // within 30 seconds
+              return { ...convItem, text }
+            }
+            return convItem
+          })
+          try {
+            const payload = { id: 'latest', createdAt: Date.now(), conversation: updated }
+            localStorage.setItem('demoInterview:latest', JSON.stringify(payload))
+          } catch {}
+          return updated
+        })
+      }
+    })
+  }
   const [conversation, setConversation] = useState<{ role: 'agent' | 'user'; text: string; t: number }[]>([])
 
   // Request permissions on explicit user action
@@ -156,12 +259,35 @@ export default function DemoInterviewPage() {
     dc.onmessage = (evt) => {
       try {
         const msg = JSON.parse(evt.data)
-        // Debug each message type
-        if (msg?.type) {
-          console.log('[DC evt]', msg.type)
-          // Log ANY event that might contain user speech
-          if (msg.type.includes('input') || msg.type.includes('transcription') || msg.type.includes('audio') || msg.type.includes('user')) {
-            console.log('[DEBUG FULL EVENT]', JSON.stringify(msg, null, 2))
+        
+        // Handle session history events like OpenAI reference
+        switch (msg.type) {
+          case "conversation.item.input_audio_transcription.completed": {
+            console.log('[handleTranscriptionCompleted]', msg);
+            handleTranscriptionCompleted(msg);
+            break;
+          }
+          case "response.audio_transcript.done": {
+            console.log('[handleTranscriptionCompleted]', msg);
+            handleTranscriptionCompleted(msg);
+            break;
+          }
+          case "response.audio_transcript.delta": {
+            console.log('[handleTranscriptionEvent]', msg);
+            handleTranscriptionDelta(msg);
+            break;
+          }
+          case "conversation.item.created": {
+            console.log('[handleHistoryAdded]', msg.item || msg);
+            handleHistoryAdded(msg.item || msg);
+            break;
+          }
+          case "conversation.item.updated": 
+          case "history.updated": {
+            if (msg.items) {
+              handleHistoryUpdated(msg.items);
+            }
+            break;
           }
         }
         // Agent text streaming (delta)
@@ -172,188 +298,7 @@ export default function DemoInterviewPage() {
         if ((msg.type === 'response.audio_transcript.delta' || msg.type === 'response.output_audio_transcript.delta') && typeof msg.delta === 'string') {
           agentTextBufferRef.current += msg.delta
         }
-        // Agent text done
-        if (msg.type === 'response.output_text.done' || msg.type === 'response.audio_transcript.done' || msg.type === 'response.output_audio_transcript.done') {
-          const text = agentTextBufferRef.current
-          console.log('[Agent]', text)
-          agentTextBufferRef.current = ''
-          setConversation(prev => {
-            const next = [...prev, { role: 'agent' as const, text, t: Date.now() }]
-            try {
-              const payload = { id: 'latest', createdAt: Date.now(), conversation: next }
-              localStorage.setItem('demoInterview:latest', JSON.stringify(payload))
-            } catch {}
-            return next
-          })
-        }
-        // User speech (delta variants)
-        if (
-          (msg.type === 'input_audio_transcription.delta' ||
-           msg.type === 'input_audio_buffer.transcription.delta' ||
-           msg.type === 'input_audio_transcript.delta') &&
-          typeof msg.delta === 'string'
-        ) {
-          userTextBufferRef.current += msg.delta
-        }
-        // User speech (completed/done variants carrying full transcript)
-        if (
-          (msg.type === 'input_audio_transcription.completed' ||
-           msg.type === 'input_audio_transcription.done' ||
-           msg.type === 'input_audio_buffer.transcription.completed' ||
-           msg.type === 'input_audio_buffer.transcription.done' ||
-           msg.type === 'input_audio_transcript.completed' ||
-           msg.type === 'input_audio_transcript.done') &&
-          (msg.transcript || userTextBufferRef.current)
-        ) {
-          const text = String(msg.transcript || userTextBufferRef.current)
-          userTextBufferRef.current = ''
-          console.log('[You]', text)
-          setConversation(prev => {
-            const last = prev[prev.length - 1]
-            if (last && last.role === 'user' && last.text === text) return prev
-            const next = [...prev, { role: 'user' as const, text, t: Date.now() }]
-            try {
-              const payload = { id: 'latest', createdAt: Date.now(), conversation: next }
-              localStorage.setItem('demoInterview:latest', JSON.stringify(payload))
-            } catch {}
-            return next
-          })
-        }
-        // conversation.item.completed may include a user transcript
-        if (msg.type === 'conversation.item.completed' && msg.item?.role === 'user' && msg.item?.transcript) {
-          const text = String(msg.item.transcript)
-          console.log('[You]', text)
-          setConversation(prev => {
-            // avoid duplicate if same as last entry
-            const last = prev[prev.length - 1]
-            if (last && last.role === 'user' && last.text === text) return prev
-            const next = [...prev, { role: 'user' as const, text, t: Date.now() }]
-            try {
-              const payload = { id: 'latest', createdAt: Date.now(), conversation: next }
-              localStorage.setItem('demoInterview:latest', JSON.stringify(payload))
-            } catch {}
-            return next
-          })
-        }
-        // conversation.item.created carries user text in content array (OpenAI reference approach)
-        if (msg.type === 'conversation.item.created' && msg.item?.role === 'user') {
-          console.log('[DEBUG] conversation.item.created (user):', JSON.stringify(msg.item, null, 2))
-          const text = extractMessageText(msg.item.content || [])
-          if (text && text.trim()) {
-            console.log('[You]', text)
-            setConversation(prev => {
-              const last = prev[prev.length - 1]
-              if (last && last.role === 'user' && last.text === text) return prev
-              const next = [...prev, { role: 'user' as const, text, t: Date.now() }]
-              try {
-                const payload = { id: 'latest', createdAt: Date.now(), conversation: next }
-                localStorage.setItem('demoInterview:latest', JSON.stringify(payload))
-              } catch {}
-              return next
-            })
-          } else {
-            // Track this item for later transcript update
-            if (msg.item?.id && msg.item.content?.some((c: any) => c.type === 'input_audio')) {
-              pendingUserItems.current.set(msg.item.id, Date.now())
-              console.log('[DEBUG] Tracking pending user item:', msg.item.id)
-            }
-            console.log('[DEBUG] No text extracted from user item content:', msg.item.content)
-          }
-        }
-        // conversation.item.input_audio_transcription.completed - transcript is ready
-        if (msg.type === 'conversation.item.input_audio_transcription.completed' && msg.item_id && msg.transcript) {
-          const text = String(msg.transcript).trim()
-          if (text && pendingUserItems.current.has(msg.item_id)) {
-            console.log('[You]', text)
-            pendingUserItems.current.delete(msg.item_id)
-            setConversation(prev => {
-              const last = prev[prev.length - 1]
-              if (last && last.role === 'user' && last.text === text) return prev
-              const next = [...prev, { role: 'user' as const, text, t: Date.now() }]
-              try {
-                const payload = { id: 'latest', createdAt: Date.now(), conversation: next }
-                localStorage.setItem('demoInterview:latest', JSON.stringify(payload))
-              } catch {}
-              return next
-            })
-          }
-        }
-        // Clean up old pending items when agent responds (don't add placeholder)
-        if (msg.type === 'response.created' && pendingUserItems.current.size > 0) {
-          // Clear old pending items without adding placeholder text
-          const pendingItems = Array.from(pendingUserItems.current.entries())
-          pendingItems.forEach(([itemId, timestamp]) => {
-            if (Date.now() - timestamp < 10000) {
-              console.log('[DEBUG] Clearing pending user item without transcript:', itemId)
-              pendingUserItems.current.delete(itemId)
-            }
-          })
-        }
-        // input_audio_buffer.committed might contain transcript
-        if (msg.type === 'input_audio_buffer.committed' && msg.transcript) {
-          const text = String(msg.transcript).trim()
-          if (text) {
-            console.log('[You]', text)
-            setConversation(prev => {
-              const last = prev[prev.length - 1]
-              if (last && last.role === 'user' && last.text === text) return prev
-              const next = [...prev, { role: 'user' as const, text, t: Date.now() }]
-              try {
-                const payload = { id: 'latest', createdAt: Date.now(), conversation: next }
-                localStorage.setItem('demoInterview:latest', JSON.stringify(payload))
-              } catch {}
-              return next
-            })
-          }
-        }
-        
-        // CATCH-ALL: Try to extract user speech from ANY event that might contain it
-        if (msg.transcript && typeof msg.transcript === 'string' && msg.transcript.trim()) {
-          // Check if this looks like user speech (not agent)
-          if (!msg.type.includes('response') && !msg.type.includes('output')) {
-            const text = String(msg.transcript).trim()
-            console.log('[CATCH-ALL You]', text)
-            setConversation(prev => {
-              const last = prev[prev.length - 1]
-              if (last && last.role === 'user' && last.text === text) return prev
-              const next = [...prev, { role: 'user' as const, text, t: Date.now() }]
-              try {
-                const payload = { id: 'latest', createdAt: Date.now(), conversation: next }
-                localStorage.setItem('demoInterview:latest', JSON.stringify(payload))
-              } catch {}
-              return next
-            })
-          }
-        }
-        // Additional realtime events often seen
-        if (msg.type === 'input_audio_buffer.speech_started') {
-          console.log('[You] speech started')
-        }
-        if (msg.type === 'input_audio_buffer.speech_ended') {
-          console.log('[You] speech ended')
-        }
-        if (msg.type === 'response.created') {
-          console.log('[Agent] response created')
-        }
-        if (msg.type === 'conversation.item.completed' && msg.item?.transcript) {
-          console.log('[You]', msg.item.transcript)
-        }
-        // Turn markers (optional debug)
-        if (msg.type === 'response.completed') {
-          // Finalize any remaining buffer just in case
-          if (agentTextBufferRef.current) {
-            const text = agentTextBufferRef.current
-            console.log('[Agent]', text)
-            agentTextBufferRef.current = ''
-            setConversation(prev => [...prev, { role: 'agent' as const, text, t: Date.now() }])
-          }
-          if (userTextBufferRef.current) {
-            const text = userTextBufferRef.current
-            console.log('[You]', text)
-            userTextBufferRef.current = ''
-            setConversation(prev => [...prev, { role: 'user' as const, text, t: Date.now() }])
-          }
-        }
+        // Clean up - remove all old debug handlers since we use the switch above
       } catch (e) {
         // Non-JSON payloads
         console.log('[DC raw]', evt.data)
