@@ -135,18 +135,21 @@ export default function HomePage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button className="sr-button-dark">Explore the Benefits</Button>
-                <Button className="sr-button-secondary">
+                <Button className="sr-button-secondary" onClick={() => router.push('/demo-interview')}>
                   <Play className="w-4 h-4 mr-2" />
-                  See how it works
+                  Try Demo Interview
                 </Button>
               </div>
             </div>
             <div className="relative">
               <div className="relative z-10">
-                <img
-                  src="/placeholder.svg?height=600&width=800"
-                  alt="HireGenAI Dashboard Interface"
-                  className="w-full h-auto rounded-2xl shadow-2xl"
+                <video
+                  src="https://storage.googleapis.com/ai_recruiter_bucket_prod/assets/videos/olivia_character_no_audio.mp4"
+                  className="w-full rounded-2xl shadow-2xl object-cover h-[360px] sm:h-[440px] md:h-[450px] lg:h-[500px]"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
                 />
               </div>
               <div className="absolute -top-4 -right-4 w-full h-full bg-gradient-to-br from-emerald-100 to-emerald-200 rounded-2xl -z-10"></div>
