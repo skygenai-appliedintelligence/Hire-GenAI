@@ -6,7 +6,6 @@ import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { LoginModal } from "@/components/auth/login-modal"
-import { SignupModal } from "@/components/auth/signup-modal"
 import Link from "next/link"
 import {
   Zap,
@@ -26,7 +25,6 @@ export default function HomePage() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const [showSignupModal, setShowSignupModal] = useState(false)
 
   useEffect(() => {
     if (!loading && user) {
@@ -100,9 +98,9 @@ export default function HomePage() {
               >
                 Login
               </Button>
-              <Button onClick={() => setShowSignupModal(true)} className="sr-button-primary">
-                Get started
-              </Button>
+              <Link href="/signup">
+                <Button className="sr-button-primary">Get started</Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -316,10 +314,10 @@ export default function HomePage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
-              onClick={() => setShowSignupModal(true)}
+              onClick={() => router.push('/pricing')}
               className="bg-white text-emerald-600 hover:bg-gray-100 font-semibold px-8 py-4 text-lg rounded-full"
             >
-              Start your free trial
+              View pricing
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
             <Button
@@ -434,7 +432,6 @@ export default function HomePage() {
 
       {/* Modals */}
       <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} />
-      <SignupModal open={showSignupModal} onClose={() => setShowSignupModal(false)} />
     </div>
   )
 }

@@ -155,7 +155,7 @@ export function AIQuestionGeneratorModal({
         params.set('ai', '1')
         if (agentId) params.set('agent', agentId)
         if (taskId) params.set('task', taskId)
-        router.replace(`${basePath}?${params.toString()}`, { scroll: false })
+        router.push(`${basePath}?${params.toString()}`)
       } catch {}
     }
     if (!next) {
@@ -166,7 +166,7 @@ export function AIQuestionGeneratorModal({
         params.delete('agent')
         params.delete('task')
         const qs = params.toString()
-        router.replace(qs ? `${basePath}?${qs}` : basePath, { scroll: false })
+        router.push(qs ? `${basePath}?${qs}` : basePath)
       } catch {}
     }
   }
