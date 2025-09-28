@@ -1136,7 +1136,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
             </Button>
             <Button 
               type="submit" 
-              disabled={true}
+              disabled={isSubmitting}
               className="min-w-[200px]"
             >
               {isSubmitting ? (
