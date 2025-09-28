@@ -6,14 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { LoginModal } from "@/components/auth/login-modal"
-import { SignupModal } from "@/components/auth/signup-modal"
 import Link from "next/link"
 import { Check, X, ArrowRight, Star } from "lucide-react"
 
 export default function PricingPage() {
   const [isAnnual, setIsAnnual] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
-  const [showSignupModal, setShowSignupModal] = useState(false)
 
   const plans = [
     {
@@ -158,9 +156,7 @@ export default function PricingPage() {
               >
                 Login
               </Button>
-              <Button onClick={() => setShowSignupModal(true)} className="sr-button-primary">
-                Get started
-              </Button>
+              {/* Removed signup modal trigger */}
             </div>
           </div>
         </div>
@@ -235,7 +231,7 @@ export default function PricingPage() {
                   </div>
                   <Button
                     className={`w-full ${plan.popular ? "sr-button-primary" : "sr-button-secondary"}`}
-                    onClick={() => (plan.cta === "Contact Sales" ? null : setShowSignupModal(true))}
+                    onClick={() => (plan.cta === "Contact Sales" ? null : setShowLoginModal(true))}
                   >
                     {plan.cta}
                     {plan.cta !== "Contact Sales" && <ArrowRight className="w-4 h-4 ml-2" />}
@@ -437,7 +433,7 @@ export default function PricingPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
-              onClick={() => setShowSignupModal(true)}
+              onClick={() => setShowLoginModal(true)}
               className="bg-white text-emerald-600 hover:bg-gray-100 font-semibold px-8 py-4 text-lg rounded-full"
             >
               Start Free Trial
@@ -553,7 +549,6 @@ export default function PricingPage() {
 
       {/* Modals */}
       <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} />
-      <SignupModal open={showSignupModal} onClose={() => setShowSignupModal(false)} />
     </div>
   )
 }
