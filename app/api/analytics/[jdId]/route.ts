@@ -11,14 +11,14 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jdId: string }
 
   try {
     // TODO: Replace with real database-backed aggregation.
-    // Keeping a deterministic empty response ensures the UI is wired and live-refresh works.
+    // Sample data to show the dashboard cards in action.
     const stats = {
-      applicants: 0,
-      qualified: 0,
-      interviewsCompleted: 0,
-      inProgress: 0,
-      recommended: 0,
-      rejected: 0,
+      applicants: 156,
+      qualified: 6,  // Updated to match our 6 qualified candidates
+      interviewsCompleted: 45,
+      inProgress: 23,
+      recommended: 12,
+      rejected: 8,
     }
 
     return NextResponse.json({ ok: true, jdId, stats })
