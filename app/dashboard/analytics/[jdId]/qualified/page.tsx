@@ -1,9 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo } from "react"
-// Removed Card wrappers per request
-// Tabs removed per request
+import { useEffect, useMemo, useState } from "react"
+import { useParams } from "next/navigation"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 
@@ -27,68 +26,41 @@ type Bucket = {
   rows: CandidateRow[]
 }
 
-export default function QualifiedCandidatesInterviewFlowPage() {
+export default function JDQualifiedPage() {
+  const params = useParams()
+  const jdId = (params?.jdId as string) || ""
+
+  const [rows, setRows] = useState<CandidateRow[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const load = async () => {
+      if (!jdId) return
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await fetch(`/api/qualified/by-job/${encodeURIComponent(jdId)}`, { cache: "no-store" })
+        const json = await res.json()
+        if (!res.ok || !json?.ok) throw new Error(json?.error || "Failed to load qualified candidates")
+        setRows(json.qualified || [])
+      } catch (e: any) {
+        setError(e?.message || "Failed to load qualified candidates")
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [jdId])
+
   const buckets: Bucket[] = useMemo(
     () => [
       {
         key: "screening",
         label: "Screening Round",
         agent: "Agent 1 - Screening Round",
-        rows: [
-          {
-            id: "qual-global-1",
-            candidateName: "Jennifer Martinez",
-            appliedJD: "Senior Frontend Developer",
-            email: "jennifer.martinez@techsolutions.com",
-            phone: "+1-555-0201",
-            cvUrl: "https://drive.google.com/file/d/1abc123/view",
-            status: "Qualified"
-          },
-          {
-            id: "qual-global-2",
-            candidateName: "David Chen",
-            appliedJD: "Full Stack Engineer",
-            email: "david.chen@innovatetech.io",
-            phone: "+1-555-0202",
-            cvUrl: "https://drive.google.com/file/d/1def456/view",
-            status: "Qualified"
-          },
-          {
-            id: "qual-global-3",
-            candidateName: "Sarah Williams",
-            appliedJD: "React Developer",
-            email: "sarah.w@digitalcorp.com",
-            phone: "+1-555-0203",
-            cvUrl: "https://drive.google.com/file/d/1ghi789/view",
-            status: "Unqualified"
-          },
-          {
-            id: "qual-global-4",
-            candidateName: "Michael Rodriguez",
-            appliedJD: "Senior Backend Developer",
-            email: "m.rodriguez@enterprise.com",
-            phone: "+1-555-0204",
-            cvUrl: "https://drive.google.com/file/d/1jkl012/view",
-            status: "Pending"
-          },
-          {
-            id: "qual-global-5",
-            candidateName: "Emily Johnson",
-            appliedJD: "JavaScript Developer",
-            email: "emily.johnson@startupventures.com",
-            phone: "+1-555-0205",
-            cvUrl: "https://drive.google.com/file/d/1mno345/view",
-            status: "Expired"
-          },
-          {
-            id: "qual-global-6",
-            candidateName: "Robert Taylor",
-            appliedJD: "Lead Frontend Engineer",
-            email: "robert.taylor@bigtech.com",
-            phone: "+1-555-0206",
-            cvUrl: "https://drive.google.com/file/d/1pqr678/view",
-            status: "Qualified"
-          }
+        rows: rows.length > 0 ? rows : [
+          // Empty table - no candidates
         ],
       },
       {
@@ -116,19 +88,22 @@ export default function QualifiedCandidatesInterviewFlowPage() {
         rows: [],
       },
     ],
-    []
+    [rows]
   )
 
   const firstBucket = buckets[0]
 
   return (
-    <div className="max-w-7xl mx-auto px-4 space-y-6 py-6 overflow-x-hidden bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
+    <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Qualified Candidates</h1>
-        <Link href="/dashboard/analytics" className="text-sm text-blue-600 hover:underline">
-          Back to Analytics
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href={`/dashboard/analytics/${jdId}`} className="text-sm text-blue-600 hover:underline">
+            Back to Overview
+          </Link>
+        </div>
       </div>
+
       {/* Single section (keep only one table) */}
       <div className="space-y-8">
         {firstBucket && (
