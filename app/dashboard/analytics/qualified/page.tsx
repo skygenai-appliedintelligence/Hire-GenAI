@@ -1,9 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { useMemo } from "react"
+// Removed Card wrappers per request
+// Tabs removed per request
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 
@@ -141,8 +141,7 @@ export default function QualifiedCandidatesInterviewFlowPage() {
     []
   )
 
-  // Controlled tabs to allow programmatic switching when clicking summary cards
-  const [tabValue, setTabValue] = useState<string>("screening")
+  const firstBucket = buckets[0]
 
   return (
     <div className="max-w-7xl mx-auto px-4 space-y-6 py-6 overflow-x-hidden bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
@@ -152,131 +151,97 @@ export default function QualifiedCandidatesInterviewFlowPage() {
           Back to Analytics
         </Link>
       </div>
-
-      {/* Summary metric cards for each bucket */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-        {buckets.map((b) => (
-          <button
-            key={b.key}
-            onClick={() => setTabValue(b.key)}
-            className={`w-full text-left group focus:outline-none`}
-            aria-label={`Open ${b.label}`}
-          >
-            <Card
-              className={`border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow ${tabValue === b.key ? "ring-emerald-300" : ""}`}
-            >
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold text-gray-800 flex items-center justify-between">
-                  <span>{b.label}</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="text-3xl font-bold text-gray-900">{b.rows.length}</div>
-                <p className="text-xs text-gray-500 mt-1">total candidates</p>
-              </CardContent>
-            </Card>
-          </button>
-        ))}
+      {/* Single section (keep only one table) */}
+      <div className="space-y-8">
+        {firstBucket && (
+          <section key={firstBucket.key} aria-labelledby={`heading-${firstBucket.key}`} className="space-y-3">
+            <h2 id={`heading-${firstBucket.key}`} className="text-xl font-semibold text-gray-900">
+              {firstBucket.label}
+              <span className="ml-2 align-middle rounded-full bg-gray-100 text-gray-700 px-2 py-0.5 text-xs">
+                {firstBucket.rows.length}
+              </span>
+            </h2>
+            <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+              <Table className="table-auto w-full">
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="px-3 py-2 text-sm align-middle">Candidate Name</TableHead>
+                    <TableHead className="px-3 py-2 text-sm align-middle">Applied JD</TableHead>
+                    <TableHead className="px-3 py-2 text-sm align-middle">Email</TableHead>
+                    <TableHead className="px-3 py-2 text-sm align-middle">Phone</TableHead>
+                    <TableHead className="px-3 py-2 text-sm align-middle">CV Link</TableHead>
+                    <TableHead className="px-3 py-2 text-sm align-middle">Status</TableHead>
+                    <TableHead className="px-3 py-2 text-sm align-middle">Report</TableHead>
+                    <TableHead className="px-3 py-2 text-sm align-middle whitespace-nowrap">Action</TableHead>
+                    <TableHead className="px-3 py-2 text-sm align-middle whitespace-nowrap">Resend Link</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {firstBucket.rows.map((row, idx) => (
+                    <TableRow key={row.id} className={idx % 2 === 1 ? "bg-gray-50" : undefined}>
+                      <TableCell className="px-3 py-2 text-sm align-middle font-medium truncate">{row.candidateName}</TableCell>
+                      <TableCell className="px-3 py-2 text-sm align-middle truncate">{row.appliedJD}</TableCell>
+                      <TableCell className="px-3 py-2 text-sm align-middle">
+                        <span className="block max-w-[220px] truncate">{row.email}</span>
+                      </TableCell>
+                      <TableCell className="px-3 py-2 text-sm align-middle">{row.phone}</TableCell>
+                      <TableCell className="px-3 py-2 text-sm align-middle">
+                        <Link href={row.cvUrl} target="_blank" className="text-blue-600 hover:underline">
+                          View CV
+                        </Link>
+                      </TableCell>
+                      <TableCell className="px-3 py-2 text-sm align-middle">
+                        <span
+                          className={
+                            row.status === "Qualified"
+                              ? "inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700"
+                              : row.status === "Unqualified"
+                              ? "inline-flex items-center rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700"
+                              : row.status === "Pending"
+                              ? "inline-flex items-center rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-700"
+                              : "inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700"
+                          }
+                        >
+                          {row.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
+                        <Button variant="outline" size="sm">Show Report & Interview Details</Button>
+                      </TableCell>
+                      <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
+                        <Button
+                          size="sm"
+                          className={
+                            row.status === "Qualified"
+                              ? "bg-blue-600 text-white hover:bg-blue-700"
+                              : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                          }
+                          disabled={row.status !== "Qualified"}
+                        >
+                          Processed to Next Round
+                        </Button>
+                      </TableCell>
+                      <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
+                        <Button
+                          size="sm"
+                          className={
+                            row.status === "Pending" || row.status === "Expired"
+                              ? "bg-yellow-500 text-white hover:bg-yellow-600"
+                              : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                          }
+                          disabled={!(row.status === "Pending" || row.status === "Expired")}
+                        >
+                          Resend Link
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </section>
+        )}
       </div>
-
-      {/* Tabs without visible strip; switching happens via the summary cards above */}
-      <Tabs value={tabValue} onValueChange={setTabValue} className="w-full">
-
-        {buckets.map((b) => (
-          <TabsContent key={b.key} value={b.key}>
-            <Card className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
-              <CardHeader>
-                <CardTitle>{b.agent}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
-                  <Table className="table-auto w-full">
-                    <TableHeader>
-                      <TableRow className="bg-gray-50">
-                        <TableHead className="px-3 py-2 text-sm align-middle">Candidate Name</TableHead>
-                        <TableHead className="px-3 py-2 text-sm align-middle">Applied JD</TableHead>
-                        <TableHead className="px-3 py-2 text-sm align-middle">Email</TableHead>
-                        <TableHead className="px-3 py-2 text-sm align-middle">Phone</TableHead>
-                        <TableHead className="px-3 py-2 text-sm align-middle">CV Link</TableHead>
-                        <TableHead className="px-3 py-2 text-sm align-middle">Status</TableHead>
-                        <TableHead className="px-3 py-2 text-sm align-middle">Report</TableHead>
-                        <TableHead className="px-3 py-2 text-sm align-middle whitespace-nowrap">Action</TableHead>
-                        <TableHead className="px-3 py-2 text-sm align-middle whitespace-nowrap">Resend Link</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {b.rows.map((row, idx) => {
-                        const isQualified = row.status === "Qualified"
-                        const isUnqualified = row.status === "Unqualified"
-                        const canResend = row.status === "Pending" || row.status === "Expired"
-                        return (
-                          <TableRow key={row.id} className={idx % 2 === 1 ? "bg-gray-50" : undefined}>
-                            <TableCell className="px-3 py-2 text-sm align-middle font-medium truncate">{row.candidateName}</TableCell>
-                            <TableCell className="px-3 py-2 text-sm align-middle truncate">{row.appliedJD}</TableCell>
-                            <TableCell className="px-3 py-2 text-sm align-middle">
-                              <span className="block max-w-[220px] truncate">{row.email}</span>
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-sm align-middle">{row.phone}</TableCell>
-                            <TableCell className="px-3 py-2 text-sm align-middle">
-                              <Link href={row.cvUrl} target="_blank" className="text-blue-600 hover:underline">
-                                View CV
-                              </Link>
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-sm align-middle">
-                              <span
-                                className={
-                                  row.status === "Qualified"
-                                    ? "inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700"
-                                    : row.status === "Unqualified"
-                                    ? "inline-flex items-center rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700"
-                                    : row.status === "Pending"
-                                    ? "inline-flex items-center rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-700"
-                                    : "inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700"
-                                }
-                              >
-                                {row.status}
-                              </span>
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
-                              <Button variant="outline" size="sm">Show Report & Interview Details</Button>
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
-                              <Button
-                                size="sm"
-                                className={
-                                  isQualified
-                                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                                }
-                                disabled={!isQualified}
-                              >
-                                Processed to Next Round
-                              </Button>
-                            </TableCell>
-                            <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
-                              <Button
-                                size="sm"
-                                className={
-                                  canResend
-                                    ? "bg-yellow-500 text-white hover:bg-yellow-600"
-                                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                                }
-                                disabled={!canResend}
-                              >
-                                Resend Link
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        ))}
-      </Tabs>
     </div>
   )
 }
