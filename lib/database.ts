@@ -28,29 +28,17 @@ export class DatabaseService {
     }
 
     const domain = email.split('@')[1]
-    
-    // First check if company exists by domain
-    const existingCompanyQuery = `
-      SELECT c.* FROM companies c 
-      JOIN company_domains cd ON c.id = cd.company_id 
-      WHERE cd.domain = $1 
-      LIMIT 1
-    `
-    const existingCompany = await this.query(existingCompanyQuery, [domain]) as any[]
 
-    if (existingCompany.length > 0) {
-      return existingCompany[0]
-    }
+    // Always create a new company for each signup, don't reuse existing ones by domain
+    // This ensures each user gets their own company
+    const finalCompanyName = companyName || domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1)
 
-    // Create new company
-    const defaultCompanyName = companyName || domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1)
-    
     const insertCompanyQuery = `
       INSERT INTO companies (name, status, verified, created_at)
       VALUES ($1, 'active', false, NOW())
       RETURNING *
     `
-    const newCompany = await this.query(insertCompanyQuery, [defaultCompanyName]) as any[]
+    const newCompany = await this.query(insertCompanyQuery, [finalCompanyName]) as any[]
 
     if (newCompany.length === 0) {
       throw new Error('Failed to create company')

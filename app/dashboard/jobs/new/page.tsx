@@ -707,6 +707,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
             <Select
               value={formData.status}
               onValueChange={(val) => handleInputChange('status', val)}
+              disabled={isEditing}
             >
               <SelectTrigger className="w-[220px]">
                 <SelectValue placeholder="Select status" />
@@ -770,8 +771,8 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                       value={formData.jobTitle}
                       onChange={(e) => handleInputChange('jobTitle', e.target.value)}
                       required
-                      readOnly
-                      disabled
+                      readOnly={isEditing}
+                      disabled={isEditing}
                     />
                   </div>
                   <div className="space-y-2">
@@ -795,13 +796,13 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                       value={formData.location}
                       onChange={(e) => handleInputChange('location', e.target.value)}
                       required
-                      readOnly
-                      disabled
+                      readOnly={isEditing}
+                      disabled={isEditing}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="jobType">Work Arrangement *</Label>
-                    <Select value={formData.jobType} onValueChange={(value) => handleInputChange('jobType', value)} disabled>
+                    <Select value={formData.jobType} onValueChange={(value) => handleInputChange('jobType', value)} disabled={isEditing}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select work arrangement" />
                       </SelectTrigger>
@@ -818,7 +819,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
 
                 <div className="space-y-2">
                   <Label htmlFor="experienceLevel">Job Level / Seniority</Label>
-                  <Select value={formData.experienceLevel} onValueChange={(value) => handleInputChange('experienceLevel', value)} disabled>
+                  <Select value={formData.experienceLevel} onValueChange={(value) => handleInputChange('experienceLevel', value)} disabled={isEditing}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select experience level" />
                     </SelectTrigger>
@@ -851,40 +852,40 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="education">Educational Background</Label>
-                    <Input id="education" placeholder="e.g., BSc CS; Azure Certs" value={formData.education} onChange={(e)=>handleInputChange('education', e.target.value)} readOnly disabled />
+                    <Input id="education" placeholder="e.g., BSc CS; Azure Certs" value={formData.education} onChange={(e)=>handleInputChange('education', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="years">Years of Experience</Label>
-                    <Input id="years" placeholder="e.g., 5–8 years (min 5)" value={formData.years} onChange={(e)=>handleInputChange('years', e.target.value)} readOnly disabled />
+                    <Input id="years" placeholder="e.g., 5–8 years (min 5)" value={formData.years} onChange={(e)=>handleInputChange('years', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="technical">Technical Skills</Label>
-                  <Textarea id="technical" placeholder="Hard skills, tools, languages, platforms" value={formData.technical} onChange={(e)=>handleInputChange('technical', e.target.value)} readOnly disabled />
+                  <Textarea id="technical" placeholder="Hard skills, tools, languages, platforms" value={formData.technical} onChange={(e)=>handleInputChange('technical', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="domain">Domain Knowledge</Label>
-                  <Textarea id="domain" placeholder="Industry-specific expertise" value={formData.domain} onChange={(e)=>handleInputChange('domain', e.target.value)} readOnly disabled />
+                  <Textarea id="domain" placeholder="Industry-specific expertise" value={formData.domain} onChange={(e)=>handleInputChange('domain', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="soft">Soft Skills</Label>
-                  <Textarea id="soft" placeholder="Communication, leadership, problem-solving, adaptability" value={formData.soft} onChange={(e)=>handleInputChange('soft', e.target.value)} readOnly disabled />
+                  <Textarea id="soft" placeholder="Communication, leadership, problem-solving, adaptability" value={formData.soft} onChange={(e)=>handleInputChange('soft', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="languages">Languages</Label>
-                    <Input id="languages" placeholder="e.g., English (required), Mandarin (nice-to-have)" value={formData.languages} onChange={(e)=>handleInputChange('languages', e.target.value)} readOnly disabled />
+                    <Input id="languages" placeholder="e.g., English (required), Mandarin (nice-to-have)" value={formData.languages} onChange={(e)=>handleInputChange('languages', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                   </div>
                   <div className="space-y-2"></div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="mustHave">Must‑Have Skills</Label>
-                    <Textarea id="mustHave" placeholder="List must-haves, one per line" value={formData.mustHave} onChange={(e)=>handleInputChange('mustHave', e.target.value)} readOnly disabled />
+                    <Textarea id="mustHave" placeholder="List must-haves, one per line" value={formData.mustHave} onChange={(e)=>handleInputChange('mustHave', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="niceToHave">Nice‑to‑Have Skills</Label>
-                    <Textarea id="niceToHave" placeholder="List nice-to-haves, one per line" value={formData.niceToHave} onChange={(e)=>handleInputChange('niceToHave', e.target.value)} readOnly disabled />
+                    <Textarea id="niceToHave" placeholder="List nice-to-haves, one per line" value={formData.niceToHave} onChange={(e)=>handleInputChange('niceToHave', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                   </div>
                 </div>
               </CardContent>
@@ -905,19 +906,19 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="day">Day‑to‑Day Duties</Label>
-                  <Textarea id="day" placeholder="Regular tasks (one per line)" value={formData.day} onChange={(e)=>handleInputChange('day', e.target.value)} readOnly disabled />
+                  <Textarea id="day" placeholder="Regular tasks (one per line)" value={formData.day} onChange={(e)=>handleInputChange('day', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="project">Project / Strategic Duties</Label>
-                  <Textarea id="project" placeholder="Long‑term contributions (one per line)" value={formData.project} onChange={(e)=>handleInputChange('project', e.target.value)} readOnly disabled />
+                  <Textarea id="project" placeholder="Long‑term contributions (one per line)" value={formData.project} onChange={(e)=>handleInputChange('project', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="collaboration">Team Collaboration / Stakeholders</Label>
-                  <Textarea id="collaboration" placeholder="Cross‑functional interactions (one per line)" value={formData.collaboration} onChange={(e)=>handleInputChange('collaboration', e.target.value)} readOnly disabled />
+                  <Textarea id="collaboration" placeholder="Cross‑functional interactions (one per line)" value={formData.collaboration} onChange={(e)=>handleInputChange('collaboration', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="scope">Decision‑Making Scope</Label>
-                  <Textarea id="scope" placeholder="Budget, people management, strategic influence" value={formData.scope} onChange={(e)=>handleInputChange('scope', e.target.value)} readOnly disabled />
+                  <Textarea id="scope" placeholder="Budget, people management, strategic influence" value={formData.scope} onChange={(e)=>handleInputChange('scope', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                 </div>
               </CardContent>
             </Card>
@@ -938,15 +939,15 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="salaryMin">Salary Min</Label>
-                    <Input id="salaryMin" type="number" placeholder="e.g., 6000" value={formData.salaryMin} onChange={(e)=>handleInputChange('salaryMin', e.target.value)} readOnly disabled />
+                    <Input id="salaryMin" type="number" placeholder="e.g., 6000" value={formData.salaryMin} onChange={(e)=>handleInputChange('salaryMin', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="salaryMax">Salary Max</Label>
-                    <Input id="salaryMax" type="number" placeholder="e.g., 9000" value={formData.salaryMax} onChange={(e)=>handleInputChange('salaryMax', e.target.value)} readOnly disabled />
+                    <Input id="salaryMax" type="number" placeholder="e.g., 9000" value={formData.salaryMax} onChange={(e)=>handleInputChange('salaryMax', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="period">Period</Label>
-                    <Select value={formData.period} onValueChange={(value)=>handleInputChange('period', value)} disabled>
+                    <Select value={formData.period} onValueChange={(value)=>handleInputChange('period', value)} disabled={isEditing}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -959,15 +960,15 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="bonus">Bonus / Incentives</Label>
-                  <Input id="bonus" placeholder="e.g., 10% annual bonus; RSUs" value={formData.bonus} onChange={(e)=>handleInputChange('bonus', e.target.value)} readOnly disabled />
+                  <Input id="bonus" placeholder="e.g., 10% annual bonus; RSUs" value={formData.bonus} onChange={(e)=>handleInputChange('bonus', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="perks">Perks & Benefits</Label>
-                  <Textarea id="perks" placeholder="Health, insurance, stock options, learning budget, wellness" value={formData.perks} onChange={(e)=>handleInputChange('perks', e.target.value)} readOnly disabled />
+                  <Textarea id="perks" placeholder="Health, insurance, stock options, learning budget, wellness" value={formData.perks} onChange={(e)=>handleInputChange('perks', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="timeOff">Time Off Policy</Label>
-                  <Input id="timeOff" placeholder="e.g., 18 AL, sick leave, parental leave" value={formData.timeOff} onChange={(e)=>handleInputChange('timeOff', e.target.value)} readOnly disabled />
+                  <Input id="timeOff" placeholder="e.g., 18 AL, sick leave, parental leave" value={formData.timeOff} onChange={(e)=>handleInputChange('timeOff', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                 </div>
               </CardContent>
             </Card>
@@ -988,16 +989,16 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="joining">Joining Timeline</Label>
-                    <Input id="joining" placeholder="e.g., Within 30 days" value={formData.joining} onChange={(e)=>handleInputChange('joining', e.target.value)} readOnly disabled />
+                    <Input id="joining" placeholder="e.g., Within 30 days" value={formData.joining} onChange={(e)=>handleInputChange('joining', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="travel">Travel Requirements</Label>
-                    <Input id="travel" placeholder="e.g., Up to 20%" value={formData.travel} onChange={(e)=>handleInputChange('travel', e.target.value)} readOnly disabled />
+                    <Input id="travel" placeholder="e.g., Up to 20%" value={formData.travel} onChange={(e)=>handleInputChange('travel', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="visa">Work Authorization / Visa</Label>
-                  <Input id="visa" placeholder="e.g., Open to sponsorship / PR required" value={formData.visa} onChange={(e)=>handleInputChange('visa', e.target.value)} readOnly disabled />
+                  <Input id="visa" placeholder="e.g., Open to sponsorship / PR required" value={formData.visa} onChange={(e)=>handleInputChange('visa', e.target.value)} readOnly={isEditing} disabled={isEditing} />
                 </div>
               </CardContent>
             </Card>
@@ -1029,8 +1030,13 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                       return (
                         <Card
                           key={round}
-                          className={`transition-all duration-200 ${checked ? 'ring-2 ring-blue-500 shadow-md' : 'hover:shadow-md'}`}
-                          onClick={() => {}} style={{pointerEvents: 'none', opacity: 0.6}}
+                          className={`transition-all duration-200 ${checked ? 'ring-2 ring-blue-500 shadow-md' : 'hover:shadow-md'} ${isEditing ? '' : 'cursor-pointer'}`}
+                          onClick={() => {
+                            if (isEditing) return
+                            // toggle selection
+                            handleArrayChange('interviewRounds', round, !checked)
+                          }}
+                          style={isEditing ? { pointerEvents: 'none', opacity: 0.6 } : undefined}
                         >
                           <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
@@ -1038,8 +1044,11 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                 <input
                                   type="checkbox"
                                   checked={checked}
-                                  onChange={(e) => {}}
-                                  disabled
+                                  onChange={(e) => {
+                                    if (isEditing) return
+                                    handleArrayChange('interviewRounds', round, e.target.checked)
+                                  }}
+                                  disabled={isEditing}
                                   onClick={(e) => e.stopPropagation()}
                                   className="h-4 w-4 rounded border border-gray-300 text-blue-600 focus:ring-blue-500"
                                 />
@@ -1136,7 +1145,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
             </Button>
             <Button 
               type="submit" 
-              disabled={true}
+              disabled={isEditing || isSubmitting}
               className="min-w-[200px]"
             >
               {isSubmitting ? (
