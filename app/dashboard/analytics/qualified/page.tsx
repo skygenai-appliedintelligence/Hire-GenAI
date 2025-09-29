@@ -34,108 +34,31 @@ export default function QualifiedCandidatesInterviewFlowPage() {
         key: "screening",
         label: "Screening Round",
         agent: "Agent 1 - Screening Round",
-        rows: [
-          {
-            id: "1",
-            candidateName: "Jane Doe",
-            appliedJD: "Frontend Engineer",
-            email: "jane.doe@example.com",
-            phone: "+1 555-0100",
-            cvUrl: "/uploads/sample-cv-1.pdf",
-            status: "Qualified",
-          },
-          {
-            id: "2",
-            candidateName: "John Smith",
-            appliedJD: "Backend Engineer",
-            email: "john.smith@example.com",
-            phone: "+1 555-0101",
-            cvUrl: "/uploads/sample-cv-2.pdf",
-            status: "Unqualified",
-          },
-          {
-            id: "3",
-            candidateName: "Sara Khan",
-            appliedJD: "Fullstack Developer",
-            email: "sara.khan@example.com",
-            phone: "+1 555-0102",
-            cvUrl: "/uploads/sample-cv-3.pdf",
-            status: "Pending",
-          },
-        ],
+        rows: [],
       },
       {
         key: "technical",
         label: "Technical Round",
         agent: "Agent 2 - Technical Round",
-        rows: [
-          {
-            id: "4",
-            candidateName: "Ava Patel",
-            appliedJD: "Fullstack Developer",
-            email: "ava.patel@example.com",
-            phone: "+1 555-0103",
-            cvUrl: "/uploads/sample-cv-4.pdf",
-            status: "Qualified",
-          },
-          {
-            id: "5",
-            candidateName: "Mike Ross",
-            appliedJD: "Backend Engineer",
-            email: "mike.ross@example.com",
-            phone: "+1 555-0104",
-            cvUrl: "/uploads/sample-cv-5.pdf",
-            status: "Expired",
-          },
-        ],
+        rows: [],
       },
       {
         key: "system-design",
         label: "System Design Round",
         agent: "Agent 3 - System Design Round",
-        rows: [
-          {
-            id: "6",
-            candidateName: "Emily Clark",
-            appliedJD: "Senior Engineer",
-            email: "emily.clark@example.com",
-            phone: "+1 555-0105",
-            cvUrl: "/uploads/sample-cv-6.pdf",
-            status: "Pending",
-          },
-        ],
+        rows: [],
       },
       {
         key: "behavioral",
         label: "Behavioral Round",
         agent: "Agent 4 - Behavioral Round",
-        rows: [
-          {
-            id: "7",
-            candidateName: "Leo Wang",
-            appliedJD: "Frontend Engineer",
-            email: "leo.wang@example.com",
-            phone: "+1 555-0106",
-            cvUrl: "/uploads/sample-cv-7.pdf",
-            status: "Qualified",
-          },
-        ],
+        rows: [],
       },
       {
         key: "final",
         label: "Final Round",
         agent: "Agent 5 - Final Round",
-        rows: [
-          {
-            id: "8",
-            candidateName: "Noah Lee",
-            appliedJD: "Staff Engineer",
-            email: "noah.lee@example.com",
-            phone: "+1 555-0107",
-            cvUrl: "/uploads/sample-cv-8.pdf",
-            status: "Qualified",
-          },
-        ],
+        rows: [],
       },
     ],
     []
@@ -146,7 +69,7 @@ export default function QualifiedCandidatesInterviewFlowPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 space-y-6 py-6 overflow-x-hidden bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Qualified Candidates - Interview Flow</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Qualified Candidates</h1>
         <Link href="/dashboard/analytics" className="text-sm text-blue-600 hover:underline">
           Back to Analytics
         </Link>
@@ -154,13 +77,7 @@ export default function QualifiedCandidatesInterviewFlowPage() {
       {/* Single section (keep only one table) */}
       <div className="space-y-8">
         {firstBucket && (
-          <section key={firstBucket.key} aria-labelledby={`heading-${firstBucket.key}`} className="space-y-3">
-            <h2 id={`heading-${firstBucket.key}`} className="text-xl font-semibold text-gray-900">
-              {firstBucket.label}
-              <span className="ml-2 align-middle rounded-full bg-gray-100 text-gray-700 px-2 py-0.5 text-xs">
-                {firstBucket.rows.length}
-              </span>
-            </h2>
+          <section key={firstBucket.key} className="space-y-3">
             <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
               <Table className="table-auto w-full">
                 <TableHeader>
