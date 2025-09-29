@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Check, Hourglass, ArrowLeft } from "lucide-react"
+import { CheckCircle, Check, Hourglass, ArrowLeft } from "lucide-react"
 
 interface EvaluationRecord {
   candidateId: string
@@ -18,7 +18,7 @@ interface EvaluationRecord {
   feedback: string
 }
 
-export default function NotQualifiedResultPage() {
+export default function QualifiedResultPage() {
   const params = useSearchParams()
   const router = useRouter()
   const candidateId = params.get("candidateId") || ""
@@ -45,7 +45,7 @@ export default function NotQualifiedResultPage() {
       <div className="min-h-screen flex items-center justify-center px-4">
         <Card className="max-w-xl w-full">
           <CardHeader>
-            <CardTitle>Application Result</CardTitle>
+            <CardTitle>Congratulations!</CardTitle>
             <CardDescription>Missing candidate reference.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -57,6 +57,7 @@ export default function NotQualifiedResultPage() {
       </div>
     )
   }
+
   return (
     <div className="min-h-screen bg-white px-4 sm:px-6 lg:px-8 py-10">
       <div className="mx-auto w-full max-w-4xl rounded-2xl border border-emerald-200 bg-emerald-50/70 p-6 sm:p-10 shadow-sm">
@@ -115,4 +116,3 @@ export default function NotQualifiedResultPage() {
     </div>
   )
 }
- 

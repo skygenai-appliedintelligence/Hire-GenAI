@@ -147,7 +147,7 @@ export default function SettingsContent({ section }: { section?: string }) {
     if (!(company as any)?.id) return
     setMembersLoading(true)
     try {
-      const res = await fetch(`/api/company-members?companyId=${(company as any).id}&email=${encodeURIComponent(email)}`, { method: "DELETE" })
+      const res = await fetch(`/api/company-members?companyId=${(company as any).id}&email=${encodeURIComponent(email)}&actorEmail=${encodeURIComponent((user as any)?.email || '')}`, { method: "DELETE" })
       const data = await res.json()
       if (data.ok) {
         toast({ title: "Member removed" })

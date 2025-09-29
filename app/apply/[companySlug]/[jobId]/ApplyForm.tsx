@@ -211,7 +211,7 @@ export default function ApplyForm({ job }: { job: any }) {
         toast({ title: 'Application Successful! 🎉', description: `You've been qualified for interviews. Your AI-powered interview process is ready!` })
 
         setTimeout(() => {
-          router.push(`/interview-pipeline/${candidateId}`)
+          router.push(`/apply/qualified?candidateId=${encodeURIComponent(candidateId)}`)
         }, 1500)
       } else {
         application.status = 'unqualified'
