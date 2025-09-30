@@ -365,7 +365,7 @@ export default function JobsPage() {
                         )}
                       </div>
                       <div className="flex space-x-2">
-                        <Link href={`/dashboard/analytics`}>
+                        <Link href={`/dashboard/analytics/${job.id}`}>
                           <Button
                             variant="outline"
                             size="sm"
@@ -522,7 +522,7 @@ export default function JobsPage() {
                         )}
                       </div>
                       <div className="flex space-x-2">
-                        <Link href={`/dashboard/analytics`}>
+                        <Link href={`/dashboard/analytics/${job.id}`}>
                           <Button
                             variant="outline"
                             size="sm"
@@ -533,18 +533,18 @@ export default function JobsPage() {
                             View Stats
                           </Button>
                         </Link>
-                        {/* Disabled Apply in non-open statuses */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled
-                          className="cursor-not-allowed text-red-600 bg-transparent hover:bg-red-50/50 border-red-200/70"
-                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
-                          title="Apply Form is disabled for this status"
-                        >
-                          <ExternalLink className="h-4 w-4 mr-1" />
-                          Apply Form
-                        </Button>
+                        {/* Apply Form button enabled for all statuses */}
+                        <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-blue-600 hover:text-blue-700 bg-transparent hover:bg-blue-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            Apply Form
+                          </Button>
+                        </Link>
                         <Button
                           variant="outline"
                           size="sm"
@@ -679,7 +679,7 @@ export default function JobsPage() {
                         )}
                       </div>
                       <div className="flex space-x-2">
-                        <Link href={`/dashboard/analytics`}>
+                        <Link href={`/dashboard/analytics/${job.id}`}>
                           <Button
                             variant="outline"
                             size="sm"
@@ -690,18 +690,18 @@ export default function JobsPage() {
                             View Stats
                           </Button>
                         </Link>
-                        {/* Disabled Apply in non-open statuses */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled
-                          className="cursor-not-allowed text-red-600 bg-transparent hover:bg-red-50/50 border-red-200/70"
-                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
-                          title="Apply Form is disabled for this status"
-                        >
-                          <ExternalLink className="h-4 w-4 mr-1" />
-                          Apply Form
-                        </Button>
+                        {/* Apply Form button enabled for all statuses */}
+                        <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-blue-600 hover:text-blue-700 bg-transparent hover:bg-blue-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            Apply Form
+                          </Button>
+                        </Link>
                         <Button
                           variant="outline"
                           size="sm"
@@ -849,7 +849,7 @@ export default function JobsPage() {
                         )}
                       </div>
                       <div className="flex space-x-2">
-                        <Link href={`/dashboard/analytics`}>
+                        <Link href={`/dashboard/analytics/${job.id}`}>
                           <Button
                             variant="outline"
                             size="sm"
@@ -860,18 +860,18 @@ export default function JobsPage() {
                             View Stats
                           </Button>
                         </Link>
-                        {/* Disabled Apply in non-open statuses */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled
-                          className="cursor-not-allowed text-red-600 bg-transparent hover:bg-red-50/50 border-red-200/70"
-                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
-                          title="Apply Form is disabled for this status"
-                        >
-                          <ExternalLink className="h-4 w-4 mr-1" />
-                          Apply Form
-                        </Button>
+                        {/* Apply Form button enabled for all statuses */}
+                        <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-blue-600 hover:text-blue-700 bg-transparent hover:bg-blue-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            Apply Form
+                          </Button>
+                        </Link>
                         <Button
                           variant="outline"
                           size="sm"
