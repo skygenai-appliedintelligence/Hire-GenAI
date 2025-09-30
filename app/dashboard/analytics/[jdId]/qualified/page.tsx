@@ -40,10 +40,22 @@ export default function JDQualifiedPage() {
       setLoading(true)
       setError(null)
       try {
-        const res = await fetch(`/api/qualified/by-job/${encodeURIComponent(jdId)}`, { cache: "no-store" })
+        const res = await fetch(`/api/applications/qualified/${encodeURIComponent(jdId)}`, { cache: "no-store" })
         const json = await res.json()
         if (!res.ok || !json?.ok) throw new Error(json?.error || "Failed to load qualified candidates")
-        setRows(json.qualified || [])
+        
+        // Map API response to table format
+        const mapped = (json.applications || []).map((app: any) => ({
+          id: app.id,
+          candidateName: app.candidateName,
+          appliedJD: jdId.substring(0, 8) + '...',
+          email: app.email,
+          phone: app.phone,
+          cvUrl: app.cvUrl,
+          status: "Qualified" as InterviewStatus,
+        }))
+        
+        setRows(mapped)
       } catch (e: any) {
         setError(e?.message || "Failed to load qualified candidates")
       } finally {
@@ -106,7 +118,11 @@ export default function JDQualifiedPage() {
 
       {/* Single section (keep only one table) */}
       <div className="space-y-8">
-        {firstBucket && (
+        {loading ? (
+          <div className="py-8 text-center">Loading qualified candidates...</div>
+        ) : error ? (
+          <div className="py-8 text-center text-red-600">{error}</div>
+        ) : firstBucket && (
           <section key={firstBucket.key} className="space-y-3">
             <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
               <Table className="table-auto w-full">
@@ -124,7 +140,14 @@ export default function JDQualifiedPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {firstBucket.rows.map((row, idx) => (
+                  {firstBucket.rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center text-gray-500 py-8">
+                        No qualified candidates yet for this job.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    firstBucket.rows.map((row, idx) => (
                     <TableRow key={row.id} className={idx % 2 === 1 ? "bg-gray-50" : undefined}>
                       <TableCell className="px-3 py-2 text-sm align-middle font-medium truncate">{row.candidateName}</TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle truncate">{row.appliedJD}</TableCell>
@@ -153,7 +176,9 @@ export default function JDQualifiedPage() {
                         </span>
                       </TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
-                        <Button variant="outline" size="sm">Show Report & Interview Details</Button>
+                        <Link href={`/dashboard/analytics/${jdId}/applications/${row.id}/report`}>
+                          <Button variant="outline" size="sm">Show Report & Interview Details</Button>
+                        </Link>
                       </TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
                         <Button
@@ -182,7 +207,8 @@ export default function JDQualifiedPage() {
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>

@@ -70,7 +70,13 @@ export async function POST(req: NextRequest) {
       candidate,
       resume, // { url, name, type, size }
       source = 'direct_application',
+      meta, // { timestamp, ip, userAgent }
     } = body || {}
+
+    // Capture request metadata
+    const submittedAt = meta?.timestamp || new Date().toISOString()
+    const clientIp = meta?.ip || req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    const userAgent = meta?.userAgent || req.headers.get('user-agent') || 'unknown'
 
     if (!jobId) return NextResponse.json({ error: 'Missing jobId' }, { status: 400 })
     if (!candidate?.email) return NextResponse.json({ error: 'Missing candidate email' }, { status: 400 })
@@ -258,9 +264,39 @@ export async function POST(req: NextRequest) {
       } catch {}
     }
 
-    return NextResponse.json({ ok: true, candidateId, applicationId, fileId })
+    // 5) Fire analytics event
+    try {
+      await fetch(`${req.nextUrl.origin}/api/analytics/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'candidate_submitted',
+          jobId,
+          candidateId,
+          applicationId,
+          timestamp: submittedAt,
+          metadata: {
+            source,
+            ip: clientIp,
+            userAgent,
+            hasResume: !!fileId,
+          },
+        }),
+      }).catch(e => console.warn('Analytics event failed:', e))
+    } catch {}
+
+    // Log success
+    console.log(`✅ Application submitted: candidate=${candidateId}, job=${jobId}, app=${applicationId}`)
+
+    return NextResponse.json({ 
+      ok: true, 
+      candidateId, 
+      applicationId, 
+      fileId,
+      message: 'Application submitted successfully'
+    })
   } catch (err: any) {
-    console.error('Application submit error:', err)
+    console.error('❌ Application submit error:', err)
     return NextResponse.json({ error: err?.message || 'Failed to submit application' }, { status: 500 })
   }
 }
