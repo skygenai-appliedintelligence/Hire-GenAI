@@ -149,6 +149,10 @@ export default function ApplyForm({ job }: { job: any }) {
                   }
                 : null),
           source: 'direct_application',
+          meta: {
+            timestamp: new Date().toISOString(),
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+          },
         }
 
         const submitRes = await fetch('/api/applications/submit', {

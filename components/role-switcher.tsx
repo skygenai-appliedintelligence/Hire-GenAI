@@ -8,19 +8,29 @@ import { Badge } from "@/components/ui/badge"
 import { User, Shield, Bot } from "lucide-react"
 
 export function RoleSwitcher() {
-  const { user, company, switchRole } = useAuth()
+  const { user, company } = useAuth()
   const [users, setUsers] = useState<any[]>([])
+  const [currentRoleUser, setCurrentRoleUser] = useState<any | null>(null)
 
   useEffect(() => {
     // Get all available users for role switching
-    const allUsers = RoleManagementService.getAllUsers()
-    setUsers(allUsers)
+    try {
+      RoleManagementService.initializeDefaultUsers()
+      const allUsers = RoleManagementService.getAllUsers()
+      setUsers(allUsers)
+      const current = RoleManagementService.getCurrentUser() || allUsers[0] || null
+      if (current) {
+        RoleManagementService.setCurrentUser(current)
+        setCurrentRoleUser(current)
+      }
+    } catch {}
   }, [])
 
   const handleRoleSwitch = (userId: string) => {
     const selectedUser = users.find((u) => u.id === userId)
     if (selectedUser) {
-      switchRole(selectedUser)
+      RoleManagementService.setCurrentUser(selectedUser)
+      setCurrentRoleUser(selectedUser)
     }
   }
 
@@ -52,12 +62,12 @@ export function RoleSwitcher() {
 
   return (
     <div className="flex items-center space-x-2">
-      <Badge className={getRoleColor(user?.role || "")}> 
-        {getRoleIcon(user?.role || "")}
-        <span className="ml-1 capitalize">{user?.role?.replace("_", " ") || "User"}</span>
+      <Badge className={getRoleColor(currentRoleUser?.role || "")}> 
+        {getRoleIcon(currentRoleUser?.role || "")}
+        <span className="ml-1 capitalize">{(currentRoleUser?.role || "user").replace("_", " ")}</span>
       </Badge>
 
-      <Select value={user?.id} onValueChange={handleRoleSwitch}>
+      <Select value={currentRoleUser?.id} onValueChange={handleRoleSwitch}>
         <SelectTrigger className="w-44">
           <div className="flex flex-col text-left leading-tight">
             <span className="text-sm font-medium truncate">{user?.full_name || user?.email?.split('@')[0] || 'User'}</span>
