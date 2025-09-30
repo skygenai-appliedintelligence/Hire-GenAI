@@ -4,8 +4,8 @@ import { DatabaseService } from "@/lib/database"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-// GET /api/applications/by-job/:jobId
-// Returns applications for a given job from database
+// GET /api/applications/qualified/:jobId
+// Returns only qualified applications for a given job
 export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string }> | { jobId: string } }) {
   const { jobId } = await (ctx.params as any)
   if (!jobId) return NextResponse.json({ ok: false, error: "Missing jobId" }, { status: 400 })
@@ -20,7 +20,32 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string 
       })
     }
 
-    // First, check which columns exist in candidates table
+    // First, check the enum values for status column
+    const enumQuery = `
+      SELECT e.enumlabel as enum_value
+      FROM pg_type t 
+      JOIN pg_enum e ON t.oid = e.enumtypid  
+      JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+      WHERE t.typname = 'status_application'
+    `
+    const enumRows = await (DatabaseService as any)["query"]?.call(DatabaseService, enumQuery, []).catch(() => []) as any[]
+    const validStatuses = (enumRows || []).map((r: any) => r.enum_value)
+    
+    console.log('📊 Available status enum values:', validStatuses)
+    
+    // If no enum found, try common status values
+    const statusFilter = validStatuses.length > 0 
+      ? validStatuses.filter((s: string) => 
+          s.includes('qualified') || 
+          s.includes('screening') || 
+          s.includes('interview') || 
+          s.includes('offer')
+        )
+      : ['cv_qualified', 'screening_passed', 'interview_scheduled', 'interviewed', 'offer_extended']
+    
+    console.log('✅ Using status filter:', statusFilter)
+
+    // Check which columns exist in candidates table
     const checkColumnsQuery = `
       SELECT column_name 
       FROM information_schema.columns 
@@ -41,6 +66,14 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string 
     if (availableColumns.has('resume_url')) candidateSelects.push('c.resume_url')
     if (availableColumns.has('resume_file_id')) candidateSelects.push('c.resume_file_id')
 
+    // Build status filter - if we have valid statuses, use them; otherwise return empty
+    let statusCondition = 'AND 1=0' // Default to no results if no valid statuses
+    if (statusFilter.length > 0) {
+      const statusList = statusFilter.map(s => `'${s}'`).join(',')
+      statusCondition = `AND a.status IN (${statusList})`
+    }
+
+    // Fetch only qualified applications
     const query = `
       SELECT 
         a.id,
@@ -55,7 +88,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string 
       FROM applications a
       LEFT JOIN candidates c ON a.candidate_id = c.id
       ${availableColumns.has('resume_file_id') ? 'LEFT JOIN files f ON c.resume_file_id = f.id' : ''}
-      WHERE a.job_id = $1::uuid
+      WHERE a.job_id = $1::uuid 
+        ${statusCondition}
       ORDER BY a.created_at DESC
     `
     
@@ -73,12 +107,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string 
       const email = row.email || row.candidate_email || ''
       const phone = row.phone || row.candidate_phone || ''
       const cvUrl = row.resume_url || row.resume_storage_key || '#'
-      
-      // Map database status to UI status
-      let uiStatus: "CV Unqualified" | "CV Qualified" = "CV Unqualified"
-      if (row.status === 'qualified' || row.status === 'screening_passed' || row.status === 'interview_scheduled') {
-        uiStatus = "CV Qualified"
-      }
 
       return {
         id: row.id,
@@ -86,8 +114,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string 
         email,
         phone,
         cvUrl,
-        status: uiStatus,
+        status: "CV Qualified" as const,
         appliedAt: row.applied_at,
+        dbStatus: row.status,
       }
     })
 
@@ -97,7 +126,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string 
       applications,
     })
   } catch (e: any) {
-    console.error("Failed to load applications:", e)
+    console.error("Failed to load qualified applications:", e)
     return NextResponse.json({ ok: false, error: e?.message || "Failed to load applications" }, { status: 500 })
   }
 }
