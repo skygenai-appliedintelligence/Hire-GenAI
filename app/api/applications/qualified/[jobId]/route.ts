@@ -70,7 +70,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string 
     let statusCondition = 'AND 1=0' // Default to no results if no valid statuses
     if (statusFilter.length > 0) {
       const statusList = statusFilter.map(s => `'${s}'`).join(',')
-      statusCondition = `AND a.status IN (${statusList})`
+      statusCondition = `AND a.status::text IN (${statusList})`
     }
 
     // Fetch only qualified applications

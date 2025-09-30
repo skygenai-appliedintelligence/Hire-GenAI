@@ -547,21 +547,42 @@ export class DatabaseService {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
     }
-    const q = `
-      SELECT id, company_id, title, description_md, location_text, status, employment_type, level,
-             education, years_experience_min, years_experience_max,
-             technical_skills, domain_knowledge, soft_skills, languages,
-             must_have_skills, nice_to_have_skills,
-             duties_day_to_day, duties_strategic, stakeholders,
-             decision_scope, salary_min, salary_max, salary_period, bonus_incentives,
-             perks_benefits, time_off_policy, joining_timeline, travel_requirements,
-             visa_requirements,
-             created_by, created_at
-      FROM jobs
-      WHERE id = $1::uuid AND company_id = $2::uuid
-      LIMIT 1
-    `
-    const rows = (await this.query(q, [jobId, companyId])) as any[]
+    
+    // If companyId is 'temp' or invalid, just fetch by jobId without company filter
+    const isValidCompanyId = companyId && companyId !== 'temp' && companyId.length > 10
+    
+    const q = isValidCompanyId 
+      ? `
+        SELECT id, company_id, title, description_md, location_text, status, employment_type, level,
+               education, years_experience_min, years_experience_max,
+               technical_skills, domain_knowledge, soft_skills, languages,
+               must_have_skills, nice_to_have_skills,
+               duties_day_to_day, duties_strategic, stakeholders,
+               decision_scope, salary_min, salary_max, salary_period, bonus_incentives,
+               perks_benefits, time_off_policy, joining_timeline, travel_requirements,
+               visa_requirements,
+               created_by, created_at
+        FROM jobs
+        WHERE id = $1::uuid AND company_id = $2::uuid
+        LIMIT 1
+      `
+      : `
+        SELECT id, company_id, title, description_md, location_text, status, employment_type, level,
+               education, years_experience_min, years_experience_max,
+               technical_skills, domain_knowledge, soft_skills, languages,
+               must_have_skills, nice_to_have_skills,
+               duties_day_to_day, duties_strategic, stakeholders,
+               decision_scope, salary_min, salary_max, salary_period, bonus_incentives,
+               perks_benefits, time_off_policy, joining_timeline, travel_requirements,
+               visa_requirements,
+               created_by, created_at
+        FROM jobs
+        WHERE id = $1::uuid
+        LIMIT 1
+      `
+    
+    const params = isValidCompanyId ? [jobId, companyId] : [jobId]
+    const rows = (await this.query(q, params)) as any[]
     return rows.length > 0 ? rows[0] : null
   }
 

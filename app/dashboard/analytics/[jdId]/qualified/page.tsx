@@ -176,7 +176,9 @@ export default function JDQualifiedPage() {
                         </span>
                       </TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
-                        <Button variant="outline" size="sm">Show Report & Interview Details</Button>
+                        <Link href={`/dashboard/analytics/${jdId}/applications/${row.id}/report`}>
+                          <Button variant="outline" size="sm">Show Report & Interview Details</Button>
+                        </Link>
                       </TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
                         <Button

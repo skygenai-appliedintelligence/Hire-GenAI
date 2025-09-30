@@ -110,7 +110,9 @@ export default function JDApplicationsPage() {
                             </span>
                           </TableCell>
                           <TableCell>
-                            <Button variant="outline" size="sm">Show CV Report</Button>
+                            <Link href={`/dashboard/analytics/${jdId}/applications/${row.id}/report`}>
+                              <Button variant="outline" size="sm">Show CV Report</Button>
+                            </Link>
                           </TableCell>
                           <TableCell>
                             <Button

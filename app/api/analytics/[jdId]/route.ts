@@ -60,11 +60,11 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jdId: string }
     const statsQuery = `
       SELECT 
         COUNT(*) FILTER (WHERE 1=1) as total_applicants,
-        COUNT(*) FILTER (WHERE status = ANY($2::text[])) as qualified_count,
-        COUNT(*) FILTER (WHERE status = ANY($3::text[])) as interviews_count,
-        COUNT(*) FILTER (WHERE status = ANY($4::text[])) as in_progress_count,
-        COUNT(*) FILTER (WHERE status = ANY($5::text[])) as recommended_count,
-        COUNT(*) FILTER (WHERE status = ANY($6::text[])) as rejected_count
+        COUNT(*) FILTER (WHERE status::text = ANY($2::text[])) as qualified_count,
+        COUNT(*) FILTER (WHERE status::text = ANY($3::text[])) as interviews_count,
+        COUNT(*) FILTER (WHERE status::text = ANY($4::text[])) as in_progress_count,
+        COUNT(*) FILTER (WHERE status::text = ANY($5::text[])) as recommended_count,
+        COUNT(*) FILTER (WHERE status::text = ANY($6::text[])) as rejected_count
       FROM applications
       WHERE job_id = $1::uuid
     `
