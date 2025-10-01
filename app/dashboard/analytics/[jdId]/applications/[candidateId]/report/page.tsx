@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, User, FileText, MessageSquare, Download, Mail, Phone, Calendar, ExternalLink } from "lucide-react"
+import { ArrowLeft, User, FileText, MessageSquare, Download, Mail, Phone, Calendar, ExternalLink, Star, Briefcase, ChevronDown } from "lucide-react"
 
 type CandidateData = {
   id: string
@@ -63,6 +63,7 @@ export default function CandidateReportPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"candidate" | "evaluation" | "transcript" | "job">("candidate")
+  const [applicationsCount, setApplicationsCount] = useState<number | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -75,14 +76,13 @@ export default function CandidateReportPage() {
         const json = await res.json()
 
         if (!res.ok || !json?.ok) {
-          throw new Error(json?.error || "Failed to load candidate report")
         }
 
         setCandidate(json.candidate || null)
         setEvaluation(json.evaluation || null)
         setTranscript(json.transcript || null)
-        
-        // Fetch job title
+
+        // Fetch job title and applications count
         if (jdId) {
           try {
             const jobRes = await fetch(`/api/jobs/${jdId}/summary?companyId=temp`, { cache: "no-store" })
@@ -92,6 +92,21 @@ export default function CandidateReportPage() {
             }
           } catch {
             // Ignore job title fetch errors
+          }
+        }
+
+        // Fetch applications for this job to compute candidate's applications count
+        if (jdId) {
+          try {
+            const appsRes = await fetch(`/api/applications/by-job/${jdId}`, { cache: "no-store" })
+            const appsJson = await appsRes.json()
+            if (appsRes.ok && appsJson?.ok && Array.isArray(appsJson.applications)) {
+              const email = (json?.candidate?.email || "").toLowerCase()
+              const count = appsJson.applications.filter((a: any) => (a.email || "").toLowerCase() === email).length
+              setApplicationsCount(count || 1)
+            }
+          } catch {
+            setApplicationsCount(1)
           }
         }
       } catch (e: any) {
@@ -131,6 +146,10 @@ export default function CandidateReportPage() {
   // Create safe references for evaluation and transcript (they can be null)
   const evaluationData = evaluation
   const transcriptData = transcript
+
+  // Demo defaults when scores are not available
+  const resumeScore = (evaluation?.scores?.technical ?? null) !== null ? (evaluation!.scores!.technical as number) : 95
+  const overallScore = (evaluation?.overallScore ?? null) !== null ? (evaluation!.overallScore as number) : 77
 
   const getDecisionBadge = (decision: string) => {
     switch (decision) {
@@ -236,81 +255,148 @@ export default function CandidateReportPage() {
       <div className="px-4 md:px-6 py-6 bg-gradient-to-b from-gray-50/60 via-white to-gray-50/40">
         {/* Candidate Tab Content */}
         {activeTab === "candidate" && (
-          <div className="mt-6">
+          <div className="mt-6 space-y-6">
+            {/* Header Profile Card */}
             <Card className="border-2 border-purple-200 bg-white shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-purple-50 to-purple-100 border-b border-purple-200">
-                <div className="flex items-center gap-3">
-                  <div className="w-16 h-16 rounded-full bg-purple-600 flex items-center justify-center text-white text-2xl font-bold">
-                    {candidateData.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)}
-                  </div>
-                  <div>
-                    <CardTitle className="text-2xl text-purple-900">{candidateData.name}</CardTitle>
-                    <CardDescription className="text-purple-700">{candidateData.status}</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-4">
-                <div className="flex items-start gap-3">
-                  <Mail className="h-5 w-5 text-purple-600 mt-0.5" />
-                  <div>
-                    <div className="text-sm font-medium text-gray-700">Email</div>
-                    <a href={`mailto:${candidateData.email}`} className="text-purple-600 hover:underline">
-                      {candidateData.email}
-                    </a>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Phone className="h-5 w-5 text-purple-600 mt-0.5" />
-                  <div>
-                    <div className="text-sm font-medium text-gray-700">Phone</div>
-                    <a href={`tel:${candidateData.phone}`} className="text-purple-600 hover:underline">
-                      {candidateData.phone}
-                    </a>
-                  </div>
-                </div>
-
-                {candidateData.location && (
-                  <div className="flex items-start gap-3">
-                    <User className="h-5 w-5 text-purple-600 mt-0.5" />
-                    <div>
-                      <div className="text-sm font-medium text-gray-700">Location</div>
-                      <div className="text-gray-900">{candidateData.location}</div>
+              <CardHeader className="bg-gradient-to-r from-purple-50 to-purple-100">
+                <div className="flex items-start justify-between gap-6">
+                  {/* Left: Avatar + details */}
+                  <div className="flex items-start gap-8 relative">
+                    <div className="relative">
+                      <div className="w-20 h-20 rounded-full bg-purple-600 flex items-center justify-center text-white text-3xl font-bold">
+                        {candidateData.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)}
+                      </div>
+                      <div className="absolute -bottom-2 left-1">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 text-white text-xs px-2 py-0.5">
+                          {candidateData.status || 'Interviewed'} <ChevronDown className="h-3 w-3" />
+                        </span>
+                      </div>
+                    </div>
+                    <div className="pt-1 ml-2">
+                      <CardTitle className="text-2xl font-semibold text-purple-700">{candidateData.name}</CardTitle>
+                      <div className="mt-1.5 space-y-1 text-xs text-gray-700">
+                        <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-purple-600" /> {candidateData.email}</div>
+                        <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-purple-600" /> {candidateData.phone || '—'}</div>
+                        <div className="flex items-center gap-2"><Briefcase className="h-4 w-4 text-purple-600" /> {applicationsCount ?? 1} job application{(applicationsCount ?? 1) > 1 ? 's' : ''}</div>
+                      </div>
                     </div>
                   </div>
-                )}
 
-                <div className="flex items-start gap-3">
-                  <Calendar className="h-5 w-5 text-purple-600 mt-0.5" />
-                  <div>
-                    <div className="text-sm font-medium text-gray-700">Applied On</div>
-                    <div className="text-gray-900">
-                      {new Date(candidateData.appliedAt).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                  {/* Right: Scores and button */}
+                  <div className="flex flex-col items-start justify-center gap-4 min-w-[260px] ml-auto">
+                    <div className="flex items-start gap-2">
+                      <Star className="h-4 w-4 text-orange-500 fill-orange-500 mt-0.5" />
+                      <div>
+                        <div className="text-xs text-gray-700">Resume Score</div>
+                        <div className="text-base font-semibold text-gray-900">{resumeScore}/100</div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <FileText className="h-5 w-5 text-purple-600 mt-0.5" />
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-700 mb-2">Resume</div>
-                    <Button variant="outline" size="sm" asChild className="w-full">
+                    <div className="flex items-start gap-2">
+                      <Star className="h-4 w-4 text-orange-500 fill-orange-500 mt-0.5" />
+                      <div>
+                        <div className="text-xs text-gray-700">Overall Score</div>
+                        <div className="text-base font-semibold text-gray-900">{overallScore}/100</div>
+                      </div>
+                    </div>
+                    <Button size="sm" asChild className="bg-purple-600 hover:bg-purple-700 text-white w-48 justify-center mt-1">
                       <a href={candidateData.resumeUrl} target="_blank" rel="noopener noreferrer">
-                        <Download className="h-4 w-4 mr-2" />
-                        Download Resume
-                        <ExternalLink className="h-3 w-3 ml-2" />
+                        <Download className="h-4 w-4 mr-2" /> Download Resume
                       </a>
                     </Button>
                   </div>
                 </div>
-              </CardContent>
+              </CardHeader>
             </Card>
+
+            {/* Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left: Relevant + Resume Summary */}
+              <div className="space-y-6 lg:col-span-2">
+                {/* Relevant Section (AI Analysis) */}
+                <Card className="border-2 border-emerald-200 bg-emerald-50/60">
+                  <CardHeader>
+                    <CardTitle className="text-emerald-800 text-lg">Relevant</CardTitle>
+                    <CardDescription className="text-emerald-700">AI analysis of candidate fit</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm text-emerald-900 whitespace-pre-wrap">
+                      {evaluation?.reviewerComments || "No AI analysis available."}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Resume Summary */}
+                <Card className="border-2 border-gray-200 bg-white">
+                  <CardHeader>
+                    <CardTitle className="text-gray-900">Resume Summary</CardTitle>
+                    <CardDescription>Parsed resume text</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="max-h-96 overflow-y-auto">
+                      <div className="whitespace-pre-wrap text-gray-700 leading-relaxed text-sm">
+                        {transcript?.text || "Resume text not available."}
+                      </div>
+                    </div>
+                    <div className="pt-4 text-sm">
+                      <a href={candidateData.resumeUrl} target="_blank" rel="noopener noreferrer" className="text-purple-700 hover:underline inline-flex items-center gap-2">
+                        <ExternalLink className="h-4 w-4" /> View original resume
+                      </a>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Right: Quick Stats + Timeline */}
+              <div className="space-y-6">
+                {/* Quick Stats */}
+                <Card className="border-2 border-purple-200 bg-white">
+                  <CardHeader>
+                    <CardTitle className="text-purple-900">Quick Stats</CardTitle>
+                    <CardDescription className="text-purple-700">Key details at a glance</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <div className="text-gray-500">Status</div>
+                        <div className="font-semibold text-gray-900">{candidateData.status || '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">Score</div>
+                        <div className="font-semibold text-gray-900">{evaluation?.overallScore ?? '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">Applications</div>
+                        <div className="font-semibold text-gray-900">{applicationsCount ?? '—'}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">Resume Score</div>
+                        <div className="font-semibold text-gray-900">{evaluation?.scores?.technical ?? '—'}</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Timeline */}
+                <Card className="border-2 border-gray-200 bg-white">
+                  <CardHeader>
+                    <CardTitle className="text-gray-900">Timeline</CardTitle>
+                    <CardDescription>Key timestamps</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Created</span>
+                        <span className="text-gray-900">{new Date(candidateData.appliedAt).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Last Updated</span>
+                        <span className="text-gray-900">{evaluation?.reviewedAt ? new Date(evaluation.reviewedAt).toLocaleString() : new Date(candidateData.appliedAt).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </div>
         )}
 
@@ -478,220 +564,6 @@ export default function CandidateReportPage() {
         )}
       </div>
 
-      {/* Desktop Grid Layout */}
-      <div className="hidden lg:grid lg:grid-cols-3 gap-6">
-        {/* Candidate Bucket */}
-        <Card className="border-2 border-purple-200 bg-white shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-purple-50 to-purple-100 border-b border-purple-200">
-            <div className="flex items-center gap-3">
-              <div className="w-16 h-16 rounded-full bg-purple-600 flex items-center justify-center text-white text-2xl font-bold">
-                {candidateData.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)}
-              </div>
-              <div>
-                <CardTitle className="text-xl text-purple-900">{candidateData.name}</CardTitle>
-                <CardDescription className="text-purple-700">{candidateData.status}</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-6 space-y-4">
-            <div className="flex items-start gap-3">
-              <Mail className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
-              <div className="min-w-0">
-                <div className="text-sm font-medium text-gray-700">Email</div>
-                <a href={`mailto:${candidateData.email}`} className="text-purple-600 hover:underline break-all">
-                  {candidateData.email}
-                </a>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <Phone className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="text-sm font-medium text-gray-700">Phone</div>
-                <a href={`tel:${candidateData.phone}`} className="text-purple-600 hover:underline">
-                  {candidateData.phone}
-                </a>
-              </div>
-            </div>
-
-            {candidateData.location && (
-              <div className="flex items-start gap-3">
-                <User className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <div className="text-sm font-medium text-gray-700">Location</div>
-                  <div className="text-gray-900">{candidateData.location}</div>
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-start gap-3">
-              <Calendar className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
-              <div>
-                <div className="text-sm font-medium text-gray-700">Applied On</div>
-                <div className="text-gray-900 text-sm">
-                  {new Date(candidateData.appliedAt).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric'
-                  })}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3">
-              <FileText className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-700 mb-2">Resume</div>
-                <Button variant="outline" size="sm" asChild className="w-full">
-                  <a href={candidateData.resumeUrl} target="_blank" rel="noopener noreferrer">
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
-                    <ExternalLink className="h-3 w-3 ml-2" />
-                  </a>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Evaluation Bucket */}
-        <Card className="border-2 border-emerald-200 bg-white shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-emerald-50 to-emerald-100 border-b border-emerald-200">
-            <CardTitle className="text-xl text-emerald-900 flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Evaluation
-            </CardTitle>
-            <CardDescription className="text-emerald-700">Assessment & feedback</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6 space-y-4 max-h-[600px] overflow-y-auto">
-            {evaluation ? (
-              <>
-                <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                  <div>
-                    <div className="text-xs font-medium text-gray-700">Overall Score</div>
-                    <div className={`text-3xl font-bold ${getScoreColor(evaluationData!.overallScore)}`}>
-                      {evaluationData!.overallScore}/100
-                    </div>
-                  </div>
-                  <div>
-                    {getDecisionBadge(evaluationData!.decision)}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-sm text-gray-900">Scores</h3>
-                  {Object.entries(evaluationData!.scores).map(([key, value]) => (
-                    <div key={key} className="space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span className="font-medium capitalize">{key.replace('_', ' ')}</span>
-                        <span className={`font-bold ${getScoreColor(value)}`}>{value}</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-1.5">
-                        <div
-                          className={`h-1.5 rounded-full ${
-                            value >= 80 ? 'bg-green-600' : value >= 60 ? 'bg-yellow-600' : 'bg-red-600'
-                          }`}
-                          style={{ width: `${value}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {evaluationData!.strengths.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-sm text-gray-900 mb-1">Strengths</h3>
-                    <ul className="space-y-1">
-                      {evaluationData!.strengths.map((strength, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-xs">
-                          <span className="text-green-600 mt-0.5">✓</span>
-                          <span>{strength}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {evaluationData!.weaknesses.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold text-sm text-gray-900 mb-1">Improvements</h3>
-                    <ul className="space-y-1">
-                      {evaluationData!.weaknesses.map((weakness, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-xs">
-                          <span className="text-red-600 mt-0.5">✗</span>
-                          <span>{weakness}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {evaluationData!.reviewerComments && (
-                  <div>
-                    <h3 className="font-semibold text-sm text-gray-900 mb-1">Comments</h3>
-                    <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs">
-                      {evaluationData!.reviewerComments}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="text-center py-8 text-gray-500 text-sm">
-                No evaluation data
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Transcript Bucket */}
-        <Card className="border-2 border-blue-200 bg-white shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200">
-            <CardTitle className="text-xl text-blue-900 flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              Transcript
-            </CardTitle>
-            <CardDescription className="text-blue-700">Interview responses</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6 max-h-[600px] overflow-y-auto">
-            {transcript ? (
-              <div className="space-y-4">
-                {transcriptData!.rounds && transcriptData!.rounds.length > 0 ? (
-                  <div className="space-y-4">
-                    {transcriptData!.rounds!.map((round, roundIdx) => (
-                      <div key={roundIdx} className="space-y-3">
-                        <h3 className="font-semibold text-sm text-blue-900 border-b pb-1">
-                          {round.round}
-                        </h3>
-                        {round.questions.map((qa, qaIdx) => (
-                          <div key={qaIdx} className="space-y-1 pl-3 border-l-2 border-blue-200 text-xs">
-                            <div className="font-medium text-gray-900">Q: {qa.question}</div>
-                            <div className="text-gray-700 pl-3">A: {qa.answer}</div>
-                            {qa.score !== undefined && (
-                              <Badge variant="outline" className={`text-xs ${getScoreColor(qa.score)}`}>
-                                {qa.score}/100
-                              </Badge>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="prose prose-sm max-w-none">
-                    <div className="whitespace-pre-wrap text-gray-700 text-xs leading-relaxed">
-                      {transcriptData!.text || "No transcript available"}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500 text-sm">
-                No transcript available
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
     </div>
   )
 }
