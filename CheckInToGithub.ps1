@@ -26,8 +26,12 @@ function Write-Err($msg)  { Write-Host "[CheckInToGithub] ERROR: $msg" -Foregrou
 # Ensure per-repo Git identity is configured
 function Ensure-GitIdentity {
     # Read existing config
-    $cfgName = (git config user.name 2>$null).Trim()
-    $cfgEmail = (git config user.email 2>$null).Trim()
+    $cfgName = git config user.name 2>$null
+    $cfgEmail = git config user.email 2>$null
+    
+    # Safely trim if not null
+    if ($cfgName) { $cfgName = $cfgName.Trim() }
+    if ($cfgEmail) { $cfgEmail = $cfgEmail.Trim() }
 
     if (-not $cfgName -or -not $cfgEmail) {
         Write-Info "Configuring Git identity for this repository..."
@@ -75,7 +79,8 @@ try {
     Ensure-GitIdentity
 
     # Determine current branch
-    $CurrentBranch = (git rev-parse --abbrev-ref HEAD).Trim()
+    $CurrentBranch = git rev-parse --abbrev-ref HEAD
+    if ($CurrentBranch) { $CurrentBranch = $CurrentBranch.Trim() }
     if ([string]::IsNullOrWhiteSpace($CurrentBranch) -or $CurrentBranch -eq 'HEAD') {
         Write-Err "Could not determine current branch. Are you in a detached HEAD state?"
         exit 1
