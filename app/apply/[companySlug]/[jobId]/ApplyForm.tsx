@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,10 +16,14 @@ export default function ApplyForm({ job }: { job: any }) {
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const appRootRef = useRef<HTMLDivElement | null>(null)
   const [resumeMeta, setResumeMeta] = useState<{ name: string; size: number; type: string; url?: string } | null>(null)
   const [uploadedResume, setUploadedResume] = useState<any>(null)
+  const [parsedResume, setParsedResume] = useState<any>(null)
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [parsingOpen, setParsingOpen] = useState(false)
+  const [parseStep, setParseStep] = useState<'idle' | 'uploading' | 'parsing' | 'evaluating' | 'finalizing'>('idle')
   const [formData, setFormData] = useState({
     // General info
     firstName: '',
@@ -49,6 +53,12 @@ export default function ApplyForm({ job }: { job: any }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    // Ensure parsing overlay remains visible during upload/parse
+    if (resumeFile || resumeMeta) {
+      setParsingOpen(true)
+      // Determine initial step: if we have a local file to upload, start at uploading; else go to parsing
+      setParseStep(resumeFile ? 'uploading' : 'parsing')
+    }
 
     try {
       const fullName = formData.fullName || `${formData.firstName} ${formData.lastName}`.trim()
@@ -76,6 +86,8 @@ export default function ApplyForm({ job }: { job: any }) {
 
       // Upload resume first
       let resumeUploadResult: any = null
+      let parsedResumeData: any = null
+      
       if (resumeFile) {
         try {
           const candidateId = `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -100,10 +112,14 @@ export default function ApplyForm({ job }: { job: any }) {
             title: 'Resume uploaded successfully!', 
             description: `${resumeUploadResult.filename} uploaded to cloud storage` 
           })
+
+          // Note: We'll parse the resume AFTER application is created
+          // so we can save the parsed text to the applications table
         } catch (err: any) {
           console.error('Resume upload failed:', err)
           toast({ title: 'Upload failed', description: err?.message || 'Could not upload resume. Please try again.', variant: 'destructive' })
           setLoading(false)
+          setParsingOpen(false)
           return
         }
       }
@@ -119,6 +135,8 @@ export default function ApplyForm({ job }: { job: any }) {
         submittedAt: new Date().toISOString(),
         status: 'applied',
         resumeUrl: resumeUploadResult?.fileUrl,
+        // Include parsed resume data for evaluation
+        parsedResume: parsedResumeData,
       }
 
       // Persist into DB applications table (server-side) so analytics can use real data
@@ -164,98 +182,164 @@ export default function ApplyForm({ job }: { job: any }) {
         if (!submitRes.ok || submitData?.error) {
           console.warn('Application DB submit failed:', submitData?.error)
         }
+
+        // Parse and evaluate resume if uploaded; otherwise evaluate using form fields
+        let resumeTextForEval = ''
+        if (resumeFile && submitData?.applicationId) {
+          try {
+            // Step 1: Parse resume to extract text
+            setParseStep('parsing')
+            const parseFormData = new FormData()
+            if (resumeFile) {
+              parseFormData.append('file', resumeFile)
+            }
+            parseFormData.append('applicationId', submitData.applicationId)
+            if (submitData.candidateId) {
+              parseFormData.append('candidateId', submitData.candidateId)
+            }
+
+            const parseRes = await fetch('/api/resumes/parse', {
+              method: 'POST',
+              body: parseFormData,
+            })
+
+            if (parseRes.ok) {
+              const parseData = await parseRes.json()
+              const resumeText = parseData.parsed?.rawText || ''
+              resumeTextForEval = resumeText
+
+              // Keep parsed object for UI if needed
+              parsedResumeData = parseData.parsed
+              setParsedResume(parsedResumeData)
+            }
+          } catch (err) {
+            console.warn('Resume parsing failed (non-fatal):', err)
+          }
+        }
+
+        // If parsing produced little/empty text, build a fallback from form fields to avoid 0 scores
+        if (!resumeTextForEval || resumeTextForEval.trim().length < 50) {
+          const fallbackParts = [
+            `[Name] ${fullName}`,
+            `[Email] ${formData.email}`,
+            `[Phone] ${formData.phone}`,
+            `[Location] ${formData.location || ''}`,
+            `[Technical Skills] ${formData.technicalSkills || ''}`,
+            `[Why Interested] ${formData.whyInterested || ''}`,
+            `[Impactful Project] ${formData.impactfulProject || ''}`,
+          ]
+          resumeTextForEval = fallbackParts.filter(Boolean).join('\n')
+        }
+
+        // Step 2: Evaluate CV against JD using a balanced rubric (always run; JD-based scoring)
+        try {
+          setParseStep('evaluating')
+          const evalRes = await fetch('/api/applications/evaluate-cv', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              applicationId: submitData?.applicationId,
+              resumeText: resumeTextForEval,
+              jobDescription: job?.description || '',
+              passThreshold: 40,
+            })
+          })
+
+          if (evalRes.ok) {
+            const evalData = await evalRes.json()
+            console.log('[Application] CV Evaluation:', evalData.evaluation)
+
+            // Attach evaluation to parsedResumeData if present for any downstream UI
+            if (parsedResumeData) {
+              parsedResumeData = { ...parsedResumeData, evaluation: evalData.evaluation }
+              setParsedResume(parsedResumeData)
+            }
+          }
+          setParseStep('finalizing')
+        } catch (err) {
+          console.warn('CV evaluation failed (non-fatal):', err)
+        }
       } catch (err) {
         console.warn('Application DB submit error:', err)
       }
 
-      const jobDescription = job?.description || 'Senior Full Stack Developer position requiring React, Node.js, and cloud experience'
-      // Use server API to evaluate via OpenAI when available
-      let evaluation: { qualified: boolean; score: number; reasoning: string; feedback: string }
-      try {
-        const res = await fetch('/api/applications/evaluate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ application, jobDescription }),
-        })
-        if (!res.ok) throw new Error('Evaluation failed')
-        const data = await res.json()
-        evaluation = data?.result || { qualified: false, score: 0, reasoning: '', feedback: 'Evaluation failed.' }
-      } catch {
-        // Fallback to local evaluation (mock) if API fails
-        evaluation = await AIInterviewService.evaluateApplication(application, jobDescription)
+      // All applications are accepted regardless of evaluation
+      application.status = 'applied'
+
+      // Save to localStorage
+      const candidatesKey = 'candidates'
+      const existingCandidates = JSON.parse(localStorage.getItem(candidatesKey) || '[]')
+      const newCandidates = [...existingCandidates.filter((c: any) => c.id !== candidateId), application]
+      localStorage.setItem(candidatesKey, JSON.stringify(newCandidates))
+
+      // Log activity
+      const activityLog = {
+        id: `activity_${Date.now()}`,
+        company_id: job?.company_id || 'company_1',
+        action: 'New Application Received',
+        details: {
+          candidate_name: fullName,
+          job_title: job?.title || 'Position',
+          status: 'applied',
+          source: 'direct_application',
+        },
+        created_at: new Date().toISOString(),
       }
 
-      if (evaluation.qualified) {
-        application.status = 'qualified'
+      const activityKey = `activity_logs_${job?.company_id || 'company_1'}`
+      const existingActivity = JSON.parse(localStorage.getItem(activityKey) || '[]')
+      existingActivity.push(activityLog)
+      localStorage.setItem(activityKey, JSON.stringify(existingActivity))
 
-        // Create interview pipeline (local UX flow)
-        const pipeline = await AIInterviewService.createInterviewPipeline(candidateId, job.id)
-        const existingPipelines = JSON.parse(localStorage.getItem('interviewPipelines') || '[]')
-        existingPipelines.push(pipeline)
-        localStorage.setItem('interviewPipelines', JSON.stringify(existingPipelines))
+      toast({ 
+        title: 'Application Submitted Successfully! 🎉', 
+        description: `Redirecting to confirmation page...`,
+        duration: 2000
+      })
 
-        const activityLog = {
-          id: `activity_${Date.now()}`,
-          company_id: job?.company_id || 'company_1',
-          action: 'New Application Received',
-          details: {
-            candidate_name: fullName,
-            job_title: job?.title || 'Senior Full Stack Developer',
-            status: 'qualified',
-            source: 'direct_application',
-          },
-          created_at: new Date().toISOString(),
-        }
-
-        const activityKey = `activity_logs_${job?.company_id || 'company_1'}`
-        const existingActivity = JSON.parse(localStorage.getItem(activityKey) || '[]')
-        existingActivity.push(activityLog)
-        localStorage.setItem(activityKey, JSON.stringify(existingActivity))
-
-        toast({ title: 'Application Successful! 🎉', description: `You've been qualified for interviews. Your AI-powered interview process is ready!` })
-
-        setTimeout(() => {
-          router.push(`/apply/qualified?candidateId=${encodeURIComponent(candidateId)}`)
-        }, 1500)
-      } else {
-        application.status = 'unqualified'
-
-        // Persist evaluation details for a dedicated result page
-        try {
-          const evaluationsKey = 'applicationEvaluations'
-          const evalList = JSON.parse(localStorage.getItem(evaluationsKey) || '[]')
-          const evalRecord = {
-            candidateId,
-            jobId: job.id,
-            jobTitle: job?.title || 'Your job',
-            candidateName: fullName,
-            createdAt: new Date().toISOString(),
-            qualified: evaluation.qualified,
-            score: evaluation.score,
-            reasoning: evaluation.reasoning,
-            feedback: evaluation.feedback,
-          }
-          const newList = [...evalList.filter((e: any) => e.candidateId !== candidateId), evalRecord]
-          localStorage.setItem(evaluationsKey, JSON.stringify(newList))
-        } catch {}
-
-        toast({ title: 'Application Received', description: evaluation.feedback, variant: 'destructive' })
-
-        // Navigate to the Not Qualified page to show detailed analysis
-        setTimeout(() => {
-          router.push(`/apply/not-qualified?candidateId=${encodeURIComponent(candidateId)}`)
-        }, 900)
-      }
+      // Redirect to success page
+      setTimeout(() => {
+        const companySlug = window.location.pathname.split('/')[2] || 'tata'
+        router.push(`/apply/success?jobTitle=${encodeURIComponent(job?.title || 'this position')}&company=${companySlug}`)
+      }, 1500)
     } catch (error: any) {
       console.error('Application submission error:', error)
       toast({ title: 'Error', description: error.message || 'Failed to submit application. Please try again.', variant: 'destructive' })
     } finally {
       setLoading(false)
+      setParsingOpen(false)
+      setParseStep('idle')
     }
   }
 
+  // Body scroll lock & background inert handling
+  useEffect(() => {
+    if (parsingOpen) {
+      const original = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      // Set inert on background container for assistive tech and pointer events
+      const root = appRootRef.current
+      if (root) root.setAttribute('inert', '')
+      return () => {
+        document.body.style.overflow = original
+        if (root) root.removeAttribute('inert')
+      }
+    }
+  }, [parsingOpen])
+
+  // If overlay was opened optimistically on file select but no submit is running,
+  // auto-close after a short delay to prevent getting stuck pre-submit.
+  useEffect(() => {
+    if (parsingOpen && !loading) {
+      const t = setTimeout(() => {
+        setParsingOpen(false)
+      }, 1500)
+      return () => clearTimeout(t)
+    }
+  }, [parsingOpen, loading])
+
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto relative" ref={appRootRef} aria-hidden={parsingOpen ? 'true' : undefined}>
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* General Information */}
         <section>
@@ -338,6 +422,8 @@ export default function ApplyForm({ job }: { job: any }) {
               }
               setResumeFile(f)
               setResumeMeta({ name: f.name, size: f.size, type: f.type || 'file' })
+              // Optimistic parsing overlay on selection
+              setParsingOpen(true)
               toast({ title: 'File selected', description: `${f.name} (${Math.round(f.size / 1024)} KB)` })
             }}
           >
@@ -357,6 +443,8 @@ export default function ApplyForm({ job }: { job: any }) {
                 if (f) {
                   setResumeFile(f)
                   setResumeMeta({ name: f.name, size: f.size, type: f.type || 'file' })
+                  // Optimistic parsing overlay on selection
+                  setParsingOpen(true)
                   toast({ title: 'File selected', description: `${f.name} (${Math.round(f.size / 1024)} KB)` })
                 }
               }}
@@ -445,6 +533,10 @@ export default function ApplyForm({ job }: { job: any }) {
         </div>
       </form>
 
+      {parsingOpen && (
+        <ParsingOverlay step={parseStep} />
+      )}
+
       <div className="mt-6 p-4 bg-slate-50 rounded-md border">
         <h4 className="font-semibold mb-2">What happens next?</h4>
         <ul className="text-sm text-slate-700 space-y-1">
@@ -454,6 +546,139 @@ export default function ApplyForm({ job }: { job: any }) {
           <li>• You'll receive real-time feedback and progress updates</li>
           <li>• Final results will be shared with our HR team</li>
         </ul>
+      </div>
+    </div>
+  )
+}
+
+// Accessible, non-dismissible parsing overlay
+function ParsingOverlay({ step }: { step: 'idle' | 'uploading' | 'parsing' | 'evaluating' | 'finalizing' }) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const focusableSelector = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+
+  useEffect(() => {
+    // Focus the dialog container
+    const t = setTimeout(() => {
+      containerRef.current?.focus()
+    }, 0)
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // Non-dismissable
+        e.preventDefault()
+        e.stopPropagation()
+      } else if (e.key === 'Tab') {
+        const root = containerRef.current
+        if (!root) return
+        const focusables = Array.from(root.querySelectorAll<HTMLElement>(focusableSelector))
+        if (focusables.length === 0) {
+          e.preventDefault()
+          return
+        }
+        const first = focusables[0]
+        const last = focusables[focusables.length - 1]
+        const active = document.activeElement as HTMLElement | null
+        if (e.shiftKey) {
+          if (active === first || active === root) {
+            e.preventDefault(); last.focus()
+          }
+        } else {
+          if (active === last) {
+            e.preventDefault(); first.focus()
+          }
+        }
+      }
+    }
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => {
+      clearTimeout(t)
+      document.removeEventListener('keydown', onKeyDown, true)
+    }
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" aria-hidden="true" />
+      <div
+        ref={containerRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="resume-parse-title"
+        aria-describedby="resume-parse-desc"
+        tabIndex={0}
+        className="relative w-[90%] max-w-md rounded-2xl border border-white/20 bg-white/70 dark:bg-slate-900/60 shadow-2xl backdrop-blur-xl p-6 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ring-offset-2 ring-offset-white/50
+        transform transition-all duration-200 ease-out scale-95 opacity-0 data-[show=true]:scale-100 data-[show=true]:opacity-100"
+        data-show
+      >
+        <div className="flex items-start gap-4">
+          <div className="relative">
+            <div className="p-3 rounded-full bg-emerald-500/10 ring-1 ring-emerald-400/30 shadow-[0_0_30px_rgba(16,185,129,0.25)] animate-pulse">
+              <svg className="w-6 h-6 text-emerald-600 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a 8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              </svg>
+            </div>
+          </div>
+          <div>
+            <h2 id="resume-parse-title" className="text-slate-900 dark:text-white font-semibold text-lg">We’re parsing your resume — kindly wait</h2>
+            <p id="resume-parse-desc" className="text-slate-600 dark:text-slate-300 text-sm mt-1">This takes ~10–20 seconds.</p>
+          </div>
+        </div>
+
+        {/* Flipkart-style horizontal stepper */}
+        <div className="mt-6" aria-live="polite">
+          {(() => {
+            const steps = [
+              { key: 'uploading', label: 'Uploaded resume' },
+              { key: 'parsing', label: 'Resume parsing' },
+              { key: 'evaluating', label: 'Evaluation' },
+              { key: 'finalizing', label: 'Finalizing' },
+            ] as const
+            const order: Record<'idle'|'uploading'|'parsing'|'evaluating'|'finalizing', number> = { idle: -1, uploading: 0, parsing: 1, evaluating: 2, finalizing: 3 }
+            const curIndex = order[step] ?? -1
+            return (
+              <div className="w-full">
+                <div className="flex items-center justify-between gap-2">
+                  {steps.map((s, i) => {
+                    const myIndex = order[s.key]
+                    const status = myIndex < curIndex ? 'done' : myIndex === curIndex ? 'active' : 'pending'
+                    const circleClasses = status === 'done'
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : status === 'active'
+                      ? 'bg-white text-emerald-700 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.35)]'
+                      : 'bg-white text-slate-400 border-slate-300'
+                    const lineClasses = myIndex < curIndex
+                      ? 'bg-emerald-500'
+                      : 'bg-slate-200 dark:bg-slate-700'
+                    return (
+                      <div key={s.key} className="flex-1 flex flex-col items-center min-w-0">
+                        <div className="flex items-center w-full">
+                          {/* Left connector */}
+                          {i !== 0 && (
+                            <div className={`h-1 flex-1 ${lineClasses}`} aria-hidden="true" />
+                          )}
+                          {/* Circle */}
+                          <div
+                            className={`flex items-center justify-center h-8 w-8 rounded-full border text-xs font-semibold transition-all ${circleClasses}`}
+                            aria-current={status === 'active' ? 'step' : undefined}
+                          >
+                            {status === 'done' ? '✓' : i + 1}
+                          </div>
+                          {/* Right connector */}
+                          {i !== steps.length - 1 && (
+                            <div className={`h-1 flex-1 ${lineClasses}`} aria-hidden="true" />
+                          )}
+                        </div>
+                        <div className="mt-2 text-[11px] sm:text-xs font-medium text-center text-slate-600 dark:text-slate-300 truncate max-w-[6.5rem] sm:max-w-none">
+                          {s.label}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+        </div>
       </div>
     </div>
   )
