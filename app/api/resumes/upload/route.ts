@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { put } from '@vercel/blob'
 import { DatabaseService } from '@/lib/database'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
-    const file = formData.get('file') as File
-    const candidateId = (formData.get('candidateId') as string) || ''
+    const file = formData.get('file') as File | null
+    const candidateId = formData.get('candidateId') as string | null
 
     if (!file) {
       return NextResponse.json(
@@ -15,84 +18,93 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate file size and type
-    const maxSize = 10 * 1024 * 1024 // 10MB
-    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain']
+    // Validate file type
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+    ]
 
+    if (file.type && !allowedTypes.includes(file.type)) {
+      return NextResponse.json(
+        { error: 'Invalid file type. Please upload PDF, DOC, DOCX, or TXT' },
+        { status: 400 }
+      )
+    }
+
+    // Validate file size (10MB max)
+    const maxSize = 10 * 1024 * 1024
     if (file.size > maxSize) {
       return NextResponse.json(
-        { error: 'File size exceeds 10MB limit' },
+        { error: 'File too large. Maximum size is 10MB' },
         { status: 400 }
       )
     }
 
-    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(pdf|doc|docx|txt)$/i)) {
-      return NextResponse.json(
-        { error: 'Invalid file type. Only PDF, DOC, DOCX, and TXT files are allowed' },
-        { status: 400 }
-      )
-    }
+    // Generate unique filename
+    const timestamp = Date.now()
+    const randomStr = Math.random().toString(36).substring(2, 9)
+    const fileName = `resumes/${candidateId || 'candidate'}-${timestamp}-${randomStr}-${file.name}`
 
-    // Upload to Vercel Blob
-    const filename = `${candidateId}-${Date.now()}-${file.name}`
-    const blob = await put(filename, file, {
+    // Upload to Vercel Blob storage
+    const blob = await put(fileName, file, {
       access: 'public',
+      addRandomSuffix: false,
     })
 
-    // Save file to files table using DatabaseService
-    const file_record = await DatabaseService.createFile({
-      storage_key: blob.url,
-      content_type: file.type,
-      size_bytes: BigInt(file.size),
-    })
+    // Save file metadata to database
+    let fileId: string | null = null
+    try {
+      const fileRow = await DatabaseService.createFile({
+        storage_key: blob.url,
+        content_type: file.type,
+        size_bytes: BigInt(file.size),
+      })
+      fileId = fileRow.id
+    } catch (dbError) {
+      console.warn('Failed to save file metadata to database:', dbError)
+      // Continue without database record
+    }
 
-    // Link candidate to this file via candidate_documents IF candidateId is a valid UUID
-    const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
-    if (candidateId && uuidRegex.test(candidateId)) {
-      const linkQ = `
-        INSERT INTO candidate_documents (candidate_id, file_id, doc_type, title, created_at)
-        VALUES ($1::uuid, $2::uuid, 'resume', $3, NOW())
-        ON CONFLICT DO NOTHING
-      `
-      await (DatabaseService as any)["query"].call(DatabaseService, linkQ, [candidateId, file_record.id, file.name])
-
-      // Optionally update candidate resume_* columns if they exist
+    // If candidateId provided, link file to candidate
+    if (candidateId && fileId) {
       try {
-        const colsQ = `
-          SELECT column_name FROM information_schema.columns
-          WHERE table_schema = 'public' AND table_name = 'candidates'
-            AND column_name IN ('resume_file_id','resume_url','resume_name','resume_size','resume_type')
-        `
-        const rows = await (DatabaseService as any)["query"].call(DatabaseService, colsQ, []) as Array<{ column_name: string }>
-        const setParts: string[] = []
-        const params: any[] = []
-        let p = 1
-        const have = new Set(rows.map(r => r.column_name))
-        if (have.has('resume_file_id')) { setParts.push(`resume_file_id = $${p++}::uuid`); params.push(file_record.id) }
-        if (have.has('resume_url')) { setParts.push(`resume_url = $${p++}`); params.push(blob.url) }
-        if (have.has('resume_name')) { setParts.push(`resume_name = $${p++}`); params.push(file.name) }
-        if (have.has('resume_size')) { setParts.push(`resume_size = $${p++}`); params.push(String(file.size)) }
-        if (have.has('resume_type')) { setParts.push(`resume_type = $${p++}`); params.push(file.type) }
-        if (setParts.length) {
-          const updQ = `UPDATE candidates SET ${setParts.join(', ')} WHERE id = $${p}::uuid`
-          await (DatabaseService as any)["query"].call(DatabaseService, updQ, [...params, candidateId])
+        // Validate that candidateId is a valid UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        if (!uuidRegex.test(candidateId)) {
+          console.warn('[Resume Upload] candidateId is not a valid UUID, skipping link:', candidateId)
+        } else {
+          const linkQuery = `
+            INSERT INTO candidate_documents (candidate_id, file_id, doc_type, title, created_at)
+            VALUES ($1::uuid, $2::uuid, 'resume', $3, NOW())
+            ON CONFLICT DO NOTHING
+          `
+          await (DatabaseService as any)["query"]?.call(
+            DatabaseService,
+            linkQuery,
+            [candidateId, fileId, file.name]
+          )
         }
-      } catch {}
+      } catch (linkError) {
+        console.warn('Failed to link file to candidate:', linkError)
+        // Non-fatal, continue
+      }
     }
 
     return NextResponse.json({
-      id: file_record.id,
-      candidateId: candidateId && uuidRegex.test(candidateId) ? candidateId : null,
+      success: true,
+      fileId,
       fileUrl: blob.url,
       filename: file.name,
-      fileSize: file.size,
+      size: file.size,
       mimeType: file.type,
-      createdAt: file_record.created_at
+      candidateId: candidateId || undefined,
     })
   } catch (error: any) {
     console.error('Resume upload error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to upload resume' },
+      { error: error?.message || 'Failed to upload resume' },
       { status: 500 }
     )
   }

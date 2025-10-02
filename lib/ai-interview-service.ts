@@ -17,6 +17,14 @@ export interface CandidateApplication {
   impactfulProject: string
   availability: string
   resumeUrl?: string
+  parsedResume?: {
+    rawText?: string
+    skills?: string[]
+    experience?: any[]
+    education?: any[]
+    summary?: string
+    certifications?: string[]
+  }
   submittedAt: string
   status: "applied" | "screening" | "qualified" | "unqualified" | "interview_scheduled" | "completed"
 }
@@ -158,10 +166,18 @@ export class AIInterviewService {
     const normalize = (text: string) => text.toLowerCase()
     const tokenize = (text: string) => Array.from(new Set(normalize(text).split(/[^a-z0-9+#\.]+/).filter(Boolean)))
 
+    // Combine form fields AND parsed resume data
     const applicantText = [
       application.technicalSkills,
       application.whyInterested,
       application.impactfulProject,
+      // Include parsed resume skills and experience
+      application.parsedResume?.skills?.join(' '),
+      application.parsedResume?.summary,
+      application.parsedResume?.experience?.map((exp: any) => 
+        [exp.title, exp.company, exp.description].filter(Boolean).join(' ')
+      ).join(' '),
+      application.parsedResume?.certifications?.join(' '),
     ].filter(Boolean).join(' ')
 
     const applicantTokens = tokenize(applicantText)
@@ -196,29 +212,49 @@ export class AIInterviewService {
     }
     // --------------------------------------------------------------------------
     const prompt = `
-      You are evaluating ONLY by core skill match. Ignore seniority, years, timeline, employment gaps, and dates.
+      You are a technical recruiter evaluating candidates. Be fair and balanced.
       
-      Job Description (extract core skills only, not timelines): ${jobDescription}
+      Job Description: ${jobDescription}
       
       Candidate Application:
       - Name: ${application.fullName}
-      - Technical Skills (free text list): ${application.technicalSkills}
-      - Additional context (optional; IGNORE timelines): ${application.whyInterested}; ${application.impactfulProject}
+      - Technical Skills: ${application.technicalSkills || 'Not provided'}
+      - Why Interested: ${application.whyInterested || 'Not provided'}
+      - Impactful Project: ${application.impactfulProject || 'Not provided'}
+      ${application.parsedResume ? `
+      - PARSED RESUME DATA:
+        * Skills: ${application.parsedResume.skills?.join(', ') || 'None'}
+        * Summary: ${application.parsedResume.summary || 'None'}
+        * Experience: ${application.parsedResume.experience?.map((exp: any) => 
+            `${exp.title || 'Position'} at ${exp.company || 'Company'}`
+          ).join('; ') || 'None'}
+        * Certifications: ${application.parsedResume.certifications?.join(', ') || 'None'}
+      ` : '- Resume file uploaded but text extraction pending'}
       
-      Rules:
-      - Focus exclusively on whether the candidate lists the key skills required by the JD.
-      - If they list at least one of the core skills, mark as QUALIFIED even without years.
-      - Be inclusive: transferable equivalents (e.g., React ↔ Next.js) count as overlap.
-      
-      Provide a score out of 100 and determine if they should proceed (threshold: score >= 58),
-      but set qualified to true if skills overlap is sufficient regardless of score.
+      EVALUATION RULES:
+      1. Extract key technical skills/technologies from the Job Description
+      2. Check if candidate has mentioned ANY of those skills (in form OR resume)
+      3. QUALIFY if:
+         - They mention at least 2-3 relevant skills from JD
+         - OR have similar/transferable skills (React↔Next.js, Python↔Django, Java↔Spring, etc.)
+         - OR their job title/experience is directly relevant
+      4. DO NOT QUALIFY if:
+         - Zero overlap with required skills
+         - Completely different domain (e.g., Marketing resume for Backend Dev job)
+         - No technical background for technical role
+      5. IGNORE: years of experience, employment gaps, dates, education level
+      6. Scoring:
+         - 80-100: Strong match (3+ key skills)
+         - 60-79: Good match (2-3 skills or transferable)
+         - 40-59: Weak match (1 skill or loosely related)
+         - 0-39: No match (no relevant skills)
       
       Respond as pure JSON:
       {
         "qualified": boolean,
-        "score": number,
-        "reasoning": "why based on skills only",
-        "feedback": "brief constructive note"
+        "score": number (0-100),
+        "reasoning": "explain skill match or mismatch",
+        "feedback": "constructive feedback"
       }
     `
 
