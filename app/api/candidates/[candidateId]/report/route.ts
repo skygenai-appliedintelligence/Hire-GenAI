@@ -84,6 +84,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
         a.id,
         a.status,
         a.created_at as applied_at,
+        a.resume_text,
         a.first_name,
         a.last_name,
         a.email,
@@ -207,6 +208,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
     return NextResponse.json({
       ok: true,
       candidate,
+      resumeText: row.resume_text || null,
       evaluation,
       transcript
     })

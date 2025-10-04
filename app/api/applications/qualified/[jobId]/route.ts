@@ -66,12 +66,26 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string 
     if (availableColumns.has('resume_url')) candidateSelects.push('c.resume_url')
     if (availableColumns.has('resume_file_id')) candidateSelects.push('c.resume_file_id')
 
-    // Build status filter - if we have valid statuses, use them; otherwise return empty
-    let statusCondition = 'AND 1=0' // Default to no results if no valid statuses
+    // Detect applications.is_qualified column
+    const colCheck = await (DatabaseService as any)["query"]?.call(
+      DatabaseService,
+      `SELECT 1 FROM information_schema.columns 
+       WHERE table_schema = 'public' AND table_name = 'applications' AND column_name = 'is_qualified'`
+      , []
+    ).catch(() => []) as any[]
+    const hasIsQualified = (colCheck || []).length > 0
+
+    // Build status filter - if we have valid statuses, use them; otherwise default to none
+    let statusCondition = 'AND 1=0'
     if (statusFilter.length > 0) {
       const statusList = statusFilter.map(s => `'${s}'`).join(',')
       statusCondition = `AND a.status::text IN (${statusList})`
     }
+
+    // Combine is_qualified flag when available
+    const qualifiedWhere = hasIsQualified
+      ? `(a.is_qualified = true OR (a.status IS NOT NULL ${statusCondition.replace('AND', 'AND') }))`
+      : `(a.status IS NOT NULL ${statusCondition.replace('AND', 'AND') })`
 
     // Fetch only qualified applications
     const query = `
@@ -89,7 +103,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string 
       LEFT JOIN candidates c ON a.candidate_id = c.id
       ${availableColumns.has('resume_file_id') ? 'LEFT JOIN files f ON c.resume_file_id = f.id' : ''}
       WHERE a.job_id = $1::uuid 
-        ${statusCondition}
+        AND ${qualifiedWhere}
       ORDER BY a.created_at DESC
     `
     

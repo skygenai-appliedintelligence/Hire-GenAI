@@ -60,10 +60,13 @@ export default function CandidateReportPage() {
   const [evaluation, setEvaluation] = useState<EvaluationData | null>(null)
   const [transcript, setTranscript] = useState<TranscriptData | null>(null)
   const [jobTitle, setJobTitle] = useState<string>("")
+  const [resumeText, setResumeText] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"candidate" | "evaluation" | "transcript" | "job">("candidate")
   const [applicationsCount, setApplicationsCount] = useState<number | null>(null)
+  const [dbScore, setDbScore] = useState<number | null>(null)
+  const [dbQualified, setDbQualified] = useState<boolean | null>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -81,6 +84,7 @@ export default function CandidateReportPage() {
         setCandidate(json.candidate || null)
         setEvaluation(json.evaluation || null)
         setTranscript(json.transcript || null)
+        setResumeText(typeof json.resumeText === 'string' ? json.resumeText : null)
 
         // Fetch job title and applications count
         if (jdId) {
@@ -119,6 +123,22 @@ export default function CandidateReportPage() {
     fetchData()
   }, [jdId, candidateId])
 
+  // Fetch authoritative score from DB using applicationId (candidateId param is applicationId in this route)
+  useEffect(() => {
+    const fetchScore = async () => {
+      if (!candidateId) return
+      try {
+        const res = await fetch(`/api/applications/score?applicationId=${encodeURIComponent(candidateId)}`, { cache: 'no-store' })
+        const json = await res.json()
+        if (res.ok && json?.ok) {
+          if (typeof json.score === 'number') setDbScore(json.score)
+          if (typeof json.isQualified === 'boolean') setDbQualified(json.isQualified)
+        }
+      } catch {}
+    }
+    fetchScore()
+  }, [candidateId])
+
   if (loading) {
     return (
       <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
@@ -147,9 +167,12 @@ export default function CandidateReportPage() {
   const evaluationData = evaluation
   const transcriptData = transcript
 
-  // Demo defaults when scores are not available
-  const resumeScore = (evaluation?.scores?.technical ?? null) !== null ? (evaluation!.scores!.technical as number) : 95
-  const overallScore = (evaluation?.overallScore ?? null) !== null ? (evaluation!.overallScore as number) : 77
+  // Prefer DB score from applications table; fall back to evaluation values or safe defaults
+  const overallScore = dbScore ?? ((evaluation?.overallScore ?? null) !== null ? (evaluation!.overallScore as number) : 77)
+  // Resume/Qualification score must come from DB qualification_score
+  const resumeScore = typeof dbScore === 'number' ? dbScore : 0
+  // Display placeholder for overall score until interview module provides it
+  const overallScoreDisplay = "--"
 
   const getDecisionBadge = (decision: string) => {
     switch (decision) {
@@ -264,7 +287,7 @@ export default function CandidateReportPage() {
                   <div className="flex items-start gap-8 relative">
                     <div className="relative">
                       <div className="w-20 h-20 rounded-full bg-purple-600 flex items-center justify-center text-white text-3xl font-bold">
-                        {candidateData.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)}
+                        {candidateData.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2)}
                       </div>
                       <div className="absolute -bottom-2 left-1">
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 text-white text-xs px-2 py-0.5">
@@ -295,7 +318,7 @@ export default function CandidateReportPage() {
                       <Star className="h-4 w-4 text-orange-500 fill-orange-500 mt-0.5" />
                       <div>
                         <div className="text-xs text-gray-700">Overall Score</div>
-                        <div className="text-base font-semibold text-gray-900">{overallScore}/100</div>
+                        <div className="text-base font-semibold text-gray-900">{overallScoreDisplay}</div>
                       </div>
                     </div>
                     <Button size="sm" asChild className="bg-purple-600 hover:bg-purple-700 text-white w-48 justify-center mt-1">
@@ -334,7 +357,7 @@ export default function CandidateReportPage() {
                   <CardContent>
                     <div className="max-h-96 overflow-y-auto">
                       <div className="whitespace-pre-wrap text-gray-700 leading-relaxed text-sm">
-                        {transcript?.text || "Resume text not available."}
+                        {resumeText || transcript?.text || "Resume text not available."}
                       </div>
                     </div>
                     <div className="pt-4 text-sm">
@@ -361,16 +384,16 @@ export default function CandidateReportPage() {
                         <div className="font-semibold text-gray-900">{candidateData.status || '—'}</div>
                       </div>
                       <div>
-                        <div className="text-gray-500">Score</div>
-                        <div className="font-semibold text-gray-900">{evaluation?.overallScore ?? '—'}</div>
+                        <div className="text-gray-500">Qualification Score</div>
+                        <div className="font-semibold text-gray-900">{resumeScore}</div>
                       </div>
                       <div>
                         <div className="text-gray-500">Applications</div>
                         <div className="font-semibold text-gray-900">{applicationsCount ?? '—'}</div>
                       </div>
                       <div>
-                        <div className="text-gray-500">Resume Score</div>
-                        <div className="font-semibold text-gray-900">{evaluation?.scores?.technical ?? '—'}</div>
+                        <div className="text-gray-500">Resume Score (DB)</div>
+                        <div className="font-semibold text-gray-900">{typeof dbScore === 'number' ? dbScore : '—'}</div>
                       </div>
                     </div>
                   </CardContent>
@@ -416,9 +439,12 @@ export default function CandidateReportPage() {
                   <>
                     <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg border border-emerald-200">
                       <div>
-                        <div className="text-sm font-medium text-gray-700">Overall Score</div>
-                        <div className={`text-4xl font-bold ${getScoreColor(evaluationData!.overallScore)}`}>
-                          {evaluationData!.overallScore}/100
+                        <div className="text-xs text-gray-700">Overall Score</div>
+                        <div className={`text-4xl font-bold text-gray-800`}>
+                          {overallScoreDisplay}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Interview scores coming soon
                         </div>
                       </div>
                       <div>

@@ -24,6 +24,7 @@ export default function JDApplicationsPage() {
   const [rows, setRows] = useState<ApplicationRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const load = async () => {
@@ -43,6 +44,29 @@ export default function JDApplicationsPage() {
     }
     load()
   }, [jdId])
+
+  const updateStatus = async (row: ApplicationRow, qualified: boolean) => {
+    setSaving((s) => ({ ...s, [row.id]: true }))
+    const newStatus: ApplicationRow["status"] = qualified ? "CV Qualified" : "CV Unqualified"
+    // Optimistic update
+    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: newStatus } : r)))
+    try {
+      const res = await fetch('/api/applications/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ applicationId: row.id, qualified }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || json?.ok === false) {
+        // Revert on failure
+        setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: row.status } : r)))
+      }
+    } catch {
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: row.status } : r)))
+    } finally {
+      setSaving((s) => ({ ...s, [row.id]: false }))
+    }
+  }
 
   return (
     <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
@@ -75,7 +99,6 @@ export default function JDApplicationsPage() {
                     <TableHead>CV Link</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Report</TableHead>
-                    <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -99,34 +122,31 @@ export default function JDApplicationsPage() {
                             </Link>
                           </TableCell>
                           <TableCell>
-                            <span
-                              className={
-                                isQualified
-                                  ? "inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700"
-                                  : "inline-flex items-center rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700"
-                              }
-                            >
-                              {row.status}
-                            </span>
+                            <div className="relative inline-flex items-center">
+                              <select
+                                className={`appearance-none rounded-md border px-2 py-1 text-xs font-medium pr-6 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
+                                  isQualified
+                                    ? 'bg-green-50 border-green-200 text-green-700'
+                                    : 'bg-red-50 border-red-200 text-red-700'
+                                }`}
+                                value={row.status}
+                                onChange={(e) => updateStatus(row, e.target.value === 'CV Qualified')}
+                                disabled={saving[row.id] || loading}
+                              >
+                                <option value="CV Qualified">CV Qualified</option>
+                                <option value="CV Unqualified">CV Unqualified</option>
+                              </select>
+                              <svg className="pointer-events-none absolute right-1.5 h-3 w-3 text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.25 8.29a.75.75 0 01-.02-1.08z" clipRule="evenodd" />
+                              </svg>
+                            </div>
                           </TableCell>
                           <TableCell>
                             <Link href={`/dashboard/analytics/${jdId}/applications/${row.id}/report`}>
                               <Button variant="outline" size="sm">Show CV Report</Button>
                             </Link>
                           </TableCell>
-                          <TableCell>
-                            <Button
-                              size="sm"
-                              className={
-                                isQualified
-                                  ? "bg-blue-600 text-white hover:bg-blue-700"
-                                  : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                              }
-                              disabled={!isQualified}
-                            >
-                              Processed to Next Round
-                            </Button>
-                          </TableCell>
+                          
                         </TableRow>
                       )
                     })
