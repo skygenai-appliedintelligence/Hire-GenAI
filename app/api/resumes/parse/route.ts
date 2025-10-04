@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { parseResume } from '@/lib/resume-parser'
+import { parseResume, cleanText } from '@/lib/resume-parser'
+import { CVEvaluator } from '@/lib/cv-evaluator'
 import { DatabaseService } from '@/lib/database'
 
 export const runtime = 'nodejs'
@@ -95,11 +96,8 @@ export async function POST(request: NextRequest) {
         const hasResumeText = checkCol?.[0]?.exists === true
 
         if (hasResumeText) {
-          // Clean text to remove null bytes and invalid UTF-8 sequences
-          const cleanedText = parsed.rawText
-            .replace(/\0/g, '') // Remove null bytes
-            .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '') // Remove control characters
-            .trim()
+          // Clean text robustly using shared utility (removes control bytes and PDF artifacts)
+          const cleanedText = cleanText(parsed.rawText)
           
           // Save parsed text to applications.resume_text
           // Check if updated_at column exists
@@ -135,6 +133,136 @@ export async function POST(request: NextRequest) {
           }
           
           console.log('[Resume Parse] Successfully saved resume text to database')
+
+          // ---- Auto-evaluate after saving resume text (Option A) -----------------
+          try {
+            // Fetch JD text for this application
+            // 1) Get job_id from applications
+            const appRows = await (DatabaseService as any)["query"]?.call(
+              DatabaseService,
+              `SELECT job_id FROM applications WHERE id = $1::uuid`,
+              [applicationId]
+            )
+            const jobId = appRows?.[0]?.job_id
+
+            if (jobId) {
+              // 2) Determine which JD column exists in jobs
+              const jdColsCheck = await (DatabaseService as any)["query"]?.call(
+                DatabaseService,
+                `SELECT column_name FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'jobs'
+                   AND column_name IN ('description','job_description','jd_text','details','summary')`,
+                []
+              )
+              const jdCols = (jdColsCheck || []).map((r: any) => r.column_name)
+              const preferred = ['description','job_description','jd_text','details','summary']
+              const chosenJdCol = preferred.find(c => jdCols.includes(c))
+
+              if (chosenJdCol) {
+                const jdRow = await (DatabaseService as any)["query"]?.call(
+                  DatabaseService,
+                  `SELECT ${chosenJdCol} as jd FROM jobs WHERE id = $1::uuid`,
+                  [jobId]
+                )
+                const jdText: string | undefined = jdRow?.[0]?.jd || undefined
+
+                if (jdText) {
+                  // Prepare inputs
+                  const resumeForEval = cleanedText.length > 15000
+                    ? cleanedText.substring(0, 15000) + "\n\n[Resume truncated due to length...]"
+                    : cleanedText
+                  const jdForEval = String(jdText)
+                  const passThreshold = 40
+
+                  // Run evaluator
+                  const evaluation = await CVEvaluator.evaluateCandidate(
+                    resumeForEval,
+                    jdForEval,
+                    passThreshold
+                  )
+
+                  // Save evaluation results to applications (mirror evaluate-cv route)
+                  try {
+                    const checkCols = await (DatabaseService as any)["query"]?.call(
+                      DatabaseService,
+                      `SELECT column_name FROM information_schema.columns
+                       WHERE table_schema = 'public' 
+                         AND table_name = 'applications'
+                         AND column_name IN ('qualification_score', 'is_qualified', 'qualification_explanations')`,
+                      []
+                    )
+                    const cols = new Set((checkCols || []).map((r: any) => r.column_name))
+
+                    if (cols.size > 0) {
+                      const updates: string[] = []
+                      const params: any[] = []
+                      let p = 1
+
+                      if (cols.has('qualification_score')) {
+                        updates.push(`qualification_score = $${p++}`)
+                        params.push(Math.round(evaluation.overall.score_percent))
+                      }
+                      if (cols.has('is_qualified')) {
+                        updates.push(`is_qualified = $${p++}`)
+                        params.push(evaluation.overall.qualified)
+                      }
+                      if (cols.has('qualification_explanations')) {
+                        updates.push(`qualification_explanations = $${p++}::jsonb`)
+                        params.push(JSON.stringify({
+                          breakdown: evaluation.breakdown,
+                          extracted: evaluation.extracted,
+                          gaps_and_notes: evaluation.gaps_and_notes,
+                          reason_summary: evaluation.overall.reason_summary
+                        }))
+                      }
+
+                      if (updates.length > 0) {
+                        params.push(applicationId)
+                        await (DatabaseService as any)["query"]?.call(
+                          DatabaseService,
+                          `UPDATE applications SET ${updates.join(', ')} WHERE id = $${p}::uuid`,
+                          params
+                        )
+                        console.log('[Resume Parse] Auto-evaluation saved to database')
+                      }
+                    }
+
+                    // Try to set a qualified-like status when candidate is qualified
+                    try {
+                      if (evaluation?.overall?.qualified) {
+                        const enumRows = await (DatabaseService as any)["query"]?.call(
+                          DatabaseService,
+                          `SELECT e.enumlabel as enum_value
+                           FROM pg_type t 
+                           JOIN pg_enum e ON t.oid = e.enumtypid  
+                           WHERE t.typname = 'status_application'`,
+                          []
+                        ) as any[]
+                        const statuses = new Set((enumRows || []).map((r: any) => String(r.enum_value)))
+                        const preferredStatus = ['cv_qualified', 'qualified', 'screening_passed']
+                        const chosen = preferredStatus.find(s => statuses.has(s))
+                        if (chosen) {
+                          await (DatabaseService as any)["query"]?.call(
+                            DatabaseService,
+                            `UPDATE applications SET status = $1::status_application WHERE id = $2::uuid`,
+                            [chosen, applicationId]
+                          )
+                          console.log(`[Resume Parse] Application status set to ${chosen}`)
+                        }
+                      }
+                    } catch (setStatusErr) {
+                      console.warn('[Resume Parse] Could not set qualified status:', setStatusErr)
+                    }
+                  } catch (saveErr) {
+                    console.warn('[Resume Parse] Failed to save auto-evaluation:', saveErr)
+                  }
+                }
+              }
+            }
+          } catch (autoEvalErr) {
+            console.warn('[Resume Parse] Auto-evaluation failed:', autoEvalErr)
+          }
+          // --------------------------------------------------------------------
         }
       } catch (err) {
         console.warn('Failed to save resume text to database:', err)
