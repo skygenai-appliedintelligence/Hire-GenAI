@@ -1,24 +1,42 @@
 import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
 
+// Cache for loaded libraries
+let librariesCache: { mammoth: any; pdfParse: any } | null = null
+
 /**
  * Load parsing libraries using require (server-side only)
+ * These are marked as external in next.config.mjs to avoid webpack bundling issues
  */
 function loadParsingLibraries() {
   if (typeof window !== 'undefined') {
     return { mammoth: null, pdfParse: null }
   }
   
-  try {
-    // Use require for better compatibility
-    const mammoth = require("mammoth")
-    const pdfParse = require("pdf-parse")
-    
-    return { mammoth, pdfParse }
-  } catch (err) {
-    console.warn("Failed to load PDF/DOCX parsing libraries:", err)
-    return { mammoth: null, pdfParse: null }
+  // Return cached libraries if already loaded
+  if (librariesCache) {
+    return librariesCache
   }
+  
+  let mammoth = null
+  let pdfParse = null
+  
+  // Load mammoth
+  try {
+    mammoth = require("mammoth")
+  } catch (err) {
+    console.warn("Failed to load mammoth library:", err)
+  }
+  
+  // Load pdf-parse separately to isolate errors
+  try {
+    pdfParse = require("pdf-parse")
+  } catch (err) {
+    console.warn("Failed to load pdf-parse library:", err)
+  }
+  
+  librariesCache = { mammoth, pdfParse }
+  return librariesCache
 }
 
 export interface ParsedResume {
