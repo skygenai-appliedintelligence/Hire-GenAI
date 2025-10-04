@@ -17,6 +17,13 @@ type CandidateData = {
   appliedAt: string
   location?: string
   status: string
+  expectedSalary?: number | null
+  salaryCurrency?: string
+  salaryPeriod?: string
+  linkedinUrl?: string | null
+  portfolioUrl?: string | null
+  availableStartDate?: string | null
+  willingToRelocate?: boolean
 }
 
 type EvaluationData = {
@@ -67,6 +74,7 @@ export default function CandidateReportPage() {
   const [applicationsCount, setApplicationsCount] = useState<number | null>(null)
   const [dbScore, setDbScore] = useState<number | null>(null)
   const [dbQualified, setDbQualified] = useState<boolean | null>(null)
+  const [qualificationDetails, setQualificationDetails] = useState<any>(null)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -85,6 +93,9 @@ export default function CandidateReportPage() {
         setEvaluation(json.evaluation || null)
         setTranscript(json.transcript || null)
         setResumeText(typeof json.resumeText === 'string' ? json.resumeText : null)
+        setQualificationDetails(json.qualificationDetails || null)
+        if (json.qualificationScore) setDbScore(json.qualificationScore)
+        if (typeof json.isQualified === 'boolean') setDbQualified(json.isQualified)
 
         // Fetch job title and applications count
         if (jdId) {
@@ -331,46 +342,440 @@ export default function CandidateReportPage() {
               </CardHeader>
             </Card>
 
-            {/* Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left: Relevant + Resume Summary */}
-              <div className="space-y-6 lg:col-span-2">
+            {/* Content Grid - Full Width */}
+            <div className="space-y-6">
                 {/* Relevant Section (AI Analysis) */}
                 <Card className="border-2 border-emerald-200 bg-emerald-50/60">
                   <CardHeader>
-                    <CardTitle className="text-emerald-800 text-lg">Relevant</CardTitle>
-                    <CardDescription className="text-emerald-700">AI analysis of candidate fit</CardDescription>
+                    <CardTitle className="text-emerald-800 text-lg">Relevance</CardTitle>
+                    <CardDescription className="text-emerald-700">Detailed CV evaluation breakdown</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-sm text-emerald-900 whitespace-pre-wrap">
-                      {evaluation?.reviewerComments || "No AI analysis available."}
-                    </div>
-                  </CardContent>
-                </Card>
+                    {qualificationDetails ? (
+                      <div className="space-y-6">
+                        {/* Resume Evaluation Summary */}
+                        <div className="p-5 bg-gradient-to-br from-white to-emerald-50 rounded-lg border-2 border-emerald-300 shadow-sm">
+                          <h4 className="text-lg font-bold text-emerald-900 mb-4 flex items-center gap-2">
+                            📄 Resume Evaluation Summary
+                          </h4>
+                          
+                          {/* Header Info */}
+                          <div className="mb-4 pb-4 border-b border-emerald-200">
+                            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                              <span className="font-semibold text-gray-900">
+                                Candidate: <span className="text-emerald-700">{qualificationDetails.extracted?.name || candidateData.name}</span>
+                              </span>
+                              <span className="text-gray-400">|</span>
+                              <span className="font-semibold text-gray-900">
+                                Role: <span className="text-emerald-700">{jobTitle || 'N/A'}</span>
+                              </span>
+                              <span className="text-gray-400">|</span>
+                              <span className="font-semibold text-gray-900">
+                                Exp: <span className="text-emerald-700">
+                                  {qualificationDetails.extracted?.total_experience_years_estimate 
+                                    ? `${qualificationDetails.extracted.total_experience_years_estimate} yrs` 
+                                    : 'N/A'}
+                                </span>
+                              </span>
+                            </div>
+                          </div>
 
-                {/* Resume Summary */}
-                <Card className="border-2 border-gray-200 bg-white">
-                  <CardHeader>
-                    <CardTitle className="text-gray-900">Resume Summary</CardTitle>
-                    <CardDescription>Parsed resume text</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="max-h-96 overflow-y-auto">
-                      <div className="whitespace-pre-wrap text-gray-700 leading-relaxed text-sm">
-                        {resumeText || transcript?.text || "Resume text not available."}
+                          {/* Overall Score & Verdict */}
+                          <div className="mb-4 pb-4 border-b border-emerald-200">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="text-2xl font-bold text-gray-900">{resumeScore}</span>
+                                <span className="text-lg text-gray-600"> / 100</span>
+                              </div>
+                              <div>
+                                {resumeScore >= 60 ? (
+                                  <Badge className="bg-green-100 text-green-800 border-green-300 text-base px-3 py-1">
+                                    ✅ Qualified
+                                  </Badge>
+                                ) : resumeScore >= 40 ? (
+                                  <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 text-base px-3 py-1">
+                                    ⚠️ Borderline
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-red-100 text-red-800 border-red-300 text-base px-3 py-1">
+                                    ❌ Not Qualified
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Key Evaluation */}
+                          <div className="mb-4 pb-4 border-b border-emerald-200">
+                            <h5 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                              🔑 Key Evaluation
+                            </h5>
+                            <div className="grid grid-cols-2 gap-3 text-sm">
+                              <div>
+                                <span className="text-gray-600">Skills Match:</span>
+                                <span className={`ml-2 font-semibold ${
+                                  qualificationDetails.breakdown?.hard_skills?.score >= 70 ? 'text-green-700' :
+                                  qualificationDetails.breakdown?.hard_skills?.score >= 50 ? 'text-yellow-700' : 'text-red-700'
+                                }`}>
+                                  {qualificationDetails.breakdown?.hard_skills?.score >= 70 ? 'Strong' :
+                                   qualificationDetails.breakdown?.hard_skills?.score >= 50 ? 'Moderate' : 'Weak'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-gray-600">Domain Knowledge:</span>
+                                <span className={`ml-2 font-semibold ${
+                                  qualificationDetails.breakdown?.domain_relevance?.score >= 60 ? 'text-green-700' : 'text-yellow-700'
+                                }`}>
+                                  {qualificationDetails.breakdown?.domain_relevance?.score >= 60 ? 'Good' : 'Limited'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-gray-600">Communication:</span>
+                                <span className={`ml-2 font-semibold ${
+                                  qualificationDetails.breakdown?.communication_redflags?.score >= 80 ? 'text-green-700' :
+                                  qualificationDetails.breakdown?.communication_redflags?.score >= 60 ? 'text-yellow-700' : 'text-red-700'
+                                }`}>
+                                  {qualificationDetails.breakdown?.communication_redflags?.score >= 80 ? 'Clear' :
+                                   qualificationDetails.breakdown?.communication_redflags?.score >= 60 ? 'Average' : 'Weak'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-gray-600">Problem Solving:</span>
+                                <span className={`ml-2 font-semibold ${
+                                  qualificationDetails.breakdown?.experience_depth?.score >= 70 ? 'text-green-700' :
+                                  qualificationDetails.breakdown?.experience_depth?.score >= 50 ? 'text-yellow-700' : 'text-red-700'
+                                }`}>
+                                  {qualificationDetails.breakdown?.experience_depth?.score >= 70 ? 'Strong' :
+                                   qualificationDetails.breakdown?.experience_depth?.score >= 50 ? 'Fair' : 'Needs Work'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Strengths */}
+                          {qualificationDetails.breakdown?.hard_skills?.matched?.length > 0 && (
+                            <div className="mb-4">
+                              <h5 className="font-semibold text-green-800 mb-2 flex items-center gap-2">
+                                ✅ Strengths
+                              </h5>
+                              <ul className="space-y-1 text-sm text-gray-700">
+                                {qualificationDetails.breakdown.hard_skills.matched.slice(0, 3).map((skill: string, i: number) => (
+                                  <li key={i} className="flex items-start gap-2">
+                                    <span className="text-green-600 mt-0.5">•</span>
+                                    <span>Strong proficiency in {skill}</span>
+                                  </li>
+                                ))}
+                                {qualificationDetails.breakdown.role_title_alignment?.score >= 70 && (
+                                  <li className="flex items-start gap-2">
+                                    <span className="text-green-600 mt-0.5">•</span>
+                                    <span>Excellent role alignment with job requirements</span>
+                                  </li>
+                                )}
+                                {qualificationDetails.breakdown.experience_depth?.years_estimate >= 3 && (
+                                  <li className="flex items-start gap-2">
+                                    <span className="text-green-600 mt-0.5">•</span>
+                                    <span>Solid experience of {qualificationDetails.breakdown.experience_depth.years_estimate} years</span>
+                                  </li>
+                                )}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Gaps */}
+                          {(qualificationDetails.breakdown?.hard_skills?.missing?.length > 0 || 
+                            qualificationDetails.gaps_and_notes?.length > 0) && (
+                            <div className="mb-4">
+                              <h5 className="font-semibold text-yellow-800 mb-2 flex items-center gap-2">
+                                ⚠️ Gaps
+                              </h5>
+                              <ul className="space-y-1 text-sm text-gray-700">
+                                {qualificationDetails.breakdown?.hard_skills?.missing?.slice(0, 3).map((skill: string, i: number) => (
+                                  <li key={i} className="flex items-start gap-2">
+                                    <span className="text-yellow-600 mt-0.5">•</span>
+                                    <span>Missing experience with {skill}</span>
+                                  </li>
+                                ))}
+                                {qualificationDetails.gaps_and_notes?.slice(0, 2).map((note: string, i: number) => (
+                                  <li key={`note-${i}`} className="flex items-start gap-2">
+                                    <span className="text-yellow-600 mt-0.5">•</span>
+                                    <span>{note}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Recommendation */}
+                          <div className="pt-4 border-t border-emerald-200">
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-gray-900">Recommendation:</span>
+                              <Badge className={`text-sm px-3 py-1 ${
+                                resumeScore >= 60 ? 'bg-green-100 text-green-800 border-green-300' :
+                                resumeScore >= 40 ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                                'bg-red-100 text-red-800 border-red-300'
+                              }`}>
+                                {resumeScore >= 60 ? '✅ Next Round' :
+                                 resumeScore >= 40 ? '⏸️ Pipeline' : '❌ Reject'}
+                              </Badge>
+                            </div>
+                            {qualificationDetails.reason_summary && (
+                              <p className="text-xs text-gray-600 mt-2 italic">{qualificationDetails.reason_summary}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Breakdown Scores */}
+                        {qualificationDetails.breakdown && (
+                          <div className="space-y-4">
+                            <h4 className="font-semibold text-emerald-900">Evaluation Breakdown</h4>
+                            
+                            {/* Role Title Alignment */}
+                            {qualificationDetails.breakdown.role_title_alignment && (
+                              <div className="bg-white p-4 rounded-lg border border-emerald-200">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="font-medium text-gray-900">Role/Title Alignment</span>
+                                  <span className="text-sm font-semibold text-emerald-700">
+                                    {qualificationDetails.breakdown.role_title_alignment.score}/100 (Weight: {qualificationDetails.breakdown.role_title_alignment.weight}%)
+                                  </span>
+                                </div>
+                                {qualificationDetails.breakdown.role_title_alignment.evidence?.length > 0 && (
+                                  <ul className="text-xs text-gray-600 space-y-1 mt-2">
+                                    {qualificationDetails.breakdown.role_title_alignment.evidence.map((e: string, i: number) => (
+                                      <li key={i} className="pl-2 border-l-2 border-emerald-300">• {e}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Hard Skills */}
+                            {qualificationDetails.breakdown.hard_skills && (
+                              <div className="bg-white p-4 rounded-lg border border-emerald-200">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="font-medium text-gray-900">Hard Skills & Tools</span>
+                                  <span className="text-sm font-semibold text-emerald-700">
+                                    {qualificationDetails.breakdown.hard_skills.score}/100 (Weight: {qualificationDetails.breakdown.hard_skills.weight}%)
+                                  </span>
+                                </div>
+                                {qualificationDetails.breakdown.hard_skills.matched?.length > 0 && (
+                                  <div className="mt-2">
+                                    <p className="text-xs font-medium text-green-700 mb-1">✓ Matched Skills:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {qualificationDetails.breakdown.hard_skills.matched.map((s: string, i: number) => (
+                                        <Badge key={i} className="bg-green-100 text-green-800 text-xs">{s}</Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {qualificationDetails.breakdown.hard_skills.missing?.length > 0 && (
+                                  <div className="mt-2">
+                                    <p className="text-xs font-medium text-red-700 mb-1">✗ Missing Skills:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {qualificationDetails.breakdown.hard_skills.missing.map((s: string, i: number) => (
+                                        <Badge key={i} className="bg-red-100 text-red-800 text-xs">{s}</Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {qualificationDetails.breakdown.hard_skills.evidence?.length > 0 && (
+                                  <ul className="text-xs text-gray-600 space-y-1 mt-2">
+                                    {qualificationDetails.breakdown.hard_skills.evidence.map((e: string, i: number) => (
+                                      <li key={i} className="pl-2 border-l-2 border-emerald-300">• {e}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Experience Depth */}
+                            {qualificationDetails.breakdown.experience_depth && (
+                              <div className="bg-white p-4 rounded-lg border border-emerald-200">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="font-medium text-gray-900">Experience Depth</span>
+                                  <span className="text-sm font-semibold text-emerald-700">
+                                    {qualificationDetails.breakdown.experience_depth.score}/100 (Weight: {qualificationDetails.breakdown.experience_depth.weight}%)
+                                  </span>
+                                </div>
+                                {qualificationDetails.breakdown.experience_depth.years_estimate && (
+                                  <p className="text-xs text-gray-700 mb-2">
+                                    Estimated Experience: <span className="font-semibold">{qualificationDetails.breakdown.experience_depth.years_estimate} years</span>
+                                  </p>
+                                )}
+                                {qualificationDetails.breakdown.experience_depth.evidence?.length > 0 && (
+                                  <ul className="text-xs text-gray-600 space-y-1 mt-2">
+                                    {qualificationDetails.breakdown.experience_depth.evidence.map((e: string, i: number) => (
+                                      <li key={i} className="pl-2 border-l-2 border-emerald-300">• {e}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Domain Relevance */}
+                            {qualificationDetails.breakdown.domain_relevance && (
+                              <div className="bg-white p-4 rounded-lg border border-emerald-200">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="font-medium text-gray-900">Domain/Industry Relevance</span>
+                                  <span className="text-sm font-semibold text-emerald-700">
+                                    {qualificationDetails.breakdown.domain_relevance.score}/100 (Weight: {qualificationDetails.breakdown.domain_relevance.weight}%)
+                                  </span>
+                                </div>
+                                {qualificationDetails.breakdown.domain_relevance.evidence?.length > 0 && (
+                                  <ul className="text-xs text-gray-600 space-y-1 mt-2">
+                                    {qualificationDetails.breakdown.domain_relevance.evidence.map((e: string, i: number) => (
+                                      <li key={i} className="pl-2 border-l-2 border-emerald-300">• {e}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Education & Certifications */}
+                            {qualificationDetails.breakdown.education_certs && (
+                              <div className="bg-white p-4 rounded-lg border border-emerald-200">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="font-medium text-gray-900">Education & Certifications</span>
+                                  <span className="text-sm font-semibold text-emerald-700">
+                                    {qualificationDetails.breakdown.education_certs.score}/100 (Weight: {qualificationDetails.breakdown.education_certs.weight}%)
+                                  </span>
+                                </div>
+                                {qualificationDetails.breakdown.education_certs.matched?.length > 0 && (
+                                  <div className="mt-2">
+                                    <p className="text-xs font-medium text-green-700 mb-1">✓ Matched:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {qualificationDetails.breakdown.education_certs.matched.map((s: string, i: number) => (
+                                        <Badge key={i} className="bg-green-100 text-green-800 text-xs">{s}</Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {qualificationDetails.breakdown.education_certs.evidence?.length > 0 && (
+                                  <ul className="text-xs text-gray-600 space-y-1 mt-2">
+                                    {qualificationDetails.breakdown.education_certs.evidence.map((e: string, i: number) => (
+                                      <li key={i} className="pl-2 border-l-2 border-emerald-300">• {e}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Nice to Have */}
+                            {qualificationDetails.breakdown.nice_to_have && (
+                              <div className="bg-white p-4 rounded-lg border border-emerald-200">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="font-medium text-gray-900">Nice-to-Have Skills</span>
+                                  <span className="text-sm font-semibold text-emerald-700">
+                                    {qualificationDetails.breakdown.nice_to_have.score}/100 (Weight: {qualificationDetails.breakdown.nice_to_have.weight}%)
+                                  </span>
+                                </div>
+                                {qualificationDetails.breakdown.nice_to_have.matched?.length > 0 && (
+                                  <div className="mt-2">
+                                    <p className="text-xs font-medium text-green-700 mb-1">✓ Matched:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {qualificationDetails.breakdown.nice_to_have.matched.map((s: string, i: number) => (
+                                        <Badge key={i} className="bg-blue-100 text-blue-800 text-xs">{s}</Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Communication & Red Flags */}
+                            {qualificationDetails.breakdown.communication_redflags && (
+                              <div className="bg-white p-4 rounded-lg border border-emerald-200">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="font-medium text-gray-900">Communication & Quality</span>
+                                  <span className="text-sm font-semibold text-emerald-700">
+                                    {qualificationDetails.breakdown.communication_redflags.score}/100 (Weight: {qualificationDetails.breakdown.communication_redflags.weight}%)
+                                  </span>
+                                </div>
+                                {qualificationDetails.breakdown.communication_redflags.red_flags?.length > 0 && (
+                                  <div className="mt-2">
+                                    <p className="text-xs font-medium text-red-700 mb-1">⚠ Red Flags:</p>
+                                    <ul className="text-xs text-red-600 space-y-1">
+                                      {qualificationDetails.breakdown.communication_redflags.red_flags.map((f: string, i: number) => (
+                                        <li key={i}>• {f}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Extracted Information */}
+                        {qualificationDetails.extracted && (
+                          <div className="bg-white p-4 rounded-lg border border-gray-300">
+                            <h4 className="font-semibold text-gray-900 mb-3">Extracted Information</h4>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              {qualificationDetails.extracted.name && (
+                                <div>
+                                  <span className="text-gray-500">Name:</span>
+                                  <span className="ml-2 font-medium">{qualificationDetails.extracted.name}</span>
+                                </div>
+                              )}
+                              {qualificationDetails.extracted.email && (
+                                <div>
+                                  <span className="text-gray-500">Email:</span>
+                                  <span className="ml-2 font-medium">{qualificationDetails.extracted.email}</span>
+                                </div>
+                              )}
+                              {qualificationDetails.extracted.phone && (
+                                <div>
+                                  <span className="text-gray-500">Phone:</span>
+                                  <span className="ml-2 font-medium">{qualificationDetails.extracted.phone}</span>
+                                </div>
+                              )}
+                              {qualificationDetails.extracted.location && (
+                                <div>
+                                  <span className="text-gray-500">Location:</span>
+                                  <span className="ml-2 font-medium">{qualificationDetails.extracted.location}</span>
+                                </div>
+                              )}
+                              {qualificationDetails.extracted.total_experience_years_estimate && (
+                                <div>
+                                  <span className="text-gray-500">Total Experience:</span>
+                                  <span className="ml-2 font-medium">{qualificationDetails.extracted.total_experience_years_estimate} years</span>
+                                </div>
+                              )}
+                            </div>
+                            {qualificationDetails.extracted.skills?.length > 0 && (
+                              <div className="mt-3">
+                                <p className="text-xs font-medium text-gray-700 mb-2">Skills:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {qualificationDetails.extracted.skills.map((s: string, i: number) => (
+                                    <Badge key={i} variant="outline" className="text-xs">{s}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Gaps and Notes */}
+                        {qualificationDetails.gaps_and_notes?.length > 0 && (
+                          <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-300">
+                            <h4 className="font-semibold text-yellow-900 mb-2">Notes & Observations</h4>
+                            <ul className="text-xs text-yellow-800 space-y-1">
+                              {qualificationDetails.gaps_and_notes.map((note: string, i: number) => (
+                                <li key={i}>• {note}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    <div className="pt-4 text-sm">
-                      <a href={candidateData.resumeUrl} target="_blank" rel="noopener noreferrer" className="text-purple-700 hover:underline inline-flex items-center gap-2">
-                        <ExternalLink className="h-4 w-4" /> View original resume
-                      </a>
-                    </div>
+                    ) : (
+                      <div className="text-sm text-emerald-900 whitespace-pre-wrap">
+                        {evaluation?.reviewerComments || "No evaluation details available yet. The CV will be evaluated when a candidate applies."}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
-              </div>
 
-              {/* Right: Quick Stats + Timeline */}
-              <div className="space-y-6">
+              {/* Quick Stats + Submitted Information - Horizontal Layout */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Quick Stats */}
                 <Card className="border-2 border-purple-200 bg-white">
                   <CardHeader>
@@ -399,21 +804,77 @@ export default function CandidateReportPage() {
                   </CardContent>
                 </Card>
 
-                {/* Timeline */}
+                {/* Submitted Information */}
                 <Card className="border-2 border-gray-200 bg-white">
                   <CardHeader>
-                    <CardTitle className="text-gray-900">Timeline</CardTitle>
-                    <CardDescription>Key timestamps</CardDescription>
+                    <CardTitle className="text-gray-900">Submitted Information</CardTitle>
+                    <CardDescription>Details provided by applicant</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Created</span>
-                        <span className="text-gray-900">{new Date(candidateData.appliedAt).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Last Updated</span>
-                        <span className="text-gray-900">{evaluation?.reviewedAt ? new Date(evaluation.reviewedAt).toLocaleString() : new Date(candidateData.appliedAt).toLocaleString()}</span>
+                      {candidateData.expectedSalary && (
+                        <div>
+                          <div className="text-gray-500 text-xs mb-1">Expected Salary</div>
+                          <div className="font-semibold text-gray-900">
+                            {candidateData.salaryCurrency} {Number(candidateData.expectedSalary).toLocaleString()}/{candidateData.salaryPeriod}
+                          </div>
+                        </div>
+                      )}
+                      {candidateData.location && (
+                        <div>
+                          <div className="text-gray-500 text-xs mb-1">Location</div>
+                          <div className="font-semibold text-gray-900">{candidateData.location}</div>
+                        </div>
+                      )}
+                      {candidateData.linkedinUrl && (
+                        <div>
+                          <div className="text-gray-500 text-xs mb-1">LinkedIn URL</div>
+                          <a 
+                            href={candidateData.linkedinUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-purple-600 hover:underline text-xs break-all inline-flex items-center gap-1"
+                          >
+                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                            {candidateData.linkedinUrl.replace(/^https?:\/\//, '').substring(0, 30)}...
+                          </a>
+                        </div>
+                      )}
+                      {candidateData.portfolioUrl && (
+                        <div>
+                          <div className="text-gray-500 text-xs mb-1">Portfolio/Website</div>
+                          <a 
+                            href={candidateData.portfolioUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-purple-600 hover:underline text-xs break-all inline-flex items-center gap-1"
+                          >
+                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                            {candidateData.portfolioUrl.replace(/^https?:\/\//, '').substring(0, 30)}...
+                          </a>
+                        </div>
+                      )}
+                      {candidateData.availableStartDate && (
+                        <div>
+                          <div className="text-gray-500 text-xs mb-1">Available Start Date</div>
+                          <div className="font-semibold text-gray-900">
+                            {new Date(candidateData.availableStartDate).toLocaleDateString('en-US', { 
+                              year: 'numeric', 
+                              month: 'long', 
+                              day: 'numeric' 
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <div className="text-gray-500 text-xs mb-1">Willing to Relocate</div>
+                        <div className="font-semibold text-gray-900">
+                          {candidateData.willingToRelocate ? (
+                            <Badge className="bg-green-100 text-green-800 border-green-300">Yes</Badge>
+                          ) : (
+                            <Badge className="bg-gray-100 text-gray-800 border-gray-300">No</Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </CardContent>

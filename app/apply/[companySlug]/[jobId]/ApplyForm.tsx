@@ -150,6 +150,13 @@ export default function ApplyForm({ job }: { job: any }) {
             email: formData.email,
             phone: formData.phone,
             location: formData.location,
+            expectedSalary: formData.expectedSalary,
+            salaryCurrency: formData.expectedCurrency,
+            salaryPeriod: 'month',
+            linkedinUrl: formData.linkedinUrl || null,
+            portfolioUrl: formData.portfolioUrl || null,
+            availableStartDate: formData.availableStartDate || null,
+            willingToRelocate: formData.relocate || false,
           },
           resume: resumeUploadResult?.fileUrl
             ? {
