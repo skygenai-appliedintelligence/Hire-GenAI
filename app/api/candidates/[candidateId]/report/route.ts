@@ -89,6 +89,17 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
         a.last_name,
         a.email,
         a.phone,
+        a.qualification_score,
+        a.is_qualified,
+        a.qualification_explanations,
+        a.expected_salary,
+        a.salary_currency,
+        a.salary_period,
+        a.location as app_location,
+        a.linkedin_url,
+        a.portfolio_url,
+        a.available_start_date,
+        a.willing_to_relocate,
         c.email as candidate_email,
         c.phone as candidate_phone,
         c.first_name as c_first_name,
@@ -125,8 +136,15 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       phone: row.phone || row.candidate_phone || '',
       resumeUrl: row.resume_url || row.resume_storage_key || '#',
       appliedAt: row.applied_at || new Date().toISOString(),
-      location: row.location || null,
-      status: row.status || 'applied'
+      location: row.app_location || row.location || null,
+      status: row.status || 'applied',
+      expectedSalary: row.expected_salary || null,
+      salaryCurrency: row.salary_currency || 'USD',
+      salaryPeriod: row.salary_period || 'month',
+      linkedinUrl: row.linkedin_url || null,
+      portfolioUrl: row.portfolio_url || null,
+      availableStartDate: row.available_start_date || null,
+      willingToRelocate: row.willing_to_relocate || false
     }
 
     // Try to fetch evaluation data (if table exists)
@@ -205,12 +223,27 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       console.log('Transcript table not found or error:', e)
     }
 
+    // Parse qualification_explanations if available
+    let qualificationDetails = null
+    if (row.qualification_explanations) {
+      try {
+        qualificationDetails = typeof row.qualification_explanations === 'string' 
+          ? JSON.parse(row.qualification_explanations)
+          : row.qualification_explanations
+      } catch (e) {
+        console.warn('Failed to parse qualification_explanations:', e)
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       candidate,
       resumeText: row.resume_text || null,
       evaluation,
-      transcript
+      transcript,
+      qualificationScore: row.qualification_score || null,
+      isQualified: row.is_qualified || null,
+      qualificationDetails
     })
   } catch (e: any) {
     console.error('Failed to load candidate report:', e)
