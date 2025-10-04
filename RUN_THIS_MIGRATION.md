@@ -57,46 +57,4 @@ ADD COLUMN IF NOT EXISTS min_qualification_score INTEGER DEFAULT 40;
 CREATE INDEX IF NOT EXISTS idx_applications_is_qualified ON applications(is_qualified);
 CREATE INDEX IF NOT EXISTS idx_applications_qualification_score ON applications(qualification_score);
 CREATE INDEX IF NOT EXISTS idx_applications_parsing_status ON applications(parsing_status);
-```
-
-## Verify It Worked
-
-After running the migration, verify the column exists:
-
-```sql
-SELECT column_name, data_type 
-FROM information_schema.columns 
-WHERE table_name = 'applications' 
-  AND column_name = 'resume_text';
-```
-
-You should see:
-```
- column_name | data_type 
--------------+-----------
- resume_text | text
-```
-
-## What Happens Next
-
-Once the migration is complete:
-
-1. ✅ Resume parsing will automatically save parsed text to `applications.resume_text`
-2. ✅ You can query resume content directly from the database
-3. ✅ Resume content persists even if file storage fails
-4. ✅ Full-text search on resumes becomes possible
-
-## Test It
-
-1. Apply to a job with a resume
-2. Check the database:
-
-```sql
-SELECT id, resume_text 
-FROM applications 
-WHERE resume_text IS NOT NULL 
-ORDER BY created_at DESC 
-LIMIT 1;
-```
-
 You should see the parsed resume text!
