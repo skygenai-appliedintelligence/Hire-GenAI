@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/hooks/use-toast"
 
 // Status and Bucket typings
 export type InterviewStatus = "Unqualified" | "Qualified" | "Pending" | "Expired"
@@ -29,10 +30,13 @@ type Bucket = {
 export default function JDQualifiedPage() {
   const params = useParams()
   const jdId = (params?.jdId as string) || ""
+  const { toast } = useToast()
 
   const [rows, setRows] = useState<CandidateRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Tracks if an email has been sent for a given application row
+  const [sentMap, setSentMap] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const load = async () => {
@@ -64,6 +68,32 @@ export default function JDQualifiedPage() {
     }
     load()
   }, [jdId])
+
+  const sendInterviewLink = async (row: CandidateRow) => {
+    try {
+      const res = await fetch('/api/interview/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationId: row.id,
+          email: row.email,
+          name: row.candidateName,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.ok) throw new Error(json?.error || 'Failed to send link')
+
+      setSentMap(prev => ({ ...prev, [row.id]: true }))
+      toast({
+        title: 'Interview link sent',
+        description: json.url ? `URL: ${json.url}` : 'Link generated successfully',
+      })
+      // For quick testing, also log in browser console
+      if (json.url) console.log('[Interview Link]', json.url)
+    } catch (e: any) {
+      toast({ title: 'Failed to send', description: e?.message || 'Something went wrong', variant: 'destructive' })
+    }
+  }
 
   const buckets: Bucket[] = useMemo(
     () => [
@@ -129,20 +159,19 @@ export default function JDQualifiedPage() {
                 <TableHeader>
                   <TableRow className="bg-gray-50">
                     <TableHead className="px-3 py-2 text-sm align-middle">Candidate Name</TableHead>
-                    <TableHead className="px-3 py-2 text-sm align-middle">Applied JD</TableHead>
                     <TableHead className="px-3 py-2 text-sm align-middle">Email</TableHead>
                     <TableHead className="px-3 py-2 text-sm align-middle">Phone</TableHead>
                     <TableHead className="px-3 py-2 text-sm align-middle">CV Link</TableHead>
                     <TableHead className="px-3 py-2 text-sm align-middle">Status</TableHead>
                     <TableHead className="px-3 py-2 text-sm align-middle">Report</TableHead>
                     <TableHead className="px-3 py-2 text-sm align-middle whitespace-nowrap">Action</TableHead>
-                    <TableHead className="px-3 py-2 text-sm align-middle whitespace-nowrap">Resend Link</TableHead>
+                    <TableHead className="px-3 py-2 text-sm align-middle whitespace-nowrap">Sent Link</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {firstBucket.rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center text-gray-500 py-8">
+                      <TableCell colSpan={8} className="text-center text-gray-500 py-8">
                         No qualified candidates yet for this job.
                       </TableCell>
                     </TableRow>
@@ -150,7 +179,6 @@ export default function JDQualifiedPage() {
                     firstBucket.rows.map((row, idx) => (
                     <TableRow key={row.id} className={idx % 2 === 1 ? "bg-gray-50" : undefined}>
                       <TableCell className="px-3 py-2 text-sm align-middle font-medium truncate">{row.candidateName}</TableCell>
-                      <TableCell className="px-3 py-2 text-sm align-middle truncate">{row.appliedJD}</TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle">
                         <span className="block max-w-[220px] truncate">{row.email}</span>
                       </TableCell>
@@ -177,7 +205,7 @@ export default function JDQualifiedPage() {
                       </TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
                         <Link href={`/dashboard/analytics/${jdId}/applications/${row.id}/report`}>
-                          <Button variant="outline" size="sm">Show Report & Interview Details</Button>
+                          <Button variant="outline" size="sm">Show Report</Button>
                         </Link>
                       </TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
@@ -190,20 +218,20 @@ export default function JDQualifiedPage() {
                           }
                           disabled={row.status !== "Qualified"}
                         >
-                          Processed to Next Round
+                          Proceed Next
                         </Button>
                       </TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
                         <Button
                           size="sm"
                           className={
-                            row.status === "Pending" || row.status === "Expired"
+                            sentMap[row.id]
                               ? "bg-yellow-500 text-white hover:bg-yellow-600"
-                              : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                              : "bg-emerald-600 text-white hover:bg-emerald-700"
                           }
-                          disabled={!(row.status === "Pending" || row.status === "Expired")}
+                          onClick={() => sendInterviewLink(row)}
                         >
-                          Resend Link
+                          {sentMap[row.id] ? "Resend Link" : "Send Email"}
                         </Button>
                       </TableCell>
                     </TableRow>
