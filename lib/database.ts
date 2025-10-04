@@ -3,7 +3,7 @@ import crypto from 'crypto'
 // Database service for authentication operations using raw SQL
 export class DatabaseService {
   // Get database connection from existing prisma instance
-  private static async query(sql: string, params: any[] = []) {
+  static async query(sql: string, params: any[] = []) {
     try {
       const { prisma } = await import('./prisma')
       if (!prisma) {
@@ -54,8 +54,133 @@ export class DatabaseService {
     return newCompany[0]
   }
 
+  // Create company with full signup form data
+  static async createCompanyFromSignup(email: string, signupData: {
+    companyName: string
+    industry?: string
+    companySize?: string
+    website?: string
+    companyDescription?: string
+    street?: string
+    city?: string
+    state?: string
+    postalCode?: string
+    country?: string
+    phone?: string
+    legalCompanyName?: string
+    taxId?: string
+    registrationNumber?: string
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+
+    const domain = email.split('@')[1]
+
+    // TEMPORARY FIX: Database enum values don't match Prisma schema
+    // Setting size_band to NULL to avoid enum errors
+    // The company size is still stored in the form but not in the enum field
+    // TODO: Fix database enum values by running: check_enum_values.sql to see current values
+    const sizeBand = null  // Temporarily disabled due to enum mismatch
+
+    // Build headquarters from address fields (legacy field, kept for compatibility)
+    const headquartersArray = [
+      signupData.street,
+      signupData.city,
+      signupData.state,
+      signupData.postalCode,
+      signupData.country
+    ].filter(Boolean)
+    const headquarters = headquartersArray.length > 0 ? headquartersArray.join(', ') : null
+
+    // Check if company name already exists and make it unique if needed
+    let finalCompanyName = signupData.companyName
+    const checkNameQuery = `
+      SELECT COUNT(*) as count FROM companies WHERE name = $1
+    `
+    const nameCheck = await this.query(checkNameQuery, [finalCompanyName]) as any[]
+    
+    if (nameCheck[0].count > 0) {
+      // Append domain or timestamp to make name unique
+      const timestamp = Date.now()
+      finalCompanyName = `${signupData.companyName} (${domain.split('.')[0]}-${timestamp})`
+    }
+
+    const insertCompanyQuery = `
+      INSERT INTO companies (
+        name, 
+        status, 
+        verified, 
+        description_md,
+        website_url,
+        industry,
+        size_band,
+        headquarters,
+        phone_number,
+        primary_country,
+        legal_company_name,
+        tax_id_ein,
+        business_registration_number,
+        created_at
+      )
+      VALUES ($1, 'active', false, $2, $3, $4, $5::company_size, $6, $7, $8, $9, $10, $11, NOW())
+      RETURNING *
+    `
+    const newCompany = await this.query(insertCompanyQuery, [
+      finalCompanyName,
+      signupData.companyDescription || null,
+      signupData.website || null,
+      signupData.industry || null,
+      sizeBand,
+      headquarters,
+      signupData.phone || null,
+      signupData.country || null,
+      signupData.legalCompanyName || null,
+      signupData.taxId || null,
+      signupData.registrationNumber || null,
+    ]) as any[]
+
+    if (newCompany.length === 0) {
+      throw new Error('Failed to create company')
+    }
+
+    // Add domain mapping
+    const insertDomainQuery = `
+      INSERT INTO company_domains (company_id, domain)
+      VALUES ($1::uuid, $2)
+    `
+    await this.query(insertDomainQuery, [newCompany[0].id, domain])
+
+    // Create structured address if address fields are provided
+    if (signupData.street && signupData.city && signupData.state && signupData.postalCode && signupData.country) {
+      const insertAddressQuery = `
+        INSERT INTO company_addresses (
+          company_id, 
+          address_type, 
+          street_address, 
+          city, 
+          state_province, 
+          postal_code, 
+          country,
+          is_primary
+        )
+        VALUES ($1::uuid, 'primary', $2, $3, $4, $5, $6, true)
+      `
+      await this.query(insertAddressQuery, [
+        newCompany[0].id,
+        signupData.street,
+        signupData.city,
+        signupData.state,
+        signupData.postalCode,
+        signupData.country
+      ])
+    }
+
+    return newCompany[0]
+  }
+
   // Create or find user
-  static async findOrCreateUser(email: string, fullName: string, companyId: string) {
+  static async findOrCreateUser(email: string, fullName: string, companyId: string, jobTitle?: string, emailVerified?: boolean) {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
     }
@@ -74,11 +199,26 @@ export class DatabaseService {
 
     // Create new user
     const insertUserQuery = `
-      INSERT INTO users (company_id, email, full_name, status, created_at)
-      VALUES ($1::uuid, $2, $3, 'active', NOW())
+      INSERT INTO users (
+        company_id, 
+        email, 
+        full_name, 
+        status, 
+        job_title,
+        email_verified_at,
+        created_at
+      )
+      VALUES ($1::uuid, $2, $3, 'active', $4, $5::timestamptz, NOW())
       RETURNING *
     `
-    const newUser = await this.query(insertUserQuery, [companyId, email.toLowerCase(), fullName]) as any[]
+    const emailVerifiedAt = emailVerified ? new Date().toISOString() : null
+    const newUser = await this.query(insertUserQuery, [
+      companyId, 
+      email.toLowerCase(), 
+      fullName,
+      jobTitle || null,
+      emailVerifiedAt
+    ]) as any[]
 
     if (newUser.length === 0) {
       throw new Error('Failed to create user')
