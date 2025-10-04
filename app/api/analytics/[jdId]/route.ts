@@ -56,11 +56,20 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jdId: string }
       s.includes('reject') || s.includes('declined') || s.includes('failed')
     )
 
+    // Check if applications.is_qualified column exists
+    const colCheck = await (DatabaseService as any)["query"]?.call(
+      DatabaseService,
+      `SELECT 1 FROM information_schema.columns 
+       WHERE table_schema = 'public' AND table_name = 'applications' AND column_name = 'is_qualified'`
+      , []
+    ).catch(() => []) as any[]
+    const hasIsQualified = (colCheck || []).length > 0
+
     // Query to get counts for this specific job only
     const statsQuery = `
       SELECT 
         COUNT(*) FILTER (WHERE 1=1) as total_applicants,
-        COUNT(*) FILTER (WHERE status::text = ANY($2::text[])) as qualified_count,
+        COUNT(*) FILTER (WHERE ${hasIsQualified ? `(is_qualified = true OR status::text = ANY($2::text[]))` : `status::text = ANY($2::text[])`}) as qualified_count,
         COUNT(*) FILTER (WHERE status::text = ANY($3::text[])) as interviews_count,
         COUNT(*) FILTER (WHERE status::text = ANY($4::text[])) as in_progress_count,
         COUNT(*) FILTER (WHERE status::text = ANY($5::text[])) as recommended_count,

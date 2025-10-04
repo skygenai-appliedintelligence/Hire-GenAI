@@ -41,6 +41,17 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string 
     if (availableColumns.has('resume_url')) candidateSelects.push('c.resume_url')
     if (availableColumns.has('resume_file_id')) candidateSelects.push('c.resume_file_id')
 
+    // Check if applications.is_qualified exists
+    const appColsCheck = await (DatabaseService as any)["query"]?.call(
+      DatabaseService,
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'applications' AND column_name IN ('is_qualified','qualification_score')`,
+      []
+    ) as any[]
+    const appCols = new Set((appColsCheck || []).map((r: any) => r.column_name))
+    const selectIsQualified = appCols.has('is_qualified') ? ', a.is_qualified' : ''
+    const selectQualScore = appCols.has('qualification_score') ? ', a.qualification_score' : ''
+
     const query = `
       SELECT 
         a.id,
@@ -52,6 +63,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string 
         a.phone
         ${candidateSelects.length > 0 ? ',' + candidateSelects.join(',') : ''}
         ${availableColumns.has('resume_file_id') ? ',f.storage_key as resume_storage_key' : ''}
+        ${selectIsQualified}
+        ${selectQualScore}
       FROM applications a
       LEFT JOIN candidates c ON a.candidate_id = c.id
       ${availableColumns.has('resume_file_id') ? 'LEFT JOIN files f ON c.resume_file_id = f.id' : ''}
@@ -74,9 +87,12 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string 
       const phone = row.phone || row.candidate_phone || ''
       const cvUrl = row.resume_url || row.resume_storage_key || '#'
       
-      // Map database status to UI status
+      // Map database status to UI status; prefer is_qualified=true when available
       let uiStatus: "CV Unqualified" | "CV Qualified" = "CV Unqualified"
-      if (row.status === 'qualified' || row.status === 'screening_passed' || row.status === 'interview_scheduled') {
+      const isQualifiedFlag = Object.prototype.hasOwnProperty.call(row, 'is_qualified') ? Boolean(row.is_qualified) : false
+      const qualScoreOk = Object.prototype.hasOwnProperty.call(row, 'qualification_score') ? Number(row.qualification_score) >= 40 : false
+      const qualifiedStatuses = new Set(['cv_qualified','qualified','screening_passed','shortlisted','interview_scheduled'])
+      if (isQualifiedFlag || qualScoreOk || qualifiedStatuses.has(String(row.status))) {
         uiStatus = "CV Qualified"
       }
 
