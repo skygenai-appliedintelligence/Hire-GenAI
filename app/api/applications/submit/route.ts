@@ -237,6 +237,32 @@ export async function POST(req: NextRequest) {
           params.push(fileId)
         }
 
+        // Additional application fields from form
+        if (candidate.expectedSalary !== undefined && candidate.expectedSalary !== null && candidate.expectedSalary !== '') {
+          cols.push('expected_salary'); vals.push(`$${p++}`); params.push(Number(candidate.expectedSalary))
+        }
+        if (candidate.salaryCurrency) {
+          cols.push('salary_currency'); vals.push(`$${p++}`); params.push(String(candidate.salaryCurrency))
+        }
+        if (candidate.salaryPeriod) {
+          cols.push('salary_period'); vals.push(`$${p++}`); params.push(String(candidate.salaryPeriod))
+        }
+        if (candidate.location) {
+          cols.push('location'); vals.push(`$${p++}`); params.push(String(candidate.location))
+        }
+        if (candidate.linkedinUrl) {
+          cols.push('linkedin_url'); vals.push(`$${p++}`); params.push(String(candidate.linkedinUrl))
+        }
+        if (candidate.portfolioUrl) {
+          cols.push('portfolio_url'); vals.push(`$${p++}`); params.push(String(candidate.portfolioUrl))
+        }
+        if (candidate.availableStartDate) {
+          cols.push('available_start_date'); vals.push(`$${p++}::date`); params.push(String(candidate.availableStartDate))
+        }
+        if (candidate.willingToRelocate !== undefined) {
+          cols.push('willing_to_relocate'); vals.push(`$${p++}`); params.push(Boolean(candidate.willingToRelocate))
+        }
+
       if (cols.length === 0) throw new Error('applications table not compatible')
 
         const insertAppQ = `
