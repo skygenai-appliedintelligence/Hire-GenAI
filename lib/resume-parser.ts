@@ -55,7 +55,7 @@ export interface ParsedResume {
 /**
  * Clean text to remove null bytes and invalid UTF-8 sequences
  */
-function cleanText(text: string): string {
+export function cleanText(text: string): string {
   // Remove null bytes and other problematic characters
   return text
     .replace(/\0/g, '') // Remove null bytes

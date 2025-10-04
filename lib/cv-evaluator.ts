@@ -55,6 +55,78 @@ export class CVEvaluator {
     jobDescription: string,
     passThreshold: number = 40
   ): Promise<CVEvaluationResult> {
+    // --- Deterministic pre-filters to avoid obvious false positives ---
+    const text = (resumeText || '').toLowerCase()
+    const jd = (jobDescription || '').toLowerCase()
+
+    const tokenize = (s: string) => Array.from(new Set(s.split(/[^a-z0-9+#\.]+/).filter(Boolean)))
+    const tokens = tokenize(text)
+    const has = (kw: string | string[]) => {
+      const list = Array.isArray(kw) ? kw : [kw]
+      return list.some(k => {
+        const kk = k.toLowerCase()
+        return text.includes(kk) || tokens.some(t => t === kk || t.includes(kk) || kk.includes(t))
+      })
+    }
+
+    // Core domain keywords for RPA vs Full-Stack
+    const RPA_KWS = [
+      'rpa','robotic process automation','uipath','ui path','automation anywhere','blue prism','power automate','workfusion','pega','orchestrator'
+    ]
+    const FULLSTACK_KWS = [
+      'full stack','full-stack','mern','mean','react','next.js','node','express','angular','vue','typescript','javascript','mongodb','postgres','mysql'
+    ]
+
+    const jdMentionsRPA = RPA_KWS.some(k => jd.includes(k))
+    const resumeHasRPA = has(RPA_KWS)
+
+    // Require direct JD skill overlap using existing extractor
+    const requiredSkills = CVEvaluator.extractJDSkills(jobDescription)
+    const overlap = requiredSkills.filter(s => has(s)).length
+
+    // Hard fail if JD has clear RPA intent but resume lacks any RPA signals
+    if (jdMentionsRPA && !resumeHasRPA) {
+      const reason = 'JD targets RPA but resume has no RPA tools (UiPath, Automation Anywhere, Blue Prism, etc.).'
+      return {
+        overall: { score_percent: 15, qualified: false, reason_summary: reason },
+        breakdown: {
+          role_title_alignment: { score: 10, weight: 15, evidence: [] },
+          hard_skills: { score: 10, weight: 35, matched: [], missing: requiredSkills, evidence: [] },
+          experience_depth: { score: 20, weight: 20, years_estimate: null, evidence: [] },
+          domain_relevance: { score: 5, weight: 10, evidence: [] },
+          education_certs: { score: 20, weight: 10, matched: [], missing: [], evidence: [] },
+          nice_to_have: { score: 10, weight: 5, matched: [], missing: [], evidence: [] },
+          communication_redflags: { score: 70, weight: 5, red_flags: [], evidence: [] },
+        },
+        extracted: {
+          name: null, email: null, phone: null, location: null,
+          total_experience_years_estimate: null, titles: [], skills: [], education: [], certifications: [], notable_projects: []
+        },
+        gaps_and_notes: ['Domain mismatch: RPA JD vs non-RPA resume']
+      }
+    }
+
+    // If JD has any core skills, require at least 1 direct overlap
+    if (requiredSkills.length > 0 && overlap === 0) {
+      const reason = 'No direct overlap with JD core skills.'
+      return {
+        overall: { score_percent: 20, qualified: false, reason_summary: reason },
+        breakdown: {
+          role_title_alignment: { score: 20, weight: 15, evidence: [] },
+          hard_skills: { score: 10, weight: 35, matched: [], missing: requiredSkills, evidence: [] },
+          experience_depth: { score: 25, weight: 20, years_estimate: null, evidence: [] },
+          domain_relevance: { score: 20, weight: 10, evidence: [] },
+          education_certs: { score: 30, weight: 10, matched: [], missing: [], evidence: [] },
+          nice_to_have: { score: 10, weight: 5, matched: [], missing: [], evidence: [] },
+          communication_redflags: { score: 80, weight: 5, red_flags: [], evidence: [] },
+        },
+        extracted: {
+          name: null, email: null, phone: null, location: null,
+          total_experience_years_estimate: null, titles: [], skills: [], education: [], certifications: [], notable_projects: []
+        },
+        gaps_and_notes: ['No JD skill overlap found']
+      }
+    }
     const userPrompt = `Evaluate this candidate for the given JD. Use the schema and rubric below.
 
 [THRESHOLD]
@@ -125,7 +197,7 @@ FAIR SCORING GUIDELINES:
         model: openai("gpt-4o"),
         system: SYSTEM_PROMPT,
         prompt: userPrompt,
-        temperature: 0.2,
+        temperature: 0.1,
       })
 
       // Parse JSON response

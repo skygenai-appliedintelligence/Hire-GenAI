@@ -90,6 +90,37 @@ export async function POST(request: NextRequest) {
             console.log('[CV Evaluator] Saved evaluation to database')
           }
         }
+
+        // Additionally, try to set a qualified-like status when candidate is qualified
+        try {
+          if (evaluation?.overall?.qualified) {
+            // Find available application status enum values
+            const enumRows = await (DatabaseService as any)["query"]?.call(
+              DatabaseService,
+              `SELECT e.enumlabel as enum_value
+               FROM pg_type t 
+               JOIN pg_enum e ON t.oid = e.enumtypid  
+               WHERE t.typname = 'status_application'`,
+              []
+            ) as any[]
+            const statuses = new Set((enumRows || []).map((r: any) => String(r.enum_value)))
+
+            // Preferred qualified-like statuses in order
+            const preferred = ['cv_qualified', 'qualified', 'screening_passed']
+            const chosen = preferred.find(s => statuses.has(s))
+
+            if (chosen) {
+              await (DatabaseService as any)["query"]?.call(
+                DatabaseService,
+                `UPDATE applications SET status = $1::status_application WHERE id = $2::uuid`,
+                [chosen, applicationId]
+              )
+              console.log(`[CV Evaluator] Application status set to ${chosen}`)
+            }
+          }
+        } catch (setStatusErr) {
+          console.warn('[CV Evaluator] Could not set qualified status:', setStatusErr)
+        }
       } catch (dbError) {
         console.warn('[CV Evaluator] Failed to save to database:', dbError)
         // Non-fatal, continue
