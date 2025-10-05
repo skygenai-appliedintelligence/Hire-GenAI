@@ -180,6 +180,76 @@ ${transcript}
     
     await DatabaseService.query(updateQuery, [applicationId, JSON.stringify(evaluationData)])
 
+    // Also store in the evaluations table linked to interview
+    try {
+      // Find the interview for this application
+      const findInterviewQuery = `
+        SELECT i.id as interview_id
+        FROM interviews i
+        JOIN application_rounds ar ON ar.id = i.application_round_id
+        WHERE ar.application_id = $1::uuid
+        ORDER BY i.completed_at DESC NULLS LAST, i.started_at DESC NULLS LAST
+        LIMIT 1
+      `
+      const interviewRows = await DatabaseService.query(findInterviewQuery, [applicationId]) as any[]
+      
+      if (interviewRows && interviewRows.length > 0) {
+        const interviewId = interviewRows[0].interview_id
+        
+        // Insert into evaluations table
+        const insertEvaluationQuery = `
+          INSERT INTO evaluations (
+            interview_id,
+            overall_score,
+            skill_scores,
+            recommendation,
+            rubric_notes_md,
+            created_at
+          )
+          VALUES ($1::uuid, $2::numeric, $3::jsonb, $4::rec_outcome, $5, NOW())
+          ON CONFLICT (interview_id) DO UPDATE SET
+            overall_score = EXCLUDED.overall_score,
+            skill_scores = EXCLUDED.skill_scores,
+            recommendation = EXCLUDED.recommendation,
+            rubric_notes_md = EXCLUDED.rubric_notes_md,
+            created_at = NOW()
+          RETURNING id
+        `
+        
+        // Map recommendation to enum values (hire, maybe, no_hire)
+        let recOutcome = 'maybe'
+        if (evaluation.recommendation) {
+          const rec = evaluation.recommendation.toLowerCase()
+          if (rec.includes('hire') && !rec.includes('no')) {
+            recOutcome = 'hire'
+          } else if (rec.includes('no') || rec.includes('reject')) {
+            recOutcome = 'no_hire'
+          }
+        }
+        
+        const rubricNotes = [
+          evaluation.summary || '',
+          evaluation.strengths?.length ? `**Strengths:**\n${evaluation.strengths.map((s: string) => `- ${s}`).join('\n')}` : '',
+          evaluation.areas_for_improvement?.length ? `**Areas for Improvement:**\n${evaluation.areas_for_improvement.map((a: string) => `- ${a}`).join('\n')}` : ''
+        ].filter(Boolean).join('\n\n')
+        
+        await DatabaseService.query(insertEvaluationQuery, [
+          interviewId,
+          evaluation.overall_score || 5,
+          JSON.stringify(evaluation.scores || {}),
+          recOutcome,
+          rubricNotes
+        ])
+        
+        console.log('✅ Evaluation also stored in evaluations table for interview:', interviewId)
+      } else {
+        console.log('⚠️ No interview found for application, skipping evaluations table insert')
+      }
+    } catch (evalError) {
+      console.error('❌ Failed to store in evaluations table:', evalError)
+      // Don't fail the whole request if this fails
+    }
+
     console.log('✅ Evaluation completed and stored for application:', applicationId)
     console.log('📊 Overall score:', evaluation.overall_score)
     console.log('🎯 Recommendation:', evaluation.recommendation)
