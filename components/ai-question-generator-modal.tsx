@@ -143,31 +143,12 @@ export function AIQuestionGeneratorModal({
   const handleOpenChange = (next: boolean) => {
     setOpen(next)
     if (next) {
-      setNumberOfQuestions("")
+      setNumberOfQuestions("10") // Default to 10 questions
       // Prefill only when jobId is present in URL
       const jobId = searchParams.get('jobId')
       if (!jobDescription && initialJobDescription && jobId) {
         setJobDescription(initialJobDescription)
       }
-      // Update URL to reflect AI modal open state
-      try {
-        const params = new URLSearchParams(searchParams.toString())
-        params.set('ai', '1')
-        if (agentId) params.set('agent', agentId)
-        if (taskId) params.set('task', taskId)
-        router.push(`${basePath}?${params.toString()}`)
-      } catch {}
-    }
-    if (!next) {
-      // Remove AI-related params, keep others (like tab)
-      try {
-        const params = new URLSearchParams(searchParams.toString())
-        params.delete('ai')
-        params.delete('agent')
-        params.delete('task')
-        const qs = params.toString()
-        router.push(qs ? `${basePath}?${qs}` : basePath)
-      } catch {}
     }
   }
 

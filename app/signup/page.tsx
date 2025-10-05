@@ -1,8 +1,8 @@
 "use client"
 
-import React, { useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -45,10 +45,23 @@ const companySizes = [
   "1000+ employees",
 ]
 
-const countries = ["United States", "India", "United Kingdom", "Canada", "Australia", "Germany", "France", "Other"]
+// Country mapping: Display Name -> ISO Code
+const countryOptions = [
+  { name: "United States", code: "US" },
+  { name: "India", code: "IN" },
+  { name: "United Kingdom", code: "GB" },
+  { name: "Canada", code: "CA" },
+  { name: "Australia", code: "AU" },
+  { name: "Germany", code: "DE" },
+  { name: "France", code: "FR" },
+  { name: "Singapore", code: "SG" },
+  { name: "UAE", code: "AE" },
+  { name: "Other", code: "XX" },
+]
 
 export default function SignupPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [step, setStep] = useState(1)
 
   const [form, setForm] = useState({
@@ -89,6 +102,45 @@ export default function SignupPage() {
 
   const totalSteps = 5
   const progressPct = useMemo(() => Math.round(((step - 1) / (totalSteps - 1)) * 100), [step])
+
+  // Map steps <-> section slugs for readable URLs
+  const stepToSection = (s: number) => (
+    s === 1 ? 'company' :
+    s === 2 ? 'contact' :
+    s === 3 ? 'legal' :
+    s === 4 ? 'admin' :
+    'review'
+  )
+  const sectionToStep = (sec?: string | null) => {
+    switch ((sec || '').toLowerCase()) {
+      case 'company': return 1
+      case 'contact': return 2
+      case 'legal': return 3
+      case 'admin': return 4
+      case 'review': return 5
+      default: return 1
+    }
+  }
+
+  // Initialize step from URL on first render and when section changes
+  useEffect(() => {
+    const sec = searchParams?.get('section')
+    const target = sectionToStep(sec)
+    setStep(target)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  // Update URL whenever step changes (but avoid infinite loop)
+  useEffect(() => {
+    const currentSection = searchParams?.get('section')
+    const expectedSection = stepToSection(step)
+    
+    // Only update URL if it doesn't match current step
+    if (currentSection !== expectedSection) {
+      router.push(`/signup?section=${expectedSection}`, { scroll: false })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
 
   const next = () => setStep((s) => Math.min(totalSteps, s + 1))
   const prev = () => setStep((s) => Math.max(1, s - 1))
@@ -139,11 +191,12 @@ export default function SignupPage() {
     if (!otp || !form.email) return
     setOtpLoading(true)
     try {
-      const fullName = `${form.firstName} ${form.lastName}`.trim()
-      const res = await fetch('/api/otp/verify', {
+      // Just verify the OTP is valid, don't create user/company yet
+      // That will happen in onSubmit with all the form data
+      const res = await fetch('/api/otp/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: form.email, otp, companyName: form.companyName, fullName })
+        body: JSON.stringify({ email: form.email, otp, purpose: 'signup' })
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || data?.error) throw new Error(data?.error || 'Failed to verify OTP')
@@ -151,17 +204,76 @@ export default function SignupPage() {
       setCountdown(0)
     } catch (e) {
       console.error('Verify OTP failed', e)
+      alert(e instanceof Error ? e.message : 'Failed to verify OTP')
     } finally {
       setOtpLoading(false)
     }
   }
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: integrate with your OTP/signup flow if needed
-    console.log("Signup data", form)
-    router.push("/dashboard")
+    
+    if (!otpVerified) {
+      alert('Please verify your email first')
+      return
+    }
 
+    if (!form.agreeTos || !form.agreePrivacy) {
+      alert('Please agree to Terms of Service and Privacy Policy')
+      return
+    }
+
+    try {
+      const res = await fetch('/api/signup/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email,
+          otp: otp,
+          // Step 1: Company Information
+          companyName: form.companyName,
+          industry: form.industry,
+          companySize: form.companySize,
+          website: form.website,
+          companyDescription: form.companyDescription,
+          // Step 2: Contact Information
+          street: form.street,
+          city: form.city,
+          state: form.state,
+          postalCode: form.postalCode,
+          country: form.country,
+          phone: form.phone,
+          // Step 3: Legal Information
+          legalCompanyName: form.legalCompanyName,
+          taxId: form.taxId,
+          registrationNumber: form.registrationNumber,
+          // Step 4: Admin Account
+          firstName: form.firstName,
+          lastName: form.lastName,
+          jobTitle: form.jobTitle,
+          // Step 5: Consent
+          agreeTos: form.agreeTos,
+          agreePrivacy: form.agreePrivacy,
+        })
+      })
+
+      const data = await res.json().catch(() => ({}))
+      
+      if (!res.ok || data?.error) {
+        throw new Error(data?.error || 'Signup failed')
+      }
+
+      // Store session token if needed
+      if (data.session?.refreshToken) {
+        localStorage.setItem('refreshToken', data.session.refreshToken)
+      }
+
+      // Redirect to dashboard
+      router.push("/dashboard")
+    } catch (error: any) {
+      console.error('Signup error:', error)
+      alert(error?.message || 'Failed to complete signup. Please try again.')
+    }
   }
 
   return (
@@ -286,8 +398,8 @@ export default function SignupPage() {
                     <Select value={form.country} onValueChange={(v) => setForm((f) => ({ ...f, country: v }))}>
                       <SelectTrigger id="country"><SelectValue placeholder="Select country" /></SelectTrigger>
                       <SelectContent>
-                        {countries.map((c) => (
-                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        {countryOptions.map((c) => (
+                          <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -424,7 +536,7 @@ export default function SignupPage() {
                       <div><span className="text-slate-500">Company:</span> {form.companyName || "—"}</div>
                       <div><span className="text-slate-500">Industry:</span> {form.industry || "—"}</div>
                       <div><span className="text-slate-500">Size:</span> {form.companySize || "—"}</div>
-                      <div><span className="text-slate-500">Location:</span> {[form.city, form.state].filter(Boolean).join(', ') || "—"}</div>
+                      <div><span className="text-slate-500">Location:</span> {[form.city, form.state, countryOptions.find(c => c.code === form.country)?.name].filter(Boolean).join(', ') || "—"}</div>
                     </div>
                   </div>
                   <div className="rounded-lg border p-4">

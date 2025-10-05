@@ -176,8 +176,8 @@ export default function CreateAgentsPage() {
     // Save selected agents to localStorage
     localStorage.setItem('selectedAgents', JSON.stringify(selectedAgents))
     
-    // Navigate to selected agents page
-    router.push('/selected-agents')
+    // Navigate back to jobs page
+    router.push('/dashboard/jobs')
   }
 
   const handleBack = () => {

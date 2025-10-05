@@ -192,35 +192,68 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       console.log('Evaluation table not found or error:', e)
     }
 
-    // Try to fetch transcript data (if table exists)
+    // Try to fetch transcript data from interviews table
     let transcript = null
     try {
+      console.log('📝 Fetching transcript for application:', candidateId)
+      
+      // First check if application_rounds exist
+      const checkRoundsQuery = `SELECT id FROM application_rounds WHERE application_id = $1::uuid`
+      const roundsCheck = await (DatabaseService as any)["query"]?.call(DatabaseService, checkRoundsQuery, [candidateId]) as any[]
+      console.log('📝 Application rounds found:', roundsCheck?.length || 0)
+      if (roundsCheck && roundsCheck.length > 0) {
+        console.log('📝 Round ID:', roundsCheck[0].id)
+      }
+      
       const transcriptQuery = `
         SELECT 
-          transcript_text,
-          duration,
-          interview_date,
-          interviewer,
-          rounds_data
-        FROM interview_transcripts
-        WHERE candidate_id = $1::uuid OR application_id = $1::uuid
-        ORDER BY interview_date DESC
+          i.id as interview_id,
+          i.raw_transcript,
+          i.started_at,
+          i.completed_at,
+          i.status,
+          ra.agent_type,
+          ar.id as round_id
+        FROM interviews i
+        JOIN application_rounds ar ON ar.id = i.application_round_id
+        LEFT JOIN round_agents ra ON ra.id = i.round_agent_id
+        WHERE ar.application_id = $1::uuid
+        ORDER BY i.completed_at DESC NULLS LAST, i.started_at DESC NULLS LAST
         LIMIT 1
       `
       const transcriptRows = await (DatabaseService as any)["query"]?.call(DatabaseService, transcriptQuery, [candidateId]) as any[]
+      console.log('📝 Transcript rows found:', transcriptRows?.length || 0)
+      if (transcriptRows && transcriptRows.length > 0) {
+        console.log('📝 Interview ID:', transcriptRows[0].interview_id)
+        console.log('📝 Transcript length:', transcriptRows[0].raw_transcript?.length || 0)
+      }
       
       if (transcriptRows && transcriptRows.length > 0) {
         const transRow = transcriptRows[0]
-        transcript = {
-          text: transRow.transcript_text || '',
-          duration: transRow.duration || null,
-          interviewDate: transRow.interview_date || null,
-          interviewer: transRow.interviewer || null,
-          rounds: transRow.rounds_data || null
+        
+        // Calculate duration if we have both timestamps
+        let duration = null
+        if (transRow.started_at && transRow.completed_at) {
+          const start = new Date(transRow.started_at)
+          const end = new Date(transRow.completed_at)
+          const diffMs = end.getTime() - start.getTime()
+          const diffMins = Math.floor(diffMs / 60000)
+          duration = `${diffMins} minutes`
         }
+        
+        transcript = {
+          text: transRow.raw_transcript || 'No transcript available',
+          duration: duration,
+          interviewDate: transRow.completed_at || transRow.started_at || null,
+          interviewer: transRow.agent_type || 'AI Agent',
+          status: transRow.status
+        }
+        console.log('✅ Transcript loaded, length:', transRow.raw_transcript?.length || 0)
+      } else {
+        console.log('⚠️ No transcript found for application:', candidateId)
       }
     } catch (e) {
-      console.log('Transcript table not found or error:', e)
+      console.error('❌ Failed to fetch transcript:', e)
     }
 
     // Parse qualification_explanations if available
