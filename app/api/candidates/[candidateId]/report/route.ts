@@ -148,13 +148,21 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       willingToRelocate: row.willing_to_relocate || false
     }
 
-    // Build evaluation data from applications.evaluation JSONB if present
+    // Primary source: evaluation from interviews.metadata->evaluation
     let evaluation = null
     try {
-      const rawEval = row.evaluation
-      if (rawEval) {
-        const evalObj = typeof rawEval === 'string' ? JSON.parse(rawEval) : rawEval
-        // Support both legacy and new structures
+      const evalFromInterviewQuery = `
+        SELECT (i.metadata -> 'evaluation') AS evaluation_json
+        FROM interviews i
+        JOIN application_rounds ar ON ar.id = i.application_round_id
+        WHERE ar.application_id = $1::uuid
+        ORDER BY i.completed_at DESC NULLS LAST, i.started_at DESC NULLS LAST
+        LIMIT 1
+      `
+      const evalIntRows = await (DatabaseService as any)["query"]?.call(DatabaseService, evalFromInterviewQuery, [candidateId]) as any[]
+      const evalJson = evalIntRows?.[0]?.evaluation_json
+      if (evalJson) {
+        const evalObj = typeof evalJson === 'string' ? JSON.parse(evalJson) : evalJson
         const scores = evalObj.scores || {}
         const strengths = evalObj.strengths || []
         const weaknesses = evalObj.weaknesses || evalObj.areas_for_improvement || []
@@ -174,12 +182,44 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
           reviewedAt: evalObj.evaluated_at || evalObj.reviewed_at || null,
           reviewedBy: evalObj.reviewed_by || 'AI Evaluator'
         }
+        console.log('✅ Evaluation loaded from interviews.metadata')
       }
     } catch (e) {
-      console.log('Evaluation JSON parse error:', e)
+      console.log('Evaluation from interviews.metadata parse error:', e)
     }
 
-    // If no evaluation found in applications table, try interviews/evaluations tables
+    // Fallback 1: applications.evaluation JSONB
+    if (!evaluation) {
+      try {
+        const rawEval = row.evaluation
+        if (rawEval) {
+          const evalObj = typeof rawEval === 'string' ? JSON.parse(rawEval) : rawEval
+          const scores = evalObj.scores || {}
+          const strengths = evalObj.strengths || []
+          const weaknesses = evalObj.weaknesses || evalObj.areas_for_improvement || []
+          const decision = evalObj.decision || evalObj.recommendation || 'pending'
+          evaluation = {
+            overallScore: evalObj.overall_score || 0,
+            decision,
+            scores: {
+              technical: scores.technical?.score ?? scores.technical ?? 0,
+              communication: scores.communication?.score ?? scores.communication ?? 0,
+              experience: scores.experience?.score ?? scores.experience ?? 0,
+              cultural_fit: scores.cultural_fit?.score ?? scores.cultural_fit ?? 0
+            },
+            strengths: Array.isArray(strengths) ? strengths : [],
+            weaknesses: Array.isArray(weaknesses) ? weaknesses : [],
+            reviewerComments: evalObj.summary || evalObj.reviewer_comments || '',
+            reviewedAt: evalObj.evaluated_at || evalObj.reviewed_at || null,
+            reviewedBy: evalObj.reviewed_by || 'AI Evaluator'
+          }
+        }
+      } catch (e) {
+        console.log('Evaluation JSON parse error (applications.evaluation):', e)
+      }
+    }
+
+    // Fallback 2: evaluations table
     if (!evaluation) {
       try {
         const interviewEvalQuery = `
@@ -198,19 +238,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
           LIMIT 1
         `
         const evalRows = await (DatabaseService as any)["query"]?.call(DatabaseService, interviewEvalQuery, [candidateId]) as any[]
-        
         if (evalRows && evalRows.length > 0) {
           const evalRow = evalRows[0]
           const skillScores = typeof evalRow.skill_scores === 'string' ? JSON.parse(evalRow.skill_scores) : evalRow.skill_scores || {}
-          
-          // Parse strengths/weaknesses from rubric notes
           const notes = evalRow.rubric_notes_md || ''
           const strengthsMatch = notes.match(/\*\*Strengths:\*\*\n((?:- .+\n?)*)/i)
           const weaknessesMatch = notes.match(/\*\*Areas for Improvement:\*\*\n((?:- .+\n?)*)/i)
-          
           const strengths = strengthsMatch ? strengthsMatch[1].split('\n').filter((s: string) => s.trim().startsWith('-')).map((s: string) => s.replace(/^- /, '').trim()) : []
           const weaknesses = weaknessesMatch ? weaknessesMatch[1].split('\n').filter((s: string) => s.trim().startsWith('-')).map((s: string) => s.replace(/^- /, '').trim()) : []
-          
           evaluation = {
             overallScore: parseFloat(evalRow.overall_score) || 0,
             decision: evalRow.recommendation || 'pending',
@@ -226,10 +261,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
             reviewedAt: evalRow.evaluated_at || null,
             reviewedBy: 'AI Evaluator'
           }
-          console.log('✅ Evaluation loaded from interviews/evaluations tables')
+          console.log('✅ Evaluation loaded from evaluations table')
         }
       } catch (e) {
-        console.log('Failed to fetch from interviews/evaluations tables:', e)
+        console.log('Failed to fetch from evaluations table:', e)
       }
     }
 
