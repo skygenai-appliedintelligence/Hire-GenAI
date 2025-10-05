@@ -20,6 +20,11 @@ export default function InterviewPage() {
   const [agentReady, setAgentReady] = useState(false)
   const [sessionInfo, setSessionInfo] = useState<any>(null)
   const [jobDetails, setJobDetails] = useState<any>(null)
+  const [interviewQuestions, setInterviewQuestions] = useState<any[]>([])
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [interviewPhase, setInterviewPhase] = useState<'setup' | 'greeting' | 'questions' | 'candidate_questions' | 'closing'>('setup')
+  const [interviewStartTime, setInterviewStartTime] = useState<number | null>(null)
+  const [interviewDuration, setInterviewDuration] = useState(30) // minutes
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const dcRef = useRef<RTCDataChannel | null>(null)
   const agentTextBufferRef = useRef<string>("")
@@ -182,37 +187,56 @@ export default function InterviewPage() {
     
     const init = async () => {
       try {
-        // First fetch job details
-        const res = await fetch(`/api/applications/${encodeURIComponent(applicationId)}/summary`, { cache: 'no-store' })
+        // Fetch interview questions and job details
+        const res = await fetch(`/api/applications/${encodeURIComponent(applicationId)}/interview-questions`, { cache: 'no-store' })
         const json = await res.json()
+        
         if (res.ok && json?.ok) {
           const details = {
-            jobTitle: json.job?.title || 'Position',
-            company: json.company?.name || 'Company',
-            jobDescription: json.job?.description || '',
-            requirements: json.job?.requirements || '',
-            candidateName: json.candidate?.name || 'Candidate'
+            jobTitle: json.application?.jobTitle || 'Position',
+            company: json.application?.companyName || 'Company',
+            candidateName: json.application?.candidateName || 'Candidate'
           }
+          
+          // Extract all questions from all rounds
+          const allQuestions = json.rounds?.flatMap((round: any) => 
+            round.questions?.map((q: string, index: number) => ({
+              text: q,
+              roundName: round.name,
+              criteria: round.criteria || [],
+              sequence: index + 1
+            })) || []
+          ) || []
+          
+          // Set interview duration from first round or default to 30 minutes
+          const duration = json.rounds?.[0]?.duration_minutes || 30
+          
           setJobDetails(details)
+          setInterviewQuestions(allQuestions)
+          setInterviewDuration(duration)
           setCheckingStatus(false)
+          
+          console.log('📋 Loaded interview questions:', allQuestions.length)
+          console.log('⏱️ Interview duration:', duration, 'minutes')
+          
           // Then request permissions with job context
-          await requestPermissions(details)
+          await requestPermissions(details, allQuestions, duration)
         } else {
           setCheckingStatus(false)
-          // Fallback if job details not available
-          await requestPermissions(null)
+          // Fallback if questions not available
+          await requestPermissions(null, [], 30)
         }
       } catch (e) {
-        console.error('Failed to fetch job details:', e)
+        console.error('Failed to fetch interview questions:', e)
         setCheckingStatus(false)
-        await requestPermissions(null)
+        await requestPermissions(null, [], 30)
       }
     }
     
     checkStatus()
   }, [applicationId])
 
-  const requestPermissions = async (details: any) => {
+  const requestPermissions = async (details: any, questions: any[] = [], duration: number = 30) => {
     setInitializing(true)
     setError(null)
     try {
@@ -243,8 +267,10 @@ export default function InterviewPage() {
       const data = await resp.json()
       logTs('Init: Ephemeral session received')
       setSessionInfo(data)
-      await initRealtimeConnection(data, stream, details)
+      await initRealtimeConnection(data, stream, details, questions, duration)
       setAgentReady(true)
+      setInterviewPhase('greeting')
+      setInterviewStartTime(Date.now())
       logTs('Agent Connected (peer connection established)')
     } catch (e: any) {
       setError("Please allow camera and microphone to start the interview.")
@@ -254,7 +280,7 @@ export default function InterviewPage() {
   }
 
   // Initialize WebRTC connection with OpenAI Realtime
-  const initRealtimeConnection = async (session: any, localStream: MediaStream, details: any) => {
+  const initRealtimeConnection = async (session: any, localStream: MediaStream, details: any, questions: any[] = [], duration: number = 30) => {
     pcRef.current?.close()
     pcRef.current = null
 
@@ -297,27 +323,64 @@ export default function InterviewPage() {
     dc.onopen = () => {
       logTs('DC open')
       try {
-        // Build context-aware instructions for the AI agent
-        let instructions = 'You are Olivia, a professional AI recruiter conducting a video interview.'
-        
-        if (details && details.jobTitle) {
-          instructions += `\n\nIMPORTANT CONTEXT:
-- You are interviewing ${details.candidateName} for the position of ${details.jobTitle} at ${details.company}
-- DO NOT ask which position they are applying for - you already know it's ${details.jobTitle}
-- Start by greeting them warmly and saying something like: "Hello ${details.candidateName}, welcome to your interview for the ${details.jobTitle} position at ${details.company}. I'm excited to learn more about your experience."`
-          
-          if (details.jobDescription) {
-            instructions += `\n- Job Description: ${details.jobDescription}`
-          }
-          if (details.requirements) {
-            instructions += `\n- Key Requirements: ${details.requirements}`
-          }
-          
-          instructions += `\n\nConduct a professional interview focusing on their experience, skills, and fit for the ${details.jobTitle} role. Ask relevant technical and behavioral questions.`
+        // Build structured 6-step interview instructions
+        let instructions = `You are Olivia, a professional AI recruiter conducting a structured video interview. Follow this EXACT 6-step process:
+
+**STEP 1: GREETING & SETUP CHECK**
+- Greet warmly: "Hello ${details?.candidateName || 'there'}, welcome and thank you for joining today's interview."
+- Confirm setup: "Before we begin, can you please confirm that your audio and video are working fine, and you can hear/see me clearly?"
+- Wait for confirmation before proceeding.
+
+**STEP 2: START INTERVIEW & TIME MANAGEMENT**  
+- Once setup confirmed: "Great, let's get started. This interview will last about ${duration} minutes. I'll be asking you questions based on the ${details?.jobTitle || 'position'} role you applied for at ${details?.company || 'our company'}."
+- Keep track of time and ensure interview finishes within ${duration} minutes.
+
+**STEP 3: QUESTION FLOW**
+Ask these questions sequentially:`
+
+        // Add the specific questions from database
+        if (questions && questions.length > 0) {
+          questions.forEach((q, index) => {
+            instructions += `\n${index + 1}. ${q.text}`
+          })
+          instructions += `\n\nAllow time for responses. If candidate goes off-track or takes too long, politely redirect: "Thank you, let's move to the next question so we can cover everything within our time."`
         } else {
-          instructions += '\n\nGreet the candidate warmly and ask which position they are interviewing for, then proceed with relevant questions.'
+          instructions += `\n1. Tell me about yourself and your relevant experience.
+2. Why are you interested in this ${details?.jobTitle || 'position'}?
+3. What motivates you in your work?
+4. Describe a challenging situation you faced and how you handled it.
+5. How do you handle feedback and criticism?
+6. Tell me about a time you worked in a team to achieve a goal.
+7. What technical skills do you bring to this role?
+8. How do you stay updated with the latest technologies in your field?
+9. Describe a technical problem you solved recently.
+10. Do you have any questions about the role or company?
+
+Allow time for responses. If candidate goes off-track or takes too long, politely redirect: "Thank you, let's move to the next question so we can cover everything within our time."`
         }
-        
+
+        instructions += `
+
+**STEP 4: WRAP-UP & CANDIDATE QUESTIONS**
+Once all questions covered (or time runs out): "That concludes my set of questions. Do you have any questions for me?"
+- If question is about JD/role, answer briefly
+- If question is not directly related (HR policy, compensation, next steps): "That's a great question. Our team will get back to you with the details after this interview."
+
+**STEP 5: CLOSING**
+Thank the candidate: "Thank you for your time today. We'll review your responses and share feedback through the recruitment team."
+
+**INTERVIEW CONTEXT:**
+- Candidate: ${details?.candidateName || 'Candidate'}
+- Position: ${details?.jobTitle || 'Position'}  
+- Company: ${details?.company || 'Company'}
+- Duration: ${duration} minutes
+- Total Questions: ${questions?.length || 10}
+
+**EVALUATION CRITERIA:**
+${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Culture fit, Problem-solving'}
+
+Be professional, warm, and keep the interview structured and on-time.`
+
         // Update session with instructions
         const updateMsg = {
           type: 'session.update',
@@ -339,7 +402,7 @@ export default function InterviewPage() {
           }
         }
         dc.send(JSON.stringify(updateMsg))
-        logTs('Session updated with job context')
+        logTs('Session updated with structured interview flow')
         
         // Then trigger the first response
         const startMsg = {
@@ -349,7 +412,7 @@ export default function InterviewPage() {
           }
         }
         dc.send(JSON.stringify(startMsg))
-        logTs('First response triggered')
+        logTs('Interview started - Step 1: Greeting & Setup')
       } catch (e) {
         console.error('Error in dc.onopen:', e)
       }
@@ -481,12 +544,13 @@ export default function InterviewPage() {
       localStorage.setItem(`interview:${applicationId}`, JSON.stringify(payload))
       
       // Mark interview as completed in database
-      const transcript = turns.map(t => `${t.role === 'agent' ? 'Agent' : 'You'}: ${t.text}`).join('\n\n')
+      const transcript = turns.map(t => `${t.role === 'agent' ? 'Interviewer' : 'Candidate'}: ${t.text}`).join('\n\n')
       console.log('📝 Saving transcript to database...')
       console.log('📝 Conversation turns:', turns.length)
       console.log('📝 Transcript length:', transcript.length)
       console.log('📝 Transcript preview:', transcript.substring(0, 300))
       
+      // Step 6: Store transcript and mark as completed
       const response = await fetch(`/api/applications/${encodeURIComponent(applicationId)}/interview-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -499,6 +563,22 @@ export default function InterviewPage() {
       if (response) {
         const result = await response.json()
         console.log('✅ Interview marked as completed:', result)
+        
+        // Trigger evaluation pipeline
+        console.log('🔍 Starting evaluation pipeline...')
+        const evaluationResponse = await fetch(`/api/applications/${encodeURIComponent(applicationId)}/evaluate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript })
+        }).catch(e => {
+          console.error('❌ Failed to run evaluation:', e)
+          return null
+        })
+        
+        if (evaluationResponse) {
+          const evaluationResult = await evaluationResponse.json()
+          console.log('✅ Evaluation completed:', evaluationResult)
+        }
       }
       
       // Navigate to interview success page
@@ -610,10 +690,12 @@ export default function InterviewPage() {
             </Button>
           </div>
 
-          {/* Agent status badge */}
+          {/* Interview status */}
           {agentReady && (
-            <div className="absolute right-4 bottom-6 bg-emerald-600 text-white text-xs px-3 py-1 rounded-full shadow">
-              Agent Connected
+            <div className="absolute right-4 bottom-6">
+              <div className="bg-emerald-600 text-white text-xs px-3 py-1 rounded-full shadow">
+                Agent Connected
+              </div>
             </div>
           )}
 

@@ -106,38 +106,21 @@ export default function InterviewStartPage() {
           <p className="text-gray-600 max-w-2xl">You're just one click away from starting your AI-powered video interview</p>
         </div>
 
-        {/* Main card */}
+        {/* Main card (simplified, no green relevancy panel) */}
         <div className="mt-8 rounded-2xl border border-gray-200 bg-white shadow-md">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 p-8 md:p-12">
-            {/* Left: Relevancy panel */}
-            <div>
-              <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4">
-                <div className="text-sm font-semibold text-emerald-800 mb-2">Relevancy Check Success</div>
-                <p className="text-sm leading-6 text-emerald-900">
-                  Candidate has extensive experience in RPA development and architecture, including hands-on work with 
-                  Automation Anywhere, UiPath, and Blue Prism. They have led RPA projects, designed and implemented 
-                  automation workflows, collaborated with cross-functional teams, and supported RPA solutions in production. 
-                  The candidate also has relevant certifications and experience in troubleshooting and supporting RPA bots, 
-                  aligning well with the job requirements.
-                </p>
-              </div>
+          <div className="p-8 md:p-12 flex flex-col items-center justify-center text-center gap-3">
+            <div className="text-2xl md:text-4xl font-bold text-gray-900">{jobTitle || 'Job Title'}</div>
+            <div className="text-base md:text-lg text-gray-600">at {company || 'Company'}</div>
+            <div className="flex items-center justify-center gap-2 text-sm md:text-base text-gray-500">
+              <CircleDot className="h-4 w-4" /> {location || 'Location'}
             </div>
-
-            {/* Right: Job panel (centered, larger) */}
-            <div className="flex flex-col items-center justify-center text-center gap-3">
-              <div className="text-2xl md:text-4xl font-bold text-gray-900">{jobTitle || 'Job Title'}</div>
-              <div className="text-base md:text-lg text-gray-600">at {company || 'Company'}</div>
-              <div className="flex items-center justify-center gap-2 text-sm md:text-base text-gray-500">
-                <CircleDot className="h-4 w-4" /> {location || 'Location'}
-              </div>
-              <div className="flex items-center gap-3 mt-2">
-                <Badge variant="outline" className="border-gray-300 text-gray-700 gap-2 px-3 py-1.5 rounded-full text-sm md:text-base">
-                  <Video className="h-4 w-4" /> AI Interview
-                </Badge>
-                <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 gap-2 px-3 py-1.5 rounded-full text-sm md:text-base">
-                  <Heart className="h-4 w-4" /> Application Submitted
-                </Badge>
-              </div>
+            <div className="flex items-center gap-3 mt-2">
+              <Badge variant="outline" className="border-gray-300 text-gray-700 gap-2 px-3 py-1.5 rounded-full text-sm md:text-base">
+                <Video className="h-4 w-4" /> AI Interview
+              </Badge>
+              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 gap-2 px-3 py-1.5 rounded-full text-sm md:text-base">
+                <Heart className="h-4 w-4" /> Application Submitted
+              </Badge>
             </div>
           </div>
         </div>
