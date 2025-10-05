@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -60,6 +60,7 @@ type TranscriptData = {
 export default function CandidateReportPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const jdId = (params?.jdId as string) || ""
   const candidateId = (params?.candidateId as string) || ""
 
@@ -76,6 +77,21 @@ export default function CandidateReportPage() {
   const [dbQualified, setDbQualified] = useState<boolean | null>(null)
   const [qualificationDetails, setQualificationDetails] = useState<any>(null)
 
+  // Read tab from URL on mount
+  useEffect(() => {
+    const tabParam = searchParams?.get('tab')
+    if (tabParam && ['candidate', 'evaluation', 'transcript', 'job'].includes(tabParam)) {
+      setActiveTab(tabParam as "candidate" | "evaluation" | "transcript" | "job")
+    }
+  }, [searchParams])
+
+  // Function to change tab and update URL
+  const changeTab = (tab: "candidate" | "evaluation" | "transcript" | "job") => {
+    setActiveTab(tab)
+    const url = `/dashboard/analytics/${jdId}/applications/${candidateId}/report?tab=${tab}`
+    router.push(url, { scroll: false })
+  }
+
   useEffect(() => {
     const fetchData = async () => {
       if (!jdId || !candidateId) return
@@ -89,6 +105,9 @@ export default function CandidateReportPage() {
         if (!res.ok || !json?.ok) {
         }
 
+        console.log('📊 Report data received:', json)
+        console.log('📝 Transcript data:', json.transcript)
+        
         setCandidate(json.candidate || null)
         setEvaluation(json.evaluation || null)
         setTranscript(json.transcript || null)
@@ -230,7 +249,7 @@ export default function CandidateReportPage() {
           {/* Tabs Navigation */}
           <div className="flex items-center gap-8 border-b border-gray-200 -mb-px">
             <button
-              onClick={() => setActiveTab("candidate")}
+              onClick={() => changeTab("candidate")}
               className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
                 activeTab === "candidate"
                   ? "text-purple-600"
@@ -243,7 +262,7 @@ export default function CandidateReportPage() {
               )}
             </button>
             <button
-              onClick={() => setActiveTab("evaluation")}
+              onClick={() => changeTab("evaluation")}
               className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
                 activeTab === "evaluation"
                   ? "text-purple-600"
@@ -256,7 +275,7 @@ export default function CandidateReportPage() {
               )}
             </button>
             <button
-              onClick={() => setActiveTab("transcript")}
+              onClick={() => changeTab("transcript")}
               className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
                 activeTab === "transcript"
                   ? "text-purple-600"
@@ -269,7 +288,7 @@ export default function CandidateReportPage() {
               )}
             </button>
             <button
-              onClick={() => setActiveTab("job")}
+              onClick={() => changeTab("job")}
               className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
                 activeTab === "job"
                   ? "text-purple-600"
@@ -1001,6 +1020,13 @@ export default function CandidateReportPage() {
               <CardContent className="pt-6">
                 {transcript ? (
                   <div className="space-y-4">
+                    {/* Debug info */}
+                    <div className="mb-4 p-3 bg-gray-50 rounded text-xs">
+                      <div>Transcript exists: {transcript ? 'Yes' : 'No'}</div>
+                      <div>Text length: {transcriptData?.text?.length || 0} characters</div>
+                      <div>Has rounds: {transcriptData?.rounds ? 'Yes' : 'No'}</div>
+                    </div>
+                    
                     {transcriptData!.interviewDate && (
                       <div className="flex items-center gap-4 text-sm text-gray-600 pb-4 border-b">
                         <span>📅 {new Date(transcriptData!.interviewDate).toLocaleDateString()}</span>
