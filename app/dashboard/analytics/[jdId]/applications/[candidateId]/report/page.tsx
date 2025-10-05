@@ -197,12 +197,22 @@ export default function CandidateReportPage() {
   const evaluationData = evaluation
   const transcriptData = transcript
 
-  // Prefer DB score from applications table; fall back to evaluation values or safe defaults
-  const overallScore = dbScore ?? ((evaluation?.overallScore ?? null) !== null ? (evaluation!.overallScore as number) : 77)
+  // Prefer evaluation score; fall back to DB score only if evaluation missing
+  const overallScore = ((evaluation?.overallScore ?? null) !== null)
+    ? (evaluation!.overallScore as number)
+    : (typeof dbScore === 'number' ? dbScore : null)
   // Resume/Qualification score must come from DB qualification_score
   const resumeScore = typeof dbScore === 'number' ? dbScore : 0
-  // Display placeholder for overall score until interview module provides it
-  const overallScoreDisplay = "--"
+  // Display overall score from evaluation: if <=10 show /10, else assume /100
+  const overallScoreDisplay = (() => {
+    if (overallScore === null || overallScore === undefined || isNaN(overallScore as any)) return "--"
+    const n = Number(overallScore)
+    if (n <= 10) {
+      const rounded = Math.round(n * 10) / 10
+      return `${rounded}/10`
+    }
+    return `${Math.round(n)}/100`
+  })()
 
   const getDecisionBadge = (decision: string) => {
     switch (decision) {

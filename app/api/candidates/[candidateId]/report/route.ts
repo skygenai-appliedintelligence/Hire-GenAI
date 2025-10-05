@@ -92,6 +92,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
         a.qualification_score,
         a.is_qualified,
         a.qualification_explanations,
+        a.evaluation,
         a.expected_salary,
         a.salary_currency,
         a.salary_period,
@@ -147,49 +148,124 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       willingToRelocate: row.willing_to_relocate || false
     }
 
-    // Try to fetch evaluation data (if table exists)
+    // Primary source: evaluation from interviews.metadata->evaluation
     let evaluation = null
     try {
-      const evalQuery = `
-        SELECT 
-          overall_score,
-          decision,
-          technical_score,
-          communication_score,
-          experience_score,
-          cultural_fit_score,
-          strengths,
-          weaknesses,
-          reviewer_comments,
-          reviewed_at,
-          reviewed_by
-        FROM candidate_evaluations
-        WHERE candidate_id = $1::uuid OR application_id = $1::uuid
-        ORDER BY reviewed_at DESC
+      const evalFromInterviewQuery = `
+        SELECT (i.metadata -> 'evaluation') AS evaluation_json
+        FROM interviews i
+        JOIN application_rounds ar ON ar.id = i.application_round_id
+        WHERE ar.application_id = $1::uuid
+        ORDER BY i.completed_at DESC NULLS LAST, i.started_at DESC NULLS LAST
         LIMIT 1
       `
-      const evalRows = await (DatabaseService as any)["query"]?.call(DatabaseService, evalQuery, [candidateId]) as any[]
-      
-      if (evalRows && evalRows.length > 0) {
-        const evalRow = evalRows[0]
+      const evalIntRows = await (DatabaseService as any)["query"]?.call(DatabaseService, evalFromInterviewQuery, [candidateId]) as any[]
+      const evalJson = evalIntRows?.[0]?.evaluation_json
+      if (evalJson) {
+        const evalObj = typeof evalJson === 'string' ? JSON.parse(evalJson) : evalJson
+        const scores = evalObj.scores || {}
+        const strengths = evalObj.strengths || []
+        const weaknesses = evalObj.weaknesses || evalObj.areas_for_improvement || []
+        const decision = evalObj.decision || evalObj.recommendation || 'pending'
         evaluation = {
-          overallScore: evalRow.overall_score || 0,
-          decision: evalRow.decision || 'pending',
+          overallScore: evalObj.overall_score || 0,
+          decision,
           scores: {
-            technical: evalRow.technical_score || 0,
-            communication: evalRow.communication_score || 0,
-            experience: evalRow.experience_score || 0,
-            cultural_fit: evalRow.cultural_fit_score || 0
+            technical: scores.technical?.score ?? scores.technical ?? 0,
+            communication: scores.communication?.score ?? scores.communication ?? 0,
+            experience: scores.experience?.score ?? scores.experience ?? 0,
+            cultural_fit: scores.cultural_fit?.score ?? scores.cultural_fit ?? 0
           },
-          strengths: Array.isArray(evalRow.strengths) ? evalRow.strengths : [],
-          weaknesses: Array.isArray(evalRow.weaknesses) ? evalRow.weaknesses : [],
-          reviewerComments: evalRow.reviewer_comments || '',
-          reviewedAt: evalRow.reviewed_at || null,
-          reviewedBy: evalRow.reviewed_by || null
+          strengths: Array.isArray(strengths) ? strengths : [],
+          weaknesses: Array.isArray(weaknesses) ? weaknesses : [],
+          reviewerComments: evalObj.summary || evalObj.reviewer_comments || '',
+          reviewedAt: evalObj.evaluated_at || evalObj.reviewed_at || null,
+          reviewedBy: evalObj.reviewed_by || 'AI Evaluator'
         }
+        console.log('✅ Evaluation loaded from interviews.metadata')
       }
     } catch (e) {
-      console.log('Evaluation table not found or error:', e)
+      console.log('Evaluation from interviews.metadata parse error:', e)
+    }
+
+    // Fallback 1: applications.evaluation JSONB
+    if (!evaluation) {
+      try {
+        const rawEval = row.evaluation
+        if (rawEval) {
+          const evalObj = typeof rawEval === 'string' ? JSON.parse(rawEval) : rawEval
+          const scores = evalObj.scores || {}
+          const strengths = evalObj.strengths || []
+          const weaknesses = evalObj.weaknesses || evalObj.areas_for_improvement || []
+          const decision = evalObj.decision || evalObj.recommendation || 'pending'
+          evaluation = {
+            overallScore: evalObj.overall_score || 0,
+            decision,
+            scores: {
+              technical: scores.technical?.score ?? scores.technical ?? 0,
+              communication: scores.communication?.score ?? scores.communication ?? 0,
+              experience: scores.experience?.score ?? scores.experience ?? 0,
+              cultural_fit: scores.cultural_fit?.score ?? scores.cultural_fit ?? 0
+            },
+            strengths: Array.isArray(strengths) ? strengths : [],
+            weaknesses: Array.isArray(weaknesses) ? weaknesses : [],
+            reviewerComments: evalObj.summary || evalObj.reviewer_comments || '',
+            reviewedAt: evalObj.evaluated_at || evalObj.reviewed_at || null,
+            reviewedBy: evalObj.reviewed_by || 'AI Evaluator'
+          }
+        }
+      } catch (e) {
+        console.log('Evaluation JSON parse error (applications.evaluation):', e)
+      }
+    }
+
+    // Fallback 2: evaluations table
+    if (!evaluation) {
+      try {
+        const interviewEvalQuery = `
+          SELECT 
+            e.overall_score,
+            e.skill_scores,
+            e.recommendation,
+            e.rubric_notes_md,
+            e.created_at as evaluated_at,
+            i.id as interview_id
+          FROM evaluations e
+          JOIN interviews i ON e.interview_id = i.id
+          JOIN application_rounds ar ON ar.id = i.application_round_id
+          WHERE ar.application_id = $1::uuid
+          ORDER BY e.created_at DESC
+          LIMIT 1
+        `
+        const evalRows = await (DatabaseService as any)["query"]?.call(DatabaseService, interviewEvalQuery, [candidateId]) as any[]
+        if (evalRows && evalRows.length > 0) {
+          const evalRow = evalRows[0]
+          const skillScores = typeof evalRow.skill_scores === 'string' ? JSON.parse(evalRow.skill_scores) : evalRow.skill_scores || {}
+          const notes = evalRow.rubric_notes_md || ''
+          const strengthsMatch = notes.match(/\*\*Strengths:\*\*\n((?:- .+\n?)*)/i)
+          const weaknessesMatch = notes.match(/\*\*Areas for Improvement:\*\*\n((?:- .+\n?)*)/i)
+          const strengths = strengthsMatch ? strengthsMatch[1].split('\n').filter((s: string) => s.trim().startsWith('-')).map((s: string) => s.replace(/^- /, '').trim()) : []
+          const weaknesses = weaknessesMatch ? weaknessesMatch[1].split('\n').filter((s: string) => s.trim().startsWith('-')).map((s: string) => s.replace(/^- /, '').trim()) : []
+          evaluation = {
+            overallScore: parseFloat(evalRow.overall_score) || 0,
+            decision: evalRow.recommendation || 'pending',
+            scores: {
+              technical: skillScores.technical?.score ?? skillScores.technical ?? 0,
+              communication: skillScores.communication?.score ?? skillScores.communication ?? 0,
+              experience: skillScores.experience?.score ?? skillScores.experience ?? 0,
+              cultural_fit: skillScores.cultural_fit?.score ?? skillScores.cultural_fit ?? 0
+            },
+            strengths,
+            weaknesses,
+            reviewerComments: notes.replace(/\*\*Strengths:\*\*[\s\S]*?\*\*Areas for Improvement:\*\*[\s\S]*?$/i, '').trim() || '',
+            reviewedAt: evalRow.evaluated_at || null,
+            reviewedBy: 'AI Evaluator'
+          }
+          console.log('✅ Evaluation loaded from evaluations table')
+        }
+      } catch (e) {
+        console.log('Failed to fetch from evaluations table:', e)
+      }
     }
 
     // Try to fetch transcript data from interviews table
