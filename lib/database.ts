@@ -992,6 +992,77 @@ export class DatabaseService {
     return rows as any
   }
 
+  // Update job_round configuration with questions and criteria
+  static async updateJobRoundConfiguration(jobId: string, roundName: string, questions: string[], criteria: string[]): Promise<void> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+    
+    console.log('📝 Saving configuration for:', { jobId, roundName, questionsCount: questions.length, criteriaCount: criteria.length })
+    
+    // First check if the round exists
+    const checkQ = `SELECT id, name, seq FROM job_rounds WHERE job_id = $1::uuid`
+    const existingRounds = await this.query(checkQ, [jobId]) as any[]
+    console.log('🔍 Existing rounds in DB:', existingRounds.map(r => `${r.name} (seq:${r.seq})`))
+    
+    const configuration = JSON.stringify({
+      questions: questions || [],
+      criteria: criteria || []
+    })
+    
+    // Find the round's seq number or use 1 as default
+    const existingRound = existingRounds.find(r => r.name === roundName)
+    const seq = existingRound ? existingRound.seq : 1
+    
+    console.log(`💾 ${existingRound ? 'Updating' : 'Inserting'} round:`, roundName, 'seq:', seq)
+    
+    // Use INSERT ... ON CONFLICT to handle both insert and update
+    const q = `
+      INSERT INTO job_rounds (job_id, seq, name, duration_minutes, configuration)
+      VALUES ($1::uuid, $2, $3, 30, $4::jsonb)
+      ON CONFLICT (job_id, seq) 
+      DO UPDATE SET 
+        configuration = EXCLUDED.configuration,
+        name = EXCLUDED.name,
+        duration_minutes = 30
+      RETURNING id, name
+    `
+    const result = await this.query(q, [jobId, seq, roundName, configuration]) as any[]
+    
+    if (result.length === 0) {
+      console.error('❌ Failed to save round:', roundName)
+    } else {
+      console.log('✅ Saved round:', result[0].name, 'with', questions.length, 'questions')
+      
+      // Also store individual questions in the questions table
+      try {
+        const companyId = await this.getCompanyIdForJob(jobId)
+        console.log('💾 Storing individual questions in questions table...')
+        
+        for (let i = 0; i < questions.length; i++) {
+          const question = questions[i]
+          const questionType = i < 2 ? 'introduction' : i < 5 ? 'behavioral' : 'technical'
+          
+          await this.createQuestion({
+            company_id: companyId,
+            text_md: question,
+            difficulty: 'medium',
+            category: questionType,
+            metadata: {
+              roundName: roundName,
+              jobId: jobId,
+              sequence: i + 1,
+              criteria: criteria
+            }
+          })
+        }
+        console.log('✅ Stored', questions.length, 'individual questions in questions table')
+      } catch (error) {
+        console.error('⚠️ Failed to store individual questions:', error)
+      }
+    }
+  }
+
   // Create round_agents rows for a specific job_round_id
   static async createRoundAgents(jobRoundId: string, agents: Array<{ agent_type: string; skill_weights?: any; config?: any }>): Promise<void> {
     if (!this.isDatabaseConfigured()) {
@@ -1063,7 +1134,7 @@ export class DatabaseService {
   }
 
   // Get company_id for a given job
-  static async getJobCompanyId(jobId: string): Promise<string | null> {
+  static async getCompanyIdForJob(jobId: string): Promise<string | null> {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
     }

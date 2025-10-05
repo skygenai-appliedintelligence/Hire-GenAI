@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Building2, Users, Briefcase, Target, CheckCircle, Clock, Bot } from 'lucide-react'
+import { ArrowLeft, Building2, Users, Briefcase, Target, CheckCircle, Clock, Bot, ChevronDown, ChevronUp, Trash2, Plus, RefreshCw } from 'lucide-react'
 import { useAuth } from "@/contexts/auth-context"
 import { parseJobDescription, renderLinkedInJobDescription } from "@/lib/job-description-parser"
 
@@ -26,6 +26,15 @@ export default function CreateJobPage() {
   const [currentTab, setCurrentTab] = useState("basic")
   const lastSyncedTabRef = useRef<string | null>(null)
   const statusInitializedRef = useRef(false)
+  const [expandedAgent, setExpandedAgent] = useState<string | null>(null)
+  const [agentQuestions, setAgentQuestions] = useState<Record<string, string[]>>({
+    "Phone Screening": []
+  })
+  const [agentCriteria, setAgentCriteria] = useState<Record<string, string[]>>({
+    "Phone Screening": ["Communication", "Culture fit", "Technical", "Team player"]
+  })
+  const [createdJobId, setCreatedJobId] = useState<string | null>(null)
+  const [generatingQuestions, setGeneratingQuestions] = useState(false)
   
   // Job status: open | on_hold | closed | cancelled
 
@@ -479,21 +488,119 @@ export default function CreateJobPage() {
     })
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
+  // Validation functions for each tab
+  const isBasicInfoValid = () => {
+    return formData.jobTitle.trim() !== '' && 
+           formData.location.trim() !== '' && 
+           formData.jobType.trim() !== ''
+  }
 
+  const isRequirementsValid = () => {
+    return formData.technical.trim() !== '' || formData.mustHave.trim() !== ''
+  }
+
+  const isResponsibilitiesValid = () => {
+    return formData.day.trim() !== ''
+  }
+
+  const isCompensationValid = () => {
+    return formData.salaryMin.trim() !== '' && formData.salaryMax.trim() !== ''
+  }
+
+  const isLogisticsValid = () => {
+    return true // Optional fields
+  }
+
+  const isResumeScreeningValid = () => {
+    return true // Auto-configured
+  }
+
+  const isInterviewValid = () => {
+    return formData.interviewRounds.length > 0
+  }
+
+  // Get validation status for current tab
+  const isCurrentTabValid = () => {
+    switch (currentTab) {
+      case 'basic': return isBasicInfoValid()
+      case 'requirements': return isRequirementsValid()
+      case 'responsibilities': return isResponsibilitiesValid()
+      case 'compensation': return isCompensationValid()
+      case 'logistics': return isLogisticsValid()
+      case 'resume-screening': return isResumeScreeningValid()
+      case 'interview': return isInterviewValid()
+      default: return false
+    }
+  }
+
+  // Navigate to next tab
+  const goToNextTab = () => {
+    const tabs = ['basic', 'requirements', 'responsibilities', 'compensation', 'logistics', 'resume-screening', 'interview']
+    const currentIndex = tabs.indexOf(currentTab)
+    if (currentIndex < tabs.length - 1) {
+      setCurrentTab(tabs[currentIndex + 1])
+      // Update URL
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('tab', tabs[currentIndex + 1])
+      router.push(`/dashboard/jobs/new?${params.toString()}`, { scroll: false })
+    }
+  }
+
+  // Generate interview questions using AI
+  const handleGenerateQuestions = async (round: string) => {
+    setGeneratingQuestions(true)
     try {
-      // Generate structured description in the new format
-      const generateStructuredDescription = () => {
-        const salaryRange = formData.salaryMin && formData.salaryMax 
-          ? `₹${parseInt(formData.salaryMin).toLocaleString()} – ₹${parseInt(formData.salaryMax).toLocaleString()} per ${formData.period?.toLowerCase() || 'month'}`
-          : 'Competitive salary'
-        
-        const workArrangement = formData.jobType?.replace(/[_-]/g, '-') || 'Full-time'
-        const location = formData.location || 'Remote'
-        
-        return `// Basic Information
+      const jobDescription = generateStructuredDescription()
+      
+      const res = await fetch('/api/ai/generate-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobDescription,
+          agentType: 'Screening Agent',
+          numberOfQuestions: 10,
+          skills: agentCriteria[round] || []
+        })
+      })
+
+      if (!res.ok) {
+        throw new Error('Failed to generate questions')
+      }
+
+      const data = await res.json()
+      const generatedQuestions = data.questions || []
+      
+      // Categorize questions: 2 intro, 3 behavioral, 5 technical
+      const categorizedQuestions = [
+        ...generatedQuestions.slice(0, 2), // 2 intro
+        ...generatedQuestions.slice(2, 5), // 3 behavioral  
+        ...generatedQuestions.slice(5, 10) // 5 technical
+      ]
+
+      setAgentQuestions({
+        ...agentQuestions,
+        [round]: categorizedQuestions
+      })
+
+      alert(`Generated ${categorizedQuestions.length} questions successfully!`)
+    } catch (error) {
+      console.error('Error generating questions:', error)
+      alert('Failed to generate questions. Please try again.')
+    } finally {
+      setGeneratingQuestions(false)
+    }
+  }
+
+  // Generate structured description
+  const generateStructuredDescription = () => {
+    const salaryRange = formData.salaryMin && formData.salaryMax 
+      ? `₹${parseInt(formData.salaryMin).toLocaleString()} – ₹${parseInt(formData.salaryMax).toLocaleString()} per ${formData.period?.toLowerCase() || 'month'}`
+      : 'Competitive salary'
+    
+    const workArrangement = formData.jobType?.replace(/[_-]/g, '-') || 'Full-time'
+    const location = formData.location || 'Remote'
+    
+    return `// Basic Information
 Job Title* → ${formData.jobTitle || 'Position Title'}
 Company* → ${company?.name || 'Company'}
 Location* → ${location}
@@ -536,19 +643,15 @@ ${formData.timeOff ? `🌴 Time Off Policy: ${formData.timeOff}` : '🌴 Time Of
 Joining Timeline: ${formData.joining || 'Within 30 days'}
 ${formData.travel ? `Travel Requirements: ${formData.travel}` : 'Travel Requirements: Minimal travel as per project needs'}
 Work Authorization: ${formData.visa || 'Work authorization required'}`
-      }
+  }
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+
+    try {
       const compiledDescription = generateStructuredDescription()
       const compiledRequirements = formData.requirements || 'As per job requirements'
-
-      // Basic mandatory checks for create only
-      if (!isEditing) {
-        if (!formData.jobTitle || !formData.location || !formData.jobType) {
-          alert('Please complete required fields: Job Title, Location, Work Arrangement.')
-          setIsSubmitting(false)
-          return
-        }
-      }
 
       // Optional sanity check for salary range
       const minNum = formData.salaryMin ? Number(formData.salaryMin) : undefined
@@ -561,9 +664,13 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
 
       let res: Response
       let data: any
-      if (isEditing) {
+      
+      // Use createdJobId or URL jobId for updates
+      const jobIdToUpdate = createdJobId || searchParams.get('jobId')
+      
+      if (jobIdToUpdate) {
         // PATCH update for edit flow
-        const jobId = searchParams.get('jobId')!
+        const jobId = jobIdToUpdate
         // Build minimal updates supported by API
         const updates: any = {}
         if (formData.jobTitle) updates.title = formData.jobTitle
@@ -604,30 +711,50 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
         data = await res.json()
       }
       if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || 'Failed to create job')
+        throw new Error(data?.error || 'Failed to save job')
       }
 
-        if (!isEditing) {
-          // Store minimal info for downstream pages (create flow)
-          const jobData = {
-            ...formData,
-            id: data.jobId,
-            createdAt: new Date().toISOString(),
+      // Store minimal info
+      const finalJobId = data.jobId || jobIdToUpdate
+      const jobData = {
+        ...formData,
+        id: finalJobId,
+        createdAt: new Date().toISOString(),
+      }
+      localStorage.setItem('newJobData', JSON.stringify(jobData))
+      localStorage.setItem('selectedInterviewRounds', JSON.stringify(formData.interviewRounds))
+
+      // Save interview questions and criteria to database
+      if (formData.interviewRounds.length > 0 && finalJobId) {
+        try {
+          const roundsData = formData.interviewRounds.map(round => ({
+            roundName: round,
+            questions: agentQuestions[round] || [],
+            criteria: agentCriteria[round] || []
+          }))
+
+          console.log('Saving questions for job:', finalJobId, roundsData)
+
+          const saveRes = await fetch(`/api/jobs/${encodeURIComponent(finalJobId)}/rounds`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roundsData })
+          })
+
+          const saveData = await saveRes.json()
+          
+          if (!saveRes.ok) {
+            console.error('Failed to save interview questions:', saveData)
+          } else {
+            console.log('Questions saved successfully')
           }
-          localStorage.setItem('newJobData', JSON.stringify(jobData))
-          localStorage.setItem('selectedInterviewRounds', JSON.stringify(formData.interviewRounds))
-
-          // Derive selectedAgents from the number of selected interview rounds
-          const agentsCount = Array.isArray(formData.interviewRounds) ? formData.interviewRounds.length : 0
-          const selectedAgents = Array.from({ length: agentsCount }, (_, i) => i + 1)
-          localStorage.setItem('selectedAgents', JSON.stringify(selectedAgents))
-
-          // Redirect to the Selected Agents page
-          router.push(`/selected-agents?jobId=${encodeURIComponent(data.jobId)}&tab=1`)
-        } else {
-          // Redirect to jobs list after saving changes in edit mode
-          router.push('/dashboard/jobs')
+        } catch (error) {
+          console.error('Error saving interview questions:', error)
         }
+      }
+
+      // Redirect to jobs list
+      router.push('/dashboard/jobs')
       
     } catch (error) {
       console.error('Error creating job:', error)
@@ -641,8 +768,8 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
     "Phone Screening": {
       name: "Screening Agent",
       description: "Initial candidate screening and basic qualification assessment",
-      duration: "15 minutes",
-      skills: ["Communication", "Basic Qualifications", "Cultural Fit"],
+      duration: "30 min",
+      skills: ["Communication", "Culture fit", "Technical", "Team player"],
       color: "bg-blue-100 text-blue-800 border-blue-200",
     },
     "Technical Assessment": {
@@ -1022,25 +1149,31 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <Label>Select Agents *</Label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {Object.entries(agentConfigurations).map(([round, cfg]) => {
+                <div className="space-y-4">
+                    {Object.entries(agentConfigurations)
+                      .filter(([round]) => round === "Phone Screening")
+                      .map(([round, cfg]) => {
                       const checked = formData.interviewRounds.includes(round)
+                      const isExpanded = expandedAgent === round
+                      const questions = agentQuestions[round] || []
+                      const criteria = agentCriteria[round] || []
+                      
                       return (
                         <Card
                           key={round}
-                          className={`transition-all duration-200 ${checked ? 'ring-2 ring-blue-500 shadow-md' : 'hover:shadow-md'} ${isEditing ? '' : 'cursor-pointer'}`}
-                          onClick={() => {
-                            if (isEditing) return
-                            // toggle selection
-                            handleArrayChange('interviewRounds', round, !checked)
-                          }}
-                          style={isEditing ? { pointerEvents: 'none', opacity: 0.6 } : undefined}
+                          className={`transition-all duration-200 ${checked ? 'ring-2 ring-blue-500 shadow-md bg-blue-50' : 'border-gray-200'}`}
                         >
-                          <CardHeader className="pb-3">
+                          <CardHeader 
+                            className="pb-3 cursor-pointer hover:bg-gray-50"
+                            onClick={() => {
+                              if (!isEditing) {
+                                handleArrayChange('interviewRounds', round, !checked)
+                              }
+                              setExpandedAgent(isExpanded ? null : round)
+                            }}
+                          >
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center space-x-3">
                                 <input
                                   type="checkbox"
                                   checked={checked}
@@ -1053,37 +1186,187 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                   className="h-4 w-4 rounded border border-gray-300 text-blue-600 focus:ring-blue-500"
                                 />
                                 <Bot className="w-5 h-5 text-blue-500" />
+                                <div>
+                                  <CardTitle className="text-base">{cfg.name}</CardTitle>
+                                  <CardDescription className="text-xs mt-1">
+                                    {cfg.description}
+                                  </CardDescription>
+                                </div>
                               </div>
-                              <Badge className={cfg.color}>{round}</Badge>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500">Phone/Video • {cfg.duration} • Pass/Fail + notes</span>
+                                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                              </div>
                             </div>
-                            <CardTitle className="text-lg">{cfg.name}</CardTitle>
-                            <CardDescription className="text-sm">
-                              {cfg.description}
-                            </CardDescription>
                           </CardHeader>
-                          <CardContent className="space-y-3">
-                            <div className="flex items-center text-sm text-gray-600">
-                              <Clock className="w-4 h-4 mr-2" />
-                              <span>{cfg.duration}</span>
-                            </div>
-                            <div className="space-y-2">
-                              <div className="flex items-center text-sm text-gray-600">
-                                <Briefcase className="w-4 h-4 mr-2" />
-                                <span>Key Skills:</span>
+
+                          {isExpanded && (
+                            <CardContent className="pt-4 space-y-6 border-t bg-white">
+                              {/* Interview Questions Section */}
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-sm font-semibold">Interview Questions ({questions.length})</Label>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs"
+                                    disabled={generatingQuestions}
+                                    onClick={() => handleGenerateQuestions(round)}
+                                  >
+                                    {generatingQuestions ? (
+                                      <>
+                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-600 mr-1"></div>
+                                        Generating...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <RefreshCw className="w-3 h-3 mr-1" />
+                                        Generate Questions
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                                
+                                {questions.length > 0 ? (
+                                  <>
+                                    <div className="space-y-2">
+                                      {questions.map((question, idx) => (
+                                        <div key={idx} className="flex items-start gap-2 group">
+                                          <span className="text-sm text-gray-500 mt-2">{idx + 1}.</span>
+                                          <Input
+                                            value={question}
+                                            onChange={(e) => {
+                                              const newQuestions = [...questions]
+                                              newQuestions[idx] = e.target.value
+                                              setAgentQuestions({ ...agentQuestions, [round]: newQuestions })
+                                            }}
+                                            className="flex-1 text-sm"
+                                            placeholder="Enter question..."
+                                          />
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-9 w-9 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={() => {
+                                              const newQuestions = questions.filter((_, i) => i !== idx)
+                                              setAgentQuestions({ ...agentQuestions, [round]: newQuestions })
+                                            }}
+                                          >
+                                            <Trash2 className="w-4 h-4 text-red-500" />
+                                          </Button>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-full h-8 text-xs border-dashed"
+                                      onClick={() => {
+                                        setAgentQuestions({
+                                          ...agentQuestions,
+                                          [round]: [...questions, ""]
+                                        })
+                                      }}
+                                    >
+                                      <Plus className="w-3 h-3 mr-1" />
+                                      Add a custom question...
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50">
+                                    <p className="text-sm text-gray-500 mb-3">No questions added yet</p>
+                                    <p className="text-xs text-gray-400 mb-4">Click "Generate Questions" to auto-generate questions or add manually</p>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 text-xs"
+                                      onClick={() => {
+                                        setAgentQuestions({
+                                          ...agentQuestions,
+                                          [round]: [""]
+                                        })
+                                      }}
+                                    >
+                                      <Plus className="w-3 h-3 mr-1" />
+                                      Add a custom question...
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
-                              <div className="flex flex-wrap gap-1">
-                                {cfg.skills.map((skill, i) => (
-                                  <Badge key={i} variant="outline" className="text-xs">
-                                    {skill}
-                                  </Badge>
-                                ))}
+
+                              {/* Evaluation Criteria Section */}
+                              <div className="space-y-3">
+                                <Label className="text-sm font-semibold">Evaluation Criteria</Label>
+                                <div className="flex flex-wrap gap-2">
+                                  {criteria.map((criterion, idx) => (
+                                    <Badge
+                                      key={idx}
+                                      variant="secondary"
+                                      className="px-3 py-1 text-xs flex items-center gap-1"
+                                    >
+                                      {criterion}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newCriteria = criteria.filter((_, i) => i !== idx)
+                                          setAgentCriteria({ ...agentCriteria, [round]: newCriteria })
+                                        }}
+                                        className="ml-1 hover:text-red-500"
+                                      >
+                                        ×
+                                      </button>
+                                    </Badge>
+                                  ))}
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                  <Input
+                                    placeholder="Add evaluation criteria..."
+                                    className="text-sm h-8"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault()
+                                        const input = e.currentTarget
+                                        if (input.value.trim()) {
+                                          setAgentCriteria({
+                                            ...agentCriteria,
+                                            [round]: [...criteria, input.value.trim()]
+                                          })
+                                          input.value = ''
+                                        }
+                                      }
+                                    }}
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-3"
+                                    onClick={(e) => {
+                                      const input = e.currentTarget.previousElementSibling as HTMLInputElement
+                                      if (input?.value.trim()) {
+                                        setAgentCriteria({
+                                          ...agentCriteria,
+                                          [round]: [...criteria, input.value.trim()]
+                                        })
+                                        input.value = ''
+                                      }
+                                    }}
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </Button>
+                                </div>
                               </div>
-                            </div>
-                          </CardContent>
+                            </CardContent>
+                          )}
                         </Card>
                       )
                     })}
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1143,23 +1426,66 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
             <Button type="button" variant="outline" onClick={() => router.back()}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              disabled={isSubmitting}
-              className="min-w-[200px]"
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  {searchParams.get('jobId') ? 'Saving Changes...' : 'Creating Job...'}
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  {searchParams.get('jobId') ? 'Save Changes' : 'Create Job & Setup Agents'}
-                </>
-              )}
-            </Button>
+            {currentTab === 'interview' ? (
+              <Button 
+                type="submit" 
+                disabled={isSubmitting || !isCurrentTabValid()}
+                className="min-w-[200px]"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    {createdJobId ? 'Updating Job...' : 'Creating Job...'}
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Create Job & Setup Agents
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button 
+                type="button"
+                disabled={!isCurrentTabValid()}
+                onClick={async () => {
+                  // Save job on resume-screening tab
+                  if (currentTab === 'resume-screening' && !createdJobId) {
+                    setIsSubmitting(true)
+                    try {
+                      const compiledDescription = generateStructuredDescription()
+                      const res = await fetch('/api/jobs', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          ...formData,
+                          description: compiledDescription || formData.description || '',
+                          requirements: formData.requirements || '',
+                          companyId: company?.id,
+                          createdBy: user?.id || null,
+                        }),
+                      })
+                      const data = await res.json()
+                      if (res.ok && data?.ok && data?.jobId) {
+                        setCreatedJobId(data.jobId)
+                        // Update URL with jobId
+                        const params = new URLSearchParams(searchParams.toString())
+                        params.set('jobId', data.jobId)
+                        router.push(`/dashboard/jobs/new?${params.toString()}`, { scroll: false })
+                      }
+                    } catch (error) {
+                      console.error('Error creating job:', error)
+                    } finally {
+                      setIsSubmitting(false)
+                    }
+                  }
+                  goToNextTab()
+                }}
+                className="min-w-[120px]"
+              >
+                Next
+              </Button>
+            )}
           </div>
         </div>
       </form>

@@ -207,13 +207,7 @@ export default function JobsPage() {
       const selectedAgents = Array.from({ length: agentsCount }, (_, i) => i + 1)
       localStorage.setItem('selectedAgents', JSON.stringify(selectedAgents))
 
-      // Persist chosen interview rounds if available so Selected Agents can map correctly
-      const rounds = Array.isArray((job as any).interview_rounds) ? (job as any).interview_rounds : []
-      if (rounds.length > 0) {
-        localStorage.setItem('selectedInterviewRounds', JSON.stringify(rounds))
-      }
-
-      // Optionally store minimal job data (not required by selected-agents page but useful)
+      // Store job data for edit flow
       const jobData = {
         id: job.id,
         title: job.title,
@@ -225,10 +219,10 @@ export default function JobsPage() {
       }
       localStorage.setItem('newJobData', JSON.stringify(jobData))
 
-      // Redirect to Selected Agents page with jobId so it can fetch JD directly
-      router.push(`/selected-agents?jobId=${encodeURIComponent(job.id)}`)
+      // Redirect to edit job page with interview tab
+      router.push(`/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}&tab=interview`)
     } catch (e) {
-      console.error('Failed to store JD for selected agents:', e)
+      console.error('Failed to load job for editing:', e)
       alert('Unable to proceed. Please try again.')
     }
   }
