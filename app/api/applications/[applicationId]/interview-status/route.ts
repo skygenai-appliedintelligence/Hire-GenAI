@@ -8,10 +8,11 @@ export const dynamic = 'force-dynamic'
 // Check if interview has been completed for this application
 export async function GET(
   req: Request,
-  { params }: { params: { applicationId: string } }
+  ctx: { params: Promise<{ applicationId: string }> } | { params: { applicationId: string } }
 ) {
   try {
-    const { applicationId } = params
+    const p = 'then' in (ctx as any).params ? await (ctx as any).params : (ctx as any).params
+    const applicationId = p.applicationId
 
     if (!applicationId) {
       return NextResponse.json({ error: 'Missing applicationId' }, { status: 400 })
@@ -69,10 +70,11 @@ export async function GET(
 // Mark interview as completed
 export async function POST(
   req: Request,
-  { params }: { params: { applicationId: string } }
+  ctx: { params: Promise<{ applicationId: string }> } | { params: { applicationId: string } }
 ) {
   try {
-    const { applicationId } = params
+    const p = 'then' in (ctx as any).params ? await (ctx as any).params : (ctx as any).params
+    const applicationId = p.applicationId
     const body = await req.json().catch(() => ({}))
     const { transcript } = body
 
@@ -100,7 +102,7 @@ export async function POST(
       [applicationId]
     ) as any[]
 
-    let interviewId: string
+    let interviewId: string | null = null
 
     if (existingRows && existingRows.length > 0) {
       // Update existing interview
@@ -123,80 +125,28 @@ export async function POST(
       )
       console.log('✅ Updated interview with transcript')
     } else {
-      // Create new interview record
-      console.log('⚠️ No existing interview found, creating new one')
-      // First, get or create application_round
-      const roundQuery = `
-        INSERT INTO application_rounds (application_id, job_round_id, seq, status)
-        SELECT 
-          $1::uuid,
-          jr.id,
-          1,
-          'in_progress'
-        FROM job_rounds jr
-        JOIN applications a ON a.job_id = jr.job_id
-        WHERE a.id = $1::uuid
-        LIMIT 1
-        ON CONFLICT (application_id, seq) DO UPDATE SET status = 'in_progress'
+      // Simply store transcript in applications table
+      console.log('⚠️ No existing interview found, storing transcript in applications table')
+      
+      const updateAppQuery = `
+        UPDATE applications 
+        SET transcript = $2
+        WHERE id = $1::uuid
         RETURNING id
       `
       
-      const roundRows = await (DatabaseService as any)["query"].call(
+      const updateResult = await (DatabaseService as any)["query"].call(
         DatabaseService,
-        roundQuery,
-        [applicationId]
+        updateAppQuery,
+        [applicationId, transcript || null]
       ) as any[]
-
-      if (!roundRows || roundRows.length === 0) {
-        console.error('❌ Failed to create application round')
-        throw new Error('Failed to create application round')
+      
+      if (updateResult && updateResult.length > 0) {
+        console.log('✅ Stored transcript in applications table')
       }
-
-      const roundId = roundRows[0].id
-      console.log('✅ Created/found application round:', roundId)
-
-      // Get a round_agent_id (use first available)
-      const agentQuery = `SELECT id FROM round_agents LIMIT 1`
-      const agentRows = await (DatabaseService as any)["query"].call(
-        DatabaseService,
-        agentQuery,
-        []
-      ) as any[]
-
-      const agentId = agentRows?.[0]?.id || null
-      if (!agentId) {
-        console.error('❌ No round agent available')
-        throw new Error('No round agent available')
-      }
-      console.log('✅ Found round agent:', agentId)
-
-      // Create interview
-      const createQuery = `
-        INSERT INTO interviews (
-          application_round_id,
-          round_agent_id,
-          started_at,
-          completed_at,
-          status,
-          raw_transcript,
-          mode
-        )
-        VALUES ($1::uuid, $2::uuid, NOW(), NOW(), 'success', $3, 'async_ai')
-        RETURNING id
-      `
-
-      console.log('💾 Creating interview with transcript length:', transcript?.length || 0)
-      const newRows = await (DatabaseService as any)["query"].call(
-        DatabaseService,
-        createQuery,
-        [roundId, agentId, transcript || null]
-      ) as any[]
-
-      interviewId = newRows?.[0]?.id
-      console.log('✅ Created new interview:', interviewId)
     }
 
-    console.log(`✅ Interview marked as completed: ${interviewId} for application ${applicationId}`)
+    console.log(`✅ Interview marked as completed for application ${applicationId}`)
 
     return NextResponse.json({
       ok: true,
