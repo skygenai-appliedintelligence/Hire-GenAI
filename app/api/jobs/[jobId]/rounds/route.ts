@@ -15,7 +15,35 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string 
     }
 
     const data = await DatabaseService.listRoundsWithAgents(jobId)
-    return NextResponse.json({ ok: true, rounds: data })
+    
+    // Also fetch configuration for each round
+    const roundsWithConfig = await Promise.all(
+      data.map(async (round) => {
+        try {
+          const configQuery = `
+            SELECT configuration 
+            FROM job_rounds 
+            WHERE id = $1::uuid
+            LIMIT 1
+          `
+          const configRows = await DatabaseService.query(configQuery, [round.round_id]) as any[]
+          const configuration = configRows.length > 0 ? configRows[0].configuration : null
+          
+          return {
+            ...round,
+            configuration
+          }
+        } catch (e) {
+          console.warn(`Failed to load config for round ${round.round_id}:`, e)
+          return {
+            ...round,
+            configuration: null
+          }
+        }
+      })
+    )
+    
+    return NextResponse.json({ ok: true, rounds: roundsWithConfig })
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err?.message || 'unknown' }, { status: 500 })
   }
