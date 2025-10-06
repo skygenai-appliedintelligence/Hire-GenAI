@@ -42,6 +42,29 @@ type EvaluationData = {
   reviewedBy?: string
 }
 
+type SectionPointers = {
+  technical: {
+    score: number
+    label: string
+    summary: string
+  }
+  communication: {
+    score: number
+    label: string
+    summary: string
+  }
+  experience: {
+    score: number
+    label: string
+    summary: string
+  }
+  cultural: {
+    score: number
+    label: string
+    summary: string
+  }
+}
+
 type TranscriptData = {
   text: string
   duration?: string
@@ -76,6 +99,7 @@ export default function CandidateReportPage() {
   const [dbScore, setDbScore] = useState<number | null>(null)
   const [dbQualified, setDbQualified] = useState<boolean | null>(null)
   const [qualificationDetails, setQualificationDetails] = useState<any>(null)
+  const [sectionPointers, setSectionPointers] = useState<SectionPointers | null>(null)
 
   // Read tab from URL on mount
   useEffect(() => {
@@ -107,12 +131,15 @@ export default function CandidateReportPage() {
 
         console.log('📊 Report data received:', json)
         console.log('📝 Transcript data:', json.transcript)
+        console.log('🔍 Evaluation data received:', JSON.stringify(json.evaluation, null, 2))
+        console.log('🔍 SectionPointers received:', JSON.stringify(json.sectionPointers, null, 2))
         
         setCandidate(json.candidate || null)
         setEvaluation(json.evaluation || null)
         setTranscript(json.transcript || null)
         setResumeText(typeof json.resumeText === 'string' ? json.resumeText : null)
         setQualificationDetails(json.qualificationDetails || null)
+        setSectionPointers(json.sectionPointers || null)
         if (json.qualificationScore) setDbScore(json.qualificationScore)
         if (typeof json.isQualified === 'boolean') setDbQualified(json.isQualified)
 
@@ -203,15 +230,18 @@ export default function CandidateReportPage() {
     : (typeof dbScore === 'number' ? dbScore : null)
   // Resume/Qualification score must come from DB qualification_score
   const resumeScore = typeof dbScore === 'number' ? dbScore : 0
-  // Display overall score from evaluation: if <=10 show /10, else assume /100
+  // Display overall score from evaluation: always show out of 100
   const overallScoreDisplay = (() => {
     if (overallScore === null || overallScore === undefined || isNaN(overallScore as any)) return "--"
     const n = Number(overallScore)
+    // If score is <=10, scale it up to 100 scale
     if (n <= 10) {
-      const rounded = Math.round(n * 10) / 10
-      return `${rounded}/10`
+      const scaled = Math.round(n * 10)
+      return `${scaled}/100`
+    } else {
+      const rounded = Math.round(n)
+      return `${rounded}/100`
     }
-    return `${Math.round(n)}/100`
   })()
 
   const getDecisionBadge = (decision: string) => {
@@ -942,24 +972,92 @@ export default function CandidateReportPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       <h3 className="font-semibold text-gray-900">Detailed Scores</h3>
-                      {Object.entries(evaluationData!.scores).map(([key, value]) => (
-                        <div key={key} className="space-y-1">
-                          <div className="flex justify-between text-sm">
-                            <span className="font-medium capitalize">{key.replace('_', ' ')}</span>
-                            <span className={`font-bold ${getScoreColor(value)}`}>{value}/100</span>
+                      
+                      {/* Technical Section */}
+                      {(sectionPointers?.technical || evaluationData?.scores?.technical !== undefined) && (
+                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-medium text-blue-900">Technical</span>
+                            <span className="font-bold text-blue-800">
+                              {sectionPointers?.technical?.label || `${evaluationData?.scores?.technical || 0}/100`}
+                            </span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="w-full bg-blue-200 rounded-full h-2 mb-3">
                             <div
-                              className={`h-2 rounded-full ${
-                                value >= 80 ? 'bg-green-600' : value >= 60 ? 'bg-yellow-600' : 'bg-red-600'
-                              }`}
-                              style={{ width: `${value}%` }}
+                              className="h-2 rounded-full bg-blue-600"
+                              style={{ width: `${sectionPointers?.technical?.score || evaluationData?.scores?.technical || 0}%` }}
                             />
                           </div>
+                          <p className="text-sm text-blue-800">
+                            {sectionPointers?.technical?.summary || "Technical skills assessment based on interview performance"}
+                          </p>
                         </div>
-                      ))}
+                      )}
+                      
+                      {/* Communication Section */}
+                      {(sectionPointers?.communication || evaluationData?.scores?.communication !== undefined) && (
+                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-medium text-green-900">Communication</span>
+                            <span className="font-bold text-green-800">
+                              {sectionPointers?.communication?.label || `${evaluationData?.scores?.communication || 0}/100`}
+                            </span>
+                          </div>
+                          <div className="w-full bg-green-200 rounded-full h-2 mb-3">
+                            <div
+                              className="h-2 rounded-full bg-green-600"
+                              style={{ width: `${sectionPointers?.communication?.score || evaluationData?.scores?.communication || 0}%` }}
+                            />
+                          </div>
+                          <p className="text-sm text-green-800">
+                            {sectionPointers?.communication?.summary || "Communication skills assessment based on interview performance"}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {/* Experience Section */}
+                      {(sectionPointers?.experience || evaluationData?.scores?.experience !== undefined) && (
+                        <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-medium text-orange-900">Experience</span>
+                            <span className="font-bold text-orange-800">
+                              {sectionPointers?.experience?.label || `${evaluationData?.scores?.experience || 0}/100`}
+                            </span>
+                          </div>
+                          <div className="w-full bg-orange-200 rounded-full h-2 mb-3">
+                            <div
+                              className="h-2 rounded-full bg-orange-600"
+                              style={{ width: `${sectionPointers?.experience?.score || evaluationData?.scores?.experience || 0}%` }}
+                            />
+                          </div>
+                          <p className="text-sm text-orange-800">
+                            {sectionPointers?.experience?.summary || "Experience assessment based on interview performance"}
+                          </p>
+                        </div>
+                      )}
+                      
+                      {/* Cultural Section */}
+                      {(sectionPointers?.cultural || evaluationData?.scores?.cultural_fit !== undefined) && (
+                        <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-medium text-purple-900">Cultural Fit</span>
+                            <span className="font-bold text-purple-800">
+                              {sectionPointers?.cultural?.label || `${evaluationData?.scores?.cultural_fit || 0}/100`}
+                            </span>
+                          </div>
+                          <div className="w-full bg-purple-200 rounded-full h-2 mb-3">
+                            <div
+                              className="h-2 rounded-full bg-purple-600"
+                              style={{ width: `${sectionPointers?.cultural?.score || evaluationData?.scores?.cultural_fit || 0}%` }}
+                            />
+                          </div>
+                          <p className="text-sm text-purple-800">
+                            {sectionPointers?.cultural?.summary || "Cultural fit assessment based on interview performance"}
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     {evaluationData!.strengths.length > 0 && (

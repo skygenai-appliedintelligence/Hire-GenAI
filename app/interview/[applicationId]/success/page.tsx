@@ -1,9 +1,5 @@
 "use client"
 
-export const dynamic = "force-dynamic"
-export const fetchCache = "force-no-store"
-export const revalidate = 0
-
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Check, Hourglass, ArrowLeft, Home } from "lucide-react"
