@@ -378,6 +378,68 @@ export default function CreateJobPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, company?.name])
 
+  // Load interview questions when editing an existing job
+  useEffect(() => {
+    const jobId = searchParams.get('jobId')
+    if (!jobId || !company?.name) return
+    
+    ;(async () => {
+      try {
+        console.log('🔍 Loading interview questions for job:', jobId)
+        const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/rounds`, {
+          cache: 'no-store'
+        })
+        const data = await res.json().catch(() => ({}))
+        
+        if (res.ok && data?.ok && Array.isArray(data.rounds)) {
+          console.log('📝 Found rounds:', data.rounds.length)
+          
+          // Extract questions and criteria from job_rounds configuration
+          const loadedQuestions: Record<string, string[]> = {}
+          const loadedCriteria: Record<string, string[]> = {}
+          
+          // Process each round's configuration
+          for (const round of data.rounds) {
+            const roundName = round.name
+            
+            if (round.configuration) {
+              try {
+                const config = typeof round.configuration === 'string' 
+                  ? JSON.parse(round.configuration) 
+                  : round.configuration
+                
+                if (config.questions && Array.isArray(config.questions)) {
+                  loadedQuestions[roundName] = config.questions
+                  console.log(`✅ Loaded ${config.questions.length} questions for round: ${roundName}`)
+                }
+                
+                if (config.criteria && Array.isArray(config.criteria)) {
+                  loadedCriteria[roundName] = config.criteria
+                  console.log(`✅ Loaded ${config.criteria.length} criteria for round: ${roundName}`)
+                }
+              } catch (e) {
+                console.warn(`⚠️ Could not parse config for round ${roundName}:`, e)
+              }
+            }
+          }
+          
+          // Update state with loaded questions and criteria
+          if (Object.keys(loadedQuestions).length > 0) {
+            setAgentQuestions(prev => ({ ...prev, ...loadedQuestions }))
+            console.log('📋 Updated agentQuestions with loaded data')
+          }
+          
+          if (Object.keys(loadedCriteria).length > 0) {
+            setAgentCriteria(prev => ({ ...prev, ...loadedCriteria }))
+            console.log('📋 Updated agentCriteria with loaded data')
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load interview questions:', e)
+      }
+    })()
+  }, [searchParams, company?.name])
+
   // Initialize tab from URL once on mount to avoid feedback loops
   useEffect(() => {
     const t = searchParams.get('tab')
