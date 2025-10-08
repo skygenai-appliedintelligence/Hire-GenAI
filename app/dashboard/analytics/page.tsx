@@ -1,33 +1,133 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { TrendingUp, TrendingDown, Users, Briefcase, Calendar, Target } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { TrendingUp, TrendingDown, Users, Briefcase, Calendar, Target, Filter } from "lucide-react"
 
 export default function AnalyticsPage() {
   const { company } = useAuth()
   const router = useRouter()
-  const [analytics, setAnalytics] = useState({
-    totalApplications: 156,
-    qualifiedCandidates: 89,
-    interviewsCompleted: 45,
-    successfulHires: 12,
-    averageTimeToHire: 18,
-    topSources: [
-      { platform: "LinkedIn", count: 67, percentage: 43 },
-      { platform: "Indeed", count: 45, percentage: 29 },
-      { platform: "Monster", count: 28, percentage: 18 },
-      { platform: "Naukri", count: 16, percentage: 10 },
-    ],
+  const [analytics, setAnalytics] = useState<{
+    totalApplications: number
+    qualifiedCandidates: number
+    interviewsCompleted: number
+    successfulHires: number
+    averageTimeToHire: number
+    topSources: { platform: string; count: number; percentage: number }[]
     monthlyTrends: {
-      applications: { current: 156, previous: 134, change: 16.4 },
-      interviews: { current: 45, previous: 38, change: 18.4 },
-      hires: { current: 12, previous: 8, change: 50 },
-    },
-  })
+      applications: { current: number; previous: number; change: number }
+      interviews: { current: number; previous: number; change: number }
+      hires: { current: number; previous: number; change: number }
+    }
+  } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [jobs, setJobs] = useState<{ id: string; title: string }[]>([])
+  const [selectedJobId, setSelectedJobId] = useState<string>("all")
+
+  useEffect(() => {
+    const loadAnalytics = async () => {
+      try {
+        const url = selectedJobId === 'all' 
+          ? '/api/analytics' 
+          : `/api/analytics?jobId=${encodeURIComponent(selectedJobId)}`
+        const res = await fetch(url, { cache: 'no-store' })
+        const data = await res.json()
+        if (data.ok && data.analytics) {
+          setAnalytics(data.analytics)
+        } else {
+          setAnalytics({
+            totalApplications: 0,
+            qualifiedCandidates: 0,
+            interviewsCompleted: 0,
+            successfulHires: 0,
+            averageTimeToHire: 0,
+            topSources: [],
+            monthlyTrends: {
+              applications: { current: 0, previous: 0, change: 0 },
+              interviews: { current: 0, previous: 0, change: 0 },
+              hires: { current: 0, previous: 0, change: 0 },
+            },
+          })
+        }
+      } catch (e) {
+        setAnalytics({
+          totalApplications: 0,
+          qualifiedCandidates: 0,
+          interviewsCompleted: 0,
+          successfulHires: 0,
+          averageTimeToHire: 0,
+          topSources: [],
+          monthlyTrends: {
+            applications: { current: 0, previous: 0, change: 0 },
+            interviews: { current: 0, previous: 0, change: 0 },
+            hires: { current: 0, previous: 0, change: 0 },
+          },
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    const loadJobs = async () => {
+      try {
+        const res = await fetch('/api/jobs/titles', { cache: 'no-store' })
+        const data = await res.json()
+        if (data.ok && data.jobs) {
+          setJobs(data.jobs)
+        }
+      } catch (e) {
+        console.error('Failed to load job titles:', e)
+      }
+    }
+
+    // Check if coming from jobs page with selected job
+    const checkSelectedJob = () => {
+      try {
+        const selectedJob = localStorage.getItem('selectedJobForAnalytics')
+        if (selectedJob) {
+          const jobData = JSON.parse(selectedJob)
+          setSelectedJobId(jobData.id)
+          // Clear the localStorage after using it
+          localStorage.removeItem('selectedJobForAnalytics')
+        }
+      } catch (e) {
+        console.error('Failed to parse selected job:', e)
+      }
+    }
+
+    loadAnalytics()
+    loadJobs()
+    checkSelectedJob()
+  }, [])
+
+  // Reload analytics when job filter changes
+  useEffect(() => {
+    const loadAnalytics = async () => {
+      setLoading(true)
+      try {
+        const url = selectedJobId === 'all' 
+          ? '/api/analytics' 
+          : `/api/analytics?jobId=${encodeURIComponent(selectedJobId)}`
+        const res = await fetch(url, { cache: 'no-store' })
+        const data = await res.json()
+        if (data.ok && data.analytics) {
+          setAnalytics(data.analytics)
+        }
+      } catch (e) {
+        console.error('Failed to load filtered analytics:', e)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (selectedJobId) {
+      loadAnalytics()
+    }
+  }, [selectedJobId])
 
   const getTrendIcon = (change: number) => {
     return change > 0 ? (
@@ -43,9 +143,29 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-        <p className="text-gray-600">Track your recruitment performance and insights</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
+          <p className="text-gray-600">Track your recruitment performance and insights</p>
+        </div>
+        
+        {/* Job Filter */}
+        <div className="flex items-center space-x-2">
+          <Filter className="h-4 w-4 text-gray-500" />
+          <Select value={selectedJobId} onValueChange={setSelectedJobId}>
+            <SelectTrigger className="w-64">
+              <SelectValue placeholder="Filter by job title" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Jobs</SelectItem>
+              {jobs.map((job) => (
+                <SelectItem key={job.id} value={job.id}>
+                  {job.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Key Metrics */}
@@ -54,10 +174,18 @@ export default function AnalyticsPage() {
           className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
           role="button"
           tabIndex={0}
-          onClick={() => router.push("/dashboard/analytics/applications")}
+          onClick={() => {
+            const url = selectedJobId === 'all' 
+              ? "/dashboard/analytics/applications"
+              : `/dashboard/analytics/applications?jobId=${encodeURIComponent(selectedJobId)}`
+            router.push(url)
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
-              router.push("/dashboard/analytics/applications")
+              const url = selectedJobId === 'all' 
+                ? "/dashboard/analytics/applications"
+                : `/dashboard/analytics/applications?jobId=${encodeURIComponent(selectedJobId)}`
+              router.push(url)
             }
           }}
         >
@@ -66,11 +194,11 @@ export default function AnalyticsPage() {
             <Users className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.totalApplications}</div>
+            <div className="text-2xl font-bold">{analytics?.totalApplications ?? 0}</div>
             <div className="flex items-center space-x-1 text-xs">
-              {getTrendIcon(analytics.monthlyTrends.applications.change)}
-              <span className={getTrendColor(analytics.monthlyTrends.applications.change)}>
-                +{analytics.monthlyTrends.applications.change}%
+              {getTrendIcon(analytics?.monthlyTrends.applications.change ?? 0)}
+              <span className={getTrendColor(analytics?.monthlyTrends.applications.change ?? 0)}>
+                +{analytics?.monthlyTrends.applications.change ?? 0}%
               </span>
               <span className="text-muted-foreground">from last month</span>
             </div>
@@ -81,10 +209,18 @@ export default function AnalyticsPage() {
           className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
           role="button"
           tabIndex={0}
-          onClick={() => router.push("/dashboard/analytics/qualified")}
+          onClick={() => {
+            const url = selectedJobId === 'all' 
+              ? "/dashboard/analytics/qualified"
+              : `/dashboard/analytics/qualified?jobId=${encodeURIComponent(selectedJobId)}`
+            router.push(url)
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
-              router.push("/dashboard/analytics/qualified")
+              const url = selectedJobId === 'all' 
+                ? "/dashboard/analytics/qualified"
+                : `/dashboard/analytics/qualified?jobId=${encodeURIComponent(selectedJobId)}`
+              router.push(url)
             }
           }}
         >
@@ -93,9 +229,9 @@ export default function AnalyticsPage() {
             <Target className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.qualifiedCandidates}</div>
+            <div className="text-2xl font-bold">{analytics?.qualifiedCandidates ?? 0}</div>
             <div className="text-xs text-muted-foreground">
-              {Math.round((analytics.qualifiedCandidates / analytics.totalApplications) * 100)}% qualification rate
+              {analytics && analytics.totalApplications ? Math.round((analytics.qualifiedCandidates / analytics.totalApplications) * 100) : 0}% qualification rate
             </div>
           </CardContent>
         </Card>
@@ -106,11 +242,11 @@ export default function AnalyticsPage() {
             <Calendar className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.interviewsCompleted}</div>
+            <div className="text-2xl font-bold">{analytics?.interviewsCompleted ?? 0}</div>
             <div className="flex items-center space-x-1 text-xs">
-              {getTrendIcon(analytics.monthlyTrends.interviews.change)}
-              <span className={getTrendColor(analytics.monthlyTrends.interviews.change)}>
-                +{analytics.monthlyTrends.interviews.change}%
+              {getTrendIcon(analytics?.monthlyTrends.interviews.change ?? 0)}
+              <span className={getTrendColor(analytics?.monthlyTrends.interviews.change ?? 0)}>
+                +{analytics?.monthlyTrends.interviews.change ?? 0}%
               </span>
               <span className="text-muted-foreground">from last month</span>
             </div>
@@ -123,11 +259,11 @@ export default function AnalyticsPage() {
             <Briefcase className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.successfulHires}</div>
+            <div className="text-2xl font-bold">{analytics?.successfulHires ?? 0}</div>
             <div className="flex items-center space-x-1 text-xs">
-              {getTrendIcon(analytics.monthlyTrends.hires.change)}
-              <span className={getTrendColor(analytics.monthlyTrends.hires.change)}>
-                +{analytics.monthlyTrends.hires.change}%
+              {getTrendIcon(analytics?.monthlyTrends.hires.change ?? 0)}
+              <span className={getTrendColor(analytics?.monthlyTrends.hires.change ?? 0)}>
+                +{analytics?.monthlyTrends.hires.change ?? 0}%
               </span>
               <span className="text-muted-foreground">from last month</span>
             </div>
@@ -144,7 +280,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {analytics.topSources.map((source, index) => (
+              {(analytics?.topSources ?? []).map((source, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-xs font-medium text-blue-600">
@@ -172,7 +308,7 @@ export default function AnalyticsPage() {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-medium">Average Time to Hire</span>
-                  <span className="text-2xl font-bold text-blue-600">{analytics.averageTimeToHire} days</span>
+                  <span className="text-2xl font-bold text-blue-600">{analytics?.averageTimeToHire ?? 0} days</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div className="bg-blue-600 h-2 rounded-full" style={{ width: "75%" }}></div>
@@ -183,7 +319,7 @@ export default function AnalyticsPage() {
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-medium">Interview Success Rate</span>
                   <span className="text-2xl font-bold text-green-600">
-                    {Math.round((analytics.successfulHires / analytics.interviewsCompleted) * 100)}%
+                    {analytics && analytics.interviewsCompleted ? Math.round((analytics.successfulHires / analytics.interviewsCompleted) * 100) : 0}%
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
@@ -195,7 +331,7 @@ export default function AnalyticsPage() {
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-medium">Application to Interview Rate</span>
                   <span className="text-2xl font-bold text-purple-600">
-                    {Math.round((analytics.interviewsCompleted / analytics.totalApplications) * 100)}%
+                    {analytics && analytics.totalApplications ? Math.round((analytics.interviewsCompleted / analytics.totalApplications) * 100) : 0}%
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">

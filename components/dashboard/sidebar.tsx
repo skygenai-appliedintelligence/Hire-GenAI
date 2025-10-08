@@ -3,16 +3,12 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Briefcase, Users, Calendar, Settings, BarChart3, Building2, Phone, MessageSquare, Bot } from 'lucide-react'
+import { LayoutDashboard, Briefcase, Settings, BarChart3, MessageSquare } from 'lucide-react'
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Job Descriptions", href: "/dashboard/jobs", icon: Briefcase },
-  { name: "AI Agents", href: "/dashboard/agents/create", icon: Bot },
-  { name: "Candidates", href: "/dashboard/candidates", icon: Users },
-  { name: "Interviews", href: "/dashboard/interviews", icon: Calendar },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-  { name: "Integrations", href: "/dashboard/integrations", icon: Building2 },
   { name: "Messages", href: "/dashboard/messages", icon: MessageSquare },
   { name: "Settings", href: "/dashboard/settings/profile", icon: Settings },
 ]
@@ -35,8 +31,7 @@ export function Sidebar() {
           {navigation.map((item) => {
             const isActive =
               pathname === item.href ||
-              (item.name === "Settings" && pathname.startsWith("/dashboard/settings")) ||
-              (item.href === "/dashboard/agents/create" && pathname.startsWith("/dashboard/agents"))
+              (item.name === "Settings" && pathname.startsWith("/dashboard/settings"))
             return (
               <Link
                 key={item.name}

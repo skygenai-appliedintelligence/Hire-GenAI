@@ -25,6 +25,7 @@ export default function JDInterviewedPage() {
   const jdId = (params?.jdId as string) || ""
 
   const [rows, setRows] = useState<InterviewedRow[]>([])
+  const [stats, setStats] = useState<{ applications: number; rounds: number; interviews: number } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,8 +37,11 @@ export default function JDInterviewedPage() {
       try {
         const res = await fetch(`/api/interviewed/by-job/${encodeURIComponent(jdId)}`, { cache: "no-store" })
         const json = await res.json()
+        // Debug: Log full payload
+        console.log('[Interviewed] API payload:', json)
         if (!res.ok || !json?.ok) throw new Error(json?.error || "Failed to load interviewed candidates")
         setRows(json.interviewed || [])
+        if (json.stats) setStats(json.stats)
       } catch (e: any) {
         setError(e?.message || "Failed to load interviewed candidates")
       } finally {
@@ -86,8 +90,13 @@ export default function JDInterviewedPage() {
                 <TableBody>
                   {rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center text-gray-500 py-8">
-                        No interviewed candidates yet for this job.
+                      <TableCell colSpan={9} className="text-center text-gray-700 py-8">
+                        <div>No interviewed candidates yet for this job.</div>
+                        {stats && (
+                          <div className="mt-2 text-xs text-gray-500">
+                            Diagnostics — Applications: {stats.applications} • Rounds: {stats.rounds} • Interviews: {stats.interviews}
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   ) : (

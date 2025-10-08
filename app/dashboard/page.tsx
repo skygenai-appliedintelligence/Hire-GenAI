@@ -111,16 +111,6 @@ export default function DashboardPage() {
                     Try Apply Form
                   </Button>
                 </Link>
-                <Link href="/dashboard/interviews">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-blue-300 text-blue-700 hover:bg-blue-50 bg-transparent"
-                  >
-                    <Calendar className="h-4 w-4 mr-1" />
-                    View Interviews
-                  </Button>
-                </Link>
               </div>
             </div>
             <div className="text-6xl">🚀</div>

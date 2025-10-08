@@ -1,17 +1,20 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo } from "react"
+import { useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 // Removed Card wrappers per request
 // Tabs removed per request
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/hooks/use-toast"
 
 // Status and Bucket typings
 export type InterviewStatus = "Unqualified" | "Qualified" | "Pending" | "Expired"
 
 type CandidateRow = {
   id: string
+  jobId: string
   candidateName: string
   appliedJD: string
   email: string
@@ -28,98 +31,75 @@ type Bucket = {
 }
 
 export default function QualifiedCandidatesInterviewFlowPage() {
-  const buckets: Bucket[] = useMemo(
-    () => [
-      {
-        key: "screening",
-        label: "Screening Round",
-        agent: "Agent 1 - Screening Round",
-        rows: [
-          {
-            id: "qual-global-1",
-            candidateName: "Jennifer Martinez",
-            appliedJD: "Senior Frontend Developer",
-            email: "jennifer.martinez@techsolutions.com",
-            phone: "+1-555-0201",
-            cvUrl: "https://drive.google.com/file/d/1abc123/view",
-            status: "Qualified"
-          },
-          {
-            id: "qual-global-2",
-            candidateName: "David Chen",
-            appliedJD: "Full Stack Engineer",
-            email: "david.chen@innovatetech.io",
-            phone: "+1-555-0202",
-            cvUrl: "https://drive.google.com/file/d/1def456/view",
-            status: "Qualified"
-          },
-          {
-            id: "qual-global-3",
-            candidateName: "Sarah Williams",
-            appliedJD: "React Developer",
-            email: "sarah.w@digitalcorp.com",
-            phone: "+1-555-0203",
-            cvUrl: "https://drive.google.com/file/d/1ghi789/view",
-            status: "Unqualified"
-          },
-          {
-            id: "qual-global-4",
-            candidateName: "Michael Rodriguez",
-            appliedJD: "Senior Backend Developer",
-            email: "m.rodriguez@enterprise.com",
-            phone: "+1-555-0204",
-            cvUrl: "https://drive.google.com/file/d/1jkl012/view",
-            status: "Pending"
-          },
-          {
-            id: "qual-global-5",
-            candidateName: "Emily Johnson",
-            appliedJD: "JavaScript Developer",
-            email: "emily.johnson@startupventures.com",
-            phone: "+1-555-0205",
-            cvUrl: "https://drive.google.com/file/d/1mno345/view",
-            status: "Expired"
-          },
-          {
-            id: "qual-global-6",
-            candidateName: "Robert Taylor",
-            appliedJD: "Lead Frontend Engineer",
-            email: "robert.taylor@bigtech.com",
-            phone: "+1-555-0206",
-            cvUrl: "https://drive.google.com/file/d/1pqr678/view",
-            status: "Qualified"
-          }
-        ],
-      },
-      {
-        key: "technical",
-        label: "Technical Round",
-        agent: "Agent 2 - Technical Round",
-        rows: [],
-      },
-      {
-        key: "system-design",
-        label: "System Design Round",
-        agent: "Agent 3 - System Design Round",
-        rows: [],
-      },
-      {
-        key: "behavioral",
-        label: "Behavioral Round",
-        agent: "Agent 4 - Behavioral Round",
-        rows: [],
-      },
-      {
-        key: "final",
-        label: "Final Round",
-        agent: "Agent 5 - Final Round",
-        rows: [],
-      },
-    ],
-    []
-  )
+  const searchParams = useSearchParams()
+  const jobId = searchParams.get('jobId')
+  const [rows, setRows] = useState<CandidateRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [sentMap, setSentMap] = useState<Record<string, boolean>>({})
+  const { toast } = useToast()
 
-  const firstBucket = buckets[0]
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const url = jobId && jobId !== 'all' 
+          ? `/api/analytics/qualified?jobId=${encodeURIComponent(jobId)}`
+          : '/api/analytics/qualified'
+        const res = await fetch(url, { cache: 'no-store' })
+        const json = await res.json()
+        console.log('Qualified API Response:', json)
+        
+        if (!res.ok) {
+          setError(json.error || 'Failed to load qualified candidates')
+          return
+        }
+        
+        if (json.ok && json.candidates) {
+          // Map all candidates to "Qualified" status like the job-specific page
+          const mappedCandidates = json.candidates.map((candidate: any) => ({
+            ...candidate,
+            status: "Qualified" as InterviewStatus
+          }))
+          setRows(mappedCandidates)
+        } else {
+          setError('Invalid response format')
+        }
+      } catch (e) {
+        console.error('Failed to load qualified candidates:', e)
+        setError(e instanceof Error ? e.message : 'Unknown error')
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [jobId])
+
+  const sendInterviewLink = async (row: CandidateRow) => {
+    try {
+      const res = await fetch('/api/interview/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationId: row.id,
+          email: row.email,
+          name: row.candidateName,
+          jobTitle: row.appliedJD,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.ok) throw new Error(json?.error || 'Failed to send link')
+
+      setSentMap(prev => ({ ...prev, [row.id]: true }))
+      toast({
+        title: 'Interview link sent',
+        description: json.url ? `URL: ${json.url}` : 'Link generated successfully',
+      })
+      // For quick testing, also log in browser console
+      if (json.url) console.log('[Interview Link]', json.url)
+    } catch (e: any) {
+      toast({ title: 'Failed to send', description: e?.message || 'Something went wrong', variant: 'destructive' })
+    }
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 space-y-6 py-6 overflow-x-hidden bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
@@ -131,8 +111,7 @@ export default function QualifiedCandidatesInterviewFlowPage() {
       </div>
       {/* Single section (keep only one table) */}
       <div className="space-y-8">
-        {firstBucket && (
-          <section key={firstBucket.key} className="space-y-3">
+        <section className="space-y-3">
             <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
               <Table className="table-auto w-full">
                 <TableHeader>
@@ -145,11 +124,27 @@ export default function QualifiedCandidatesInterviewFlowPage() {
                     <TableHead className="px-3 py-2 text-sm align-middle">Status</TableHead>
                     <TableHead className="px-3 py-2 text-sm align-middle">Report</TableHead>
                     <TableHead className="px-3 py-2 text-sm align-middle whitespace-nowrap">Action</TableHead>
-                    <TableHead className="px-3 py-2 text-sm align-middle whitespace-nowrap">Resend Link</TableHead>
+                    <TableHead className="px-3 py-2 text-sm align-middle whitespace-nowrap">Send Interview Link</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {firstBucket.rows.map((row, idx) => (
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">Loading...</TableCell>
+                    </TableRow>
+                  ) : error ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-red-500">
+                        Error: {error}
+                      </TableCell>
+                    </TableRow>
+                  ) : rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                        No qualified candidates found. Candidates will appear here after CV screening.
+                      </TableCell>
+                    </TableRow>
+                  ) : rows.map((row, idx) => (
                     <TableRow key={row.id} className={idx % 2 === 1 ? "bg-gray-50" : undefined}>
                       <TableCell className="px-3 py-2 text-sm align-middle font-medium truncate">{row.candidateName}</TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle truncate">{row.appliedJD}</TableCell>
@@ -158,9 +153,13 @@ export default function QualifiedCandidatesInterviewFlowPage() {
                       </TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle">{row.phone}</TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle">
-                        <Link href={row.cvUrl} target="_blank" className="text-blue-600 hover:underline">
-                          View CV
-                        </Link>
+                        {row.cvUrl ? (
+                          <Link href={row.cvUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                            View CV
+                          </Link>
+                        ) : (
+                          <span className="text-gray-400 text-sm">No CV</span>
+                        )}
                       </TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle">
                         <span
@@ -178,7 +177,9 @@ export default function QualifiedCandidatesInterviewFlowPage() {
                         </span>
                       </TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
-                        <Button variant="outline" size="sm">Show Report & Interview Details</Button>
+                        <Link href={`/dashboard/analytics/${row.jobId}/applications/${row.id}/report`}>
+                          <Button variant="outline" size="sm">Show Report</Button>
+                        </Link>
                       </TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
                         <Button
@@ -190,20 +191,20 @@ export default function QualifiedCandidatesInterviewFlowPage() {
                           }
                           disabled={row.status !== "Qualified"}
                         >
-                          Processed to Next Round
+                          Proceed Next
                         </Button>
                       </TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
                         <Button
                           size="sm"
                           className={
-                            row.status === "Pending" || row.status === "Expired"
+                            sentMap[row.id]
                               ? "bg-yellow-500 text-white hover:bg-yellow-600"
-                              : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                              : "bg-emerald-600 text-white hover:bg-emerald-700"
                           }
-                          disabled={!(row.status === "Pending" || row.status === "Expired")}
+                          onClick={() => sendInterviewLink(row)}
                         >
-                          Resend Link
+                          {sentMap[row.id] ? "Resend Link" : "Send Email"}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -212,7 +213,6 @@ export default function QualifiedCandidatesInterviewFlowPage() {
               </Table>
             </div>
           </section>
-        )}
       </div>
     </div>
   )
