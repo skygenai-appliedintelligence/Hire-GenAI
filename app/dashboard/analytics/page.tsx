@@ -29,11 +29,40 @@ export default function AnalyticsPage() {
   const [selectedJobId, setSelectedJobId] = useState<string>("all")
 
   useEffect(() => {
-    const loadAnalytics = async () => {
+    const loadJobs = async () => {
       try {
-        const url = selectedJobId === 'all' 
+        const res = await fetch('/api/jobs/titles', { cache: 'no-store' })
+        const data = await res.json()
+        if (data.ok && data.jobs) {
+          setJobs(data.jobs)
+        }
+      } catch (e) {
+        console.error('Failed to load job titles:', e)
+      }
+    }
+
+    // Check if coming from jobs page with selected job
+    const checkSelectedJob = () => {
+      try {
+        const selectedJob = localStorage.getItem('selectedJobForAnalytics')
+        if (selectedJob) {
+          const jobData = JSON.parse(selectedJob)
+          setSelectedJobId(jobData.id)
+          // Clear the localStorage after using it
+          localStorage.removeItem('selectedJobForAnalytics')
+          return jobData.id
+        }
+      } catch (e) {
+        console.error('Failed to parse selected job:', e)
+      }
+      return 'all'
+    }
+
+    const loadAnalytics = async (jobId: string) => {
+      try {
+        const url = jobId === 'all' 
           ? '/api/analytics' 
-          : `/api/analytics?jobId=${encodeURIComponent(selectedJobId)}`
+          : `/api/analytics?jobId=${encodeURIComponent(jobId)}`
         const res = await fetch(url, { cache: 'no-store' })
         const data = await res.json()
         if (data.ok && data.analytics) {
@@ -72,36 +101,10 @@ export default function AnalyticsPage() {
       }
     }
 
-    const loadJobs = async () => {
-      try {
-        const res = await fetch('/api/jobs/titles', { cache: 'no-store' })
-        const data = await res.json()
-        if (data.ok && data.jobs) {
-          setJobs(data.jobs)
-        }
-      } catch (e) {
-        console.error('Failed to load job titles:', e)
-      }
-    }
-
-    // Check if coming from jobs page with selected job
-    const checkSelectedJob = () => {
-      try {
-        const selectedJob = localStorage.getItem('selectedJobForAnalytics')
-        if (selectedJob) {
-          const jobData = JSON.parse(selectedJob)
-          setSelectedJobId(jobData.id)
-          // Clear the localStorage after using it
-          localStorage.removeItem('selectedJobForAnalytics')
-        }
-      } catch (e) {
-        console.error('Failed to parse selected job:', e)
-      }
-    }
-
-    loadAnalytics()
+    // First check for selected job, then load analytics with the correct job ID
+    const initialJobId = checkSelectedJob()
     loadJobs()
-    checkSelectedJob()
+    loadAnalytics(initialJobId)
   }, [])
 
   // Reload analytics when job filter changes
