@@ -825,7 +825,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
     }
   }
 
-  // Detailed agent catalog (aligned with /dashboard/agents/create design)
+  // Detailed agent catalog
   const agentConfigurations = {
     "Phone Screening": {
       name: "Screening Agent",

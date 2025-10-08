@@ -359,17 +359,23 @@ export default function JobsPage() {
                         )}
                       </div>
                       <div className="flex space-x-2">
-                        <Link href={`/dashboard/analytics/${job.id}`}>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <BarChart3 className="h-4 w-4 mr-1" />
-                            View Stats
-                          </Button>
-                        </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            // Store job data for analytics filter
+                            localStorage.setItem('selectedJobForAnalytics', JSON.stringify({
+                              id: job.id,
+                              title: job.title
+                            }))
+                            router.push('/dashboard/analytics')
+                          }}
+                        >
+                          <BarChart3 className="h-4 w-4 mr-1" />
+                          View Stats
+                        </Button>
                         {/* Apply button enabled for open status */}
                         <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
                           <Button
@@ -516,17 +522,23 @@ export default function JobsPage() {
                         )}
                       </div>
                       <div className="flex space-x-2">
-                        <Link href={`/dashboard/analytics/${job.id}`}>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <BarChart3 className="h-4 w-4 mr-1" />
-                            View Stats
-                          </Button>
-                        </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            // Store job data for analytics filter
+                            localStorage.setItem('selectedJobForAnalytics', JSON.stringify({
+                              id: job.id,
+                              title: job.title
+                            }))
+                            router.push('/dashboard/analytics')
+                          }}
+                        >
+                          <BarChart3 className="h-4 w-4 mr-1" />
+                          View Stats
+                        </Button>
                         {/* Apply Form button enabled for all statuses */}
                         <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
                           <Button
@@ -673,17 +685,23 @@ export default function JobsPage() {
                         )}
                       </div>
                       <div className="flex space-x-2">
-                        <Link href={`/dashboard/analytics/${job.id}`}>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <BarChart3 className="h-4 w-4 mr-1" />
-                            View Stats
-                          </Button>
-                        </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            // Store job data for analytics filter
+                            localStorage.setItem('selectedJobForAnalytics', JSON.stringify({
+                              id: job.id,
+                              title: job.title
+                            }))
+                            router.push('/dashboard/analytics')
+                          }}
+                        >
+                          <BarChart3 className="h-4 w-4 mr-1" />
+                          View Stats
+                        </Button>
                         {/* Apply Form button enabled for all statuses */}
                         <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
                           <Button
@@ -843,17 +861,23 @@ export default function JobsPage() {
                         )}
                       </div>
                       <div className="flex space-x-2">
-                        <Link href={`/dashboard/analytics/${job.id}`}>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <BarChart3 className="h-4 w-4 mr-1" />
-                            View Stats
-                          </Button>
-                        </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            // Store job data for analytics filter
+                            localStorage.setItem('selectedJobForAnalytics', JSON.stringify({
+                              id: job.id,
+                              title: job.title
+                            }))
+                            router.push('/dashboard/analytics')
+                          }}
+                        >
+                          <BarChart3 className="h-4 w-4 mr-1" />
+                          View Stats
+                        </Button>
                         {/* Apply Form button enabled for all statuses */}
                         <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
                           <Button
