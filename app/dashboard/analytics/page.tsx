@@ -274,7 +274,15 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        <Card className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
+        <Card 
+          className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow cursor-pointer"
+          onClick={() => {
+            const url = selectedJobId === "all" 
+              ? "/dashboard/analytics/successful-hire"
+              : `/dashboard/analytics/successful-hire?jobId=${encodeURIComponent(selectedJobId)}`
+            router.push(url)
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Successful Hires</CardTitle>
             <Briefcase className="h-4 w-4 text-orange-600" />
