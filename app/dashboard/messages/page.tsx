@@ -25,17 +25,63 @@ export default function MessagesPage() {
   const [selectedCategory, setSelectedCategory] = useState<'interview' | 'new_job' | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState("")
+  // Category-specific messages to maintain separate drafts for each category
+  const [categoryMessages, setCategoryMessages] = useState<{
+    interview: string
+    new_job: string
+  }>({
+    interview: "",
+    new_job: ""
+  })
   // Draft-only mode: no recipient/subject inputs
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [lastSavedDraft, setLastSavedDraft] = useState<{ id: string; category: 'interview' | 'new_job' | 'general' } | null>(null)
 
+  // Load messages from localStorage on component mount
+  useEffect(() => {
+    const savedMessages = localStorage.getItem('categoryMessages')
+    const savedCategory = localStorage.getItem('selectedCategory')
+    
+    if (savedMessages) {
+      try {
+        const parsedMessages = JSON.parse(savedMessages)
+        setCategoryMessages(parsedMessages)
+      } catch (error) {
+        console.error('Error parsing saved messages:', error)
+      }
+    }
+    
+    if (savedCategory && (savedCategory === 'interview' || savedCategory === 'new_job')) {
+      setSelectedCategory(savedCategory as 'interview' | 'new_job')
+    }
+  }, [])
+
   // Load messages when category is selected
   useEffect(() => {
     if (selectedCategory) {
       loadMessages(selectedCategory)
+      // Load the message for the selected category
+      setNewMessage(categoryMessages[selectedCategory])
     }
-  }, [selectedCategory])
+  }, [selectedCategory, categoryMessages])
+
+  // Handle category selection
+  const handleCategorySelect = (category: 'interview' | 'new_job') => {
+    // Save current message to the current category before switching
+    if (selectedCategory && newMessage.trim()) {
+      const updatedMessages = {
+        ...categoryMessages,
+        [selectedCategory]: newMessage
+      }
+      setCategoryMessages(updatedMessages)
+      localStorage.setItem('categoryMessages', JSON.stringify(updatedMessages))
+    }
+    
+    // Switch to new category and save selection
+    setSelectedCategory(category)
+    localStorage.setItem('selectedCategory', category)
+  }
 
   const loadMessages = async (category: 'interview' | 'new_job') => {
     setLoading(true)
@@ -79,7 +125,8 @@ export default function MessagesPage() {
       if (data.success) {
         console.log('Draft saved:', data)
         toast.success('Draft saved')
-        setNewMessage('')
+        // Keep the message in the input box so user can continue editing
+        // setNewMessage('') // Removed this line
         // Reload
         loadMessages(categoryToUse)
         if (data.message?.id) {
@@ -131,7 +178,7 @@ export default function MessagesPage() {
           className={`cursor-pointer transition-all hover:shadow-md ${
             selectedCategory === 'interview' ? 'ring-2 ring-blue-500 bg-blue-50' : 'linkedin-card'
           }`}
-          onClick={() => setSelectedCategory('interview')}
+          onClick={() => handleCategorySelect('interview')}
         >
           <CardContent className="p-6 text-center">
             <h3 className="text-lg font-semibold text-gray-900">Interview</h3>
@@ -142,7 +189,7 @@ export default function MessagesPage() {
           className={`cursor-pointer transition-all hover:shadow-md ${
             selectedCategory === 'new_job' ? 'ring-2 ring-blue-500 bg-blue-50' : 'linkedin-card'
           }`}
-          onClick={() => setSelectedCategory('new_job')}
+          onClick={() => handleCategorySelect('new_job')}
         >
           <CardContent className="p-6 text-center">
             <h3 className="text-lg font-semibold text-gray-900">New Job ID</h3>
@@ -168,9 +215,22 @@ export default function MessagesPage() {
             <div>
               <label className="text-sm font-medium text-gray-700 mb-1 block">Message *</label>
               <Textarea
-                placeholder="Type your message here..."
+                placeholder={selectedCategory ? "Type your message here..." : "Select a category first to start typing..."}
                 value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
+                onChange={(e) => {
+                  if (!selectedCategory) {
+                    toast.error('Select the category first.')
+                    return
+                  }
+                  setNewMessage(e.target.value)
+                  // Also update the category-specific message and save to localStorage
+                  const updatedMessages = {
+                    ...categoryMessages,
+                    [selectedCategory]: e.target.value
+                  }
+                  setCategoryMessages(updatedMessages)
+                  localStorage.setItem('categoryMessages', JSON.stringify(updatedMessages))
+                }}
                 onKeyDown={(e) => {
                   if (e.ctrlKey && e.key === 'Enter') {
                     e.preventDefault()
@@ -179,6 +239,7 @@ export default function MessagesPage() {
                 }}
                 rows={10}
                 className="linkedin-input text-base resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={!selectedCategory}
                 required
               />
             </div>
@@ -191,6 +252,26 @@ export default function MessagesPage() {
               </div>
               
               <div className="flex items-center space-x-3">
+                <Button 
+                  variant="ghost" 
+                  className="px-4"
+                  disabled={sending || !newMessage.trim() || !selectedCategory}
+                  onClick={() => {
+                    if (selectedCategory) {
+                      setNewMessage('')
+                      const updatedMessages = {
+                        ...categoryMessages,
+                        [selectedCategory]: ''
+                      }
+                      setCategoryMessages(updatedMessages)
+                      localStorage.setItem('categoryMessages', JSON.stringify(updatedMessages))
+                      setLastSavedDraft(null)
+                      toast.success('Message cleared')
+                    }
+                  }}
+                >
+                  Clear
+                </Button>
                 <Button 
                   variant="outline" 
                   className="px-8"

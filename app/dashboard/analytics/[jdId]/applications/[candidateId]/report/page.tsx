@@ -127,6 +127,7 @@ export default function CandidateReportPage() {
         const json = await res.json()
 
         if (!res.ok || !json?.ok) {
+          throw new Error(json?.error || `HTTP ${res.status}: Failed to fetch candidate report`)
         }
 
         console.log('📊 Report data received:', json)
