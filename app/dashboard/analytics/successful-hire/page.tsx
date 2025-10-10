@@ -7,6 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Download, FileText } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 type SuccessfulHireRow = {
@@ -16,9 +18,6 @@ type SuccessfulHireRow = {
   appliedJD: string
   email: string
   phone: string
-  hireDate: string
-  salary?: string
-  department?: string
   status: string
 }
 
@@ -81,13 +80,110 @@ export default function SuccessfulHirePage() {
     switch (status.toLowerCase()) {
       case "hired":
         return "bg-green-100 text-green-800"
-      case "onboarded":
+      case "pass":
         return "bg-blue-100 text-blue-800"
-      case "probation":
-        return "bg-yellow-100 text-yellow-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
+  }
+
+  const updateStatus = async (hireId: string, newStatus: string) => {
+    try {
+      const response = await fetch('/api/analytics/successful-hire', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          hireId,
+          status: newStatus
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.ok) {
+        // Update local state
+        setRows(prevRows => 
+          prevRows.map(row => 
+            row.id === hireId ? { ...row, status: newStatus } : row
+          )
+        )
+        toast({
+          title: "Status Updated",
+          description: `Status changed to ${newStatus}`,
+        })
+      } else {
+        throw new Error(result.error || 'Failed to update status')
+      }
+    } catch (error) {
+      console.error('Error updating status:', error)
+      toast({
+        title: "Error",
+        description: "Failed to update status",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const downloadReport = (hire: SuccessfulHireRow) => {
+    // Generate CSV report
+    const csvContent = `Candidate Report
+Name,${hire.candidateName}
+Position,${hire.appliedJD}
+Email,${hire.email}
+Phone,${hire.phone}
+Status,${hire.status}
+Generated,${new Date().toLocaleString()}`
+
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${hire.candidateName.replace(/\s+/g, '_')}_report.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+    toast({
+      title: "Report Downloaded",
+      description: `Report for ${hire.candidateName} has been downloaded`,
+    })
+  }
+
+  const downloadCV = (hire: SuccessfulHireRow) => {
+    // Generate dummy CV content
+    const cvContent = `${hire.candidateName}
+${hire.email} | ${hire.phone}
+
+PROFESSIONAL SUMMARY
+Experienced ${hire.appliedJD} with strong technical skills and proven track record.
+
+EXPERIENCE
+Current Position: ${hire.appliedJD}
+Status: ${hire.status}
+
+CONTACT INFORMATION
+Email: ${hire.email}
+Phone: ${hire.phone}
+
+Generated on: ${new Date().toLocaleString()}`
+
+    const blob = new Blob([cvContent], { type: 'text/plain' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${hire.candidateName.replace(/\s+/g, '_')}_CV.txt`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+    toast({
+      title: "CV Downloaded",
+      description: `CV for ${hire.candidateName} has been downloaded`,
+    })
   }
 
   return (
@@ -135,8 +231,6 @@ export default function SuccessfulHirePage() {
                     <TableHead className="px-3 py-2 text-sm align-middle">Position</TableHead>
                     <TableHead className="px-3 py-2 text-sm align-middle">Email</TableHead>
                     <TableHead className="px-3 py-2 text-sm align-middle">Phone</TableHead>
-                    <TableHead className="px-3 py-2 text-sm align-middle">Hire Date</TableHead>
-                    <TableHead className="px-3 py-2 text-sm align-middle">Department</TableHead>
                     <TableHead className="px-3 py-2 text-sm align-middle">Status</TableHead>
                     <TableHead className="px-3 py-2 text-sm align-middle">Actions</TableHead>
                   </TableRow>
@@ -144,17 +238,17 @@ export default function SuccessfulHirePage() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">Loading...</TableCell>
+                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">Loading...</TableCell>
                     </TableRow>
                   ) : error ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-red-500">
+                      <TableCell colSpan={7} className="text-center py-8 text-red-500">
                         Error: {error}
                       </TableCell>
                     </TableRow>
                   ) : rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                         No successful hires found. Hired candidates will appear here after onboarding.
                       </TableCell>
                     </TableRow>
@@ -176,23 +270,42 @@ export default function SuccessfulHirePage() {
                       </TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle">{row.phone}</TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle">
-                        {new Date(row.hireDate).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="px-3 py-2 text-sm align-middle">
-                        {row.department || 'Not specified'}
-                      </TableCell>
-                      <TableCell className="px-3 py-2 text-sm align-middle">
-                        <Badge className={getStatusColor(row.status)}>
-                          {row.status}
-                        </Badge>
+                        <Select
+                          value={row.status}
+                          onValueChange={(value) => updateStatus(row.id, value)}
+                        >
+                          <SelectTrigger className="w-24 h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Pass">
+                              <Badge className="bg-blue-100 text-blue-800">Pass</Badge>
+                            </SelectItem>
+                            <SelectItem value="Hired">
+                              <Badge className="bg-green-100 text-green-800">Hired</Badge>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
-                        <div className="flex items-center space-x-2">
-                          <Link href={`/dashboard/analytics/${row.jobId}/applications/${row.id}/profile`}>
-                            <Button variant="outline" size="sm">View Profile</Button>
-                          </Link>
-                          <Button variant="outline" size="sm">
-                            Contact
+                        <div className="flex items-center space-x-1">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => downloadReport(row)}
+                            className="h-8 px-2"
+                          >
+                            <Download className="h-3 w-3 mr-1" />
+                            Report
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => downloadCV(row)}
+                            className="h-8 px-2"
+                          >
+                            <FileText className="h-3 w-3 mr-1" />
+                            CV
                           </Button>
                         </div>
                       </TableCell>
