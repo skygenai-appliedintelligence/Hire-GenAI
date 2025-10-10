@@ -22,6 +22,7 @@ type InterviewRow = {
   interviewDate?: string
   interviewScore?: number
   feedback?: string
+  result?: 'Pass' | 'Fail'
 }
 
 export default function InterviewsPage() {
@@ -128,7 +129,7 @@ export default function InterviewsPage() {
                   <TableHead className="px-3 py-2 text-sm align-middle">Applied JD</TableHead>
                   <TableHead className="px-3 py-2 text-sm align-middle">Email</TableHead>
                   <TableHead className="px-3 py-2 text-sm align-middle">Phone</TableHead>
-                  <TableHead className="px-3 py-2 text-sm align-middle">Status</TableHead>
+                  <TableHead className="px-3 py-2 text-sm align-middle">Result</TableHead>
                   <TableHead className="px-3 py-2 text-sm align-middle">Score</TableHead>
                   <TableHead className="px-3 py-2 text-sm align-middle">Report</TableHead>
                 </TableRow>
@@ -166,14 +167,20 @@ export default function InterviewsPage() {
                     </TableCell>
                     <TableCell className="px-3 py-2 text-sm align-middle">{row.phone}</TableCell>
                     <TableCell className="px-3 py-2 text-sm align-middle">
-                      <span className={getStatusColor(row.status)}>
-                        {row.status}
-                      </span>
+                      {row.interviewScore !== undefined ? (
+                        <span className={`font-semibold ${row.result === 'Pass' ? 'text-green-600' : 'text-red-600'}`}>
+                          {row.result || 'N/A'}
+                        </span>
+                      ) : (
+                        <span className={getStatusColor(row.status)}>
+                          {row.status}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="px-3 py-2 text-sm align-middle">
                       {row.interviewScore !== undefined ? (
-                        <span className={`font-medium ${row.interviewScore >= 7 ? 'text-green-600' : row.interviewScore >= 5 ? 'text-yellow-600' : 'text-red-600'}`}>
-                          {row.interviewScore}/10
+                        <span className={`font-medium ${row.interviewScore >= 70 ? 'text-green-600' : row.interviewScore >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                          {row.interviewScore}/100
                         </span>
                       ) : (
                         <span className="text-gray-400">N/A</span>
