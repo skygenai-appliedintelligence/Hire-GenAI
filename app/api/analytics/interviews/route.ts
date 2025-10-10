@@ -1,58 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DatabaseService } from '@/lib/database'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const jobId = searchParams.get('jobId')
 
-    // For now, let's create a simple query that returns mock data to test the endpoint
-    // We'll return some sample interview data to see if the page loads
-    const mockInterviews = [
-      {
-        id: '1',
-        jobId: 'job-1',
-        candidateName: 'John Doe',
-        appliedJD: 'Software Engineer',
-        email: 'john@example.com',
-        phone: '+1234567890',
-        status: 'Completed',
-        interviewScore: 8,
-        feedback: 'Good technical skills'
-      },
-      {
-        id: '2',
-        jobId: 'job-1',
-        candidateName: 'Jane Smith',
-        appliedJD: 'Frontend Developer',
-        email: 'jane@example.com',
-        phone: '+1234567891',
-        status: 'Scheduled',
-        interviewScore: null,
-        feedback: null
-      },
-      {
-        id: '3',
-        jobId: 'job-2',
-        candidateName: 'Mike Johnson',
-        appliedJD: 'Backend Developer',
-        email: 'mike@example.com',
-        phone: '+1234567892',
-        status: 'Pending',
-        interviewScore: null,
-        feedback: null
-      }
-    ]
-
-    // Filter by jobId if provided
-    let interviews = mockInterviews
-    if (jobId && jobId !== 'all') {
-      interviews = mockInterviews.filter(interview => interview.jobId === jobId)
+    if (!DatabaseService.isDatabaseConfigured()) {
+      return NextResponse.json({ ok: true, interviews: [] })
     }
 
-    console.log('Returning mock interviews:', interviews)
+    // Resolve company_id - get the first company for now
+    // In a production app, this would come from the authenticated user's session
+    const companyRows = await DatabaseService.query(
+      `SELECT id FROM companies ORDER BY created_at ASC LIMIT 1`
+    ) as any[]
+    
+    if (!companyRows?.length) {
+      return NextResponse.json({ ok: true, interviews: [] })
+    }
+    
+    const companyId = companyRows[0].id
 
-    console.log(`Found ${interviews.length} interviews`)
+    // Fetch real interview data from database
+    const interviews = await DatabaseService.getInterviews(companyId, jobId || undefined)
+
+    console.log(`Found ${interviews.length} interviews for company ${companyId}`)
 
     return NextResponse.json({
       ok: true,

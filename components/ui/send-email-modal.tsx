@@ -74,7 +74,7 @@ export default function SendEmailModal({ isOpen, onClose, candidate, onSendEmail
     try {
       // Generate the actual interview link using the same format as the API
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-      const interviewLink = `${baseUrl}/interview/${encodeURIComponent(candidate.id)}`
+      const interviewLink = `${baseUrl}/interview/${encodeURIComponent(candidate.id)}/start`
       
       // Try to get company data from localStorage (saved from auth context)
       const savedCompanyData = localStorage.getItem('companyData')
@@ -103,7 +103,7 @@ export default function SendEmailModal({ isOpen, onClose, candidate, onSendEmail
       setCompanyData({
         companyName: "TATA",
         userJobTitle: "HR Manager", 
-        interviewLink: `${baseUrl}/interview/${encodeURIComponent(candidate.id)}`
+        interviewLink: `${baseUrl}/interview/${encodeURIComponent(candidate.id)}/start`
       })
     }
   }

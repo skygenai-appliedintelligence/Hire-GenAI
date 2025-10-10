@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-    const interviewUrl = `${baseUrl}/interview/${encodeURIComponent(applicationId)}`
+    const interviewUrl = `${baseUrl}/interview/${encodeURIComponent(applicationId)}/start`
 
     // In a real implementation, send an email using your provider (Resend, SES, SendGrid, etc.)
     // For now, log to the server console for testing (like OTP logs during login)

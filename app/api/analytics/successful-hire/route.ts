@@ -1,82 +1,108 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DatabaseService } from '@/lib/database'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const jobId = searchParams.get('jobId')
 
-    // For now, let's create mock data for successful hires
-    const mockSuccessfulHires = [
-      {
-        id: '1',
-        jobId: 'job-1',
-        candidateName: 'Rajesh Kumar',
-        appliedJD: 'Senior Software Engineer',
-        email: 'rajesh.kumar@gmail.com',
-        phone: '+91-9876543210',
-        hireDate: '2024-01-15',
-        salary: '₹12,00,000',
-        department: 'Engineering',
-        status: 'Onboarded'
-      },
-      {
-        id: '2',
-        jobId: 'job-1',
-        candidateName: 'Priya Sharma',
-        appliedJD: 'Frontend Developer',
-        email: 'priya.sharma@gmail.com',
-        phone: '+91-9876543211',
-        hireDate: '2024-01-20',
-        salary: '₹8,50,000',
-        department: 'Engineering',
-        status: 'Hired'
-      },
-      {
-        id: '3',
-        jobId: 'job-2',
-        candidateName: 'Amit Patel',
-        appliedJD: 'Data Scientist',
-        email: 'amit.patel@gmail.com',
-        phone: '+91-9876543212',
-        hireDate: '2024-01-25',
-        salary: '₹15,00,000',
-        department: 'Data Science',
-        status: 'Probation'
-      },
-      {
-        id: '4',
-        jobId: 'job-1',
-        candidateName: 'Sneha Reddy',
-        appliedJD: 'UI/UX Designer',
-        email: 'sneha.reddy@gmail.com',
-        phone: '+91-9876543213',
-        hireDate: '2024-02-01',
-        salary: '₹7,00,000',
-        department: 'Design',
-        status: 'Onboarded'
-      },
-      {
-        id: '5',
-        jobId: 'job-3',
-        candidateName: 'Vikram Singh',
-        appliedJD: 'DevOps Engineer',
-        email: 'vikram.singh@gmail.com',
-        phone: '+91-9876543214',
-        hireDate: '2024-02-05',
-        salary: '₹11,00,000',
-        department: 'Infrastructure',
-        status: 'Hired'
-      }
-    ]
-
-    // Filter by jobId if provided
-    let hires = mockSuccessfulHires
-    if (jobId && jobId !== 'all') {
-      hires = mockSuccessfulHires.filter(hire => hire.jobId === jobId)
+    if (!DatabaseService.isDatabaseConfigured()) {
+      return NextResponse.json({ ok: true, hires: [] })
     }
 
-    console.log(`Found ${hires.length} successful hires`)
+    // Get company ID
+    const companyRows = await DatabaseService.query(
+      `SELECT id FROM companies ORDER BY created_at ASC LIMIT 1`
+    ) as any[]
+    
+    if (!companyRows?.length) {
+      return NextResponse.json({ ok: true, hires: [] })
+    }
+    
+    const companyId = companyRows[0].id
+
+    // Fetch candidates who passed the interview (score >= 65)
+    let query = `
+      SELECT 
+        a.id,
+        a.job_id,
+        a.first_name,
+        a.last_name,
+        a.email,
+        a.phone,
+        c.first_name as candidate_first_name,
+        c.last_name as candidate_last_name,
+        c.email as candidate_email,
+        c.phone as candidate_phone,
+        j.title as job_title,
+        j.company_id,
+        e.overall_score,
+        e.status as evaluation_status,
+        i.completed_at as hire_date
+      FROM interviews i
+      JOIN application_rounds ar ON i.application_round_id = ar.id
+      JOIN applications a ON ar.application_id = a.id
+      JOIN candidates c ON a.candidate_id = c.id
+      JOIN jobs j ON a.job_id = j.id
+      LEFT JOIN evaluations e ON i.id = e.interview_id
+      WHERE j.company_id = $1::uuid
+        AND i.status = 'success'
+        AND e.id IS NOT NULL
+        AND (
+          e.status = 'Pass' 
+          OR (e.status IS NULL AND e.overall_score >= 65)
+          OR (e.status != 'Fail' AND e.overall_score >= 65)
+        )
+    `
+
+    const params: any[] = [companyId]
+    let paramIndex = 2
+
+    // Filter by job if provided
+    if (jobId && jobId !== 'all') {
+      query += ` AND a.job_id = $${paramIndex}::uuid`
+      params.push(jobId)
+      paramIndex++
+    }
+
+    query += ` ORDER BY i.completed_at DESC`
+
+    const rows = await DatabaseService.query(query, params) as any[]
+    
+    // Transform the data
+    const hires = rows.map(row => {
+      const candidateName = row.first_name && row.last_name 
+        ? `${row.first_name} ${row.last_name}`.trim()
+        : row.candidate_first_name && row.candidate_last_name 
+        ? `${row.candidate_first_name} ${row.candidate_last_name}`.trim()
+        : 'Unknown Candidate'
+
+      const email = row.email || row.candidate_email || ''
+      const phone = row.phone || row.candidate_phone || ''
+
+      return {
+        id: row.id,
+        jobId: row.job_id,
+        candidateName,
+        appliedJD: row.job_title || 'Unknown Position',
+        email,
+        phone,
+        hireDate: row.hire_date ? new Date(row.hire_date).toISOString() : new Date().toISOString(),
+        salary: 'Not specified',
+        department: 'Not specified',
+        status: 'Hired'
+      }
+    })
+
+    console.log(`Found ${hires.length} successful hires (Pass status or score >= 65)`)
+    console.log('Successful hires details:', hires.map(h => ({
+      name: h.candidateName,
+      score: rows.find(r => r.id === h.id)?.overall_score,
+      status: rows.find(r => r.id === h.id)?.evaluation_status
+    })))
 
     return NextResponse.json({
       ok: true,
