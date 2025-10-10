@@ -1227,6 +1227,7 @@ export class DatabaseService {
     email: string
     first_name?: string
     last_name?: string
+    full_name?: string
     resume_file_id?: string
     resume_url?: string
     resume_name?: string
@@ -1261,27 +1262,268 @@ export class DatabaseService {
 
       return updated[0]
     } else {
-      // Create new candidate
+      // Create new candidate - construct full_name from first_name and last_name if not provided
+      const fullName = data.full_name || `${data.first_name || 'Unknown'} ${data.last_name || 'Candidate'}`.trim()
+      
       const insertQuery = `
         INSERT INTO candidates (
-          email, first_name, last_name, resume_file_id, resume_url, 
-          resume_name, resume_size, resume_type, created_at
+          email, full_name, resume_file_id, created_at
         )
-        VALUES ($1, $2, $3, $4::uuid, $5, $6, $7, $8, NOW())
+        VALUES ($1, $2, $3::uuid, NOW())
         RETURNING *
       `
       const created = await this.query(insertQuery, [
         data.email.toLowerCase(),
-        data.first_name || 'Unknown',
-        data.last_name || 'Candidate',
-        data.resume_file_id || null,
-        data.resume_url || null,
-        data.resume_name || null,
-        data.resume_size || null,
-        data.resume_type || null
+        fullName,
+        data.resume_file_id || null
       ]) as any[]
 
       return created[0]
     }
+  }
+
+  // ===========================
+  // MESSAGE OPERATIONS
+  // ===========================
+
+  // Get messages by category for a company
+  static async getMessagesByCategory(companyId: string, category: 'interview' | 'new_job' | 'general', includeDrafts: boolean = false) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      SELECT 
+        id,
+        sender_user_id,
+        recipient_email,
+        recipient_name,
+        category,
+        subject,
+        content,
+        status,
+        sent_at,
+        delivered_at,
+        read_at,
+        metadata,
+        created_at,
+        updated_at
+      FROM messages 
+      WHERE company_id = $1::uuid 
+        AND category = $2::message_category
+        AND ($3::boolean = true OR status != 'draft'::message_status)
+      ORDER BY sent_at DESC, created_at DESC
+      LIMIT 50
+    `
+    
+    return await this.query(query, [companyId, category, includeDrafts]) as any[]
+  }
+
+  // Create a new message
+  static async createMessage(data: {
+    companyId: string
+    senderUserId?: string
+    recipientEmail: string
+    recipientName?: string
+    category: 'interview' | 'new_job' | 'general'
+    subject: string
+    content: string
+    status?: 'draft' | 'sent' | 'delivered' | 'read' | 'failed'
+    threadId?: string
+    metadata?: any
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      INSERT INTO messages (
+        company_id,
+        sender_user_id,
+        recipient_email,
+        recipient_name,
+        category,
+        subject,
+        content,
+        status,
+        thread_id,
+        metadata,
+        sent_at,
+        created_at,
+        updated_at
+      ) VALUES (
+        $1::uuid,
+        $2::uuid,
+        $3,
+        $4,
+        $5::message_category,
+        $6,
+        $7,
+        $8::message_status,
+        $9::uuid,
+        $10::jsonb,
+        CASE WHEN $8::message_status = 'sent'::message_status THEN NOW() ELSE NULL END,
+        NOW(),
+        NOW()
+      )
+      RETURNING *
+    `
+
+    const result = await this.query(query, [
+      data.companyId,
+      data.senderUserId || null,
+      data.recipientEmail,
+      data.recipientName || null,
+      data.category,
+      data.subject,
+      data.content,
+      data.status || 'draft',
+      data.threadId || null,
+      JSON.stringify(data.metadata || {})
+    ]) as any[]
+
+    if (!result || result.length === 0) {
+      console.error('createMessage insert returned no rows')
+      throw new Error('Failed to create message')
+    }
+
+    return result[0]
+  }
+
+  // Send a message (update status to sent)
+  static async sendMessage(messageId: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      UPDATE messages 
+      SET 
+        status = 'sent',
+        sent_at = NOW(),
+        updated_at = NOW()
+      WHERE id = $1::uuid
+      RETURNING *
+    `
+
+    const result = await this.query(query, [messageId]) as any[]
+    return result[0]
+  }
+
+  // Get message templates by category
+  static async getMessageTemplates(companyId: string, category?: 'interview' | 'new_job' | 'general') {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    let query = `
+      SELECT 
+        id,
+        name,
+        category,
+        subject_template,
+        content_template,
+        is_active,
+        created_at,
+        updated_at
+      FROM message_templates 
+      WHERE company_id = $1::uuid 
+        AND is_active = true
+    `
+    
+    const params = [companyId]
+    
+    if (category) {
+      query += ` AND category = $2::message_category`
+      params.push(category)
+    }
+    
+    query += ` ORDER BY name ASC`
+
+    return await this.query(query, params) as any[]
+  }
+
+  // Create message template
+  static async createMessageTemplate(data: {
+    companyId: string
+    name: string
+    category: 'interview' | 'new_job' | 'general'
+    subjectTemplate: string
+    contentTemplate: string
+    createdBy?: string
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      INSERT INTO message_templates (
+        company_id,
+        name,
+        category,
+        subject_template,
+        content_template,
+        created_by,
+        created_at,
+        updated_at
+      ) VALUES (
+        $1::uuid,
+        $2,
+        $3::message_category,
+        $4,
+        $5,
+        $6::uuid,
+        NOW(),
+        NOW()
+      )
+      RETURNING *
+    `
+
+    const result = await this.query(query, [
+      data.companyId,
+      data.name,
+      data.category,
+      data.subjectTemplate,
+      data.contentTemplate,
+      data.createdBy || null
+    ]) as any[]
+
+    return result[0]
+  }
+
+  // Get message threads for a company
+  static async getMessageThreads(companyId: string, category?: 'interview' | 'new_job' | 'general') {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    let query = `
+      SELECT 
+        id,
+        category,
+        participant_email,
+        participant_name,
+        subject,
+        last_message_at,
+        message_count,
+        is_archived,
+        metadata,
+        created_at,
+        updated_at
+      FROM message_threads 
+      WHERE company_id = $1::uuid 
+        AND is_archived = false
+    `
+    
+    const params = [companyId]
+    
+    if (category) {
+      query += ` AND category = $2`
+      params.push(category)
+    }
+    
+    query += ` ORDER BY last_message_at DESC`
+
+    return await this.query(query, params) as any[]
   }
 }
