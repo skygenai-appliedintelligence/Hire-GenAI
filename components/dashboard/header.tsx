@@ -1,8 +1,7 @@
 "use client"
 
-import { Bell, Search, User, LogOut, Settings } from "lucide-react"
+import { Bell, User, LogOut, Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,13 +28,7 @@ export function Header() {
     <header className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Search candidates, jobs, or interviews..."
-              className="pl-10 w-80 bg-gray-50 border-gray-200 focus:bg-white"
-            />
-          </div>
+          {/* Search bar removed - replaced with job filter on analytics page */}
         </div>
 
         <div className="flex items-center space-x-4">
