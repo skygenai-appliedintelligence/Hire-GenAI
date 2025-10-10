@@ -1526,4 +1526,135 @@ export class DatabaseService {
 
     return await this.query(query, params) as any[]
   }
+
+  // =========================
+  // INTERVIEWS
+  // =========================
+  
+  // Get interviews with candidate and job information
+  static async getInterviews(companyId?: string, jobId?: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+
+    let query = `
+      SELECT 
+        i.id,
+        i.status as interview_status,
+        i.started_at,
+        i.completed_at,
+        i.mode,
+        i.metadata,
+        ar.id as application_round_id,
+        ar.status as round_status,
+        ar.recommendation,
+        ar.summary,
+        a.id as application_id,
+        a.job_id,
+        a.status as application_status,
+        a.first_name,
+        a.last_name,
+        a.email,
+        a.phone,
+        c.first_name as candidate_first_name,
+        c.last_name as candidate_last_name,
+        c.email as candidate_email,
+        c.phone as candidate_phone,
+        j.title as job_title,
+        j.company_id,
+        e.overall_score,
+        e.status as evaluation_status,
+        e.recommendation as evaluation_recommendation
+      FROM interviews i
+      JOIN application_rounds ar ON i.application_round_id = ar.id
+      JOIN applications a ON ar.application_id = a.id
+      JOIN candidates c ON a.candidate_id = c.id
+      JOIN jobs j ON a.job_id = j.id
+      LEFT JOIN evaluations e ON i.id = e.interview_id
+      WHERE 1=1
+    `
+
+    const params: any[] = []
+    let paramIndex = 1
+
+    // Filter by company if provided
+    if (companyId) {
+      query += ` AND j.company_id = $${paramIndex}::uuid`
+      params.push(companyId)
+      paramIndex++
+    }
+
+    // Filter by job if provided
+    if (jobId && jobId !== 'all') {
+      query += ` AND a.job_id = $${paramIndex}::uuid`
+      params.push(jobId)
+      paramIndex++
+    }
+
+    query += ` ORDER BY COALESCE(i.started_at, i.completed_at) DESC NULLS LAST`
+
+    const rows = await this.query(query, params) as any[]
+    
+    // Transform the data to match the expected format
+    return rows.map(row => {
+      // Use application data first, fallback to candidate data
+      const candidateName = row.first_name && row.last_name 
+        ? `${row.first_name} ${row.last_name}`.trim()
+        : row.candidate_first_name && row.candidate_last_name 
+        ? `${row.candidate_first_name} ${row.candidate_last_name}`.trim()
+        : 'Unknown Candidate'
+
+      const email = row.email || row.candidate_email || ''
+      const phone = row.phone || row.candidate_phone || ''
+
+      // Map interview status to expected format
+      let status: 'Completed' | 'Scheduled' | 'Pending' | 'Cancelled' = 'Pending'
+      switch (row.interview_status) {
+        case 'success':
+          status = 'Completed'
+          break
+        case 'in_progress':
+          status = 'Scheduled'
+          break
+        case 'awaiting':
+          status = 'Pending'
+          break
+        case 'failed':
+        case 'expired':
+          status = 'Cancelled'
+          break
+        default:
+          status = 'Pending'
+      }
+
+      // Score is stored as 0-100, display as is
+      let interviewScore: number | undefined = undefined
+      let result: 'Pass' | 'Fail' | undefined = undefined
+      
+      if (row.overall_score !== null && row.overall_score !== undefined) {
+        interviewScore = Math.round(parseFloat(row.overall_score))
+      }
+      
+      // Use status from evaluations table if available, otherwise calculate from score
+      if (row.evaluation_status) {
+        result = row.evaluation_status as 'Pass' | 'Fail'
+      } else if (interviewScore !== undefined) {
+        result = interviewScore >= 65 ? 'Pass' : 'Fail'
+      }
+
+      return {
+        id: row.id,
+        jobId: row.job_id,
+        candidateName,
+        appliedJD: row.job_title || 'Unknown Position',
+        email,
+        phone,
+        status,
+        interviewDate: row.started_at ? new Date(row.started_at).toISOString().split('T')[0] : undefined,
+        interviewScore,
+        result,
+        feedback: row.summary || undefined
+      }
+    })
+  }
 }

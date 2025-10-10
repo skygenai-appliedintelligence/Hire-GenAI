@@ -48,11 +48,11 @@ export async function GET(
     }
 
     const interview = rows[0]
-    const isCompleted = interview.completed_at !== null || interview.status === 'success'
 
+    // Always allow interviews - users can retake interviews multiple times
     return NextResponse.json({
       ok: true,
-      canInterview: !isCompleted,
+      canInterview: true,
       status: interview.status,
       completedAt: interview.completed_at,
       startedAt: interview.started_at
