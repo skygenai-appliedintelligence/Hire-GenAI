@@ -7,23 +7,19 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
+    const companyId = searchParams.get('companyId')
     const jobId = searchParams.get('jobId')
+    
+    if (!companyId) {
+      return NextResponse.json({
+        ok: false,
+        error: 'companyId is required'
+      }, { status: 400 })
+    }
 
     if (!DatabaseService.isDatabaseConfigured()) {
       return NextResponse.json({ ok: true, interviews: [] })
     }
-
-    // Resolve company_id - get the first company for now
-    // In a production app, this would come from the authenticated user's session
-    const companyRows = await DatabaseService.query(
-      `SELECT id FROM companies ORDER BY created_at ASC LIMIT 1`
-    ) as any[]
-    
-    if (!companyRows?.length) {
-      return NextResponse.json({ ok: true, interviews: [] })
-    }
-    
-    const companyId = companyRows[0].id
 
     // Fetch real interview data from database
     const interviews = await DatabaseService.getInterviews(companyId, jobId || undefined)

@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
@@ -20,7 +21,8 @@ type ApplicationRow = {
   status: "CV Unqualified" | "CV Qualified"
 }
 
-export default function TotalApplicationsPage() {
+export default function ApplicationsPage() {
+  const { company } = useAuth()
   const searchParams = useSearchParams()
   const jobId = searchParams.get('jobId')
   const [data, setData] = useState<ApplicationRow[]>([])
@@ -30,10 +32,11 @@ export default function TotalApplicationsPage() {
 
   useEffect(() => {
     const load = async () => {
+      if (!(company as any)?.id) return
       try {
         const url = jobId && jobId !== 'all' 
-          ? `/api/analytics/applications?jobId=${encodeURIComponent(jobId)}`
-          : '/api/analytics/applications'
+          ? `/api/analytics/applications?companyId=${(company as any).id}&jobId=${encodeURIComponent(jobId)}`
+          : `/api/analytics/applications?companyId=${(company as any).id}`
         const res = await fetch(url, { cache: 'no-store' })
         const json = await res.json()
         console.log('API Response:', json)
@@ -55,8 +58,10 @@ export default function TotalApplicationsPage() {
         setLoading(false)
       }
     }
-    load()
-  }, [jobId])
+    if ((company as any)?.id) {
+      load()
+    }
+  }, [jobId, company])
 
   const updateStatus = async (row: ApplicationRow, qualified: boolean) => {
     setSaving((s) => ({ ...s, [row.id]: true }))

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Edit, Trash2, Briefcase, CheckCircle, XCircle, ExternalLink, BarChart3 } from "lucide-react"
+import { Plus, Eye, Trash2, Briefcase, CheckCircle, XCircle, ExternalLink, BarChart3 } from "lucide-react"
 import Link from "next/link"
 
 export default function JobsPage() {
@@ -398,8 +398,8 @@ export default function JobsPage() {
                             router.push(`/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
                           }}
                         >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Edit
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
                         </Button>
                         <Button
                           variant="outline"
@@ -561,8 +561,8 @@ export default function JobsPage() {
                             router.push(`/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
                           }}
                         >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Edit
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
                         </Button>
                         <Button
                           variant="outline"
@@ -724,8 +724,8 @@ export default function JobsPage() {
                             router.push(`/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
                           }}
                         >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Edit
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
                         </Button>
                         <Button
                           variant="outline"
@@ -900,8 +900,8 @@ export default function JobsPage() {
                             router.push(`/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
                           }}
                         >
-                          <Edit className="h-4 w-4 mr-1" />
-                          Edit
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
                         </Button>
                         <Button
                           variant="outline"

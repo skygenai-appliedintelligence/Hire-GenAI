@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -26,6 +27,7 @@ type InterviewRow = {
 }
 
 export default function InterviewsPage() {
+  const { company } = useAuth()
   const searchParams = useSearchParams()
   const jobId = searchParams.get('jobId')
   const [rows, setRows] = useState<InterviewRow[]>([])
@@ -37,10 +39,11 @@ export default function InterviewsPage() {
 
   useEffect(() => {
     const load = async () => {
+      if (!(company as any)?.id) return
       try {
         const url = jobId && jobId !== 'all' 
-          ? `/api/analytics/interviews?jobId=${encodeURIComponent(jobId)}`
-          : '/api/analytics/interviews'
+          ? `/api/analytics/interviews?companyId=${(company as any).id}&jobId=${encodeURIComponent(jobId)}`
+          : `/api/analytics/interviews?companyId=${(company as any).id}`
         const res = await fetch(url, { cache: 'no-store' })
         const json = await res.json()
         console.log('Interviews API Response:', json)
@@ -65,8 +68,10 @@ export default function InterviewsPage() {
         setLoading(false)
       }
     }
-    load()
-  }, [jobId])
+    if ((company as any)?.id) {
+      load()
+    }
+  }, [jobId, company])
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked)
