@@ -13,7 +13,50 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
-import { User, Building, Bell, CreditCard, Users as UsersIcon, Plus, Trash } from "lucide-react"
+import { User, Building, Bell, CreditCard, Users as UsersIcon, Plus, Trash, MapPin, FileText, Building2 } from "lucide-react"
+
+const industries = [
+  "Technology",
+  "Healthcare", 
+  "Finance",
+  "Education",
+  "Retail",
+  "Manufacturing",
+  "Hospitality",
+  "Other",
+]
+
+const companySizes = [
+  "1-10 employees",
+  "11-50 employees", 
+  "51-200 employees",
+  "201-500 employees",
+  "501-1000 employees",
+  "1000+ employees",
+]
+
+const countryOptions = [
+  { name: "United States", code: "US" },
+  { name: "India", code: "IN" },
+  { name: "United Kingdom", code: "GB" },
+  { name: "Canada", code: "CA" },
+  { name: "Australia", code: "AU" },
+  { name: "Germany", code: "DE" },
+  { name: "France", code: "FR" },
+  { name: "Singapore", code: "SG" },
+  { name: "UAE", code: "AE" },
+  { name: "Other", code: "XX" },
+]
+
+// Helper function to map country name to code
+const getCountryCode = (countryName: string): string => {
+  if (!countryName) return ""
+  const country = countryOptions.find(c => 
+    c.name.toLowerCase() === countryName.toLowerCase() ||
+    c.code.toLowerCase() === countryName.toLowerCase()
+  )
+  return country?.code || countryName
+}
 
 export default function SettingsContent({ section }: { section?: string }) {
   const router = useRouter()
@@ -39,11 +82,23 @@ export default function SettingsContent({ section }: { section?: string }) {
   })
 
   const [companyData, setCompanyData] = useState({
+    // Basic Information
     name: (company as any)?.name || "",
     website: (company as any)?.website || "",
     industry: (company as any)?.industry || "",
     size: (company as any)?.size || "",
-    description: "",
+    description: (company as any)?.description || "",
+    // Contact Information
+    street: (company as any)?.street || "",
+    city: (company as any)?.city || "",
+    state: (company as any)?.state || "",
+    postalCode: (company as any)?.postalCode || "",
+    country: (company as any)?.country || "",
+    phone: (company as any)?.phone || "",
+    // Legal Information
+    legalCompanyName: (company as any)?.legalCompanyName || "",
+    taxId: (company as any)?.taxId || "",
+    registrationNumber: (company as any)?.registrationNumber || "",
   })
 
   const [notifications, setNotifications] = useState({
@@ -92,6 +147,55 @@ export default function SettingsContent({ section }: { section?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [(company as any)?.id])
 
+  // Load company data from database
+  const loadCompanyData = async () => {
+    if (!(company as any)?.id) return
+    try {
+      console.log('🔄 Fetching company data for ID:', (company as any).id)
+      const res = await fetch(`/api/settings/company?companyId=${(company as any).id}`)
+      const data = await res.json()
+      console.log('🔍 Company data received from API:', data.company)
+      console.log('🔍 Full API response:', data)
+      
+      // Check if address fields are missing
+      const addressFields = ['street', 'city', 'state', 'postalCode']
+      const missingAddressFields = addressFields.filter(field => !data.company[field])
+      if (missingAddressFields.length > 0) {
+        console.log('⚠️ Missing address fields:', missingAddressFields)
+        console.log('💡 This likely means the addresses table doesn\'t exist or this company has no address data')
+      }
+      if (data.ok && data.company) {
+        setCompanyData({
+          // Basic Information
+          name: data.company.name || "",
+          website: data.company.website || "",
+          industry: data.company.industry || "",
+          size: data.company.size || "",
+          description: data.company.description || "",
+          // Contact Information
+          street: data.company.street || "",
+          city: data.company.city || "",
+          state: data.company.state || "",
+          postalCode: data.company.postalCode || "",
+          country: getCountryCode(data.company.country || ""),
+          phone: data.company.phone || "",
+          // Legal Information
+          legalCompanyName: data.company.legalCompanyName || "",
+          taxId: data.company.taxId || "",
+          registrationNumber: data.company.registrationNumber || "",
+        })
+      }
+    } catch (e) {
+      console.warn('Failed to load company data:', e)
+    }
+  }
+
+  // Load company data when company is ready
+  useEffect(() => {
+    loadCompanyData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(company as any)?.id])
+
   // Sync form state when auth context changes
   useEffect(() => {
     setProfileData((prev) => ({
@@ -101,15 +205,6 @@ export default function SettingsContent({ section }: { section?: string }) {
     }))
   }, [(user as any)?.id, (user as any)?.full_name, (user as any)?.email])
 
-  useEffect(() => {
-    setCompanyData((prev) => ({
-      ...prev,
-      name: (company as any)?.name || "",
-      website: (company as any)?.website || "",
-      industry: (company as any)?.industry || "",
-      size: (company as any)?.size || "",
-    }))
-  }, [(company as any)?.id, (company as any)?.name, (company as any)?.website, (company as any)?.industry, (company as any)?.size])
 
   const addMember = async () => {
     if (!(company as any)?.id || !newMember.email) return
@@ -233,11 +328,23 @@ export default function SettingsContent({ section }: { section?: string }) {
     try {
       const payload = {
         companyId: (company as any).id,
+        // Basic Information
         name: companyData.name,
         website: companyData.website,
         industry: companyData.industry,
         size: companyData.size,
         description: companyData.description,
+        // Contact Information
+        street: companyData.street,
+        city: companyData.city,
+        state: companyData.state,
+        postalCode: companyData.postalCode,
+        country: companyData.country,
+        phone: companyData.phone,
+        // Legal Information
+        legalCompanyName: companyData.legalCompanyName,
+        taxId: companyData.taxId,
+        registrationNumber: companyData.registrationNumber,
       }
       const res = await fetch('/api/settings/company', {
         method: 'PUT',
@@ -249,23 +356,10 @@ export default function SettingsContent({ section }: { section?: string }) {
 
       setAuthSession((user as any), { 
         ...(company as any), 
-        name: data.company?.name ?? companyData.name,
-        website: data.company?.website ?? companyData.website,
-        industry: data.company?.industry ?? companyData.industry,
-        size: data.company?.size ?? companyData.size,
-        description: data.company?.description ?? companyData.description,
+        ...payload,
         verified: data.company?.verified ?? (company as any)?.verified,
         status: data.company?.status ?? (company as any)?.status
       })
-
-      setCompanyData(prev => ({
-        ...prev,
-        name: data.company?.name ?? prev.name,
-        website: data.company?.website ?? prev.website,
-        industry: data.company?.industry ?? prev.industry,
-        size: data.company?.size ?? prev.size,
-        description: data.company?.description ?? prev.description
-      }))
 
       toast({ title: 'Success', description: 'Company information updated successfully' })
     } catch (error: any) {
@@ -448,88 +542,236 @@ export default function SettingsContent({ section }: { section?: string }) {
         </TabsContent>
 
         <TabsContent value="company">
-          <Card className="linkedin-card">
-            <CardHeader>
-              <CardTitle>Company Information</CardTitle>
-              <CardDescription>Manage your company details and branding</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name</Label>
-                <Input
-                  id="companyName"
-                  value={companyData.name}
-                  onChange={(e) => setCompanyData((prev) => ({ ...prev, name: e.target.value }))}
-                  disabled={!canEditSection}
-                  className="linkedin-input"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-6">
+            {/* Company Information */}
+            <Card className="linkedin-card">
+              <CardHeader className="text-center">
+                <div className="mx-auto mb-2 w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center">
+                  <Building2 className="w-6 h-6 text-emerald-600" />
+                </div>
+                <CardTitle className="text-xl">Company Information</CardTitle>
+                <CardDescription>Basic details about your company</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="companyName">Company Name *</Label>
+                    <Input
+                      id="companyName"
+                      value={companyData.name}
+                      onChange={(e) => setCompanyData((prev) => ({ ...prev, name: e.target.value }))}
+                      disabled={!canEditSection}
+                      className="linkedin-input"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="industry">Industry *</Label>
+                    <Select
+                      value={companyData.industry}
+                      onValueChange={(value) => setCompanyData((prev) => ({ ...prev, industry: value }))}
+                    >
+                      <SelectTrigger className="linkedin-input" disabled={!canEditSection}>
+                        <SelectValue placeholder="Select industry" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {industries.map((industry) => (
+                          <SelectItem key={industry} value={industry}>{industry}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="companySize">Company Size *</Label>
+                    <Select
+                      value={companyData.size}
+                      onValueChange={(value) => setCompanyData((prev) => ({ ...prev, size: value }))}
+                    >
+                      <SelectTrigger className="linkedin-input" disabled={!canEditSection}>
+                        <SelectValue placeholder="Select company size" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companySizes.map((size) => (
+                          <SelectItem key={size} value={size}>{size}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="website">Website</Label>
+                    <Input
+                      id="website"
+                      placeholder="https://www.example.com"
+                      value={companyData.website}
+                      onChange={(e) => setCompanyData((prev) => ({ ...prev, website: e.target.value }))}
+                      disabled={!canEditSection}
+                      className="linkedin-input"
+                    />
+                  </div>
+                </div>
                 <div className="space-y-2">
-                  <Label htmlFor="website">Website</Label>
+                  <Label htmlFor="companyDescription">Company Description</Label>
+                  <Textarea
+                    id="companyDescription"
+                    placeholder="Brief description of your company and what you do..."
+                    value={companyData.description}
+                    onChange={(e) => setCompanyData((prev) => ({ ...prev, description: e.target.value }))}
+                    disabled={!canEditSection}
+                    rows={4}
+                    className="linkedin-input"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Contact Information */}
+            <Card className="linkedin-card">
+              <CardHeader className="text-center">
+                <div className="mx-auto mb-2 w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center">
+                  <MapPin className="w-6 h-6 text-blue-600" />
+                </div>
+                <CardTitle className="text-xl">Contact Information</CardTitle>
+                <CardDescription>Where is your company located?</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="street">Street Address *</Label>
                   <Input
-                    id="website"
-                    value={companyData.website}
-                    onChange={(e) => setCompanyData((prev) => ({ ...prev, website: e.target.value }))}
+                    id="street"
+                    value={companyData.street}
+                    onChange={(e) => setCompanyData((prev) => ({ ...prev, street: e.target.value }))}
+                    disabled={!canEditSection}
+                    className="linkedin-input"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City *</Label>
+                    <Input
+                      id="city"
+                      value={companyData.city}
+                      onChange={(e) => setCompanyData((prev) => ({ ...prev, city: e.target.value }))}
+                      disabled={!canEditSection}
+                      className="linkedin-input"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="state">State/Province *</Label>
+                    <Input
+                      id="state"
+                      value={companyData.state}
+                      onChange={(e) => setCompanyData((prev) => ({ ...prev, state: e.target.value }))}
+                      disabled={!canEditSection}
+                      className="linkedin-input"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="postalCode">ZIP/Postal Code *</Label>
+                    <Input
+                      id="postalCode"
+                      value={companyData.postalCode}
+                      onChange={(e) => setCompanyData((prev) => ({ ...prev, postalCode: e.target.value }))}
+                      disabled={!canEditSection}
+                      className="linkedin-input"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="country">Country *</Label>
+                    <Select
+                      value={companyData.country}
+                      onValueChange={(value) => setCompanyData((prev) => ({ ...prev, country: value }))}
+                    >
+                      <SelectTrigger className="linkedin-input" disabled={!canEditSection}>
+                        <SelectValue placeholder="Select country" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {countryOptions.map((country) => (
+                          <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="companyPhone">Phone Number</Label>
+                  <Input
+                    id="companyPhone"
+                    placeholder="+1 (555) 123-4567"
+                    value={companyData.phone}
+                    onChange={(e) => setCompanyData((prev) => ({ ...prev, phone: e.target.value }))}
                     disabled={!canEditSection}
                     className="linkedin-input"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="industry">Industry</Label>
-                  <Select
-                    value={companyData.industry}
-                    onValueChange={(value) => setCompanyData((prev) => ({ ...prev, industry: value }))}
-                  >
-                    <SelectTrigger className="linkedin-input" disabled={!canEditSection}>
-                      <SelectValue placeholder="Select industry" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="technology">Technology</SelectItem>
-                      <SelectItem value="finance">Finance</SelectItem>
-                      <SelectItem value="healthcare">Healthcare</SelectItem>
-                      <SelectItem value="education">Education</SelectItem>
-                      <SelectItem value="retail">Retail</SelectItem>
-                    </SelectContent>
-                  </Select>
+              </CardContent>
+            </Card>
+
+            {/* Legal Information */}
+            <Card className="linkedin-card">
+              <CardHeader className="text-center">
+                <div className="mx-auto mb-2 w-12 h-12 rounded-2xl bg-indigo-100 flex items-center justify-center">
+                  <FileText className="w-6 h-6 text-indigo-600" />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="size">Company Size</Label>
-                <Select
-                  value={companyData.size}
-                  onValueChange={(value) => setCompanyData((prev) => ({ ...prev, size: value }))}
-                >
-                  <SelectTrigger className="linkedin-input" disabled={!canEditSection}>
-                    <SelectValue placeholder="Select company size" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1-10">1-10 employees</SelectItem>
-                    <SelectItem value="11-50">11-50 employees</SelectItem>
-                    <SelectItem value="51-200">51-200 employees</SelectItem>
-                    <SelectItem value="201-500">201-500 employees</SelectItem>
-                    <SelectItem value="500+">500+ employees</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Company Description</Label>
-                <Textarea
-                  id="description"
-                  value={companyData.description}
-                  onChange={(e) => setCompanyData((prev) => ({ ...prev, description: e.target.value }))}
-                  disabled={!canEditSection}
-                  rows={4}
-                  className="linkedin-input"
-                />
-              </div>
-              <div className="flex justify-end">
-                <Button onClick={handleSaveCompany} disabled={!canEditSection || loading} className="linkedin-button">
-                  {loading ? "Saving..." : "Save Changes"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                <CardTitle className="text-xl">Legal Information</CardTitle>
+                <CardDescription>Legal details for compliance and verification</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="legalCompanyName">Legal Company Name *</Label>
+                  <Input
+                    id="legalCompanyName"
+                    value={companyData.legalCompanyName}
+                    onChange={(e) => setCompanyData((prev) => ({ ...prev, legalCompanyName: e.target.value }))}
+                    disabled={!canEditSection}
+                    className="linkedin-input"
+                    required
+                  />
+                  <p className="text-xs text-slate-500">This should match your official business registration</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="taxId">Tax ID / EIN</Label>
+                    <Input
+                      id="taxId"
+                      value={companyData.taxId}
+                      onChange={(e) => setCompanyData((prev) => ({ ...prev, taxId: e.target.value }))}
+                      disabled={!canEditSection}
+                      className="linkedin-input"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="registrationNumber">Business Registration Number</Label>
+                    <Input
+                      id="registrationNumber"
+                      value={companyData.registrationNumber}
+                      onChange={(e) => setCompanyData((prev) => ({ ...prev, registrationNumber: e.target.value }))}
+                      disabled={!canEditSection}
+                      className="linkedin-input"
+                    />
+                  </div>
+                </div>
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 flex items-start gap-2">
+                  <Building className="w-4 h-4 text-emerald-600 mt-0.5" />
+                  This information is used for verification purposes and is kept secure and confidential.
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Save Button */}
+            <div className="flex justify-end">
+              <Button onClick={handleSaveCompany} disabled={!canEditSection || loading} className="linkedin-button">
+                {loading ? "Saving..." : "Save All Changes"}
+              </Button>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="notifications">

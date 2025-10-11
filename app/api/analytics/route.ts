@@ -7,34 +7,17 @@ export const dynamic = 'force-dynamic'
 // GET /api/analytics - company-wide analytics with optional job filter
 export async function GET(req: NextRequest) {
   try {
-    // Resolve a company_id (in production, from session)
-    const companyRows = await DatabaseService.query(
-      `SELECT id FROM companies ORDER BY created_at ASC LIMIT 1`
-    ) as any[]
-    if (!companyRows?.length) {
-      // No company yet, return zeros
-      return NextResponse.json({
-        ok: true,
-        analytics: {
-          totalApplications: 0,
-          qualifiedCandidates: 0,
-          interviewsCompleted: 0,
-          successfulHires: 0,
-          averageTimeToHire: 0,
-          topSources: [],
-          monthlyTrends: {
-            applications: { current: 0, previous: 0, change: 0 },
-            interviews: { current: 0, previous: 0, change: 0 },
-            hires: { current: 0, previous: 0, change: 0 },
-          },
-        },
-      })
-    }
-    const companyId = companyRows[0].id
-
-    // Get jobId from query parameters
+    // Get companyId and jobId from query parameters
     const { searchParams } = new URL(req.url)
+    const companyId = searchParams.get('companyId')
     const jobId = searchParams.get('jobId')
+    
+    if (!companyId) {
+      return NextResponse.json({
+        ok: false,
+        error: 'companyId is required'
+      }, { status: 400 })
+    }
     const isFiltered = jobId && jobId !== 'all'
 
     if (!DatabaseService.isDatabaseConfigured()) {
