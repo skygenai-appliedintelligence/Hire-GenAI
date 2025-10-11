@@ -5,16 +5,18 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 // GET /api/jobs/titles - fetch all job titles for filter dropdown
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    // Resolve company_id
-    const companyRows = await DatabaseService.query(
-      `SELECT id FROM companies ORDER BY created_at ASC LIMIT 1`
-    ) as any[]
-    if (!companyRows?.length) {
-      return NextResponse.json({ ok: true, jobs: [] })
+    // Get companyId from query parameters
+    const { searchParams } = new URL(req.url)
+    const companyId = searchParams.get('companyId')
+    
+    if (!companyId) {
+      return NextResponse.json({
+        ok: false,
+        error: 'companyId is required'
+      }, { status: 400 })
     }
-    const companyId = companyRows[0].id
 
     if (!DatabaseService.isDatabaseConfigured()) {
       return NextResponse.json({ ok: true, jobs: [] })
@@ -28,11 +30,12 @@ export async function GET(_req: NextRequest) {
         created_at
       FROM jobs 
       WHERE company_id = $1::uuid
-        AND status = 'open'
       ORDER BY created_at DESC
     `
 
+    console.log('🔍 Fetching jobs for company:', companyId)
     const rows = await DatabaseService.query(query, [companyId]) as any[]
+    console.log('🔍 Found jobs:', rows.map(r => ({ id: r.id, title: r.title, status: r.status })))
 
     const jobs = (rows || []).map((r: any) => ({
       id: r.id,

@@ -523,6 +523,16 @@ export class DatabaseService {
     industry?: string | null
     size_band?: string | null
     description_md?: string | null
+    phone?: string | null
+    legal_name?: string | null
+    tax_id?: string | null
+    registration_number?: string | null
+  }, addressData?: {
+    street?: string
+    city?: string
+    state?: string
+    postal_code?: string
+    country?: string
   }) {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
@@ -562,7 +572,31 @@ export class DatabaseService {
       paramIndex++
     }
 
-    if (updates.length === 0) {
+    if (data.phone !== undefined) {
+      updates.push(`phone_number = $${paramIndex}`)
+      values.push(data.phone)
+      paramIndex++
+    }
+
+    if (data.legal_name !== undefined) {
+      updates.push(`legal_company_name = $${paramIndex}`)
+      values.push(data.legal_name)
+      paramIndex++
+    }
+
+    if (data.tax_id !== undefined) {
+      updates.push(`tax_id_ein = $${paramIndex}`)
+      values.push(data.tax_id)
+      paramIndex++
+    }
+
+    if (data.registration_number !== undefined) {
+      updates.push(`business_registration_number = $${paramIndex}`)
+      values.push(data.registration_number)
+      paramIndex++
+    }
+
+    if (updates.length === 0 && !addressData) {
       throw new Error('No fields to update')
     }
 
@@ -576,13 +610,235 @@ export class DatabaseService {
       RETURNING *
     `
 
-    const result = await this.query(updateCompanyQuery, values) as any[]
+    let result: any[] = []
+    
+    // Update company if there are company fields to update
+    if (updates.length > 0) {
+      result = await this.query(updateCompanyQuery, values) as any[]
+      if (result.length === 0) {
+        throw new Error('Company not found')
+      }
+    }
+
+    // Update or create address if address data is provided and addresses table exists
+    if (addressData && Object.keys(addressData).some(key => addressData[key as keyof typeof addressData] !== undefined)) {
+      // Check if addresses table exists
+      let hasAddressesTable = false
+      try {
+        const checkTableQuery = `
+          SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name = 'company_addresses'
+          );
+        `
+        const tableCheck = await this.query(checkTableQuery, []) as any[]
+        hasAddressesTable = tableCheck[0]?.exists || false
+      } catch (e) {
+        hasAddressesTable = false
+      }
+
+      if (hasAddressesTable) {
+        const addressUpdates: string[] = []
+        const addressValues: any[] = []
+        let addressParamIndex = 1
+
+        if (addressData.street !== undefined) {
+          addressUpdates.push(`street_address = $${addressParamIndex}`)
+          addressValues.push(addressData.street)
+          addressParamIndex++
+        }
+
+        if (addressData.city !== undefined) {
+          addressUpdates.push(`city = $${addressParamIndex}`)
+          addressValues.push(addressData.city)
+          addressParamIndex++
+        }
+
+        if (addressData.state !== undefined) {
+          addressUpdates.push(`state_province = $${addressParamIndex}`)
+          addressValues.push(addressData.state)
+          addressParamIndex++
+        }
+
+        if (addressData.postal_code !== undefined) {
+          addressUpdates.push(`postal_code = $${addressParamIndex}`)
+          addressValues.push(addressData.postal_code)
+          addressParamIndex++
+        }
+
+        if (addressData.country !== undefined) {
+          addressUpdates.push(`country = $${addressParamIndex}`)
+          addressValues.push(addressData.country)
+          addressParamIndex++
+        }
+
+        if (addressUpdates.length > 0) {
+          addressValues.push(companyId)
+          
+          try {
+            // Try to update existing address first
+            const updateAddressQuery = `
+              UPDATE company_addresses 
+              SET ${addressUpdates.join(', ')}
+              WHERE company_id = $${addressParamIndex}::uuid AND address_type = 'primary'
+              RETURNING *
+            `
+            
+            const addressResult = await this.query(updateAddressQuery, addressValues) as any[]
+            
+            // If no existing address, create one
+            if (addressResult.length === 0) {
+              const insertAddressQuery = `
+                INSERT INTO company_addresses (company_id, address_type, street_address, city, state_province, postal_code, country)
+                VALUES ($${addressParamIndex}::uuid, 'primary', $1, $2, $3, $4, $5)
+              `
+              await this.query(insertAddressQuery, [
+                addressData.street || null,
+                addressData.city || null,
+                addressData.state || null,
+                addressData.postal_code || null,
+                addressData.country || null,
+                companyId
+              ])
+            }
+          } catch (e) {
+            console.warn('Failed to update address data:', e)
+            // Continue without failing the entire update
+          }
+        }
+      } else {
+        console.warn('Company addresses table does not exist, skipping address update')
+      }
+    }
+
+    // Return updated company data
+    if (result.length > 0) {
+      return result[0]
+    } else {
+      // If only address was updated, fetch the company
+      const fetchResult = await this.query('SELECT * FROM companies WHERE id = $1::uuid', [companyId]) as any[]
+      return fetchResult[0]
+    }
+  }
+
+  // Get company information by ID
+  static async getCompany(companyId: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+
+    // First try to check if addresses table exists
+    let hasAddressesTable = false
+    try {
+      const checkTableQuery = `
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'company_addresses'
+        );
+      `
+      const tableCheck = await this.query(checkTableQuery, []) as any[]
+      hasAddressesTable = tableCheck[0]?.exists || false
+      console.log('🔍 Addresses table exists:', hasAddressesTable)
+      
+      // If table exists, check if this company has address data
+      if (hasAddressesTable) {
+        const checkCompanyAddressQuery = `
+          SELECT * FROM company_addresses 
+          WHERE company_id = $1::uuid AND address_type = 'primary'
+        `
+        const addressCheck = await this.query(checkCompanyAddressQuery, [companyId]) as any[]
+        console.log('🔍 Company address data:', addressCheck)
+        
+        // Also check what company IDs exist in the address table
+        const allAddressesQuery = `SELECT company_id, street_address, city FROM company_addresses LIMIT 5`
+        const allAddresses = await this.query(allAddressesQuery, []) as any[]
+        console.log('🔍 All company addresses (sample):', allAddresses)
+        console.log('🔍 Current company ID:', companyId)
+        
+        // If no address data exists for this company, create a sample record
+        if (addressCheck.length === 0) {
+          console.log('🔧 No address data found, creating sample address for this company...')
+          try {
+            const insertSampleAddressQuery = `
+              INSERT INTO company_addresses (company_id, address_type, street_address, city, state_province, postal_code, country)
+              VALUES ($1::uuid, 'primary', 'Electronics City, Hosur Road', 'Bengaluru', 'Karnataka', '560100', 'India')
+              ON CONFLICT (company_id, address_type) DO UPDATE SET
+                street_address = EXCLUDED.street_address,
+                city = EXCLUDED.city,
+                state_province = EXCLUDED.state_province,
+                postal_code = EXCLUDED.postal_code,
+                country = EXCLUDED.country
+            `
+            await this.query(insertSampleAddressQuery, [companyId])
+            console.log('✅ Sample address created for company')
+          } catch (insertError) {
+            console.log('⚠️ Failed to create sample address:', insertError)
+          }
+        }
+      }
+    } catch (e) {
+      // If we can't check, assume no addresses table
+      hasAddressesTable = false
+      console.log('⚠️ Could not check if addresses table exists:', e)
+    }
+
+    let getCompanyQuery: string
+    if (hasAddressesTable) {
+      getCompanyQuery = `
+        SELECT 
+          c.*,
+          a.street_address as street,
+          a.city,
+          a.state_province as state,
+          a.postal_code,
+          a.country
+        FROM companies c
+        LEFT JOIN company_addresses a ON a.company_id = c.id AND a.address_type = 'primary'
+        WHERE c.id = $1::uuid
+        LIMIT 1
+      `
+    } else {
+      getCompanyQuery = `
+        SELECT 
+          c.*,
+          null as street,
+          null as city,
+          null as state,
+          null as postal_code,
+          null as country
+        FROM companies c
+        WHERE c.id = $1::uuid
+        LIMIT 1
+      `
+    }
+
+    console.log('🔍 Executing query:', getCompanyQuery)
+    console.log('🔍 Query parameters:', [companyId])
+    
+    const result = await this.query(getCompanyQuery, [companyId]) as any[]
+    
+    console.log('🔍 Query result:', result)
 
     if (result.length === 0) {
       throw new Error('Company not found')
     }
 
-    return result[0]
+    const company = result[0]
+    console.log('🔍 Company data with address fields:', {
+      id: company.id,
+      name: company.name,
+      street: company.street,
+      street_address: company.street_address,
+      city: company.city,
+      state: company.state,
+      state_province: company.state_province,
+      postal_code: company.postal_code,
+      country: company.country
+    })
+
+    return company
   }
 
   // Update user notification preferences

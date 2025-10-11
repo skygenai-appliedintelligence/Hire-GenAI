@@ -896,7 +896,6 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
             <Select
               value={formData.status}
               onValueChange={(val) => handleInputChange('status', val)}
-              disabled={isEditing}
             >
               <SelectTrigger className="w-[220px]">
                 <SelectValue placeholder="Select status" />
@@ -933,7 +932,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
               <TabsTrigger value="requirements" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Requirements</TabsTrigger>
               <TabsTrigger value="responsibilities" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Responsibilities</TabsTrigger>
               <TabsTrigger value="compensation" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Compensation</TabsTrigger>
-              <TabsTrigger value="logistics" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Logistics</TabsTrigger>
+              <TabsTrigger value="logistics" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Visa & Others</TabsTrigger>
               <TabsTrigger value="resume-screening" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Resume Screening</TabsTrigger>
               <TabsTrigger value="interview" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Interview Process</TabsTrigger>
             </div>
@@ -1168,7 +1167,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Briefcase className="h-5 w-5" />
-                  Logistics
+                  Visa & Others
                 </CardTitle>
                 <CardDescription>
                   Final details to help candidates plan
@@ -1435,42 +1434,34 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
           </TabsContent>
 
           <TabsContent value="resume-screening" className="space-y-6">
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-white to-gray-50">
-              <CardContent className="p-8">
-                <div className="flex flex-col items-center justify-center text-center">
-                  <div className="bg-emerald-50 p-4 rounded-full mb-6 shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-10 w-10 text-emerald-600">
-                      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14,2 14,8 20,8"></polyline>
+                  </svg>
+                  Resume Screening Configuration
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center space-x-3">
+                  <Checkbox 
+                    id="enable-resume-screening" 
+                    defaultChecked={true}
+                    className="h-5 w-5"
+                  />
+                  <Label htmlFor="enable-resume-screening" className="text-base font-medium">
+                    Enable Resume Screening
+                  </Label>
+                </div>
+                
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center space-x-2 text-sm text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3">Resume Screening</h3>
-                  <p className="text-gray-600 mb-8 max-w-lg leading-relaxed">
-                    Our AI will automatically screen and rank resumes based on job requirements, saving you time and effort in the hiring process.
-                  </p>
-                  <Button className="bg-emerald-500 hover:bg-emerald-600 px-8 py-6 text-base font-medium shadow-md hover:shadow-lg transition-all duration-200 transform hover:-translate-y-0.5">
-                    Configure Screening Criteria
-                  </Button>
-                  <div className="mt-8 pt-6 border-t border-gray-100 w-full">
-                    <div className="flex items-center justify-center gap-8 text-sm text-gray-500">
-                      <div className="flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span>AI-Powered Analysis</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span>Time-Saving</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-500" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span>Accurate Matching</span>
-                      </div>
-                    </div>
+                    <span>Resume screening will run first, followed by your selected interview agents for qualified candidates.</span>
                   </div>
                 </div>
               </CardContent>

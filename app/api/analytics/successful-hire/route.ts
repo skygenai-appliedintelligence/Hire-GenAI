@@ -7,7 +7,15 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
+    const companyId = searchParams.get('companyId')
     const jobId = searchParams.get('jobId')
+    
+    if (!companyId) {
+      return NextResponse.json({
+        ok: false,
+        error: 'companyId is required'
+      }, { status: 400 })
+    }
 
     // Return dummy data for successful hires (removed salary column, status shows Pass/Hired)
     const dummyHires = [
