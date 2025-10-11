@@ -30,11 +30,22 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     const loadJobs = async () => {
+      if (!(company as any)?.id) return
       try {
-        const res = await fetch('/api/jobs/titles', { cache: 'no-store' })
+        const res = await fetch(`/api/jobs/titles?companyId=${(company as any).id}`, { 
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
         const data = await res.json()
+        console.log('🔍 Jobs API response:', data)
         if (data.ok && data.jobs) {
+          console.log('🔍 Setting jobs in state:', data.jobs)
           setJobs(data.jobs)
+        } else {
+          console.log('⚠️ No jobs found or API error:', data)
         }
       } catch (e) {
         console.error('Failed to load job titles:', e)
@@ -59,10 +70,11 @@ export default function AnalyticsPage() {
     }
 
     const loadAnalytics = async (jobId: string) => {
+      if (!(company as any)?.id) return
       try {
         const url = jobId === 'all' 
-          ? '/api/analytics' 
-          : `/api/analytics?jobId=${encodeURIComponent(jobId)}`
+          ? `/api/analytics?companyId=${(company as any).id}` 
+          : `/api/analytics?companyId=${(company as any).id}&jobId=${encodeURIComponent(jobId)}`
         const res = await fetch(url, { cache: 'no-store' })
         const data = await res.json()
         if (data.ok && data.analytics) {
@@ -103,18 +115,21 @@ export default function AnalyticsPage() {
 
     // First check for selected job, then load analytics with the correct job ID
     const initialJobId = checkSelectedJob()
-    loadJobs()
-    loadAnalytics(initialJobId)
-  }, [])
+    if ((company as any)?.id) {
+      loadJobs()
+      loadAnalytics(initialJobId)
+    }
+  }, [company])
 
   // Reload analytics when job filter changes
   useEffect(() => {
     const loadAnalytics = async () => {
+      if (!(company as any)?.id) return
       setLoading(true)
       try {
         const url = selectedJobId === 'all' 
-          ? '/api/analytics' 
-          : `/api/analytics?jobId=${encodeURIComponent(selectedJobId)}`
+          ? `/api/analytics?companyId=${(company as any).id}` 
+          : `/api/analytics?companyId=${(company as any).id}&jobId=${encodeURIComponent(selectedJobId)}`
         const res = await fetch(url, { cache: 'no-store' })
         const data = await res.json()
         if (data.ok && data.analytics) {
@@ -127,10 +142,10 @@ export default function AnalyticsPage() {
       }
     }
 
-    if (selectedJobId) {
+    if (selectedJobId && (company as any)?.id) {
       loadAnalytics()
     }
-  }, [selectedJobId])
+  }, [selectedJobId, company])
 
   const getTrendIcon = (change: number) => {
     return change > 0 ? (
