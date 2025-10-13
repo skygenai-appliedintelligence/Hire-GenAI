@@ -91,33 +91,6 @@ export default function DashboardPage() {
     <div className="space-y-6">
       {/* Demo banner removed */}
 
-      {/* AIP Quick Access */}
-      <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-blue-900 mb-2">🤖 Automated Interview Pipeline (AIP)</h3>
-              <p className="text-blue-700 text-sm mb-4">
-                Test the complete AI-powered interview system with sample data and real-time processing
-              </p>
-              <div className="flex space-x-3">
-                <Link href="/apply/job-1" target="_blank">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-blue-300 text-blue-700 hover:bg-blue-50 bg-transparent"
-                  >
-                    <ExternalLink className="h-4 w-4 mr-1" />
-                    Try Apply Form
-                  </Button>
-                </Link>
-              </div>
-            </div>
-            <div className="text-6xl">🚀</div>
-          </div>
-        </CardContent>
-      </Card>
-
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-gray-600">Welcome back! Here's what's happening with your recruitment.</p>
@@ -125,7 +98,7 @@ export default function DashboardPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/dashboard/jobs'}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
             <Briefcase className="h-4 w-4 text-muted-foreground" />

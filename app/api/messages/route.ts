@@ -5,17 +5,15 @@ import { cookies } from 'next/headers'
 // GET /api/messages - Get messages by category
 export async function GET(request: NextRequest) {
   try {
-    // Resolve a company_id to scope queries. In production, take from session JWT.
-    const companyRows = await DatabaseService.query(
-      `SELECT id FROM companies ORDER BY created_at ASC LIMIT 1`
-    ) as any[]
-    if (!companyRows?.length) {
-      return NextResponse.json({ error: 'No company found in database' }, { status: 400 })
+    // Get companyId from query params
+    const { searchParams } = new URL(request.url)
+    const companyId = searchParams.get('companyId')
+
+    if (!companyId) {
+      return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
     }
-    const companyId = companyRows[0].id
 
     // Get category from query params
-    const { searchParams } = new URL(request.url)
     const category = searchParams.get('category') as 'interview' | 'new_job' | 'general'
     const includeDrafts = searchParams.get('includeDrafts') === '1' || searchParams.get('includeDrafts') === 'true'
 
@@ -57,17 +55,12 @@ export async function GET(request: NextRequest) {
 // POST /api/messages - Create a new message
 export async function POST(request: NextRequest) {
   try {
-    // Resolve a company_id to scope queries. In production, take from session JWT.
-    const companyRows = await DatabaseService.query(
-      `SELECT id FROM companies ORDER BY created_at ASC LIMIT 1`
-    ) as any[]
-    if (!companyRows?.length) {
-      return NextResponse.json({ error: 'No company found in database' }, { status: 400 })
-    }
-    const companyId = companyRows[0].id
-
     const body = await request.json()
-    const { recipientEmail, recipientName, category, subject, content, status = 'sent' } = body
+    const { companyId, recipientEmail, recipientName, category, subject, content, status = 'sent' } = body
+
+    if (!companyId) {
+      return NextResponse.json({ error: 'Company ID is required' }, { status: 400 })
+    }
 
     // Validate category
     if (!['interview', 'new_job', 'general'].includes(category)) {

@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
 import { MessageSquare, Send, Mail, Phone, User, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { useAuth } from "@/contexts/auth-context"
 
 interface Message {
   id: string
@@ -22,6 +23,7 @@ interface Message {
 }
 
 export default function MessagesPage() {
+  const { company } = useAuth()
   const [selectedCategory, setSelectedCategory] = useState<'interview' | 'new_job' | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState("")
@@ -40,31 +42,41 @@ export default function MessagesPage() {
 
   // Load messages from localStorage on component mount
   useEffect(() => {
-    const savedMessages = localStorage.getItem('categoryMessages')
     const savedCategory = localStorage.getItem('selectedCategory')
-    
-    if (savedMessages) {
-      try {
-        const parsedMessages = JSON.parse(savedMessages)
-        setCategoryMessages(parsedMessages)
-      } catch (error) {
-        console.error('Error parsing saved messages:', error)
-      }
-    }
-    
+
     if (savedCategory && (savedCategory === 'interview' || savedCategory === 'new_job')) {
       setSelectedCategory(savedCategory as 'interview' | 'new_job')
     }
   }, [])
 
+  // Reset messages and clear localStorage when company changes
+  useEffect(() => {
+    if (company?.id) {
+      // Clear previous company's data
+      setMessages([])
+      setNewMessage("")
+      setCategoryMessages({ interview: "", new_job: "" })
+      setSelectedCategory(null)
+      setLastSavedDraft(null)
+
+      // Clear localStorage to prevent data leakage between accounts
+      localStorage.removeItem('selectedCategory')
+
+      // Load messages for current company
+      if (selectedCategory) {
+        loadMessages(selectedCategory)
+      }
+    }
+  }, [company?.id])
+
   // Load messages when category is selected
   useEffect(() => {
-    if (selectedCategory) {
+    if (selectedCategory && (company as any)?.id) {
       loadMessages(selectedCategory)
       // Load the message for the selected category
       setNewMessage(categoryMessages[selectedCategory])
     }
-  }, [selectedCategory, categoryMessages])
+  }, [selectedCategory, categoryMessages, company?.id])
 
   // Handle category selection
   const handleCategorySelect = (category: 'interview' | 'new_job') => {
@@ -75,18 +87,19 @@ export default function MessagesPage() {
         [selectedCategory]: newMessage
       }
       setCategoryMessages(updatedMessages)
-      localStorage.setItem('categoryMessages', JSON.stringify(updatedMessages))
+      // Don't save to localStorage anymore - only keep in memory for current session
     }
-    
-    // Switch to new category and save selection
+
+    // Switch to new category
     setSelectedCategory(category)
-    localStorage.setItem('selectedCategory', category)
   }
 
   const loadMessages = async (category: 'interview' | 'new_job') => {
+    if (!(company as any)?.id) return
+
     setLoading(true)
     try {
-      const response = await fetch(`/api/messages?category=${category}`)
+      const response = await fetch(`/api/messages?category=${category}&companyId=${(company as any).id}`)
       const data = await response.json()
       
       if (data.success) {
@@ -109,6 +122,11 @@ export default function MessagesPage() {
       return
     }
 
+    if (!(company as any)?.id) {
+      toast.error('Company not found')
+      return
+    }
+
     setSending(true)
     try {
       const response = await fetch('/api/messages', {
@@ -117,7 +135,8 @@ export default function MessagesPage() {
         body: JSON.stringify({
           category: categoryToUse,
           content: newMessage,
-          status: 'draft'
+          status: 'draft',
+          companyId: (company as any).id
         })
       })
 
@@ -223,13 +242,12 @@ export default function MessagesPage() {
                     return
                   }
                   setNewMessage(e.target.value)
-                  // Also update the category-specific message and save to localStorage
+                  // Also update the category-specific message in memory only
                   const updatedMessages = {
                     ...categoryMessages,
                     [selectedCategory]: e.target.value
                   }
                   setCategoryMessages(updatedMessages)
-                  localStorage.setItem('categoryMessages', JSON.stringify(updatedMessages))
                 }}
                 onKeyDown={(e) => {
                   if (e.ctrlKey && e.key === 'Enter') {
@@ -264,7 +282,6 @@ export default function MessagesPage() {
                         [selectedCategory]: ''
                       }
                       setCategoryMessages(updatedMessages)
-                      localStorage.setItem('categoryMessages', JSON.stringify(updatedMessages))
                       setLastSavedDraft(null)
                       toast.success('Message cleared')
                     }

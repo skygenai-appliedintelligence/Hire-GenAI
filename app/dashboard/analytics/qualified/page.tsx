@@ -4,8 +4,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
-// Removed Card wrappers per request
-// Tabs removed per request
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -178,108 +177,109 @@ export default function QualifiedCandidatesInterviewFlowPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 space-y-6 py-6 overflow-x-hidden bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
+    <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Qualified Candidates</h1>
         <Link href="/dashboard/analytics" className="text-sm text-blue-600 hover:underline">
           Back to Analytics
         </Link>
       </div>
-      {/* Single section (keep only one table) */}
-      <div className="space-y-8">
-        <section className="space-y-3">
-            <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-              <Table className="table-auto w-full">
-                <TableHeader>
-                  <TableRow className="bg-gray-50">
-                    <TableHead className="px-3 py-2 text-sm align-middle w-12">
-                      <Checkbox
-                        checked={selectAll}
-                        onCheckedChange={handleSelectAll}
-                        aria-label="Select all candidates"
-                      />
-                    </TableHead>
-                    <TableHead className="px-3 py-2 text-sm align-middle">Candidate Name</TableHead>
-                    <TableHead className="px-3 py-2 text-sm align-middle">Applied JD</TableHead>
-                    <TableHead className="px-3 py-2 text-sm align-middle">Email</TableHead>
-                    <TableHead className="px-3 py-2 text-sm align-middle">Phone</TableHead>
-                    <TableHead className="px-3 py-2 text-sm align-middle">Status</TableHead>
-                    <TableHead className="px-3 py-2 text-sm align-middle">Report</TableHead>
-                    <TableHead className="px-3 py-2 text-sm align-middle whitespace-nowrap">Send Interview Link</TableHead>
+
+      <Card className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
+        <CardHeader>
+          <CardTitle>All Qualified Candidates</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-hidden rounded-lg border border-gray-200">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50">
+                  <TableHead>
+                    <Checkbox
+                      checked={selectAll}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all candidates"
+                    />
+                  </TableHead>
+                  <TableHead>Candidate Name</TableHead>
+                  <TableHead>Applied JD</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Report</TableHead>
+                  <TableHead>Send Interview Link</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">Loading...</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">Loading...</TableCell>
-                    </TableRow>
-                  ) : error ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-red-500">
-                        Error: {error}
-                      </TableCell>
-                    </TableRow>
-                  ) : rows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                        No qualified candidates found. Candidates will appear here after CV screening.
-                      </TableCell>
-                    </TableRow>
-                  ) : rows.map((row, idx) => (
-                    <TableRow key={row.id} className={idx % 2 === 1 ? "bg-gray-50" : undefined}>
-                      <TableCell className="px-3 py-2 text-sm align-middle">
-                        <Checkbox
-                          checked={selectedRows.has(row.id)}
-                          onCheckedChange={(checked) => handleRowSelect(row.id, checked as boolean)}
-                          aria-label={`Select ${row.candidateName}`}
-                        />
-                      </TableCell>
-                      <TableCell className="px-3 py-2 text-sm align-middle font-medium truncate">{row.candidateName}</TableCell>
-                      <TableCell className="px-3 py-2 text-sm align-middle truncate">{row.appliedJD}</TableCell>
-                      <TableCell className="px-3 py-2 text-sm align-middle">
-                        <span className="block max-w-[220px] truncate">{row.email}</span>
-                      </TableCell>
-                      <TableCell className="px-3 py-2 text-sm align-middle">{row.phone}</TableCell>
-                      <TableCell className="px-3 py-2 text-sm align-middle">
-                        <span
-                          className={
-                            row.status === "Qualified"
-                              ? "inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700"
-                              : row.status === "Unqualified"
-                              ? "inline-flex items-center rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700"
-                              : row.status === "Pending"
-                              ? "inline-flex items-center rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-700"
-                              : "inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700"
-                          }
-                        >
-                          {row.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
-                        <Link href={`/dashboard/analytics/${row.jobId}/applications/${row.id}/report`}>
-                          <Button variant="outline" size="sm">Show Report</Button>
-                        </Link>
-                      </TableCell>
-                      <TableCell className="px-3 py-2 text-sm align-middle whitespace-nowrap">
-                        <Button
-                          size="sm"
-                          className={
-                            sentMap[row.id]
-                              ? "bg-yellow-500 text-white hover:bg-yellow-600"
-                              : "bg-emerald-600 text-white hover:bg-emerald-700"
-                          }
-                          onClick={() => handleOpenEmailModal(row)}
-                        >
-                          {sentMap[row.id] ? "Resend Email" : "Send Email"}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </section>
-      </div>
+                ) : error ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-red-500">
+                      Error: {error}
+                    </TableCell>
+                  </TableRow>
+                ) : rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                      No qualified candidates found. Candidates will appear here after CV screening.
+                    </TableCell>
+                  </TableRow>
+                ) : rows.map((row, idx) => (
+                  <TableRow key={row.id} className={idx % 2 === 1 ? "bg-gray-50" : undefined}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedRows.has(row.id)}
+                        onCheckedChange={(checked) => handleRowSelect(row.id, checked as boolean)}
+                        aria-label={`Select ${row.candidateName}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">{row.candidateName}</TableCell>
+                    <TableCell>{row.appliedJD}</TableCell>
+                    <TableCell>{row.email}</TableCell>
+                    <TableCell>{row.phone}</TableCell>
+                    <TableCell>
+                      <span
+                        className={
+                          row.status === "Qualified"
+                            ? "inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700"
+                            : row.status === "Unqualified"
+                            ? "inline-flex items-center rounded-full bg-red-100 px-2 py-1 text-xs font-medium text-red-700"
+                            : row.status === "Pending"
+                            ? "inline-flex items-center rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-700"
+                            : "inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700"
+                        }
+                      >
+                        {row.status}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Link href={`/dashboard/analytics/${row.jobId}/applications/${row.id}/report`}>
+                        <Button variant="outline" size="sm">Show Report</Button>
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="sm"
+                        className={
+                          sentMap[row.id]
+                            ? "bg-yellow-500 text-white hover:bg-yellow-600"
+                            : "bg-emerald-600 text-white hover:bg-emerald-700"
+                        }
+                        onClick={() => handleOpenEmailModal(row)}
+                      >
+                        {sentMap[row.id] ? "Resend Email" : "Send Email"}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Email Modal */}
       {selectedCandidate && (
