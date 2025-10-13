@@ -3,6 +3,7 @@
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import { MockAuthService } from "@/lib/mock-auth"
+import { RoleManagementService, UserRole } from "@/lib/role-management-service"
 
 interface User {
   id: string
@@ -11,6 +12,7 @@ interface User {
   status: string
   phone?: string
   timezone?: string
+  role?: "admin" | "interviewer" | "ai_recruiter"
 }
 
 interface Company {
