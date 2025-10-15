@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 import { User, Building, Bell, CreditCard, Users as UsersIcon, Plus, Trash, MapPin, FileText, Building2, Lock } from "lucide-react"
+import BillingContent from "./BillingContent"
 
 const industries = [
   "Technology",
@@ -177,8 +178,10 @@ export default function SettingsContent({ section }: { section?: string }) {
     }
   }, [isRecruiterRole, current, router, toast])
   
-  // Allow all users to edit all settings (within their accessible tabs)
-  const canEditSection = true
+  // Allow editing based on role and section
+  // Recruiters can only view (read-only) profile section
+  // Admins can edit everything
+  const canEditSection = (isAdminRole || isBsadmin) || !(isRecruiterRole && current === 'profile')
 
   // Team management state
   const [membersLoading, setMembersLoading] = useState(false)
@@ -987,30 +990,7 @@ export default function SettingsContent({ section }: { section?: string }) {
               </CardContent>
             </Card>
           ) : (
-            <Card className="linkedin-card">
-              <CardHeader>
-                <CardTitle>Billing & Subscription</CardTitle>
-                <CardDescription>Manage your subscription and billing information</CardDescription>
-              </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-blue-900">Current Plan: Premium</h3>
-                <p className="text-blue-700">$99/month • Unlimited jobs and candidates</p>
-              </div>
-              <div className="space-y-4">
-                <h4 className="font-medium">Payment Method</h4>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm">**** **** **** 4242</p>
-                  <p className="text-sm text-gray-500">Expires 12/25</p>
-                </div>
-              </div>
-              <div className="flex space-x-4">
-                <Button variant="outline" disabled={!canEditSection}>Change Plan</Button>
-                <Button variant="outline" disabled={!canEditSection}>Update Payment Method</Button>
-                <Button variant="outline" disabled={!canEditSection}>Download Invoice</Button>
-              </div>
-            </CardContent>
-          </Card>
+            <BillingContent companyId={(company as any)?.id} />
           )}
         </TabsContent>
       </Tabs>

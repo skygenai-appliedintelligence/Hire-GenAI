@@ -31,6 +31,7 @@ export interface Job {
   interview_process?: InterviewRound[]
   role_type?: string
   created_by: string
+  created_by_email?: string
   created_at: string
   updated_at: string
   // New fields for tracking
