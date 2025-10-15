@@ -248,7 +248,7 @@ export default function DemoInterviewPage() {
           type: 'response.create',
           response: {
             modalities: ['audio'],
-            instructions: "Please greet the candidate and ask which job title they are interviewing for. Wait for their answer before continuing with role-specific questions.",
+            instructions: "You are an AI interviewer conducting this interview ONLY in English. IMPORTANT: If the candidate speaks in ANY language other than English (Hindi, Spanish, French, etc.), immediately respond: 'I apologize, but I can only conduct this interview in English. Please respond in English.' Then repeat your last question. Now, please greet the candidate and ask which job title they are interviewing for. Wait for their answer before continuing with role-specific questions.",
           },
         }
         dc.send(JSON.stringify(startMsg))

@@ -767,7 +767,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
             description: compiledDescription || formData.description || '',
             requirements: compiledRequirements || formData.requirements || '',
             companyId: company?.id, // Pass companyId directly
-            createdBy: user?.id || null,
+            createdBy: user?.email || null, // Pass email instead of user ID
           }),
         })
         data = await res.json()
@@ -873,31 +873,32 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
   ]
 
   return (
-    <div className="container mx-auto py-6 max-w-4xl">
-      <div className="mb-6">
+    <div className="w-full min-h-screen bg-gray-50/50">
+      <div className="w-full py-4 sm:py-6 px-4 sm:px-6 lg:px-8 xl:px-12">
+      <div className="mb-4 sm:mb-6">
         <Button 
           variant="ghost" 
           onClick={() => router.back()}
-          className="mb-4"
+          className="mb-3 sm:mb-4"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
-        <h1 className="text-3xl font-bold">{searchParams.get('jobId') ? 'Edit Job' : 'Create New Job'}</h1>
-        <p className="text-gray-600 mt-2">{searchParams.get('jobId') ? 'Review and update the job details' : 'Fill out the details to create a comprehensive job posting'}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold">{searchParams.get('jobId') ? 'Edit Job' : 'Create New Job'}</h1>
+        <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">{searchParams.get('jobId') ? 'Review and update the job details' : 'Fill out the details to create a comprehensive job posting'}</p>
 
         {/* Top bar Job Status selector */}
-        <div className="mt-4 flex items-center justify-between rounded-md border border-gray-200 bg-white px-4 py-3">
+        <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 rounded-md border border-gray-200 bg-white px-3 sm:px-4 py-3">
           <div className="text-sm">
             <div className="font-medium">Job Status</div>
             <div className="text-gray-500">Set whether the job is open, on hold, or closed</div>
           </div>
-          <div className="flex items-center gap-3 min-w-[220px]">
+          <div className="flex items-center gap-3 w-full sm:w-auto sm:min-w-[220px]">
             <Select
               value={formData.status}
               onValueChange={(val) => handleInputChange('status', val)}
             >
-              <SelectTrigger className="w-[220px]">
+              <SelectTrigger className="w-full sm:w-[220px]">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
@@ -926,20 +927,20 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
           }}
           className="space-y-6"
         >
-          <TabsList className="w-full flex items-center gap-2 p-1 rounded-lg border bg-muted/40 text-muted-foreground my-2 h-[56px] overflow-x-auto no-scrollbar">
-            <div className="flex items-center gap-2 flex-nowrap">
-              <TabsTrigger value="basic" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Basic Info</TabsTrigger>
-              <TabsTrigger value="requirements" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Requirements</TabsTrigger>
-              <TabsTrigger value="responsibilities" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Responsibilities</TabsTrigger>
-              <TabsTrigger value="compensation" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Compensation</TabsTrigger>
-              <TabsTrigger value="logistics" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Visa & Others</TabsTrigger>
-              <TabsTrigger value="resume-screening" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Resume Screening</TabsTrigger>
-              <TabsTrigger value="interview" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 py-2 text-sm rounded-md whitespace-nowrap shrink-0">Interview Process</TabsTrigger>
+          <TabsList className="w-full flex items-center gap-1 sm:gap-2 p-1 rounded-lg border bg-muted/40 text-muted-foreground my-2 min-h-[48px] sm:h-[56px] overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1 sm:gap-2 flex-nowrap">
+              <TabsTrigger value="basic" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Basic Info</TabsTrigger>
+              <TabsTrigger value="requirements" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Requirements</TabsTrigger>
+              <TabsTrigger value="responsibilities" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Responsibilities</TabsTrigger>
+              <TabsTrigger value="compensation" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Compensation</TabsTrigger>
+              <TabsTrigger value="logistics" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Visa & Others</TabsTrigger>
+              <TabsTrigger value="resume-screening" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Resume Screening</TabsTrigger>
+              <TabsTrigger value="interview" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Interview Process</TabsTrigger>
             </div>
           </TabsList>
 
           <TabsContent value="basic" className="space-y-6">
-            <Card>
+            <Card className="shadow-sm border-gray-200">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Briefcase className="h-5 w-5" />
@@ -950,7 +951,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="jobTitle">Job Title *</Label>
                     <Input
@@ -975,7 +976,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="location">Location *</Label>
                     <Input
@@ -1542,6 +1543,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
           </div>
         </div>
       </form>
+      </div>
     </div>
   )
 }

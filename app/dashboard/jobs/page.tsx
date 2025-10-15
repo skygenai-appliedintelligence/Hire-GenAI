@@ -9,19 +9,23 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Eye, Trash2, Briefcase, CheckCircle, XCircle, ExternalLink, BarChart3 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Plus, Eye, Trash2, Briefcase, CheckCircle, XCircle, ExternalLink, BarChart3, MapPin, Clock, DollarSign, User, Filter } from "lucide-react"
 import Link from "next/link"
 
 export default function JobsPage() {
-  const { company } = useAuth()
+  const { company, user } = useAuth()
   const router = useRouter()
   const [jobs, setJobs] = useState<Job[]>([])
+  const [allJobs, setAllJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const { toast } = useToast()
   const [applyEnabledByJob, setApplyEnabledByJob] = useState<Record<string, boolean>>({})
   const [tab, setTab] = useState<'open' | 'on_hold' | 'closed' | 'cancelled'>('open')
   const [statusByJob, setStatusByJob] = useState<Record<string, 'open' | 'on_hold' | 'closed' | 'cancelled'>>({})
+  const [users, setUsers] = useState<{ id: string; email: string; fullName: string }[]>([])
+  const [selectedUserEmail, setSelectedUserEmail] = useState<string>('all')
 
   const normalizeStatus = (s: string | undefined | null): 'open' | 'on_hold' | 'closed' | 'cancelled' => {
     const v = String(s || '').trim().toLowerCase()
@@ -30,6 +34,34 @@ export default function JobsPage() {
     if (v === 'cancelled' || v === 'canceled' || v === 'cancel') return 'cancelled'
     return 'open'
   }
+
+  // Load users from company
+  useEffect(() => {
+    const loadUsers = async () => {
+      if (!(company as any)?.id) return
+      try {
+        const res = await fetch(`/api/users/by-company?companyId=${(company as any).id}`)
+        const data = await res.json()
+        console.log('👥 Users API response:', data)
+        if (data.ok && data.users) {
+          console.log('👥 Setting users in state:', data.users)
+          setUsers(data.users)
+          // Set default filter to current user's email
+          if (user?.email) {
+            setSelectedUserEmail(user.email)
+          }
+        } else {
+          console.log('⚠️ No users found or API error:', data)
+        }
+      } catch (e) {
+        console.error('Failed to load users:', e)
+      }
+    }
+    
+    if ((company as any)?.id) {
+      loadUsers()
+    }
+  }, [company, user])
 
   useEffect(() => {
     if (company?.id) {
@@ -107,38 +139,49 @@ export default function JobsPage() {
       const res = await fetch(url)
       const data = await res.json()
       if (!res.ok || !data?.ok) throw new Error(data?.error || 'Failed to load jobs')
-      setJobs(
-        (data.jobs || []).map((j: any) => ({
-          id: j.id,
-          company_id: j.company_id || '',
-          title: j.title,
-          description: j.summary || j.description || '',
-          requirements: j.requirements || '',
-          location: j.location_text || '',
-          salary_range: j.salary_label || j.salary_range || '',
-          employment_type: j.employment_type || '',
-          status: j.status || 'open',
-          posted_platforms: Array.isArray(j.posted_platforms) ? j.posted_platforms : [],
-          platform_job_ids: typeof j.platform_job_ids === 'object' && j.platform_job_ids !== null ? j.platform_job_ids : {},
-          posting_results: Array.isArray(j.posting_results) ? j.posting_results : [],
-          interview_rounds: j.interview_rounds || [],
-          created_by: j.created_by || '',
-          created_at: j.created_at,
-          updated_at: j.updated_at,
-          total_applications: 0,
-          qualified_candidates: 0,
-          in_progress: 0,
-          completed_interviews: 0,
-          recommended: 0,
-          rejected: 0,
-        }))
-      )
+      const mappedJobs = (data.jobs || []).map((j: any) => ({
+        id: j.id,
+        company_id: j.company_id || '',
+        title: j.title,
+        description: j.summary || j.description || '',
+        requirements: j.requirements || '',
+        location: j.location || j.location_text || '',
+        salary_range: j.salary_label || j.salary_range || '',
+        employment_type: j.employment_type || '',
+        status: j.status || 'open',
+        posted_platforms: Array.isArray(j.posted_platforms) ? j.posted_platforms : [],
+        platform_job_ids: typeof j.platform_job_ids === 'object' && j.platform_job_ids !== null ? j.platform_job_ids : {},
+        posting_results: Array.isArray(j.posting_results) ? j.posting_results : [],
+        interview_rounds: j.interview_rounds || [],
+        created_by: j.created_by || '',
+        created_by_email: j.created_by_email || '',
+        created_at: j.created_at,
+        updated_at: j.updated_at,
+        total_applications: 0,
+        qualified_candidates: 0,
+        in_progress: 0,
+        completed_interviews: 0,
+        recommended: 0,
+        rejected: 0,
+      }))
+      setAllJobs(mappedJobs)
+      setJobs(mappedJobs)
     } catch (error) {
       console.error('❌ Error fetching jobs:', error)
     } finally {
       setLoading(false)
     }
   }
+
+  // Filter jobs when user selection changes
+  useEffect(() => {
+    if (selectedUserEmail === 'all') {
+      setJobs(allJobs)
+    } else {
+      const filtered = allJobs.filter(job => job.created_by_email === selectedUserEmail)
+      setJobs(filtered)
+    }
+  }, [selectedUserEmail, allJobs])
 
   const handleDeleteJob = async (jobId: string) => {
     if (!company?.name) {
@@ -156,6 +199,7 @@ export default function JobsPage() {
         if (!res.ok || !data?.ok) throw new Error(data?.error || 'Failed to delete job')
 
         setJobs((prev) => prev.filter((job) => job.id !== jobId))
+        setAllJobs((prev) => prev.filter((job) => job.id !== jobId))
         console.log("✅ Job deleted successfully")
         toast({ title: "Job deleted", description: "The job has been removed successfully." })
       } catch (err) {
@@ -242,58 +286,88 @@ export default function JobsPage() {
         </Link>
       </div>
 
-      {/* Buckets: by status */}
+      {/* Status Tabs and Filter Section */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as 'open' | 'on_hold' | 'closed' | 'cancelled')} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="open">Open</TabsTrigger>
-          <TabsTrigger value="on_hold">On Hold</TabsTrigger>
-          <TabsTrigger value="closed">Closed</TabsTrigger>
-          <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="open">Open</TabsTrigger>
+            <TabsTrigger value="on_hold">On Hold</TabsTrigger>
+            <TabsTrigger value="closed">Closed</TabsTrigger>
+            <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
+          </TabsList>
+          
+          {/* Filter Section */}
+          <div className="flex items-center space-x-2">
+            <Filter className="h-4 w-4 text-gray-500" />
+            <Select value={selectedUserEmail} onValueChange={setSelectedUserEmail}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by creator" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Users</SelectItem>
+                {users.map((user) => (
+                  <SelectItem key={user.id} value={user.email}>
+                    {user.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         
 
         {/* Open tab: show jobs with status === open */}
         <TabsContent value="open">
-          <div className="grid gap-6">
+          <div className="grid gap-5">
             {jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'open').length > 0 ? (
               jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'open').map((job) => (
                 <Card
                   key={job.id}
-                  className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
+                  className="group border border-gray-200 bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer hover:border-emerald-200 overflow-hidden"
                   onClick={() => handleStoreJD(job)}
                 >
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">{job.title}</CardTitle>
-                        <CardDescription>
-                          {job.location} • {job.employment_type}
-                          {job.salary_range && ` • ${job.salary_range}`}
-                        </CardDescription>
+                  <CardHeader className="pb-4 pt-5 px-6">
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-2xl font-bold text-gray-900 mb-1 leading-tight">{job.title}</CardTitle>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        {(() => { const effective = (statusByJob[job.id] ?? normalizeStatus((job as any).status)); return <Badge className={getStatusColor(effective)}>{effective}</Badge> })()}
-                      </div>
+                      {(() => { const effective = (statusByJob[job.id] ?? normalizeStatus((job as any).status)); return <Badge className={`${getStatusColor(effective)} shrink-0 px-3 py-1 text-xs font-semibold uppercase tracking-wide`}>{effective}</Badge> })()}
                     </div>
+                    
+                    {/* Job Metadata */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600">
+                      <span className="flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-gray-400" />
+                        <span className="font-medium">{job.location}</span>
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        <span>{job.employment_type}</span>
+                      </span>
+                      {job.salary_range && (
+                        <span className="flex items-center gap-1.5">
+                          <DollarSign className="w-4 h-4 text-gray-400" />
+                          <span className="font-semibold text-emerald-700">{job.salary_range}</span>
+                        </span>
+                      )}
+                    </div>
+                    
+                    {(job as any).created_by_email && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-2">
+                        <User className="w-3.5 h-3.5" />
+                        <span>Created by <span className="font-medium text-gray-700">{(job as any).created_by_email}</span></span>
+                      </div>
+                    )}
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-3">{(() => {
-                      // Extract "About the Role" section from structured description format
+                  
+                  <CardContent className="px-6 pb-5">
+                    {/* Description */}
+                    <p className="text-sm text-gray-600 leading-relaxed mb-4 line-clamp-2">{(() => {
                       const description = job.description || ''
-                      
-                      // Try new structured format first
                       const aboutRoleMatch = description.match(/About the Role\s*\n(.+?)(?=\n🔹|\n$|$)/s)
-                      if (aboutRoleMatch && aboutRoleMatch[1]) {
-                        return aboutRoleMatch[1].trim()
-                      }
-                      
-                      // Fallback: try old markdown format
+                      if (aboutRoleMatch && aboutRoleMatch[1]) return aboutRoleMatch[1].trim()
                       const oldFormatMatch = description.match(/## About the Role\s*\n(.+?)(?=\n##|\n$|$)/s)
-                      if (oldFormatMatch && oldFormatMatch[1]) {
-                        return oldFormatMatch[1].trim()
-                      }
-                      
-                      // Final fallback: show first meaningful content after Basic Information
+                      if (oldFormatMatch && oldFormatMatch[1]) return oldFormatMatch[1].trim()
                       const afterBasicInfo = description.split('About the Role')[1]
                       if (afterBasicInfo) {
                         const cleanContent = afterBasicInfo.split('🔹')[0]?.trim() || afterBasicInfo.split('\n\n')[0]?.trim()
@@ -301,31 +375,30 @@ export default function JobsPage() {
                           return cleanContent.length > 200 ? cleanContent.substring(0, 200) + '...' : cleanContent
                         }
                       }
-                      
-                      // Ultimate fallback: show first meaningful content without headers
                       const cleanDesc = description.replace(/^\/\/ Basic Information[\s\S]*?(?=About the Role|$)/, '').replace(/##[^\n]*\n/g, '').trim()
                       const firstLine = cleanDesc.split('\n')[0] || description
                       return firstLine.length > 200 ? firstLine.substring(0, 200) + '...' : firstLine
                     })()}</p>
 
+                    {/* Platform Status */}
                     {job.posting_results.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Platform Status:</h4>
+                      <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                        <h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Platform Status</h4>
                         <div className="flex flex-wrap gap-2">
                           {job.posting_results.map((result, index) => (
-                            <div key={index} className="flex items-center space-x-1 text-xs">
+                            <div key={index} className="flex items-center gap-1.5">
                               {result.success ? (
                                 <>
-                                  <CheckCircle className="w-3 h-3 text-green-600" />
-                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                  <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
                                     {result.platform}
                                   </Badge>
                                 </>
                               ) : (
                                 <>
-                                  <XCircle className="w-3 h-3 text-red-600" />
-                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                    {result.platform} (Failed)
+                                  <XCircle className="w-3.5 h-3.5 text-red-600" />
+                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-xs">
+                                    {result.platform}
                                   </Badge>
                                 </>
                               )}
@@ -336,11 +409,11 @@ export default function JobsPage() {
                     )}
 
                     {job.posting_results.length === 0 && job.posted_platforms.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Posted to:</h4>
-                        <div className="flex space-x-2">
+                      <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                        <h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Posted Platforms</h4>
+                        <div className="flex flex-wrap gap-2">
                           {job.posted_platforms.map((platform) => (
-                            <Badge key={platform} variant="outline">
+                            <Badge key={platform} variant="outline" className="text-xs">
                               {platform}
                             </Badge>
                           ))}
@@ -348,68 +421,67 @@ export default function JobsPage() {
                       </div>
                     )}
 
-                    <div className="flex justify-between items-center">
-                      <div className="text-xs text-gray-500">
-                        Created: {new Date(job.created_at).toLocaleDateString()}
+                    {/* Divider */}
+                    <div className="border-t border-gray-100 my-4"></div>
+
+                    {/* Footer with Actions */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="text-xs text-gray-500 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Created {new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                         {job.posting_results.length > 0 && (
-                          <span className="ml-4">
-                            Posted to {job.posting_results.filter((r) => r.success).length}/{job.posting_results.length}{" "}
-                            platforms
+                          <span className="ml-2 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full font-medium">
+                            {job.posting_results.filter((r) => r.success).length}/{job.posting_results.length} platforms
                           </span>
                         )}
                       </div>
-                      <div className="flex space-x-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 hover:border-emerald-300 transition-all"
                           onClick={(e) => {
                             e.stopPropagation()
-                            // Store job data for analytics filter
-                            localStorage.setItem('selectedJobForAnalytics', JSON.stringify({
-                              id: job.id,
-                              title: job.title
-                            }))
+                            localStorage.setItem('selectedJobForAnalytics', JSON.stringify({ id: job.id, title: job.title }))
                             router.push('/dashboard/analytics')
                           }}
                         >
-                          <BarChart3 className="h-4 w-4 mr-1" />
-                          View Stats
+                          <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                          Stats
                         </Button>
-                        {/* Apply button enabled for open status */}
                         <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="text-blue-600 hover:text-blue-700 bg-transparent hover:bg-blue-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 hover:border-blue-300 transition-all"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <ExternalLink className="h-4 w-4 mr-1" />
-                            Apply Form
+                            <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                            Apply
                           </Button>
                         </Link>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="bg-transparent hover:bg-gray-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          className="hover:bg-gray-50 transition-all"
                           onClick={(e) => {
                             e.stopPropagation()
                             try { localStorage.setItem('editJobDraft', JSON.stringify(job)) } catch {}
                             router.push(`/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
                           }}
                         >
-                          <Eye className="h-4 w-4 mr-1" />
+                          <Eye className="h-3.5 w-3.5 mr-1.5" />
                           View
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 shadow-sm hover:shadow-md motion-safe:transition-shadow"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300 transition-all"
                           onMouseDown={(e) => e.stopPropagation()}
                           disabled={deletingId === job.id}
                         >
-                          <Trash2 className="h-4 w-4 mr-1" />
+                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                           {deletingId === job.id ? 'Deleting…' : 'Delete'}
                         </Button>
                       </div>
@@ -430,46 +502,54 @@ export default function JobsPage() {
 
         {/* Cancelled tab: show jobs with status === cancelled */}
         <TabsContent value="cancelled">
-          <div className="grid gap-6">
+          <div className="grid gap-5">
             {jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'cancelled').length > 0 ? (
               jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'cancelled').map((job) => (
                 <Card
                   key={job.id}
-                  className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
+                  className="group border border-gray-200 bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer hover:border-emerald-200 overflow-hidden"
                   onClick={() => handleStoreJD(job)}
                 >
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">{job.title}</CardTitle>
-                        <CardDescription>
-                          {job.location} • {job.employment_type}
-                          {job.salary_range && ` • ${job.salary_range}`}
-                        </CardDescription>
+                  <CardHeader className="pb-4 pt-5 px-6">
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-2xl font-bold text-gray-900 mb-1 leading-tight">{job.title}</CardTitle>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        {(() => { const effective = (statusByJob[job.id] ?? normalizeStatus((job as any).status)); return <Badge className={getStatusColor(effective)}>{effective}</Badge> })()}
-                      </div>
+                      {(() => { const effective = (statusByJob[job.id] ?? normalizeStatus((job as any).status)); return <Badge className={`${getStatusColor(effective)} shrink-0 px-3 py-1 text-xs font-semibold uppercase tracking-wide`}>{effective}</Badge> })()}
                     </div>
+                    
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600">
+                      <span className="flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-gray-400" />
+                        <span className="font-medium">{job.location}</span>
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        <span>{job.employment_type}</span>
+                      </span>
+                      {job.salary_range && (
+                        <span className="flex items-center gap-1.5">
+                          <DollarSign className="w-4 h-4 text-gray-400" />
+                          <span className="font-semibold text-emerald-700">{job.salary_range}</span>
+                        </span>
+                      )}
+                    </div>
+                    
+                    {(job as any).created_by_email && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-2">
+                        <User className="w-3.5 h-3.5" />
+                        <span>Created by <span className="font-medium text-gray-700">{(job as any).created_by_email}</span></span>
+                      </div>
+                    )}
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-3">{(() => {
-                      // Extract "About the Role" section from structured description format
+                  
+                  <CardContent className="px-6 pb-5">
+                    <p className="text-sm text-gray-600 leading-relaxed mb-4 line-clamp-2">{(() => {
                       const description = job.description || ''
-                      
-                      // Try new structured format first
                       const aboutRoleMatch = description.match(/About the Role\s*\n(.+?)(?=\n🔹|\n$|$)/s)
-                      if (aboutRoleMatch && aboutRoleMatch[1]) {
-                        return aboutRoleMatch[1].trim()
-                      }
-                      
-                      // Fallback: try old markdown format
+                      if (aboutRoleMatch && aboutRoleMatch[1]) return aboutRoleMatch[1].trim()
                       const oldFormatMatch = description.match(/## About the Role\s*\n(.+?)(?=\n##|\n$|$)/s)
-                      if (oldFormatMatch && oldFormatMatch[1]) {
-                        return oldFormatMatch[1].trim()
-                      }
-                      
-                      // Final fallback: show first meaningful content after Basic Information
+                      if (oldFormatMatch && oldFormatMatch[1]) return oldFormatMatch[1].trim()
                       const afterBasicInfo = description.split('About the Role')[1]
                       if (afterBasicInfo) {
                         const cleanContent = afterBasicInfo.split('🔹')[0]?.trim() || afterBasicInfo.split('\n\n')[0]?.trim()
@@ -477,31 +557,29 @@ export default function JobsPage() {
                           return cleanContent.length > 200 ? cleanContent.substring(0, 200) + '...' : cleanContent
                         }
                       }
-                      
-                      // Ultimate fallback: show first meaningful content without headers
                       const cleanDesc = description.replace(/^\/\/ Basic Information[\s\S]*?(?=About the Role|$)/, '').replace(/##[^\n]*\n/g, '').trim()
                       const firstLine = cleanDesc.split('\n')[0] || description
                       return firstLine.length > 200 ? firstLine.substring(0, 200) + '...' : firstLine
                     })()}</p>
 
                     {job.posting_results.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Platform Status:</h4>
+                      <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                        <h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Platform Status</h4>
                         <div className="flex flex-wrap gap-2">
                           {job.posting_results.map((result, index) => (
-                            <div key={index} className="flex items-center space-x-1 text-xs">
+                            <div key={index} className="flex items-center gap-1.5">
                               {result.success ? (
                                 <>
-                                  <CheckCircle className="w-3 h-3 text-green-600" />
-                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                  <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
                                     {result.platform}
                                   </Badge>
                                 </>
                               ) : (
                                 <>
-                                  <XCircle className="w-3 h-3 text-red-600" />
-                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                    {result.platform} (Failed)
+                                  <XCircle className="w-3.5 h-3.5 text-red-600" />
+                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-xs">
+                                    {result.platform}
                                   </Badge>
                                 </>
                               )}
@@ -511,68 +589,65 @@ export default function JobsPage() {
                       </div>
                     )}
 
-                    <div className="flex justify-between items-center">
-                      <div className="text-xs text-gray-500">
-                        Created: {new Date(job.created_at).toLocaleDateString()}
+                    <div className="border-t border-gray-100 my-4"></div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="text-xs text-gray-500 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Created {new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                         {job.posting_results.length > 0 && (
-                          <span className="ml-4">
-                            Posted to {job.posting_results.filter((r) => r.success).length}/{job.posting_results.length}{" "}
-                            platforms
+                          <span className="ml-2 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full font-medium">
+                            {job.posting_results.filter((r) => r.success).length}/{job.posting_results.length} platforms
                           </span>
                         )}
                       </div>
-                      <div className="flex space-x-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 hover:border-emerald-300 transition-all"
                           onClick={(e) => {
                             e.stopPropagation()
-                            // Store job data for analytics filter
-                            localStorage.setItem('selectedJobForAnalytics', JSON.stringify({
-                              id: job.id,
-                              title: job.title
-                            }))
+                            localStorage.setItem('selectedJobForAnalytics', JSON.stringify({ id: job.id, title: job.title }))
                             router.push('/dashboard/analytics')
                           }}
                         >
-                          <BarChart3 className="h-4 w-4 mr-1" />
-                          View Stats
+                          <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                          Stats
                         </Button>
-                        {/* Apply Form button enabled for all statuses */}
                         <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="text-blue-600 hover:text-blue-700 bg-transparent hover:bg-blue-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 hover:border-blue-300 transition-all"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <ExternalLink className="h-4 w-4 mr-1" />
-                            Apply Form
+                            <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                            Apply
                           </Button>
                         </Link>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="bg-transparent hover:bg-gray-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          className="hover:bg-gray-50 transition-all"
                           onClick={(e) => {
                             e.stopPropagation()
                             try { localStorage.setItem('editJobDraft', JSON.stringify(job)) } catch {}
                             router.push(`/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
                           }}
                         >
-                          <Eye className="h-4 w-4 mr-1" />
+                          <Eye className="h-3.5 w-3.5 mr-1.5" />
                           View
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 shadow-sm hover:shadow-md motion-safe:transition-shadow"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300 transition-all"
                           onMouseDown={(e) => e.stopPropagation()}
                           disabled={deletingId === job.id}
                         >
-                          <Trash2 className="h-4 w-4 mr-1" />
+                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                           {deletingId === job.id ? 'Deleting…' : 'Delete'}
                         </Button>
                       </div>
@@ -593,46 +668,54 @@ export default function JobsPage() {
 
         {/* On Hold tab: show jobs with status === on_hold */}
         <TabsContent value="on_hold">
-          <div className="grid gap-6">
+          <div className="grid gap-5">
             {jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'on_hold').length > 0 ? (
               jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'on_hold').map((job) => (
                 <Card
                   key={job.id}
-                  className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
+                  className="group border border-gray-200 bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer hover:border-emerald-200 overflow-hidden"
                   onClick={() => handleStoreJD(job)}
                 >
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">{job.title}</CardTitle>
-                        <CardDescription>
-                          {job.location} • {job.employment_type}
-                          {job.salary_range && ` • ${job.salary_range}`}
-                        </CardDescription>
+                  <CardHeader className="pb-4 pt-5 px-6">
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-2xl font-bold text-gray-900 mb-1 leading-tight">{job.title}</CardTitle>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        {(() => { const effective = (statusByJob[job.id] ?? normalizeStatus((job as any).status)); return <Badge className={getStatusColor(effective)}>{effective}</Badge> })()}
-                      </div>
+                      {(() => { const effective = (statusByJob[job.id] ?? normalizeStatus((job as any).status)); return <Badge className={`${getStatusColor(effective)} shrink-0 px-3 py-1 text-xs font-semibold uppercase tracking-wide`}>{effective}</Badge> })()}
                     </div>
+                    
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600">
+                      <span className="flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-gray-400" />
+                        <span className="font-medium">{job.location}</span>
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        <span>{job.employment_type}</span>
+                      </span>
+                      {job.salary_range && (
+                        <span className="flex items-center gap-1.5">
+                          <DollarSign className="w-4 h-4 text-gray-400" />
+                          <span className="font-semibold text-emerald-700">{job.salary_range}</span>
+                        </span>
+                      )}
+                    </div>
+                    
+                    {(job as any).created_by_email && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-2">
+                        <User className="w-3.5 h-3.5" />
+                        <span>Created by <span className="font-medium text-gray-700">{(job as any).created_by_email}</span></span>
+                      </div>
+                    )}
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-3">{(() => {
-                      // Extract "About the Role" section from structured description format
+                  
+                  <CardContent className="px-6 pb-5">
+                    <p className="text-sm text-gray-600 leading-relaxed mb-4 line-clamp-2">{(() => {
                       const description = job.description || ''
-                      
-                      // Try new structured format first
                       const aboutRoleMatch = description.match(/About the Role\s*\n(.+?)(?=\n🔹|\n$|$)/s)
-                      if (aboutRoleMatch && aboutRoleMatch[1]) {
-                        return aboutRoleMatch[1].trim()
-                      }
-                      
-                      // Fallback: try old markdown format
+                      if (aboutRoleMatch && aboutRoleMatch[1]) return aboutRoleMatch[1].trim()
                       const oldFormatMatch = description.match(/## About the Role\s*\n(.+?)(?=\n##|\n$|$)/s)
-                      if (oldFormatMatch && oldFormatMatch[1]) {
-                        return oldFormatMatch[1].trim()
-                      }
-                      
-                      // Final fallback: show first meaningful content after Basic Information
+                      if (oldFormatMatch && oldFormatMatch[1]) return oldFormatMatch[1].trim()
                       const afterBasicInfo = description.split('About the Role')[1]
                       if (afterBasicInfo) {
                         const cleanContent = afterBasicInfo.split('🔹')[0]?.trim() || afterBasicInfo.split('\n\n')[0]?.trim()
@@ -640,31 +723,29 @@ export default function JobsPage() {
                           return cleanContent.length > 200 ? cleanContent.substring(0, 200) + '...' : cleanContent
                         }
                       }
-                      
-                      // Ultimate fallback: show first meaningful content without headers
                       const cleanDesc = description.replace(/^\/\/ Basic Information[\s\S]*?(?=About the Role|$)/, '').replace(/##[^\n]*\n/g, '').trim()
                       const firstLine = cleanDesc.split('\n')[0] || description
                       return firstLine.length > 200 ? firstLine.substring(0, 200) + '...' : firstLine
                     })()}</p>
 
                     {job.posting_results.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Platform Status:</h4>
+                      <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                        <h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Platform Status</h4>
                         <div className="flex flex-wrap gap-2">
                           {job.posting_results.map((result, index) => (
-                            <div key={index} className="flex items-center space-x-1 text-xs">
+                            <div key={index} className="flex items-center gap-1.5">
                               {result.success ? (
                                 <>
-                                  <CheckCircle className="w-3 h-3 text-green-600" />
-                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                  <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
                                     {result.platform}
                                   </Badge>
                                 </>
                               ) : (
                                 <>
-                                  <XCircle className="w-3 h-3 text-red-600" />
-                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                    {result.platform} (Failed)
+                                  <XCircle className="w-3.5 h-3.5 text-red-600" />
+                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-xs">
+                                    {result.platform}
                                   </Badge>
                                 </>
                               )}
@@ -674,68 +755,65 @@ export default function JobsPage() {
                       </div>
                     )}
 
-                    <div className="flex justify-between items-center">
-                      <div className="text-xs text-gray-500">
-                        Created: {new Date(job.created_at).toLocaleDateString()}
+                    <div className="border-t border-gray-100 my-4"></div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="text-xs text-gray-500 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Created {new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                         {job.posting_results.length > 0 && (
-                          <span className="ml-4">
-                            Posted to {job.posting_results.filter((r) => r.success).length}/{job.posting_results.length}{" "}
-                            platforms
+                          <span className="ml-2 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full font-medium">
+                            {job.posting_results.filter((r) => r.success).length}/{job.posting_results.length} platforms
                           </span>
                         )}
                       </div>
-                      <div className="flex space-x-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 hover:border-emerald-300 transition-all"
                           onClick={(e) => {
                             e.stopPropagation()
-                            // Store job data for analytics filter
-                            localStorage.setItem('selectedJobForAnalytics', JSON.stringify({
-                              id: job.id,
-                              title: job.title
-                            }))
+                            localStorage.setItem('selectedJobForAnalytics', JSON.stringify({ id: job.id, title: job.title }))
                             router.push('/dashboard/analytics')
                           }}
                         >
-                          <BarChart3 className="h-4 w-4 mr-1" />
-                          View Stats
+                          <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                          Stats
                         </Button>
-                        {/* Apply Form button enabled for all statuses */}
                         <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="text-blue-600 hover:text-blue-700 bg-transparent hover:bg-blue-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 hover:border-blue-300 transition-all"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <ExternalLink className="h-4 w-4 mr-1" />
-                            Apply Form
+                            <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                            Apply
                           </Button>
                         </Link>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="bg-transparent hover:bg-gray-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          className="hover:bg-gray-50 transition-all"
                           onClick={(e) => {
                             e.stopPropagation()
                             try { localStorage.setItem('editJobDraft', JSON.stringify(job)) } catch {}
                             router.push(`/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
                           }}
                         >
-                          <Eye className="h-4 w-4 mr-1" />
+                          <Eye className="h-3.5 w-3.5 mr-1.5" />
                           View
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 shadow-sm hover:shadow-md motion-safe:transition-shadow"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300 transition-all"
                           onMouseDown={(e) => e.stopPropagation()}
                           disabled={deletingId === job.id}
                         >
-                          <Trash2 className="h-4 w-4 mr-1" />
+                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                           {deletingId === job.id ? 'Deleting…' : 'Delete'}
                         </Button>
                       </div>
@@ -756,46 +834,54 @@ export default function JobsPage() {
 
         {/* Closed tab: show jobs with status === closed */}
         <TabsContent value="closed">
-          <div className="grid gap-6">
+          <div className="grid gap-5">
             {jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'closed').length > 0 ? (
               jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'closed').map((job) => (
                 <Card
                   key={job.id}
-                  className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
+                  className="group border border-gray-200 bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer hover:border-emerald-200 overflow-hidden"
                   onClick={() => handleStoreJD(job)}
                 >
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">{job.title}</CardTitle>
-                        <CardDescription>
-                          {job.location} • {job.employment_type}
-                          {job.salary_range && ` • ${job.salary_range}`}
-                        </CardDescription>
+                  <CardHeader className="pb-4 pt-5 px-6">
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-2xl font-bold text-gray-900 mb-1 leading-tight">{job.title}</CardTitle>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        {(() => { const effective = (statusByJob[job.id] ?? normalizeStatus((job as any).status)); return <Badge className={getStatusColor(effective)}>{effective}</Badge> })()}
-                      </div>
+                      {(() => { const effective = (statusByJob[job.id] ?? normalizeStatus((job as any).status)); return <Badge className={`${getStatusColor(effective)} shrink-0 px-3 py-1 text-xs font-semibold uppercase tracking-wide`}>{effective}</Badge> })()}
                     </div>
+                    
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600">
+                      <span className="flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-gray-400" />
+                        <span className="font-medium">{job.location}</span>
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                        <span>{job.employment_type}</span>
+                      </span>
+                      {job.salary_range && (
+                        <span className="flex items-center gap-1.5">
+                          <DollarSign className="w-4 h-4 text-gray-400" />
+                          <span className="font-semibold text-emerald-700">{job.salary_range}</span>
+                        </span>
+                      )}
+                    </div>
+                    
+                    {(job as any).created_by_email && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-2">
+                        <User className="w-3.5 h-3.5" />
+                        <span>Created by <span className="font-medium text-gray-700">{(job as any).created_by_email}</span></span>
+                      </div>
+                    )}
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-3">{(() => {
-                      // Extract "About the Role" section from structured description format
+                  
+                  <CardContent className="px-6 pb-5">
+                    <p className="text-sm text-gray-600 leading-relaxed mb-4 line-clamp-2">{(() => {
                       const description = job.description || ''
-                      
-                      // Try new structured format first
                       const aboutRoleMatch = description.match(/About the Role\s*\n(.+?)(?=\n🔹|\n$|$)/s)
-                      if (aboutRoleMatch && aboutRoleMatch[1]) {
-                        return aboutRoleMatch[1].trim()
-                      }
-                      
-                      // Fallback: try old markdown format
+                      if (aboutRoleMatch && aboutRoleMatch[1]) return aboutRoleMatch[1].trim()
                       const oldFormatMatch = description.match(/## About the Role\s*\n(.+?)(?=\n##|\n$|$)/s)
-                      if (oldFormatMatch && oldFormatMatch[1]) {
-                        return oldFormatMatch[1].trim()
-                      }
-                      
-                      // Final fallback: show first meaningful content after Basic Information
+                      if (oldFormatMatch && oldFormatMatch[1]) return oldFormatMatch[1].trim()
                       const afterBasicInfo = description.split('About the Role')[1]
                       if (afterBasicInfo) {
                         const cleanContent = afterBasicInfo.split('🔹')[0]?.trim() || afterBasicInfo.split('\n\n')[0]?.trim()
@@ -803,31 +889,29 @@ export default function JobsPage() {
                           return cleanContent.length > 200 ? cleanContent.substring(0, 200) + '...' : cleanContent
                         }
                       }
-                      
-                      // Ultimate fallback: show first meaningful content without headers
                       const cleanDesc = description.replace(/^\/\/ Basic Information[\s\S]*?(?=About the Role|$)/, '').replace(/##[^\n]*\n/g, '').trim()
                       const firstLine = cleanDesc.split('\n')[0] || description
                       return firstLine.length > 200 ? firstLine.substring(0, 200) + '...' : firstLine
                     })()}</p>
 
                     {job.posting_results.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Platform Status:</h4>
+                      <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                        <h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Platform Status</h4>
                         <div className="flex flex-wrap gap-2">
                           {job.posting_results.map((result, index) => (
-                            <div key={index} className="flex items-center space-x-1 text-xs">
+                            <div key={index} className="flex items-center gap-1.5">
                               {result.success ? (
                                 <>
-                                  <CheckCircle className="w-3 h-3 text-green-600" />
-                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                  <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
                                     {result.platform}
                                   </Badge>
                                 </>
                               ) : (
                                 <>
-                                  <XCircle className="w-3 h-3 text-red-600" />
-                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                                    {result.platform} (Failed)
+                                  <XCircle className="w-3.5 h-3.5 text-red-600" />
+                                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-xs">
+                                    {result.platform}
                                   </Badge>
                                 </>
                               )}
@@ -838,11 +922,11 @@ export default function JobsPage() {
                     )}
 
                     {job.posting_results.length === 0 && job.posted_platforms.length > 0 && (
-                      <div className="mb-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Posted to:</h4>
-                        <div className="flex space-x-2">
+                      <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                        <h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wide">Posted Platforms</h4>
+                        <div className="flex flex-wrap gap-2">
                           {job.posted_platforms.map((platform) => (
-                            <Badge key={platform} variant="outline">
+                            <Badge key={platform} variant="outline" className="text-xs">
                               {platform}
                             </Badge>
                           ))}
@@ -850,68 +934,65 @@ export default function JobsPage() {
                       </div>
                     )}
 
-                    <div className="flex justify-between items-center">
-                      <div className="text-xs text-gray-500">
-                        Created: {new Date(job.created_at).toLocaleDateString()}
+                    <div className="border-t border-gray-100 my-4"></div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="text-xs text-gray-500 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Created {new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                         {job.posting_results.length > 0 && (
-                          <span className="ml-4">
-                            Posted to {job.posting_results.filter((r) => r.success).length}/{job.posting_results.length}{" "}
-                            platforms
+                          <span className="ml-2 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full font-medium">
+                            {job.posting_results.filter((r) => r.success).length}/{job.posting_results.length} platforms
                           </span>
                         )}
                       </div>
-                      <div className="flex space-x-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="bg-transparent hover:bg-blue-50 hover:text-blue-700 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 hover:border-emerald-300 transition-all"
                           onClick={(e) => {
                             e.stopPropagation()
-                            // Store job data for analytics filter
-                            localStorage.setItem('selectedJobForAnalytics', JSON.stringify({
-                              id: job.id,
-                              title: job.title
-                            }))
+                            localStorage.setItem('selectedJobForAnalytics', JSON.stringify({ id: job.id, title: job.title }))
                             router.push('/dashboard/analytics')
                           }}
                         >
-                          <BarChart3 className="h-4 w-4 mr-1" />
-                          View Stats
+                          <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
+                          Stats
                         </Button>
-                        {/* Apply Form button enabled for all statuses */}
                         <Link href={`/jobs/${(company?.name || '').toLowerCase().replace(/\s+/g, '-')}/${job.id}`} target="_blank">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="text-blue-600 hover:text-blue-700 bg-transparent hover:bg-blue-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 hover:border-blue-300 transition-all"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <ExternalLink className="h-4 w-4 mr-1" />
-                            Apply Form
+                            <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                            Apply
                           </Button>
                         </Link>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="bg-transparent hover:bg-gray-50 shadow-sm hover:shadow-md ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow"
+                          className="hover:bg-gray-50 transition-all"
                           onClick={(e) => {
                             e.stopPropagation()
                             try { localStorage.setItem('editJobDraft', JSON.stringify(job)) } catch {}
                             router.push(`/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}`)
                           }}
                         >
-                          <Eye className="h-4 w-4 mr-1" />
+                          <Eye className="h-3.5 w-3.5 mr-1.5" />
                           View
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 shadow-sm hover:shadow-md motion-safe:transition-shadow"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300 transition-all"
                           onMouseDown={(e) => e.stopPropagation()}
                           disabled={deletingId === job.id}
                         >
-                          <Trash2 className="h-4 w-4 mr-1" />
+                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                           {deletingId === job.id ? 'Deleting…' : 'Delete'}
                         </Button>
                       </div>

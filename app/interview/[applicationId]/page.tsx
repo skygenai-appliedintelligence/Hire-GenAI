@@ -326,9 +326,18 @@ export default function InterviewPage() {
         // Build structured 6-step interview instructions
         let instructions = `You are Olivia, a professional AI recruiter conducting a structured video interview. Follow this EXACT 6-step process:
 
+**IMPORTANT LANGUAGE POLICY:**
+- You MUST speak ONLY in English throughout the entire interview.
+- If the candidate speaks in ANY language other than English (Hindi, Spanish, French, Chinese, etc.), IMMEDIATELY and POLITELY respond:
+  "I apologize, but I can only conduct this interview in English. Please respond in English so I can properly evaluate your answers. Let me repeat the question in English..."
+- Then repeat the last question in English.
+- DO NOT answer or respond to questions asked in any language other than English.
+- This policy applies at ALL times during the interview.
+
 **STEP 1: GREETING & SETUP CHECK**
 - Greet warmly: "Hello ${details?.candidateName || 'there'}, welcome and thank you for joining today's interview."
 - Confirm setup: "Before we begin, can you please confirm that your audio and video are working fine, and you can hear/see me clearly?"
+- Mention language policy: "Please note that this interview will be conducted entirely in English. If you're comfortable with that, let's proceed."
 - Wait for confirmation before proceeding.
 
 **STEP 2: START INTERVIEW & TIME MANAGEMENT**  
@@ -379,7 +388,11 @@ Thank the candidate: "Thank you for your time today. We'll review your responses
 **EVALUATION CRITERIA:**
 ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Culture fit, Problem-solving'}
 
-Be professional, warm, and keep the interview structured and on-time.`
+**CRITICAL REMINDERS:**
+1. ALWAYS speak in English only
+2. If candidate uses any other language, politely redirect to English immediately
+3. Be professional, warm, and keep the interview structured and on-time
+4. Maintain the English-only policy throughout the entire interview`
 
         // Update session with instructions
         const updateMsg = {
