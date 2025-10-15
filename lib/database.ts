@@ -929,7 +929,7 @@ export class DatabaseService {
     }
     const q = `
       SELECT id, title, location_text, status, employment_type, level,
-             salary_min, salary_max, salary_period, created_by, created_at
+             salary_min, salary_max, salary_period, created_by_email, created_at
       FROM jobs
       WHERE company_id = $1::uuid
       ORDER BY created_at DESC
@@ -957,7 +957,7 @@ export class DatabaseService {
                decision_scope, salary_min, salary_max, salary_period, bonus_incentives,
                perks_benefits, time_off_policy, joining_timeline, travel_requirements,
                visa_requirements,
-               created_by, created_at
+               created_by_email, created_at
         FROM jobs
         WHERE id = $1::uuid AND company_id = $2::uuid
         LIMIT 1
@@ -971,7 +971,7 @@ export class DatabaseService {
                decision_scope, salary_min, salary_max, salary_period, bonus_incentives,
                perks_benefits, time_off_policy, joining_timeline, travel_requirements,
                visa_requirements,
-               created_by, created_at
+               created_by_email, created_at
         FROM jobs
         WHERE id = $1::uuid
         LIMIT 1
@@ -1069,7 +1069,7 @@ export class DatabaseService {
       WHERE id = $${i++}::uuid AND company_id = $${i}::uuid
       RETURNING id, company_id, title, location_text, employment_type, level,
                 salary_min, salary_max, salary_period,
-                created_by, created_at
+                created_by_email, created_at
     `
     const rows = (await this.query(q, values)) as any[]
     return rows.length > 0 ? rows[0] : null
@@ -1133,7 +1133,7 @@ export class DatabaseService {
     travel_requirements?: string | null
     visa_requirements?: string | null
     is_public?: boolean | null
-    created_by?: string | null
+    created_by_email?: string | null
   }) {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
@@ -1160,7 +1160,7 @@ export class DatabaseService {
         duties_day_to_day, duties_strategic, stakeholders,
         decision_scope, salary_min, salary_max, salary_period, bonus_incentives,
         perks_benefits, time_off_policy, joining_timeline, travel_requirements, visa_requirements,
-        status, is_public, created_by
+        status, is_public, created_by_email
       )
       VALUES (
         $1::uuid, $2, $3, $4, $5, $6::employment_type, $7::job_level, $8,
@@ -1170,7 +1170,7 @@ export class DatabaseService {
         $17::text[], $18::text[], $19::text[],
         $20, $21, $22, $23::salary_period, $24,
         $25::text[], $26, $27, $28, $29,
-        'open', COALESCE($30, true), $31::uuid
+        'open', COALESCE($30, true), $31
       )
       RETURNING id
     `
@@ -1206,7 +1206,7 @@ export class DatabaseService {
       input.travel_requirements ?? null,
       input.visa_requirements ?? null,
       input.is_public ?? true,
-      input.created_by ?? null,
+      input.created_by_email ?? null,
     ]
 
     const rows = (await this.query(q, params)) as any[]
@@ -1912,5 +1912,745 @@ export class DatabaseService {
         feedback: row.summary || undefined
       }
     })
+  }
+
+  // =========================
+  // BILLING & USAGE TRACKING
+  // =========================
+
+  // Get current pricing from env or defaults
+  static getPricing() {
+    return {
+      cvParsePrice: parseFloat(process.env.CV_PARSE_PRICE || '0.05'),
+      questionPricePer1kTokens: parseFloat(process.env.QUESTION_PRICE_PER_1K_TOKENS || '0.002'),
+      videoPricePerMin: parseFloat(process.env.VIDEO_PRICE_PER_MIN || '0.03'),
+      rechargeAmount: parseFloat(process.env.RECHARGE_AMOUNT || '100.00')
+    }
+  }
+
+  // Get company billing info
+  static async getCompanyBilling(companyId: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      SELECT * FROM company_billing
+      WHERE company_id = $1::uuid
+    `
+    const result = await this.query(query, [companyId]) as any[]
+    return result[0] || null
+  }
+
+  // Check if company is in trial and if usage qualifies for free credit
+  static async checkTrialEligibility(companyId: string, jobId?: string): Promise<{
+    isInTrial: boolean
+    isFreeUsage: boolean
+    reason?: string
+  }> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const billing = await this.getCompanyBilling(companyId)
+    
+    if (!billing || billing.billing_status !== 'trial') {
+      return { isInTrial: false, isFreeUsage: false, reason: 'Not in trial' }
+    }
+
+    // If no trial JD set yet, this is the first JD - it's free
+    if (!billing.trial_jd_id && jobId) {
+      return { isInTrial: true, isFreeUsage: true, reason: 'First trial JD' }
+    }
+
+    // If this is the trial JD and interview count <= 1, it's free
+    if (billing.trial_jd_id === jobId && billing.trial_interview_count <= 1) {
+      return { isInTrial: true, isFreeUsage: true, reason: 'Trial JD usage' }
+    }
+
+    // Trial has ended
+    return { isInTrial: true, isFreeUsage: false, reason: 'Trial limit reached' }
+  }
+
+  // Set trial JD (when first JD is created)
+  static async setTrialJD(companyId: string, jobId: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      UPDATE company_billing
+      SET trial_jd_id = $2::uuid, updated_at = NOW()
+      WHERE company_id = $1::uuid AND trial_jd_id IS NULL
+      RETURNING *
+    `
+    const result = await this.query(query, [companyId, jobId]) as any[]
+    return result[0] || null
+  }
+
+  // Increment trial interview count
+  static async incrementTrialInterviewCount(companyId: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      UPDATE company_billing
+      SET trial_interview_count = trial_interview_count + 1, updated_at = NOW()
+      WHERE company_id = $1::uuid
+      RETURNING *
+    `
+    const result = await this.query(query, [companyId]) as any[]
+    return result[0] || null
+  }
+
+  // End trial and require billing setup
+  static async endTrial(companyId: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      UPDATE company_billing
+      SET 
+        billing_status = 'active',
+        trial_ended_at = NOW(),
+        updated_at = NOW()
+      WHERE company_id = $1::uuid AND billing_status = 'trial'
+      RETURNING *
+    `
+    const result = await this.query(query, [companyId]) as any[]
+    return result[0] || null
+  }
+
+  // Record usage and handle charging
+  static async recordUsage(params: {
+    companyId: string
+    jobId: string
+    usageType: 'cv_parse' | 'jd_questions' | 'video_minutes'
+    quantity: number
+    metadata?: any
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const { companyId, jobId, usageType, quantity, metadata = {} } = params
+    const pricing = this.getPricing()
+
+    // Check trial eligibility
+    const trial = await this.checkTrialEligibility(companyId, jobId)
+
+    let cost = 0
+    let entryType: string
+    let description: string
+    let unitPrice = 0
+
+    // Calculate cost based on usage type
+    switch (usageType) {
+      case 'cv_parse':
+        unitPrice = pricing.cvParsePrice
+        cost = trial.isFreeUsage ? 0 : quantity * unitPrice
+        entryType = trial.isFreeUsage ? 'TRIAL_CREDIT' : 'CV_PARSE'
+        description = `CV parsing (${quantity} CVs)`
+        break
+      case 'jd_questions':
+        unitPrice = pricing.questionPricePer1kTokens
+        const tokens = metadata.tokensIn + metadata.tokensOut
+        cost = trial.isFreeUsage ? 0 : (tokens / 1000) * unitPrice
+        entryType = trial.isFreeUsage ? 'TRIAL_CREDIT' : 'JD_QUESTIONS'
+        description = `JD question generation (${tokens} tokens)`
+        break
+      case 'video_minutes':
+        unitPrice = pricing.videoPricePerMin
+        cost = trial.isFreeUsage ? 0 : quantity * unitPrice
+        entryType = trial.isFreeUsage ? 'TRIAL_CREDIT' : 'VIDEO_MINUTES'
+        description = `Video interview (${quantity} minutes)`
+        break
+      default:
+        throw new Error(`Unknown usage type: ${usageType}`)
+    }
+
+    // If not free and cost > 0, check wallet and auto-recharge if needed
+    if (!trial.isFreeUsage && cost > 0) {
+      const billing = await this.getCompanyBilling(companyId)
+      
+      if (!billing) {
+        throw new Error('Billing not initialized for company')
+      }
+
+      if (billing.billing_status === 'trial') {
+        throw new Error('Trial has ended. Please set up billing to continue.')
+      }
+
+      if (billing.billing_status === 'past_due') {
+        throw new Error('Account past due. Please update payment method.')
+      }
+
+      // Check monthly spend cap
+      if (billing.monthly_spend_cap && 
+          billing.current_month_spent + cost > billing.monthly_spend_cap) {
+        throw new Error(`Monthly spend cap of $${billing.monthly_spend_cap} reached`)
+      }
+
+      // Auto-recharge if wallet insufficient
+      if (billing.wallet_balance < cost) {
+        if (!billing.auto_recharge_enabled) {
+          throw new Error(`Insufficient wallet balance. Current: $${billing.wallet_balance}, Required: $${cost}`)
+        }
+
+        // Auto-recharge
+        await this.autoRecharge(companyId)
+      }
+
+      // Deduct from wallet
+      await this.deductFromWallet(companyId, cost)
+    }
+
+    // Record in usage ledger
+    await this.addLedgerEntry({
+      companyId,
+      jobId,
+      entryType,
+      description,
+      quantity,
+      unitPrice,
+      amount: cost,
+      metadata
+    })
+
+    // Update job_usage table
+    await this.updateJobUsage(jobId, usageType, quantity, cost, metadata)
+
+    return { cost, entryType }
+  }
+
+  // Auto-recharge wallet
+  static async autoRecharge(companyId: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const pricing = this.getPricing()
+    const rechargeAmount = pricing.rechargeAmount
+
+    // Create invoice for recharge
+    const invoice = await this.createInvoice({
+      companyId,
+      description: 'Wallet Auto-Recharge',
+      subtotal: rechargeAmount,
+      total: rechargeAmount,
+      lineItems: [{
+        description: 'Wallet Top-up',
+        quantity: 1,
+        unitPrice: rechargeAmount,
+        amount: rechargeAmount
+      }]
+    })
+
+    // In production, this would call Stripe/PayPal API
+    // For now, simulate successful payment
+    const paymentSuccess = true
+
+    if (paymentSuccess) {
+      // Update wallet
+      const addQuery = `
+        UPDATE company_billing
+        SET 
+          wallet_balance = wallet_balance + $2,
+          current_month_spent = current_month_spent + $2,
+          total_spent = total_spent + $2,
+          updated_at = NOW()
+        WHERE company_id = $1::uuid
+        RETURNING *
+      `
+      await this.query(addQuery, [companyId, rechargeAmount])
+
+      // Mark invoice as paid
+      await this.markInvoicePaid(invoice.id)
+
+      // Record ledger entry
+      const billing = await this.getCompanyBilling(companyId)
+      await this.addLedgerEntry({
+        companyId,
+        entryType: 'AUTO_RECHARGE',
+        description: `Wallet auto-recharge`,
+        quantity: 1,
+        unitPrice: rechargeAmount,
+        amount: -rechargeAmount, // Negative because it's a credit
+        invoiceId: invoice.id,
+        balanceBefore: billing.wallet_balance - rechargeAmount,
+        balanceAfter: billing.wallet_balance
+      })
+
+      return invoice
+    } else {
+      throw new Error('Payment failed')
+    }
+  }
+
+  // Deduct from wallet
+  static async deductFromWallet(companyId: string, amount: number) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      UPDATE company_billing
+      SET 
+        wallet_balance = wallet_balance - $2,
+        updated_at = NOW()
+      WHERE company_id = $1::uuid AND wallet_balance >= $2
+      RETURNING *
+    `
+    const result = await this.query(query, [companyId, amount]) as any[]
+    
+    if (result.length === 0) {
+      throw new Error('Insufficient wallet balance')
+    }
+
+    return result[0]
+  }
+
+  // Add ledger entry
+  static async addLedgerEntry(params: {
+    companyId: string
+    jobId?: string
+    entryType: string
+    description: string
+    quantity?: number
+    unitPrice?: number
+    amount: number
+    invoiceId?: string
+    metadata?: any
+    balanceBefore?: number
+    balanceAfter?: number
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const billing = await this.getCompanyBilling(params.companyId)
+    const balanceBefore = params.balanceBefore ?? billing.wallet_balance
+    const balanceAfter = params.balanceAfter ?? (balanceBefore - params.amount)
+
+    const query = `
+      INSERT INTO usage_ledger (
+        company_id,
+        job_id,
+        entry_type,
+        description,
+        quantity,
+        unit_price,
+        amount,
+        balance_before,
+        balance_after,
+        invoice_id,
+        metadata,
+        created_at
+      ) VALUES (
+        $1::uuid,
+        $2::uuid,
+        $3::ledger_entry_type,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10::uuid,
+        $11::jsonb,
+        NOW()
+      )
+      RETURNING *
+    `
+
+    const result = await this.query(query, [
+      params.companyId,
+      params.jobId || null,
+      params.entryType,
+      params.description,
+      params.quantity || null,
+      params.unitPrice || null,
+      params.amount,
+      balanceBefore,
+      balanceAfter,
+      params.invoiceId || null,
+      JSON.stringify(params.metadata || {})
+    ]) as any[]
+
+    return result[0]
+  }
+
+  // Update job usage
+  static async updateJobUsage(
+    jobId: string,
+    usageType: 'cv_parse' | 'jd_questions' | 'video_minutes',
+    quantity: number,
+    cost: number,
+    metadata?: any
+  ) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    // Get job to find company_id
+    const jobQuery = `SELECT company_id FROM jobs WHERE id = $1::uuid`
+    const jobResult = await this.query(jobQuery, [jobId]) as any[]
+    
+    if (jobResult.length === 0) {
+      throw new Error('Job not found')
+    }
+
+    const companyId = jobResult[0].company_id
+
+    // Upsert job_usage
+    let updateField = ''
+    let costField = ''
+
+    switch (usageType) {
+      case 'cv_parse':
+        updateField = 'cv_parsing_count = cv_parsing_count + $3'
+        costField = 'cv_parsing_cost = cv_parsing_cost + $4'
+        break
+      case 'jd_questions':
+        updateField = `
+          jd_question_tokens_in = jd_question_tokens_in + $3,
+          jd_question_tokens_out = jd_question_tokens_out + ${metadata?.tokensOut || 0}
+        `
+        costField = 'jd_questions_cost = jd_questions_cost + $4'
+        break
+      case 'video_minutes':
+        updateField = 'video_minutes = video_minutes + $3'
+        costField = 'video_cost = video_cost + $4'
+        break
+    }
+
+    const query = `
+      INSERT INTO job_usage (job_id, company_id, ${usageType === 'jd_questions' ? 'jd_question_tokens_in' : usageType === 'cv_parse' ? 'cv_parsing_count' : 'video_minutes'}, total_cost, created_at, updated_at)
+      VALUES ($1::uuid, $2::uuid, $3, $4, NOW(), NOW())
+      ON CONFLICT (job_id)
+      DO UPDATE SET
+        ${updateField},
+        ${costField},
+        total_cost = total_cost + $4,
+        updated_at = NOW()
+      RETURNING *
+    `
+
+    const result = await this.query(query, [
+      jobId,
+      companyId,
+      usageType === 'jd_questions' ? (metadata?.tokensIn || 0) : quantity,
+      cost
+    ]) as any[]
+
+    return result[0]
+  }
+
+  // Create invoice
+  static async createInvoice(params: {
+    companyId: string
+    description: string
+    subtotal: number
+    taxRate?: number
+    total: number
+    lineItems: any[]
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    // Generate invoice number
+    const now = new Date()
+    const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+    const randomNum = Math.floor(10000 + Math.random() * 90000)
+    const invoiceNumber = `INV-${yearMonth}-${randomNum}`
+
+    const taxAmount = params.taxRate ? params.subtotal * params.taxRate : 0
+
+    const query = `
+      INSERT INTO invoices (
+        company_id,
+        invoice_number,
+        status,
+        subtotal,
+        tax_rate,
+        tax_amount,
+        total,
+        description,
+        line_items,
+        created_at,
+        updated_at
+      ) VALUES (
+        $1::uuid,
+        $2,
+        'pending',
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8::jsonb,
+        NOW(),
+        NOW()
+      )
+      RETURNING *
+    `
+
+    const result = await this.query(query, [
+      params.companyId,
+      invoiceNumber,
+      params.subtotal,
+      params.taxRate || null,
+      taxAmount,
+      params.total,
+      params.description,
+      JSON.stringify(params.lineItems)
+    ]) as any[]
+
+    return result[0]
+  }
+
+  // Mark invoice as paid
+  static async markInvoicePaid(invoiceId: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      UPDATE invoices
+      SET 
+        status = 'paid',
+        paid_at = NOW(),
+        updated_at = NOW()
+      WHERE id = $1::uuid
+      RETURNING *
+    `
+
+    const result = await this.query(query, [invoiceId]) as any[]
+    return result[0]
+  }
+
+  // Get usage ledger for company
+  static async getUsageLedger(companyId: string, options?: {
+    jobId?: string
+    startDate?: Date
+    endDate?: Date
+    entryType?: string
+    limit?: number
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    let query = `
+      SELECT 
+        ul.*,
+        j.title as job_title
+      FROM usage_ledger ul
+      LEFT JOIN jobs j ON ul.job_id = j.id
+      WHERE ul.company_id = $1::uuid
+    `
+
+    const params: any[] = [companyId]
+    let paramIndex = 2
+
+    if (options?.jobId) {
+      query += ` AND ul.job_id = $${paramIndex}::uuid`
+      params.push(options.jobId)
+      paramIndex++
+    }
+
+    if (options?.startDate) {
+      query += ` AND ul.created_at >= $${paramIndex}::timestamptz`
+      params.push(options.startDate.toISOString())
+      paramIndex++
+    }
+
+    if (options?.endDate) {
+      query += ` AND ul.created_at <= $${paramIndex}::timestamptz`
+      params.push(options.endDate.toISOString())
+      paramIndex++
+    }
+
+    if (options?.entryType) {
+      query += ` AND ul.entry_type = $${paramIndex}::ledger_entry_type`
+      params.push(options.entryType)
+      paramIndex++
+    }
+
+    query += ` ORDER BY ul.created_at DESC`
+
+    if (options?.limit) {
+      query += ` LIMIT $${paramIndex}`
+      params.push(options.limit)
+    }
+
+    return await this.query(query, params) as any[]
+  }
+
+  // Get job usage summary
+  static async getJobUsageSummary(companyId: string, jobId?: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    let query = `
+      SELECT 
+        ju.*,
+        j.title as job_title,
+        j.status as job_status
+      FROM job_usage ju
+      JOIN jobs j ON ju.job_id = j.id
+      WHERE ju.company_id = $1::uuid
+    `
+
+    const params: any[] = [companyId]
+
+    if (jobId) {
+      query += ` AND ju.job_id = $2::uuid`
+      params.push(jobId)
+    }
+
+    query += ` ORDER BY ju.updated_at DESC`
+
+    return await this.query(query, params) as any[]
+  }
+
+  // Get invoices for company
+  static async getInvoices(companyId: string, options?: {
+    status?: string
+    limit?: number
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    let query = `
+      SELECT * FROM invoices
+      WHERE company_id = $1::uuid
+    `
+
+    const params: any[] = [companyId]
+    let paramIndex = 2
+
+    if (options?.status) {
+      query += ` AND status = $${paramIndex}::invoice_status`
+      params.push(options.status)
+      paramIndex++
+    }
+
+    query += ` ORDER BY created_at DESC`
+
+    if (options?.limit) {
+      query += ` LIMIT $${paramIndex}`
+      params.push(options.limit)
+    }
+
+    return await this.query(query, params) as any[]
+  }
+
+  // Update payment method
+  static async updatePaymentMethod(companyId: string, paymentData: {
+    provider: 'stripe' | 'paypal'
+    paymentMethodId: string
+    last4?: string
+    brand?: string
+    exp?: string
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      UPDATE company_billing
+      SET 
+        payment_provider = $2::payment_provider,
+        payment_method_id = $3,
+        payment_method_last4 = $4,
+        payment_method_brand = $5,
+        payment_method_exp = $6,
+        updated_at = NOW()
+      WHERE company_id = $1::uuid
+      RETURNING *
+    `
+
+    const result = await this.query(query, [
+      companyId,
+      paymentData.provider,
+      paymentData.paymentMethodId,
+      paymentData.last4 || null,
+      paymentData.brand || null,
+      paymentData.exp || null
+    ]) as any[]
+
+    return result[0]
+  }
+
+  // Update billing settings
+  static async updateBillingSettings(companyId: string, settings: {
+    autoRechargeEnabled?: boolean
+    monthlySpendCap?: number | null
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const updates: string[] = []
+    const params: any[] = [companyId]
+    let paramIndex = 2
+
+    if (settings.autoRechargeEnabled !== undefined) {
+      updates.push(`auto_recharge_enabled = $${paramIndex}`)
+      params.push(settings.autoRechargeEnabled)
+      paramIndex++
+    }
+
+    if (settings.monthlySpendCap !== undefined) {
+      updates.push(`monthly_spend_cap = $${paramIndex}`)
+      params.push(settings.monthlySpendCap)
+      paramIndex++
+    }
+
+    if (updates.length === 0) {
+      throw new Error('No settings to update')
+    }
+
+    updates.push('updated_at = NOW()')
+
+    const query = `
+      UPDATE company_billing
+      SET ${updates.join(', ')}
+      WHERE company_id = $1::uuid
+      RETURNING *
+    `
+
+    const result = await this.query(query, params) as any[]
+    return result[0]
+  }
+
+  // Get all users by company ID with their roles
+  static async getUsersByCompanyId(companyId: string) {
+    const query = `
+      SELECT 
+        u.id,
+        u.email,
+        u.full_name,
+        u.created_at,
+        COALESCE(
+          json_agg(
+            DISTINCT jsonb_build_object('role', r.role)
+          ) FILTER (WHERE r.role IS NOT NULL),
+          '[]'
+        ) as roles
+      FROM users u
+      LEFT JOIN user_roles r ON u.id = r.user_id
+      WHERE u.company_id = $1::uuid
+      GROUP BY u.id, u.email, u.full_name, u.created_at
+      ORDER BY u.created_at DESC
+    `
+    const result = await this.query(query, [companyId]) as any[]
+    return result
   }
 }

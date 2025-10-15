@@ -300,7 +300,7 @@ Work Authorization: ${raw.visa || 'Work authorization required'}`
           travel_requirements: raw.travel || null,
           visa_requirements: raw.visa || null,
           is_public: true,
-          created_by: createdBySafe,
+          created_by_email: body.createdBy || null,
         })
       } catch (e: any) {
         const msg = String(e?.message || '')
@@ -308,7 +308,7 @@ Work Authorization: ${raw.visa || 'Work authorization required'}`
         if (!isFkViolation) {
           throw e
         }
-        // Retry without created_by when foreign key violates (user id not in users table)
+        // Retry without created_by_email when there's an error
         created = await DatabaseService.createJob({
           company_id: effectiveCompanyId!,
           company_name: body.company || null,
@@ -340,7 +340,7 @@ Work Authorization: ${raw.visa || 'Work authorization required'}`
           travel_requirements: raw.travel || null,
           visa_requirements: raw.visa || null,
           is_public: true,
-          created_by: null,
+          created_by_email: null,
         })
       }
 
@@ -508,11 +508,13 @@ export async function GET(req: Request) {
           location: r.location_text,
           employment_type: r.employment_type,
           experience_level: r.level,
+          status: r.status || 'open',
           summary: null,
           responsibilities: null,
           benefits: null,
           salary_label,
           created_by: r.created_by,
+          created_by_email: r.created_by_email,
           created_at: r.created_at,
           interview_rounds: interviewRounds,
         })
