@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
-import { User, Building, Bell, CreditCard, Users as UsersIcon, Plus, Trash, MapPin, FileText, Building2 } from "lucide-react"
+import { User, Building, Bell, CreditCard, Users as UsersIcon, Plus, Trash, MapPin, FileText, Building2, Lock } from "lucide-react"
 
 const industries = [
   "Technology",
@@ -108,18 +108,76 @@ export default function SettingsContent({ section }: { section?: string }) {
     weeklyReports: false,
   })
 
-  // Allow edit on Profile tab for all users
+  // Get user role for access control
+  const [userRole, setUserRole] = useState<string>('')
   const [isAdminRole, setIsAdminRole] = useState(false)
+  
   useEffect(() => {
-    const session = MockAuthService.getCurrentUser()
-    const role = (session as any)?.user?.role
-    setIsAdminRole(role === 'company_admin' || role === 'admin')
-  }, [])
+    const fetchUserRole = async () => {
+      if (!user?.email) return
+      
+      try {
+        console.log('🔍 Fetching role from database for:', user.email)
+        const response = await fetch(`/api/auth/user-role?email=${encodeURIComponent(user.email)}`)
+        const data = await response.json()
+        
+        if (data.ok) {
+          console.log('🔍 Role from database:', data.role)
+          setUserRole(data.role || '')
+          setIsAdminRole(data.role === 'company_admin' || data.role === 'admin')
+        } else {
+          console.error('Failed to fetch user role:', data.error)
+          // Fallback to mock auth service
+          const session = MockAuthService.getCurrentUser()
+          const role = (session as any)?.user?.role
+          console.log('🔍 Fallback to mock auth role:', role)
+          setUserRole(role || '')
+          setIsAdminRole(role === 'company_admin' || role === 'admin')
+        }
+      } catch (error) {
+        console.error('Error fetching user role:', error)
+        // Fallback to mock auth service
+        const session = MockAuthService.getCurrentUser()
+        const role = (session as any)?.user?.role
+        console.log('🔍 Fallback to mock auth role:', role)
+        setUserRole(role || '')
+        setIsAdminRole(role === 'company_admin' || role === 'admin')
+      }
+    }
+    
+    fetchUserRole()
+  }, [user?.email])
+  
   const isBsadmin = (
     ((user as any)?.email?.split("@")[0]?.toLowerCase?.() === "bsadmin") ||
     ((user as any)?.full_name?.toLowerCase?.() === "bsadmin")
   )
-  // Allow all users to edit all settings
+  
+  // Role-based access control
+  const isRecruiterRole = userRole === 'recruiter'
+  console.log('🔍 Final role being used:', userRole)
+  console.log('🔍 Is recruiter role:', isRecruiterRole)
+  console.log('🔍 Is admin role:', isAdminRole)
+  
+  const canAccessTab = (tabName: string) => {
+    if (isAdminRole || isBsadmin) return true // Admin can access all tabs
+    if (isRecruiterRole) return tabName === 'profile' // Recruiter can only access profile
+    return true // Default: allow access
+  }
+
+  // Redirect recruiter users to profile if they try to access restricted tabs
+  useEffect(() => {
+    if (isRecruiterRole && current !== 'profile') {
+      toast({
+        title: "Access Restricted",
+        description: "this tab only accesable by admin .",
+        variant: "destructive"
+      })
+      router.push('/dashboard/settings/profile')
+    }
+  }, [isRecruiterRole, current, router, toast])
+  
+  // Allow all users to edit all settings (within their accessible tabs)
   const canEditSection = true
 
   // Team management state
@@ -382,21 +440,41 @@ export default function SettingsContent({ section }: { section?: string }) {
             <User className="h-4 w-4" />
             <span>Profile</span>
           </TabsTrigger>
-          <TabsTrigger value="company" className="flex items-center space-x-2">
+          <TabsTrigger 
+            value="company" 
+            className="flex items-center space-x-2"
+            disabled={!canAccessTab('company')}
+          >
             <Building className="h-4 w-4" />
             <span>Company</span>
+            {!canAccessTab('company') && <Lock className="h-3 w-3 ml-1" />}
           </TabsTrigger>
-          <TabsTrigger value="team" className="flex items-center space-x-2">
+          <TabsTrigger 
+            value="team" 
+            className="flex items-center space-x-2"
+            disabled={!canAccessTab('team')}
+          >
             <UsersIcon className="h-4 w-4" />
             <span>Team</span>
+            {!canAccessTab('team') && <Lock className="h-3 w-3 ml-1" />}
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center space-x-2">
+          <TabsTrigger 
+            value="notifications" 
+            className="flex items-center space-x-2"
+            disabled={!canAccessTab('notifications')}
+          >
             <Bell className="h-4 w-4" />
             <span>Notifications</span>
+            {!canAccessTab('notifications') && <Lock className="h-3 w-3 ml-1" />}
           </TabsTrigger>
-          <TabsTrigger value="billing" className="flex items-center space-x-2">
+          <TabsTrigger 
+            value="billing" 
+            className="flex items-center space-x-2"
+            disabled={!canAccessTab('billing')}
+          >
             <CreditCard className="h-4 w-4" />
             <span>Billing</span>
+            {!canAccessTab('billing') && <Lock className="h-3 w-3 ml-1" />}
           </TabsTrigger>
         </TabsList>
 
@@ -469,11 +547,29 @@ export default function SettingsContent({ section }: { section?: string }) {
         </TabsContent>
 
         <TabsContent value="team">
-          <Card className="linkedin-card">
-            <CardHeader>
-              <CardTitle>Team Members</CardTitle>
-              <CardDescription>Manage recruiter team members and roles</CardDescription>
-            </CardHeader>
+          {!canAccessTab('team') ? (
+            <Card className="linkedin-card">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Lock className="h-5 w-5 text-red-500" />
+                  <span>Access Restricted</span>
+                </CardTitle>
+                <CardDescription>this tab only accesable by admin .</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <Lock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">You don't have permission to access this section.</p>
+                  <p className="text-sm text-gray-500 mt-2">Contact your administrator for access.</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="linkedin-card">
+              <CardHeader>
+                <CardTitle>Team Members</CardTitle>
+                <CardDescription>Manage recruiter team members and roles</CardDescription>
+              </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <Input
@@ -539,9 +635,28 @@ export default function SettingsContent({ section }: { section?: string }) {
               </div>
             </CardContent>
           </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="company">
+          {!canAccessTab('company') ? (
+            <Card className="linkedin-card">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Lock className="h-5 w-5 text-red-500" />
+                  <span>Access Restricted</span>
+                </CardTitle>
+                <CardDescription>this tab only accesable by admin .</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <Lock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">You don't have permission to access this section.</p>
+                  <p className="text-sm text-gray-500 mt-2">Contact your administrator for access.</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
           <div className="space-y-6">
             {/* Company Information */}
             <Card className="linkedin-card">
@@ -772,14 +887,33 @@ export default function SettingsContent({ section }: { section?: string }) {
               </Button>
             </div>
           </div>
+          )}
         </TabsContent>
 
         <TabsContent value="notifications">
-          <Card className="linkedin-card">
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>Choose how you want to be notified about important updates</CardDescription>
-            </CardHeader>
+          {!canAccessTab('notifications') ? (
+            <Card className="linkedin-card">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Lock className="h-5 w-5 text-red-500" />
+                  <span>Access Restricted</span>
+                </CardTitle>
+                <CardDescription>this tab only accesable by admin .</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <Lock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">You don't have permission to access this section.</p>
+                  <p className="text-sm text-gray-500 mt-2">Contact your administrator for access.</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="linkedin-card">
+              <CardHeader>
+                <CardTitle>Notification Preferences</CardTitle>
+                <CardDescription>Choose how you want to be notified about important updates</CardDescription>
+              </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -831,16 +965,33 @@ export default function SettingsContent({ section }: { section?: string }) {
               </div>
             </CardContent>
           </Card>
+          )}
         </TabsContent>
 
-        
-
         <TabsContent value="billing">
-          <Card className="linkedin-card">
-            <CardHeader>
-              <CardTitle>Billing & Subscription</CardTitle>
-              <CardDescription>Manage your subscription and billing information</CardDescription>
-            </CardHeader>
+          {!canAccessTab('billing') ? (
+            <Card className="linkedin-card">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Lock className="h-5 w-5 text-red-500" />
+                  <span>Access Restricted</span>
+                </CardTitle>
+                <CardDescription>this tab only accesable by admin .</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <Lock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">You don't have permission to access this section.</p>
+                  <p className="text-sm text-gray-500 mt-2">Contact your administrator for access.</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="linkedin-card">
+              <CardHeader>
+                <CardTitle>Billing & Subscription</CardTitle>
+                <CardDescription>Manage your subscription and billing information</CardDescription>
+              </CardHeader>
             <CardContent className="space-y-6">
               <div className="bg-blue-50 p-4 rounded-lg">
                 <h3 className="font-semibold text-blue-900">Current Plan: Premium</h3>
@@ -860,6 +1011,7 @@ export default function SettingsContent({ section }: { section?: string }) {
               </div>
             </CardContent>
           </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
