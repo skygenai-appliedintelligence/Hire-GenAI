@@ -12,7 +12,7 @@ interface User {
   status: string
   phone?: string
   timezone?: string
-  role?: "admin" | "interviewer" | "ai_recruiter"
+  role?: "admin" | "interviewer" | "ai_recruiter" | "recruiter" | "company_admin"
 }
 
 interface Company {
@@ -70,7 +70,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               full_name: currentUser.user.name,
               status: 'active',
               phone: undefined,
-              timezone: 'UTC'
+              timezone: 'UTC',
+              role: currentUser.user.role as any // Preserve the role from mock auth
             }
             const newCompany: Company = {
               id: currentUser.company.id,
@@ -113,7 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           full_name: currentUser.user.name,
           status: 'active',
           phone: undefined,
-          timezone: 'UTC'
+          timezone: 'UTC',
+          role: currentUser.user.role as any // Preserve the role from mock auth
         }
         const newCompany: Company = {
           id: currentUser.company.id,
@@ -153,7 +155,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             full_name: currentUser.user.name,
             status: 'active',
             phone: undefined,
-            timezone: 'UTC'
+            timezone: 'UTC',
+            role: currentUser.user.role as any // Preserve the role from mock auth
           }
           const newCompany: Company = {
             id: currentUser.company.id,
@@ -192,7 +195,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           full_name: currentUser.user.name,
           status: 'active',
           phone: undefined,
-          timezone: 'UTC'
+          timezone: 'UTC',
+          role: currentUser.user.role as any // Preserve the role from mock auth
         }
         const newCompany: Company = {
           id: currentUser.company.id,
@@ -236,7 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: userObj.id,
         email: userObj.email,
         name: userObj.full_name,
-        role: 'admin'
+        role: userObj.role || 'admin' // Preserve the actual user role
       }
       const mockCompany = {
         id: companyObj.id,

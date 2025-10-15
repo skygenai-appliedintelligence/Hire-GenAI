@@ -49,6 +49,36 @@ export class MockAuthService {
         size: "1-10",
         website: "https://demo.example.com"
       }
+    },
+    {
+      id: "user_admin_001",
+      email: "ashwini2kyadav@gmail.com",
+      password: "admin123",
+      name: "Ashwini Yadav",
+      role: "admin",
+      company: {
+        id: "company_demo_001",
+        name: "Demo Company",
+        slug: "demo-company",
+        industry: "Technology",
+        size: "1-10",
+        website: "https://demo.example.com"
+      }
+    },
+    {
+      id: "user_recruiter_001",
+      email: "member1@gmail.com",
+      password: "recruiter123",
+      name: "Member One",
+      role: "recruiter",
+      company: {
+        id: "company_demo_001",
+        name: "Demo Company",
+        slug: "demo-company",
+        industry: "Technology",
+        size: "1-10",
+        website: "https://demo.example.com"
+      }
     }
   ]
 
