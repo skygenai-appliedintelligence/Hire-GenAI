@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
-import { MessageSquare, Send, Mail, Phone, User, Loader2 } from "lucide-react"
+import { MessageSquare, Send, Mail, Phone, User, Loader2, Briefcase, Users2 } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -24,9 +25,10 @@ interface Message {
 
 export default function MessagesPage() {
   const { company } = useAuth()
-  const [selectedCategory, setSelectedCategory] = useState<'interview' | 'new_job' | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<'interview' | 'new_job' | null>('interview')
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState("")
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   // Category-specific messages to maintain separate drafts for each category
   const [categoryMessages, setCategoryMessages] = useState<{
     interview: string
@@ -49,34 +51,36 @@ export default function MessagesPage() {
     }
   }, [])
 
-  // Reset messages and clear localStorage when company changes
+  // Clear messages when company changes (company-specific data)
   useEffect(() => {
     if (company?.id) {
-      // Clear previous company's data
+      // Clear all messages and state for the new company
       setMessages([])
-      setNewMessage("")
-      setCategoryMessages({ interview: "", new_job: "" })
-      setSelectedCategory(null)
+      setNewMessage('')
+      setCategoryMessages({ interview: '', new_job: '' })
       setLastSavedDraft(null)
-
-      // Clear localStorage to prevent data leakage between accounts
-      localStorage.removeItem('selectedCategory')
-
-      // Load messages for current company
-      if (selectedCategory) {
-        loadMessages(selectedCategory)
-      }
     }
   }, [company?.id])
 
-  // Load messages when category is selected
+  // Load messages when category is selected or company is available
   useEffect(() => {
     if (selectedCategory && (company as any)?.id) {
       loadMessages(selectedCategory)
-      // Load the message for the selected category
-      setNewMessage(categoryMessages[selectedCategory])
     }
-  }, [selectedCategory, categoryMessages, company?.id])
+  }, [selectedCategory, company?.id])
+
+  // Auto-adjust textarea height when message or category changes
+  useEffect(() => {
+    // Small delay to ensure DOM is updated with new content
+    const timer = setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto'
+        textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px'
+      }
+    }, 0)
+    
+    return () => clearTimeout(timer)
+  }, [newMessage, selectedCategory])
 
   // Handle category selection
   const handleCategorySelect = (category: 'interview' | 'new_job') => {
@@ -87,11 +91,18 @@ export default function MessagesPage() {
         [selectedCategory]: newMessage
       }
       setCategoryMessages(updatedMessages)
-      // Don't save to localStorage anymore - only keep in memory for current session
     }
 
     // Switch to new category
     setSelectedCategory(category)
+    
+    // Load saved message immediately from memory for instant feedback
+    // (loadMessages will update from DB via useEffect)
+    if (categoryMessages[category]) {
+      setNewMessage(categoryMessages[category])
+    } else {
+      setNewMessage('') // Clear if no message for this category yet
+    }
   }
 
   const loadMessages = async (category: 'interview' | 'new_job') => {
@@ -99,11 +110,31 @@ export default function MessagesPage() {
 
     setLoading(true)
     try {
-      const response = await fetch(`/api/messages?category=${category}&companyId=${(company as any).id}`)
+      const response = await fetch(`/api/messages?category=${category}&companyId=${(company as any).id}&includeDrafts=true`)
       const data = await response.json()
       
       if (data.success) {
         setMessages(data.messages)
+        
+        // Load the most recent draft into textarea
+        const drafts = data.messages.filter((m: any) => m.status === 'draft')
+        if (drafts.length > 0) {
+          const mostRecentDraft = drafts[0] // Already sorted by created_at DESC
+          setNewMessage(mostRecentDraft.content || '')
+          
+          // Update category messages
+          setCategoryMessages(prev => ({
+            ...prev,
+            [category]: mostRecentDraft.content || ''
+          }))
+        } else {
+          // No draft found - clear the message for this category
+          setNewMessage('')
+          setCategoryMessages(prev => ({
+            ...prev,
+            [category]: ''
+          }))
+        }
       } else {
         toast.error('Failed to load messages')
       }
@@ -145,9 +176,12 @@ export default function MessagesPage() {
         console.log('Draft saved:', data)
         toast.success('Draft saved')
         // Keep the message in the input box so user can continue editing
-        // setNewMessage('') // Removed this line
-        // Reload
-        loadMessages(categoryToUse)
+        // Update category messages with saved content
+        setCategoryMessages(prev => ({
+          ...prev,
+          [categoryToUse]: newMessage
+        }))
+        
         if (data.message?.id) {
           setLastSavedDraft({ id: data.message.id, category: data.message.category })
         }
@@ -179,75 +213,61 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4 px-4 md:px-6 py-6 bg-gradient-to-b from-blue-50/30 via-white to-blue-50/20">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-2">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
-          <p className="text-gray-600">Manage candidate communications and outreach</p>
+          <p className="text-sm text-gray-500">Draft and manage candidate communications</p>
         </div>
-        <Button className="linkedin-button">
-          <MessageSquare className="h-4 w-4 mr-2" />
-          Compose Message
-        </Button>
       </div>
 
-      {/* Message Categories */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <Card 
-          className={`cursor-pointer transition-all hover:shadow-md ${
-            selectedCategory === 'interview' ? 'ring-2 ring-blue-500 bg-blue-50' : 'linkedin-card'
-          }`}
-          onClick={() => handleCategorySelect('interview')}
-        >
-          <CardContent className="p-6 text-center">
-            <h3 className="text-lg font-semibold text-gray-900">Interview</h3>
-          </CardContent>
-        </Card>
+      {/* Tabs for Categories */}
+      <Tabs 
+        value={selectedCategory || 'interview'} 
+        onValueChange={(val) => handleCategorySelect(val as 'interview' | 'new_job')}
+        className="w-full"
+      >
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="interview" className="flex items-center gap-2">
+            <Users2 className="h-4 w-4" />
+            Interview
+          </TabsTrigger>
+          <TabsTrigger value="new_job" className="flex items-center gap-2">
+            <Briefcase className="h-4 w-4" />
+            New Job
+          </TabsTrigger>
+        </TabsList>
 
-        <Card 
-          className={`cursor-pointer transition-all hover:shadow-md ${
-            selectedCategory === 'new_job' ? 'ring-2 ring-blue-500 bg-blue-50' : 'linkedin-card'
-          }`}
-          onClick={() => handleCategorySelect('new_job')}
-        >
-          <CardContent className="p-6 text-center">
-            <h3 className="text-lg font-semibold text-gray-900">New Job ID</h3>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Inbox Section */}
-      <Card className="linkedin-card">
-        <CardHeader>
-          <CardTitle className="text-lg">Inbox</CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          {/* Enhanced Message Input Area */}
-          <div className="space-y-4 bg-white p-6 rounded-lg border shadow-sm">
-            <div className="flex items-center justify-between">
-              <label className="text-lg font-semibold text-gray-800">Compose Message</label>
-              <div className="flex items-center space-x-2 text-sm text-gray-500">
-                <span>Category: {selectedCategory === 'interview' ? 'Interview Messages' : selectedCategory === 'new_job' ? 'Job Messages' : 'Select Category'}</span>
+        <TabsContent value="interview" className="mt-4">
+          <Card className="border-blue-100 shadow-sm">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-blue-600" />
+                  Compose Interview Message
+                </h3>
+                <Badge variant="outline" className="text-xs">
+                  {newMessage.length} chars
+                </Badge>
               </div>
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">Message *</label>
+              
               <Textarea
-                placeholder={selectedCategory ? "Type your message here..." : "Select a category first to start typing..."}
+                ref={textareaRef}
+                placeholder="Type your interview message here..."
                 value={newMessage}
                 onChange={(e) => {
-                  if (!selectedCategory) {
-                    toast.error('Select the category first.')
-                    return
-                  }
                   setNewMessage(e.target.value)
-                  // Also update the category-specific message in memory only
-                  const updatedMessages = {
-                    ...categoryMessages,
-                    [selectedCategory]: e.target.value
+                  if (selectedCategory) {
+                    const updatedMessages = {
+                      ...categoryMessages,
+                      [selectedCategory]: e.target.value
+                    }
+                    setCategoryMessages(updatedMessages)
                   }
-                  setCategoryMessages(updatedMessages)
+                  // Auto-expand textarea
+                  e.target.style.height = 'auto'
+                  e.target.style.height = e.target.scrollHeight + 'px'
                 }}
                 onKeyDown={(e) => {
                   if (e.ctrlKey && e.key === 'Enter') {
@@ -255,60 +275,144 @@ export default function MessagesPage() {
                     saveDraft()
                   }
                 }}
-                rows={10}
-                className="linkedin-input text-base resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={!selectedCategory}
-                required
+                className="min-h-[200px] max-h-[600px] overflow-y-auto focus:ring-2 focus:ring-blue-500 border-gray-200 resize-y"
               />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4 text-sm text-gray-500">
-                <span>{newMessage.length} characters</span>
-                <span>•</span>
-                <span>Press Ctrl+Enter to send</span>
+              
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-xs text-gray-400">Ctrl+Enter to save</span>
+                
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    disabled={sending || !newMessage.trim()}
+                    onClick={() => {
+                      if (selectedCategory) {
+                        setNewMessage('')
+                        const updatedMessages = {
+                          ...categoryMessages,
+                          [selectedCategory]: ''
+                        }
+                        setCategoryMessages(updatedMessages)
+                        setLastSavedDraft(null)
+                        toast.success('Cleared')
+                      }
+                    }}
+                  >
+                    Clear
+                  </Button>
+                  <Button 
+                    size="sm"
+                    disabled={sending || !newMessage.trim()}
+                    onClick={saveDraft}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {sending ? (
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    ) : (
+                      <Send className="h-3 w-3 mr-1" />
+                    )}
+                    {sending ? 'Saving...' : 'Save Draft'}
+                  </Button>
+                </div>
               </div>
               
-              <div className="flex items-center space-x-3">
-                <Button 
-                  variant="ghost" 
-                  className="px-4"
-                  disabled={sending || !newMessage.trim() || !selectedCategory}
-                  onClick={() => {
-                    if (selectedCategory) {
-                      setNewMessage('')
-                      const updatedMessages = {
-                        ...categoryMessages,
-                        [selectedCategory]: ''
-                      }
-                      setCategoryMessages(updatedMessages)
-                      setLastSavedDraft(null)
-                      toast.success('Message cleared')
-                    }
-                  }}
-                >
-                  Clear
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="px-8"
-                  disabled={sending}
-                  onClick={saveDraft}
-                >
-                  {sending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : null}
-                  {sending ? 'Saving…' : 'Save Draft'}
-                </Button>
-                {lastSavedDraft && (
-                  <span className="text-xs text-gray-500">Last draft: {lastSavedDraft.id} ({lastSavedDraft.category})</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              {lastSavedDraft && lastSavedDraft.category === 'interview' && (
+                <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                  ✓ Draft saved
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
+        <TabsContent value="new_job" className="mt-4">
+          <Card className="border-emerald-100 shadow-sm">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-emerald-600" />
+                  Compose Job Message
+                </h3>
+                <Badge variant="outline" className="text-xs">
+                  {newMessage.length} chars
+                </Badge>
+              </div>
+              
+              <Textarea
+                ref={textareaRef}
+                placeholder="Type your job announcement message here..."
+                value={newMessage}
+                onChange={(e) => {
+                  setNewMessage(e.target.value)
+                  if (selectedCategory) {
+                    const updatedMessages = {
+                      ...categoryMessages,
+                      [selectedCategory]: e.target.value
+                    }
+                    setCategoryMessages(updatedMessages)
+                  }
+                  // Auto-expand textarea
+                  e.target.style.height = 'auto'
+                  e.target.style.height = e.target.scrollHeight + 'px'
+                }}
+                onKeyDown={(e) => {
+                  if (e.ctrlKey && e.key === 'Enter') {
+                    e.preventDefault()
+                    saveDraft()
+                  }
+                }}
+                className="min-h-[200px] max-h-[600px] overflow-y-auto focus:ring-2 focus:ring-emerald-500 border-gray-200 resize-y"
+              />
+              
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-xs text-gray-400">Ctrl+Enter to save</span>
+                
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    disabled={sending || !newMessage.trim()}
+                    onClick={() => {
+                      if (selectedCategory) {
+                        setNewMessage('')
+                        const updatedMessages = {
+                          ...categoryMessages,
+                          [selectedCategory]: ''
+                        }
+                        setCategoryMessages(updatedMessages)
+                        setLastSavedDraft(null)
+                        toast.success('Cleared')
+                      }
+                    }}
+                  >
+                    Clear
+                  </Button>
+                  <Button 
+                    size="sm"
+                    disabled={sending || !newMessage.trim()}
+                    onClick={saveDraft}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    {sending ? (
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    ) : (
+                      <Send className="h-3 w-3 mr-1" />
+                    )}
+                    {sending ? 'Saving...' : 'Save Draft'}
+                  </Button>
+                </div>
+              </div>
+              
+              {lastSavedDraft && lastSavedDraft.category === 'new_job' && (
+                <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                  ✓ Draft saved
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
