@@ -1480,65 +1480,89 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
             <Button type="button" variant="outline" onClick={() => router.back()}>
               Cancel
             </Button>
-            {currentTab === 'interview' ? (
+            {isEditing ? (
+              // Edit mode: Show Save Status button
               <Button 
                 type="submit" 
-                disabled={isSubmitting || !isCurrentTabValid()}
-                className="min-w-[200px]"
+                disabled={isSubmitting}
+                className="min-w-[150px]"
               >
                 {isSubmitting ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    {createdJobId ? 'Updating Job...' : 'Creating Job...'}
+                    Saving...
                   </>
                 ) : (
                   <>
                     <CheckCircle className="mr-2 h-4 w-4" />
-                    Create Job & Setup Agents
+                    Save Status
                   </>
                 )}
               </Button>
             ) : (
-              <Button 
-                type="button"
-                disabled={!isCurrentTabValid()}
-                onClick={async () => {
-                  // Save job on resume-screening tab
-                  if (currentTab === 'resume-screening' && !createdJobId) {
-                    setIsSubmitting(true)
-                    try {
-                      const compiledDescription = generateStructuredDescription()
-                      const res = await fetch('/api/jobs', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          ...formData,
-                          description: compiledDescription || formData.description || '',
-                          requirements: formData.requirements || '',
-                          companyId: company?.id,
-                          createdBy: user?.id || null,
-                        }),
-                      })
-                      const data = await res.json()
-                      if (res.ok && data?.ok && data?.jobId) {
-                        setCreatedJobId(data.jobId)
-                        // Update URL with jobId
-                        const params = new URLSearchParams(searchParams.toString())
-                        params.set('jobId', data.jobId)
-                        router.push(`/dashboard/jobs/new?${params.toString()}`, { scroll: false })
+              // Create mode: Show Next and Create Job buttons
+              <>
+                {currentTab === 'interview' ? (
+                  <Button 
+                    type="submit" 
+                    disabled={isSubmitting || !isCurrentTabValid()}
+                    className="min-w-[200px]"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        {createdJobId ? 'Updating Job...' : 'Creating Job...'}
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        Create Job & Setup Agents
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <Button 
+                    type="button"
+                    disabled={!isCurrentTabValid()}
+                    onClick={async () => {
+                      // Save job on resume-screening tab
+                      if (currentTab === 'resume-screening' && !createdJobId) {
+                        setIsSubmitting(true)
+                        try {
+                          const compiledDescription = generateStructuredDescription()
+                          const res = await fetch('/api/jobs', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              ...formData,
+                              description: compiledDescription || formData.description || '',
+                              requirements: formData.requirements || '',
+                              companyId: company?.id,
+                              createdBy: user?.id || null,
+                            }),
+                          })
+                          const data = await res.json()
+                          if (res.ok && data?.ok && data?.jobId) {
+                            setCreatedJobId(data.jobId)
+                            // Update URL with jobId
+                            const params = new URLSearchParams(searchParams.toString())
+                            params.set('jobId', data.jobId)
+                            router.push(`/dashboard/jobs/new?${params.toString()}`, { scroll: false })
+                          }
+                        } catch (error) {
+                          console.error('Error creating job:', error)
+                        } finally {
+                          setIsSubmitting(false)
+                        }
                       }
-                    } catch (error) {
-                      console.error('Error creating job:', error)
-                    } finally {
-                      setIsSubmitting(false)
-                    }
-                  }
-                  goToNextTab()
-                }}
-                className="min-w-[120px]"
-              >
-                Next
-              </Button>
+                      goToNextTab()
+                    }}
+                    className="min-w-[120px]"
+                  >
+                    Next
+                  </Button>
+                )}
+              </>
             )}
           </div>
         </div>
