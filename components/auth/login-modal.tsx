@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
 
 interface LoginModalProps {
@@ -16,8 +17,10 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ open, onClose }: LoginModalProps) {
+  const [activeTab, setActiveTab] = useState<"demo" | "signin">("signin")
   const [step, setStep] = useState<"email" | "otp">("email")
   const [email, setEmail] = useState("")
+  const [demoEmail, setDemoEmail] = useState("")
   const [otp, setOtp] = useState("")
   const [loading, setLoading] = useState(false)
   const [countdown, setCountdown] = useState(0)
@@ -31,6 +34,17 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
       return () => clearTimeout(t)
     }
   }, [countdown])
+
+  useEffect(() => {
+    if (!open) {
+      setActiveTab("signin")
+      setStep("email")
+      setEmail("")
+      setDemoEmail("")
+      setOtp("")
+      setCountdown(0)
+    }
+  }, [open])
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -108,48 +122,85 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-center">Sign in</DialogTitle>
-          <DialogDescription className="text-center">Use OTP sent to your email</DialogDescription>
+          <DialogDescription className="text-center">Choose how you want to explore HireGenAI</DialogDescription>
         </DialogHeader>
 
-        {step === "email" ? (
-          <form onSubmit={handleSendOtp} className="space-y-4">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "demo" | "signin")} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="signin">Sign In</TabsTrigger>
+            <TabsTrigger value="demo">Demo Sign In</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="signin" className="mt-4">
+            {step === "email" ? (
+              <form onSubmit={handleSendOtp} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="border-slate-300 focus:border-emerald-500 focus:ring-emerald-500"
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" disabled={loading}>
+                  {loading ? "Sending..." : "Send OTP"}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerify} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="otp">Enter OTP</Label>
+                  <Input
+                    id="otp"
+                    type="text"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    placeholder="6-digit code"
+                    className="border-slate-300 focus:border-emerald-500 focus:ring-emerald-500"
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" disabled={loading}>
+                  {loading ? "Verifying..." : "Verify & Sign in"}
+                </Button>
+                <Button type="button" variant="outline" className="w-full" onClick={handleResend} disabled={loading || countdown > 0}>
+                  {countdown > 0 ? `Resend in ${countdown}s` : "Resend OTP"}
+                </Button>
+              </form>
+            )}
+          </TabsContent>
+
+          <TabsContent value="demo" className="mt-4 space-y-4">
+            <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-4 text-sm text-emerald-900">
+              <p className="font-semibold">Instant access to the product demo</p>
+              <p className="mt-1 text-emerald-800/80">
+                Use our shared demo credentials to explore the platform without creating an account.
+              </p>
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="demo-email">Email</Label>
               <Input
-                id="email"
+                id="demo-email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="border-slate-300 focus:border-emerald-500 focus:ring-emerald-500"
+                value={demoEmail}
+                onChange={(e) => setDemoEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500"
                 required
               />
             </div>
-            <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" disabled={loading}>
-              {loading ? "Sending..." : "Send OTP"}
+            <Button
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={() => router.push("/dashboard")}
+              disabled={!demoEmail}
+            >
+              Continue to demo
             </Button>
-          </form>
-        ) : (
-          <form onSubmit={handleVerify} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="otp">Enter OTP</Label>
-              <Input
-                id="otp"
-                type="text"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                placeholder="6-digit code"
-                className="border-slate-300 focus:border-emerald-500 focus:ring-emerald-500"
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" disabled={loading}>
-              {loading ? "Verifying..." : "Verify & Sign in"}
-            </Button>
-            <Button type="button" variant="outline" className="w-full" onClick={handleResend} disabled={loading || countdown > 0}>
-              {countdown > 0 ? `Resend in ${countdown}s` : "Resend OTP"}
-            </Button>
-          </form>
-        )}
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   )

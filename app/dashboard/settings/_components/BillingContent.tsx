@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -37,6 +38,7 @@ interface BillingContentProps {
 }
 
 export default function BillingContent({ companyId }: BillingContentProps) {
+  const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [billingData, setBillingData] = useState<any>(null)
@@ -327,13 +329,17 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                       </p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm">Update</Button>
+                  <Button variant="outline" size="sm" onClick={() => router.push('/dashboard/settings/billing/payment/add')}>
+                    Update
+                  </Button>
                 </div>
               ) : (
                 <div className="text-center py-8">
                   <CreditCard className="h-12 w-12 text-gray-300 mx-auto mb-3" />
                   <p className="text-gray-600 mb-4">No payment method on file</p>
-                  <Button>Add Payment Method</Button>
+                  <Button onClick={() => router.push('/dashboard/settings/billing/payment/add')}>
+                    Add Payment Method
+                  </Button>
                 </div>
               )}
             </CardContent>
