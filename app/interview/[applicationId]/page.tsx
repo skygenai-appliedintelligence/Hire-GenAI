@@ -29,6 +29,7 @@ export default function InterviewPage() {
   const dcRef = useRef<RTCDataChannel | null>(null)
   const agentTextBufferRef = useRef<string>("")
   const userTextBufferRef = useRef<string>("")
+  const avatarFirstPlayRef = useRef<boolean>(true)
   
   const logTs = (label: string, text?: string) => {
     const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -514,12 +515,38 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
     }
   }, [])
 
-  // Handle avatar autoplay
+  // Sync avatar video with agent audio (play when agent speaks, pause when silent)
   useEffect(() => {
-    if (avatarVideoRef.current) {
-      avatarVideoRef.current.play().catch(() => {})
+    const agentAudio = agentAudioRef.current
+    const avatarVideo = avatarVideoRef.current
+    
+    if (!agentAudio || !avatarVideo) return
+
+    const handleAudioPlay = () => {
+      avatarVideo.play().catch(() => {})
     }
-  }, [])
+
+    const handleAudioPause = () => {
+      avatarVideo.pause()
+    }
+
+    const handleAudioEnded = () => {
+      avatarVideo.pause()
+    }
+
+    // Listen to agent audio state changes
+    agentAudio.addEventListener('play', handleAudioPlay)
+    agentAudio.addEventListener('playing', handleAudioPlay)
+    agentAudio.addEventListener('pause', handleAudioPause)
+    agentAudio.addEventListener('ended', handleAudioEnded)
+
+    return () => {
+      agentAudio.removeEventListener('play', handleAudioPlay)
+      agentAudio.removeEventListener('playing', handleAudioPlay)
+      agentAudio.removeEventListener('pause', handleAudioPause)
+      agentAudio.removeEventListener('ended', handleAudioEnded)
+    }
+  }, [agentReady])
 
   const toggleMic = () => {
     const audioTracks = streamRef.current?.getAudioTracks() || []
@@ -679,9 +706,16 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
                 src="https://storage.googleapis.com/ai_recruiter_bucket_prod/assets/videos/olivia_character_no_audio.mp4"
                 className="w-[220px] h-[124px] md:w-[260px] md:h-[146px] object-cover"
                 muted
-                loop
                 playsInline
-                autoPlay
+                onEnded={() => {
+                  // First play: video plays fully from 0 to end
+                  // Subsequent plays: loop from 3 seconds to end
+                  if (avatarVideoRef.current) {
+                    avatarVideoRef.current.currentTime = 3
+                    avatarVideoRef.current.play()
+                    avatarFirstPlayRef.current = false
+                  }
+                }}
               />
               <audio ref={agentAudioRef} className="hidden" />
               <div className="absolute left-2 bottom-2 text-[10px] md:text-xs text-white/90">

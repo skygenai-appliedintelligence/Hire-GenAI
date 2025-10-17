@@ -17,6 +17,17 @@ interface DashboardStats {
   successRate: number
 }
 
+const processFlowSteps = [
+  { title: "Create JD", role: "(as a recruiter)" },
+  { title: "Share Apply Now link", role: "(as a recruiter)" },
+  { title: "Candidate applies", role: "(as a candidate)" },
+  { title: "Review qualified candidate", role: "(as a recruiter)" },
+  { title: "Send interview link", role: "(as a recruiter)" },
+  { title: "Candidate gives interview", role: "(as a candidate)" },
+  { title: "Review completed interview", role: "(as a recruiter)" },
+  { title: "Send to hiring manager", role: "(as a recruiter)" },
+]
+
 export default function DashboardPage() {
   const { company } = useAuth()
   const [stats, setStats] = useState<DashboardStats>({
@@ -25,8 +36,6 @@ export default function DashboardPage() {
     scheduledInterviews: 0,
     successRate: 0,
   })
-  const [recentActivity, setRecentActivity] = useState<any[]>([])
-
   useEffect(() => {
     if (company?.id) {
       fetchDashboardData()
@@ -69,22 +78,12 @@ export default function DashboardPage() {
       .eq("job_descriptions.company_id", company.id)
       .eq("status", "scheduled")
 
-    // Fetch recent activity
-    const { data: activity } = await supabase
-      .from("activity_logs")
-      .select("*")
-      .eq("company_id", company.id)
-      .order("created_at", { ascending: false })
-      .limit(10)
-
     setStats({
       totalJobs: openJobsCount,
       activeCandidates: candidates?.length || 0,
       scheduledInterviews: interviews?.length || 0,
       successRate: 85, // This would be calculated based on actual data
     })
-
-    setRecentActivity(activity || [])
   }
 
   return (
@@ -143,30 +142,55 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Recent Activity */}
       <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>Latest updates from your recruitment pipeline</CardDescription>
+        <CardHeader className="pb-4">
+          <CardTitle>HireGenAI Process Flow</CardTitle>
+          <CardDescription>End-to-end journey from job creation to hiring manager handoff</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {recentActivity.length > 0 ? (
-              recentActivity.map((activity, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">{activity.action}</p>
-                    <p className="text-xs text-gray-500">{new Date(activity.created_at).toLocaleDateString()}</p>
+          <div className="hidden lg:block">
+            <div className="relative overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-r from-white via-emerald-50 to-white px-12 py-8">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.22),_transparent_75%)] opacity-30" aria-hidden="true" />
+              <div className="absolute left-14 right-14 top-[62px] h-[2px] bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.25)]" />
+              <div className="relative flex justify-between gap-4">
+                {processFlowSteps.map((step, index) => (
+                  <div key={step.title} className="flex flex-col items-center text-center w-[120px]">
+                    <div className="flex items-center justify-center h-12 w-12 rounded-full border-2 border-emerald-500 bg-white text-emerald-600 text-base font-semibold shadow-[0_8px_18px_-12px_rgba(16,185,129,0.6)]">
+                      {index + 1}
+                    </div>
+                    <div className="mt-4 text-sm font-semibold text-gray-900 leading-tight">
+                      {step.title}
+                    </div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600/90 mt-1">
+                      {step.role}
+                    </div>
                   </div>
-                  <Badge variant="outline">{activity.details?.status || "Active"}</Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:hidden rounded-2xl border border-emerald-100 bg-white/95 p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-center gap-6">
+              {processFlowSteps.map((step, index) => (
+                <div key={step.title} className="flex flex-col items-center text-center w-[130px]">
+                  <div className="flex items-center justify-center h-11 w-11 rounded-full border-2 border-emerald-500 bg-white text-emerald-600 font-semibold">
+                    {index + 1}
+                  </div>
+                  <div className="mt-3 text-sm font-semibold text-gray-900 leading-tight">
+                    {step.title}
+                  </div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600/90 mt-1">
+                    {step.role}
+                  </div>
                 </div>
-              ))
-            ) : (
-              <p className="text-sm text-gray-500">No recent activity</p>
-            )}
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      <div className="pb-2" />
     </div>
   )
 }
