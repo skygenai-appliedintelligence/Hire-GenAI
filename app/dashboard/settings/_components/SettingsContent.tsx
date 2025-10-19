@@ -156,19 +156,25 @@ export default function SettingsContent({ section }: { section?: string }) {
   
   // Role-based access control
   const isRecruiterRole = userRole === 'recruiter'
-  console.log('🔍 Final role being used:', userRole)
-  console.log('🔍 Is recruiter role:', isRecruiterRole)
-  console.log('🔍 Is admin role:', isAdminRole)
+  const isMemberRole = userRole === 'member'
+  const isLimitedRole = isRecruiterRole || isMemberRole
   
   const canAccessTab = (tabName: string) => {
     if (isAdminRole || isBsadmin) return true // Admin can access all tabs
-    if (isRecruiterRole) return tabName === 'profile' // Recruiter can only access profile
+    if (isLimitedRole) return tabName === 'profile' // Member/Recruiter can only access profile
     return true // Default: allow access
   }
+  
+  console.log('🔍 Final role being used:', userRole)
+  console.log('🔍 Is recruiter role:', isRecruiterRole)
+  console.log('🔍 Is member role:', isMemberRole)
+  console.log('🔍 Is admin role:', isAdminRole)
+  console.log('🔍 Has limited access:', isLimitedRole)
+  console.log('🔍 Can access team tab:', canAccessTab('team'))
 
-  // Redirect recruiter users to profile if they try to access restricted tabs
+  // Redirect limited role users to profile if they try to access restricted tabs
   useEffect(() => {
-    if (isRecruiterRole && current !== 'profile') {
+    if (isLimitedRole && current !== 'profile') {
       toast({
         title: "Access Restricted",
         description: "this tab only accesable by admin .",
@@ -176,17 +182,17 @@ export default function SettingsContent({ section }: { section?: string }) {
       })
       router.push('/dashboard/settings/profile')
     }
-  }, [isRecruiterRole, current, router, toast])
+  }, [isLimitedRole, current, router, toast])
   
   // Allow editing based on role and section
-  // Recruiters can only view (read-only) profile section
+  // Members/Recruiters can only view (read-only) profile section
   // Admins can edit everything
-  const canEditSection = (isAdminRole || isBsadmin) || !(isRecruiterRole && current === 'profile')
+  const canEditSection = (isAdminRole || isBsadmin) || !(isLimitedRole && current === 'profile')
 
   // Team management state
   const [membersLoading, setMembersLoading] = useState(false)
-  const [members, setMembers] = useState<Array<{ id: string; email: string; name: string; role: "company_admin" | "user" }>>([])
-  const [newMember, setNewMember] = useState({ email: "", name: "", role: "user" as "company_admin" | "user" })
+  const [members, setMembers] = useState<Array<{ id: string; email: string; name: string; role: "company_admin" | "user" | "member" }>>([])
+  const [newMember, setNewMember] = useState({ email: "", name: "", role: "member" as "company_admin" | "user" | "member" })
 
   const loadMembers = async () => {
     if (!(company as any)?.id) return
@@ -286,7 +292,7 @@ export default function SettingsContent({ section }: { section?: string }) {
       const data = await res.json();
       if (data.ok) {
         toast({ title: "Member added", description: `${newMember.email} invited` })
-        setNewMember({ email: "", name: "", role: "user" })
+        setNewMember({ email: "", name: "", role: "member" })
         loadMembers()
       } else {
         const msg = typeof data.error === "string" ? data.error : data.error?.message || "Failed to add member"
@@ -319,7 +325,7 @@ export default function SettingsContent({ section }: { section?: string }) {
     }
   }
 
-  const updateRole = async (email: string, role: "company_admin" | "user") => {
+  const updateRole = async (email: string, role: "company_admin" | "user" | "member") => {
     if (!(company as any)?.id) return
     try {
       const res = await fetch(`/api/company-members`, {
@@ -597,6 +603,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                     <SelectValue placeholder="Role" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="member">Member</SelectItem>
                     <SelectItem value="user">Team member</SelectItem>
                     <SelectItem value="company_admin">Admin</SelectItem>
                   </SelectContent>
@@ -625,6 +632,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="member">Member</SelectItem>
                           <SelectItem value="user">Team member</SelectItem>
                           <SelectItem value="company_admin">Admin</SelectItem>
                         </SelectContent>

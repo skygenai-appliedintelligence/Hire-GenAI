@@ -5,11 +5,15 @@ import { DatabaseService } from '@/lib/database'
 export const dynamic = 'force-dynamic'
 
 // Map UI roles <-> DB enum roles
-function mapUiRoleToDb(role: 'company_admin' | 'user'): 'admin' | 'recruiter' {
-  return role === 'company_admin' ? 'admin' : 'recruiter'
+function mapUiRoleToDb(role: 'company_admin' | 'user' | 'member'): 'admin' | 'recruiter' {
+  if (role === 'company_admin') return 'admin'
+  return 'recruiter' // Both 'user' and 'member' map to 'recruiter' in DB
 }
-function mapDbRoleToUi(role?: string): 'company_admin' | 'user' {
-  return role === 'admin' ? 'company_admin' : 'user'
+function mapDbRoleToUi(role?: string, companyName?: string): 'company_admin' | 'user' | 'member' {
+  if (role === 'admin') return 'company_admin'
+  // If it's the demo company (HireGenAI or HireGenAI Demo Company), show recruiter role as 'member'
+  if (companyName === 'HireGenAI' || companyName === 'HireGenAI Demo Company') return 'member'
+  return 'user' // Regular company users with recruiter role show as 'user'
 }
 
 // Reusable admin check
@@ -56,9 +60,10 @@ export async function GET(req: Request) {
 
     // Use raw SQL query since Prisma models might not be available
     const membersQuery = `
-      SELECT u.id, u.email, u.full_name, ur.role
+      SELECT u.id, u.email, u.full_name, ur.role, c.name as company_name
       FROM users u
       LEFT JOIN user_roles ur ON u.id = ur.user_id
+      JOIN companies c ON u.company_id = c.id
       WHERE u.company_id = $1::uuid
       ORDER BY u.created_at ASC
     `
@@ -69,7 +74,7 @@ export async function GET(req: Request) {
       id: member.id,
       email: member.email,
       name: member.full_name, // Map full_name to name for UI
-      role: mapDbRoleToUi(member.role)
+      role: mapDbRoleToUi(member.role, member.company_name)
     }))
 
     return NextResponse.json({ ok: true, members })
@@ -86,7 +91,7 @@ export async function POST(req: Request) {
       companyName?: string
       email: string
       name?: string
-      role?: 'company_admin' | 'user'
+      role?: 'company_admin' | 'user' | 'member'
       actorEmail?: string
     }
     
@@ -155,7 +160,7 @@ export async function PUT(req: Request) {
     const { companyId, email, role, actorEmail } = (await req.json()) as {
       companyId: string
       email: string
-      role: 'company_admin' | 'user'
+      role: 'company_admin' | 'user' | 'member'
       actorEmail?: string
     }
     if (!companyId || !email || !role) return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
