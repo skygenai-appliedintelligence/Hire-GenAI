@@ -290,6 +290,7 @@ export default function QualifiedCandidatesInterviewFlowPage() {
             setSelectedCandidate(null)
           }}
           candidate={selectedCandidate}
+          company={company}
           onSendEmail={handleSendEmail}
         />
       )}
