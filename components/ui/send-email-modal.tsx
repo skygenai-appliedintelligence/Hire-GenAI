@@ -18,10 +18,14 @@ interface SendEmailModalProps {
     appliedJD: string
     jobId: string
   }
+  company?: {
+    id: string
+    name: string
+  } | null
   onSendEmail: (message: string, category: 'interview' | 'new_job') => Promise<void>
 }
 
-export default function SendEmailModal({ isOpen, onClose, candidate, onSendEmail }: SendEmailModalProps) {
+export default function SendEmailModal({ isOpen, onClose, candidate, company, onSendEmail }: SendEmailModalProps) {
   const [selectedCategory, setSelectedCategory] = useState<'interview' | 'new_job'>('interview')
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
@@ -58,15 +62,47 @@ export default function SendEmailModal({ isOpen, onClose, candidate, onSendEmail
     }
   }, [selectedCategory, savedMessages, companyData])
 
-  const loadSavedMessages = () => {
-    const savedCategoryMessages = localStorage.getItem('categoryMessages')
-    if (savedCategoryMessages) {
-      try {
-        const parsedMessages = JSON.parse(savedCategoryMessages)
-        setSavedMessages(parsedMessages)
-      } catch (error) {
-        console.error('Error parsing saved messages:', error)
+  const loadSavedMessages = async () => {
+    try {
+      const companyId = (company as any)?.id
+      
+      if (!companyId) {
+        console.warn('No company ID found, cannot load messages')
+        return
       }
+
+      // Fetch messages for both categories
+      const [interviewRes, jobRes] = await Promise.all([
+        fetch(`/api/messages?category=interview&companyId=${companyId}&includeDrafts=true`),
+        fetch(`/api/messages?category=new_job&companyId=${companyId}&includeDrafts=true`)
+      ])
+
+      const interviewData = await interviewRes.json()
+      const jobData = await jobRes.json()
+
+      const messages = {
+        interview: "",
+        new_job: ""
+      }
+
+      // Get the most recent draft for each category
+      if (interviewData.success && interviewData.messages?.length > 0) {
+        const drafts = interviewData.messages.filter((m: any) => m.status === 'draft')
+        if (drafts.length > 0) {
+          messages.interview = drafts[0].content || ""
+        }
+      }
+
+      if (jobData.success && jobData.messages?.length > 0) {
+        const drafts = jobData.messages.filter((m: any) => m.status === 'draft')
+        if (drafts.length > 0) {
+          messages.new_job = drafts[0].content || ""
+        }
+      }
+
+      setSavedMessages(messages)
+    } catch (error) {
+      console.error('Error loading saved messages:', error)
     }
   }
 

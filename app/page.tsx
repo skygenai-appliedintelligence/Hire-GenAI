@@ -133,9 +133,9 @@ export default function HomePage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button className="sr-button-dark">Explore the Benefits</Button>
-                <Button className="sr-button-secondary" onClick={() => router.push('/demo-interview')}>
+                <Button className="sr-button-secondary" onClick={() => setShowLoginModal(true)}>
                   <Play className="w-4 h-4 mr-2" />
-                  Try Demo Interview
+                  Try Demo
                 </Button>
               </div>
             </div>
