@@ -6,13 +6,14 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, otp } = await req.json()
+    const { email, otp, demo } = await req.json()
     
     if (!email || !otp) {
       return NextResponse.json({ error: 'Email and OTP are required' }, { status: 400 })
     }
 
     const normEmail = String(email).trim().toLowerCase()
+    const isDemoMode = Boolean(demo)
 
     // Check if database is configured
     if (!DatabaseService.isDatabaseConfigured()) {
@@ -67,35 +68,74 @@ export async function POST(req: NextRequest) {
     // Use database service
     await DatabaseService.verifyOtpChallenge(normEmail, otp, 'login')
 
-    // Find user
-    const user = await DatabaseService.findUserByEmail(normEmail)
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 400 })
+    if (isDemoMode) {
+      // Demo mode: Add user to demo company
+      const { user, company, isNewUser } = await DatabaseService.addUserToDemoCompany(normEmail)
+
+      // Create session for demo user
+      const { session, refreshToken } = await DatabaseService.createSession('user', user.id)
+
+      console.log(`🎯 Demo login successful for ${normEmail} - ${isNewUser ? 'New' : 'Existing'} user in demo company`)
+
+      return NextResponse.json({
+        ok: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          full_name: user.full_name,
+          status: user.status,
+        },
+        company: {
+          id: company.id,
+          name: company.name,
+          status: company.status,
+          verified: company.verified,
+        },
+        session: {
+          id: session.id,
+          refreshToken,
+          expiresAt: session.expires_at,
+        },
+        debug: {
+          isDemoMode: true,
+          isNewUser,
+          demoCompany: company.name
+        }
+      })
+    } else {
+      // Regular login mode
+      const user = await DatabaseService.findUserByEmail(normEmail)
+      if (!user) {
+        return NextResponse.json({ error: 'User not found' }, { status: 400 })
+      }
+
+      // Create session
+      const { session, refreshToken } = await DatabaseService.createSession('user', user.id)
+
+      return NextResponse.json({
+        ok: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          full_name: user.full_name,
+          status: user.status,
+        },
+        company: {
+          id: user.companies.id,
+          name: user.companies.name,
+          status: user.companies.status,
+          verified: user.companies.verified,
+        },
+        session: {
+          id: session.id,
+          refreshToken,
+          expiresAt: session.expires_at,
+        },
+        debug: {
+          isDemoMode: false
+        }
+      })
     }
-
-    // Create session
-    const { session, refreshToken } = await DatabaseService.createSession('user', user.id)
-
-    return NextResponse.json({
-      ok: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        full_name: user.full_name,
-        status: user.status,
-      },
-      company: {
-        id: user.companies.id,
-        name: user.companies.name,
-        status: user.companies.status,
-        verified: user.companies.verified,
-      },
-      session: {
-        id: session.id,
-        refreshToken,
-        expiresAt: session.expires_at,
-      },
-    })
   } catch (error: any) {
     console.error('Error verifying login OTP:', error)
     return NextResponse.json({ 

@@ -25,12 +25,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      role: user.role || 'admin', // Default to admin if no role found
+      role: user.role || 'recruiter', // Default to recruiter (limited access) if no role found
       user: {
         id: user.id,
         email: user.email,
         full_name: user.full_name,
-        role: user.role || 'admin'
+        role: user.role || 'recruiter'
       }
     })
 

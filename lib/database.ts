@@ -292,19 +292,38 @@ export class DatabaseService {
     const codeHash = await this.hashCode(code)
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
 
-    const insertChallengeQuery = `
-      INSERT INTO otp_challenges (email, principal_type, principal_id, purpose, code_hash, expires_at, max_tries, tries_used, created_at)
-      VALUES ($1, $2, $3::uuid, $4, $5, $6::timestamptz, 5, 0, NOW())
-      RETURNING *
-    `
-    const challenge = await this.query(insertChallengeQuery, [
-      email.toLowerCase(),
-      principalType,
-      principalId,
-      purpose,
-      codeHash,
-      expiresAt.toISOString()
-    ]) as any[]
+    let insertChallengeQuery: string
+    let params: any[]
+
+    if (principalId) {
+      insertChallengeQuery = `
+        INSERT INTO otp_challenges (email, principal_type, principal_id, purpose, code_hash, expires_at, max_tries, tries_used, created_at)
+        VALUES ($1, $2, $3::uuid, $4, $5, $6::timestamptz, 5, 0, NOW())
+        RETURNING *
+      `
+      params = [
+        email.toLowerCase(),
+        principalType,
+        principalId,
+        purpose,
+        codeHash,
+        expiresAt.toISOString()
+      ]
+    } else {
+      insertChallengeQuery = `
+        INSERT INTO otp_challenges (email, principal_type, principal_id, purpose, code_hash, expires_at, max_tries, tries_used, created_at)
+        VALUES ($1, $2, NULL, $3, $4, $5::timestamptz, 5, 0, NOW())
+        RETURNING *
+      `
+      params = [
+        email.toLowerCase(),
+        principalType,
+        purpose,
+        codeHash,
+        expiresAt.toISOString()
+      ]
+    }
+    const challenge = await this.query(insertChallengeQuery, params) as any[]
 
     if (challenge.length === 0) {
       throw new Error('Failed to create OTP challenge')
@@ -2652,5 +2671,140 @@ export class DatabaseService {
     `
     const result = await this.query(query, [companyId]) as any[]
     return result
+  }
+
+  // Find or create demo company
+  static async findOrCreateDemoCompany() {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+
+    const demoEmail = 'admin@hire-genai.com'
+    const demoCompanyName = 'HireGenAI Demo Company'
+
+    // First, check if demo company exists
+    const findCompanyQuery = `
+      SELECT c.* FROM companies c
+      JOIN company_domains cd ON c.id = cd.company_id
+      WHERE cd.domain = 'hire-genai.com'
+      LIMIT 1
+    `
+    const existingCompany = await this.query(findCompanyQuery) as any[]
+
+    if (existingCompany.length > 0) {
+      return existingCompany[0]
+    }
+
+    // Create demo company if it doesn't exist
+    const insertCompanyQuery = `
+      INSERT INTO companies (name, status, verified, created_at)
+      VALUES ($1, 'active', true, NOW())
+      RETURNING *
+    `
+    const newCompany = await this.query(insertCompanyQuery, [demoCompanyName]) as any[]
+
+    if (newCompany.length === 0) {
+      throw new Error('Failed to create demo company')
+    }
+
+    // Add domain mapping for demo company
+    const insertDomainQuery = `
+      INSERT INTO company_domains (company_id, domain)
+      VALUES ($1::uuid, 'hire-genai.com')
+    `
+    await this.query(insertDomainQuery, [newCompany[0].id])
+
+    // Create admin user for demo company if doesn't exist
+    const findAdminQuery = `
+      SELECT * FROM users WHERE email = $1 AND company_id = $2::uuid
+    `
+    const existingAdmin = await this.query(findAdminQuery, [demoEmail, newCompany[0].id]) as any[]
+
+    if (existingAdmin.length === 0) {
+      const insertAdminQuery = `
+        INSERT INTO users (
+          company_id, 
+          email, 
+          full_name, 
+          status, 
+          job_title,
+          email_verified_at,
+          created_at
+        )
+        VALUES ($1::uuid, $2, 'Demo Admin', 'active', 'System Administrator', NOW(), NOW())
+        RETURNING *
+      `
+      const adminUser = await this.query(insertAdminQuery, [newCompany[0].id, demoEmail]) as any[]
+
+      // Assign admin role
+      const insertRoleQuery = `
+        INSERT INTO user_roles (user_id, role)
+        VALUES ($1::uuid, 'admin')
+        ON CONFLICT DO NOTHING
+      `
+      await this.query(insertRoleQuery, [adminUser[0].id])
+    }
+
+    return newCompany[0]
+  }
+
+  // Add user to demo company as member
+  static async addUserToDemoCompany(email: string, fullName?: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+
+    // Get or create demo company
+    const demoCompany = await this.findOrCreateDemoCompany()
+
+    // Check if user already exists in demo company
+    const findUserQuery = `
+      SELECT * FROM users WHERE email = $1 AND company_id = $2::uuid
+    `
+    const existingUser = await this.query(findUserQuery, [email.toLowerCase(), demoCompany.id]) as any[]
+
+    if (existingUser.length > 0) {
+      // User already exists in demo company, keep their existing role
+      return {
+        user: existingUser[0],
+        company: demoCompany,
+        isNewUser: false
+      }
+    }
+
+    // Create new user in demo company
+    const userName = fullName || email.split('@')[0]
+    const insertUserQuery = `
+      INSERT INTO users (
+        company_id, 
+        email, 
+        full_name, 
+        status, 
+        job_title,
+        email_verified_at,
+        created_at
+      )
+      VALUES ($1::uuid, $2, $3, 'active', 'Demo User', NOW(), NOW())
+      RETURNING *
+    `
+    const newUser = await this.query(insertUserQuery, [demoCompany.id, email.toLowerCase(), userName]) as any[]
+
+    if (newUser.length === 0) {
+      throw new Error('Failed to create demo user')
+    }
+
+    // Assign recruiter role for demo users (member is not in enum, using recruiter as limited role)
+    const insertRoleQuery = `
+      INSERT INTO user_roles (user_id, role)
+      VALUES ($1::uuid, 'recruiter')
+      ON CONFLICT (user_id) DO NOTHING
+    `
+    await this.query(insertRoleQuery, [newUser[0].id])
+
+    return {
+      user: newUser[0],
+      company: demoCompany,
+      isNewUser: true
+    }
   }
 }
