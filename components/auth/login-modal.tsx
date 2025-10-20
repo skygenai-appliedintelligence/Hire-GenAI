@@ -18,7 +18,7 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ open, onClose }: LoginModalProps) {
-  const [activeTab, setActiveTab] = useState<"demo" | "signin">("demo")
+  const [activeTab, setActiveTab] = useState<"demo" | "signin">("signin")
   const [step, setStep] = useState<"email" | "otp">("email")
   const [demoStep, setDemoStep] = useState<"email" | "otp">("email")
   const [email, setEmail] = useState("")
@@ -49,7 +49,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
 
   useEffect(() => {
     if (!open) {
-      setActiveTab("demo")
+      setActiveTab("signin")
       setStep("email")
       setDemoStep("email")
       setEmail("")
