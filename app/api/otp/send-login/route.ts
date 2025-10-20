@@ -86,10 +86,10 @@ export async function POST(req: NextRequest) {
         }
       })
     } else {
-      // Regular login mode - user must exist
-      const user = await DatabaseService.findUserByEmail(normEmail)
+      // Regular login mode - user must be registered under the company matching their email domain
+      const user = await DatabaseService.findUserByEmailAndCompanyDomain(normEmail)
       if (!user) {
-        return NextResponse.json({ error: 'No account found with this email. Please sign up first.' }, { status: 400 })
+        return NextResponse.json({ error: 'Please register first before signing in.' }, { status: 400 })
       }
 
       // Create OTP challenge for regular login

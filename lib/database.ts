@@ -2807,4 +2807,38 @@ export class DatabaseService {
       isNewUser: true
     }
   }
+
+  // Check if user is registered under a specific company by email domain
+  static async findUserByEmailAndCompanyDomain(email: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
+    }
+
+    const domain = email.split('@')[1]
+    
+    const userQuery = `
+      SELECT u.*, c.*, ur.role
+      FROM users u
+      JOIN companies c ON u.company_id = c.id
+      JOIN company_domains cd ON c.id = cd.company_id
+      LEFT JOIN user_roles ur ON u.id = ur.user_id
+      WHERE u.email = $1 AND cd.domain = $2 AND u.status = 'active'
+      LIMIT 1
+    `
+    const user = await this.query(userQuery, [email.toLowerCase(), domain]) as any[]
+
+    if (user.length === 0) return null
+    
+    // Structure the response to match expected format
+    const userData = user[0]
+    return {
+      ...userData,
+      companies: {
+        id: userData.id,
+        name: userData.name,
+        status: userData.status,
+        verified: userData.verified
+      }
+    }
+  }
 }
