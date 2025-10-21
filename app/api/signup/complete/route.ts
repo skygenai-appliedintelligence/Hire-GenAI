@@ -75,17 +75,12 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    // Check if user already exists to prevent duplicate signups
-    const existingUserQuery = `
-      SELECT u.*, c.name as company_name 
-      FROM users u 
-      JOIN companies c ON u.company_id = c.id
-      WHERE u.email = $1 
-      LIMIT 1
-    `
-    const existingUsers = await DatabaseService.query(existingUserQuery, [normEmail]) as any[]
+    // Check if user already exists in their own company domain (not demo company)
+    console.log('🔍 Checking if user exists in own domain for:', normEmail)
+    const existingUser = await DatabaseService.findUserByEmailAndCompanyDomain(normEmail)
+    console.log('🔍 Domain check result:', existingUser ? 'USER EXISTS' : 'USER NOT EXISTS')
     
-    if (existingUsers.length > 0) {
+    if (existingUser) {
       // User already exists, consume OTP and return existing user data
       const consumeOtpQuery = `
         UPDATE otp_challenges 
@@ -95,7 +90,6 @@ export async function POST(req: NextRequest) {
       await DatabaseService.query(consumeOtpQuery, [normEmail, codeHash])
       
       // Create new session for existing user
-      const existingUser = existingUsers[0]
       const { session, refreshToken } = await DatabaseService.createSession('user', existingUser.id)
       
       return NextResponse.json({
@@ -109,7 +103,7 @@ export async function POST(req: NextRequest) {
         },
         company: {
           id: existingUser.company_id,
-          name: existingUser.company_name,
+          name: existingUser.companies.name,
         },
         session: {
           id: session.id,
@@ -120,6 +114,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create company with full signup data
+    console.log('🏢 Creating company for:', normEmail, 'with name:', companyName)
     const company = await DatabaseService.createCompanyFromSignup(normEmail, {
       companyName: companyName.trim(),
       industry: industry || undefined,
@@ -137,7 +132,10 @@ export async function POST(req: NextRequest) {
       registrationNumber: registrationNumber || undefined,
     })
 
+    console.log('✅ Company created:', { id: company.id, name: company.name })
+
     // Create user with job title and mark email as verified (since OTP was verified)
+    console.log('👤 Creating user for:', normEmail, 'in company:', company.id)
     const user = await DatabaseService.findOrCreateUser(
       normEmail, 
       fullName, 
@@ -145,6 +143,8 @@ export async function POST(req: NextRequest) {
       jobTitle && jobTitle.trim() ? jobTitle.trim() : undefined,
       true // Email is verified since OTP was successfully verified
     )
+
+    console.log('✅ User created:', { id: user.id, email: user.email, company_id: user.company_id })
 
     // Create email identity
     await DatabaseService.createEmailIdentity('user', user.id, normEmail)
