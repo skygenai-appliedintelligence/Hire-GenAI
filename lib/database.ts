@@ -48,6 +48,7 @@ export class DatabaseService {
     const insertDomainQuery = `
       INSERT INTO company_domains (company_id, domain)
       VALUES ($1::uuid, $2)
+      ON CONFLICT (company_id, domain) DO NOTHING
     `
     await this.query(insertDomainQuery, [newCompany[0].id, domain])
 

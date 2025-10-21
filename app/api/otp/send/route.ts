@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
 
     const normEmail = String(email).trim().toLowerCase()
 
-    // Check if user already exists
-    const existingUser = await DatabaseService.findUserByEmail(normEmail)
+    // Check if user already exists in their own company domain (not demo company)
+    const existingUser = await DatabaseService.findUserByEmailAndCompanyDomain(normEmail)
     if (existingUser) {
       return NextResponse.json({ error: 'User already exists. Please use login instead.' }, { status: 400 })
     }

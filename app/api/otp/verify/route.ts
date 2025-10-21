@@ -20,11 +20,21 @@ export async function POST(req: NextRequest) {
     // Verify OTP challenge
     await DatabaseService.verifyOtpChallenge(normEmail, otp, 'signup')
 
+    // Check if user already exists in their own company domain (not demo company)
+    const existingUser = await DatabaseService.findUserByEmailAndCompanyDomain(normEmail)
+    if (existingUser) {
+      return NextResponse.json({ error: 'User already exists. Please use login instead.' }, { status: 400 })
+    }
+
     // Create or find company
+    console.log('🏢 Creating company for email:', normEmail, 'with name:', companyName)
     const company = await DatabaseService.findOrCreateCompany(normEmail, companyName)
+    console.log('✅ Company created:', { id: company.id, name: company.name })
 
     // Create user
+    console.log('👤 Creating user for email:', normEmail, 'in company:', company.id)
     const user = await DatabaseService.findOrCreateUser(normEmail, fullName.trim(), company.id)
+    console.log('✅ User created:', { id: user.id, email: user.email, company_id: user.company_id })
 
     // Create email identity
     await DatabaseService.createEmailIdentity('user', user.id, normEmail)
