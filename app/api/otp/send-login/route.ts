@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { DatabaseService } from "@/lib/database"
 import { MockAuthService } from "@/lib/mock-auth"
+import { OtpEmailService } from "@/lib/otp-email-service"
 
 export const dynamic = 'force-dynamic'
 
@@ -30,13 +31,25 @@ export async function POST(req: NextRequest) {
       // Generate a mock OTP for development
       const otp = Math.floor(100000 + Math.random() * 900000).toString()
       
-      console.log('\n' + '='.repeat(50))
-      console.log(`🔐 MOCK OTP GENERATED FOR ${isDemoMode ? 'DEMO' : 'REGULAR'} LOGIN`)
-      console.log('='.repeat(50))
-      console.log(`📧 Email: ${normEmail}`)
-      console.log(`🔢 OTP: ${otp}`)
-      console.log(`🎯 Purpose: ${isDemoMode ? 'demo-login' : 'login'}`)
-      console.log('='.repeat(50) + '\n')
+      // Send OTP via email (mock service fallback)
+      try {
+        await OtpEmailService.sendLoginOtp({
+          email: normEmail,
+          otp,
+          isDemo: isDemoMode,
+        });
+        console.log(`✅ Mock login OTP sent via email to: ${normEmail}`);
+      } catch (emailError) {
+        console.error('❌ Failed to send mock OTP email:', emailError);
+        // Fallback to console log
+        console.log('\n' + '='.repeat(50))
+        console.log(`🔐 MOCK OTP GENERATED FOR ${isDemoMode ? 'DEMO' : 'REGULAR'} LOGIN`)
+        console.log('='.repeat(50))
+        console.log(`📧 Email: ${normEmail}`)
+        console.log(`🔢 OTP: ${otp}`)
+        console.log(`🎯 Purpose: ${isDemoMode ? 'demo-login' : 'login'}`)
+        console.log('='.repeat(50) + '\n')
+      }
 
       return NextResponse.json({ 
         ok: true, 
@@ -57,6 +70,13 @@ export async function POST(req: NextRequest) {
       // For demo mode, we don't need to check if user exists
       // We'll create them in the demo company during verification
       
+      // Clean up any existing challenges for this email to prevent conflicts
+      try {
+        await DatabaseService.cleanupExpiredChallenges(normEmail);
+      } catch (cleanupError) {
+        console.log("Note: Could not cleanup old challenges, continuing...");
+      }
+      
       // Create OTP challenge for demo login
       const { challenge, code } = await DatabaseService.createOtpChallenge(
         normEmail, 
@@ -65,13 +85,25 @@ export async function POST(req: NextRequest) {
         undefined // No specific user ID for demo mode
       )
 
-      console.log('\n' + '='.repeat(50))
-      console.log('🔐 DEMO OTP GENERATED')
-      console.log('='.repeat(50))
-      console.log(`📧 Email: ${normEmail}`)
-      console.log(`🔢 OTP: ${code}`)
-      console.log(`🎯 Purpose: demo-login`)
-      console.log('='.repeat(50) + '\n')
+      // Send OTP via email for demo login
+      try {
+        await OtpEmailService.sendLoginOtp({
+          email: normEmail,
+          otp: code,
+          isDemo: true,
+        });
+        console.log(`✅ Demo login OTP sent via email to: ${normEmail}`);
+      } catch (emailError) {
+        console.error('❌ Failed to send demo OTP email:', emailError);
+        // Fallback to console log
+        console.log('\n' + '='.repeat(50))
+        console.log('🔐 DEMO OTP GENERATED')
+        console.log('='.repeat(50))
+        console.log(`📧 Email: ${normEmail}`)
+        console.log(`🔢 OTP: ${code}`)
+        console.log(`🎯 Purpose: demo-login`)
+        console.log('='.repeat(50) + '\n')
+      }
 
       return NextResponse.json({ 
         ok: true, 
@@ -92,6 +124,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Please register first before signing in.' }, { status: 400 })
       }
 
+      // Clean up any existing challenges for this email to prevent conflicts
+      try {
+        await DatabaseService.cleanupExpiredChallenges(normEmail);
+      } catch (cleanupError) {
+        console.log("Note: Could not cleanup old challenges, continuing...");
+      }
+
       // Create OTP challenge for regular login
       const { challenge, code } = await DatabaseService.createOtpChallenge(
         normEmail, 
@@ -99,6 +138,26 @@ export async function POST(req: NextRequest) {
         'user', 
         user.id
       )
+
+      // Send OTP via email for regular login
+      try {
+        await OtpEmailService.sendLoginOtp({
+          email: normEmail,
+          otp: code,
+          isDemo: false,
+        });
+        console.log(`✅ Regular login OTP sent via email to: ${normEmail}`);
+      } catch (emailError) {
+        console.error('❌ Failed to send login OTP email:', emailError);
+        // Continue with response even if email fails (fallback to console log)
+        console.log('\n' + '='.repeat(50))
+        console.log('🔐 REGULAR LOGIN OTP (EMAIL FAILED - CONSOLE FALLBACK)')
+        console.log('='.repeat(50))
+        console.log(`📧 Email: ${normEmail}`)
+        console.log(`🔢 OTP: ${code}`)
+        console.log(`🎯 Purpose: login`)
+        console.log('='.repeat(50) + '\n')
+      }
 
       return NextResponse.json({ 
         ok: true, 

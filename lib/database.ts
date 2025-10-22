@@ -345,6 +345,25 @@ export class DatabaseService {
     return { challenge: challenge[0], code }
   }
 
+  // Clean up expired or consumed challenges for an email
+  static async cleanupExpiredChallenges(email: string) {
+    if (!this.isDatabaseConfigured()) {
+      return; // Silently skip if database not configured
+    }
+
+    try {
+      const cleanupQuery = `
+        DELETE FROM otp_challenges 
+        WHERE email = $1 AND (expires_at < NOW() OR consumed_at IS NOT NULL)
+      `;
+      await this.query(cleanupQuery, [email.toLowerCase()]);
+      console.log(`🧹 Cleaned up old OTP challenges for ${email}`);
+    } catch (error) {
+      console.log(`Note: Could not cleanup challenges for ${email}:`, error);
+      // Don't throw error, just log it
+    }
+  }
+
   // Verify OTP challenge
   static async verifyOtpChallenge(email: string, otp: string, purpose: 'signup' | 'login') {
     if (!this.isDatabaseConfigured()) {
