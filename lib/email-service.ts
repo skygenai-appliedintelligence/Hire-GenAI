@@ -233,4 +233,67 @@ Thank you for your interest in joining our team!
       text,
     });
   }
+
+  /**
+   * Send custom message to candidate (Interview or New Job)
+   */
+  static async sendCustomMessage({
+    candidateName,
+    candidateEmail,
+    jobTitle,
+    companyName,
+    messageContent,
+    category,
+  }: {
+    candidateName: string;
+    candidateEmail: string;
+    jobTitle: string;
+    companyName: string;
+    messageContent: string;
+    category: 'interview' | 'new_job';
+  }) {
+    // Extract subject from message if it starts with "Subject:"
+    let subject = category === 'interview' 
+      ? `Interview Invitation - ${jobTitle} at ${companyName}`
+      : `New Opportunity - ${jobTitle} at ${companyName}`;
+    
+    let bodyContent = messageContent;
+    
+    // Check if message has a subject line
+    const subjectMatch = messageContent.match(/^Subject:\s*(.+?)(?:\n|$)/i);
+    if (subjectMatch) {
+      subject = subjectMatch[1].trim();
+      bodyContent = messageContent.replace(/^Subject:\s*.+?(?:\n|$)/i, '').trim();
+    }
+
+    const gradientColor = category === 'interview' 
+      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+      : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: ${gradientColor}; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+          <h1 style="color: white; margin: 0; font-size: 24px;">${companyName}</h1>
+        </div>
+        
+        <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
+          <div style="background: white; padding: 25px; border-radius: 8px; line-height: 1.6; color: #333;">
+            ${bodyContent.replace(/\n/g, "<br/>")}
+          </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 20px; color: #6c757d; font-size: 12px;">
+          <p>This email was sent by ${companyName}</p>
+        </div>
+      </div>`;
+
+    const text = `${bodyContent}\n\n---\nThis email was sent by ${companyName}`;
+
+    return await sendMail({
+      to: candidateEmail,
+      subject,
+      html,
+      text,
+    });
+  }
 }

@@ -148,16 +148,16 @@ export default function QualifiedCandidatesInterviewFlowPage() {
     if (!selectedCandidate) return
 
     try {
-      // Use the same interview link API that was working before
-      const res = await fetch('/api/interview/link', {
+      // Send real email using the custom email API
+      const res = await fetch('/api/emails/send-custom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          applicationId: selectedCandidate.id,
-          email: selectedCandidate.email,
-          name: selectedCandidate.candidateName,
+          candidateName: selectedCandidate.candidateName,
+          candidateEmail: selectedCandidate.email,
           jobTitle: selectedCandidate.appliedJD,
-          customMessage: message,
+          companyName: (company as any)?.name || 'TATA',
+          messageContent: message,
           category: category
         }),
       })
@@ -166,12 +166,12 @@ export default function QualifiedCandidatesInterviewFlowPage() {
 
       setSentMap(prev => ({ ...prev, [selectedCandidate.id]: true }))
       
-      // Log the actual interview link that was generated
-      console.log('[Interview Link Generated]', json.url)
-      console.log('[Custom Message Sent]', message)
-      console.log('[Category]', category)
+      console.log('✅ Email sent successfully to:', selectedCandidate.email)
+      console.log('📧 Category:', category)
+      console.log('📝 Message length:', message.length)
       
     } catch (e: any) {
+      console.error('❌ Failed to send email:', e)
       throw new Error(e?.message || 'Something went wrong')
     }
   }
