@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import Script from "next/script"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -40,6 +40,8 @@ interface BillingContentProps {
 
 export default function BillingContent({ companyId }: BillingContentProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [billingData, setBillingData] = useState<any>(null)
@@ -59,6 +61,10 @@ export default function BillingContent({ companyId }: BillingContentProps) {
   const [usageTypeFilter, setUsageTypeFilter] = useState<string>("all")
   const [dateRange, setDateRange] = useState<string>("30")
 
+  // Tab state management
+  const [currentTab, setCurrentTab] = useState<string>("overview")
+  const lastSyncedTabRef = useRef<string>("overview")
+
   useEffect(() => {
     if (companyId) {
       loadBillingData()
@@ -67,6 +73,26 @@ export default function BillingContent({ companyId }: BillingContentProps) {
       loadJobs()
     }
   }, [companyId])
+
+  // Handle URL tab synchronization
+  useEffect(() => {
+    const urlTab = searchParams.get('tab')
+    const validTabs = ['overview', 'usage', 'invoices', 'settings']
+    
+    if (urlTab && validTabs.includes(urlTab)) {
+      if (urlTab !== lastSyncedTabRef.current) {
+        setCurrentTab(urlTab)
+        lastSyncedTabRef.current = urlTab
+      }
+    } else if (!urlTab) {
+      // If no tab in URL, set to overview and update URL
+      setCurrentTab('overview')
+      lastSyncedTabRef.current = 'overview'
+      const sp = new URLSearchParams(Array.from(searchParams.entries()))
+      sp.set('tab', 'overview')
+      router.replace(`${pathname}?${sp.toString()}`)
+    }
+  }, [searchParams, pathname, router])
 
   const loadBillingData = async () => {
     try {
@@ -231,35 +257,6 @@ export default function BillingContent({ companyId }: BillingContentProps) {
 
   return (
     <div className="space-y-6">
-      {/* Trial Banner */}
-      {billingData?.status === 'trial' && billingData?.trialInfo && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-4">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Zap className="h-6 w-6 text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-blue-900 mb-1">Free Trial Active</h3>
-                <p className="text-sm text-blue-700 mb-3">
-                  You can create <strong>1 Job Description</strong> and run <strong>1 interview</strong> for free. 
-                  All usage is complimentary during your trial.
-                </p>
-                <div className="flex gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className={`h-4 w-4 ${billingData.trialInfo.trialJdId ? 'text-green-600' : 'text-gray-400'}`} />
-                    <span>Trial JD {billingData.trialInfo.trialJdId ? 'Created' : 'Available'}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className={`h-4 w-4 ${billingData.trialInfo.trialInterviewCount > 0 ? 'text-green-600' : 'text-gray-400'}`} />
-                    <span>Trial Interview ({billingData.trialInfo.trialInterviewCount}/1)</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Past Due Banner */}
       {billingData?.status === 'past_due' && (
@@ -278,7 +275,19 @@ export default function BillingContent({ companyId }: BillingContentProps) {
         </Card>
       )}
 
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs 
+        value={currentTab} 
+        onValueChange={(val) => {
+          if (val !== currentTab) {
+            setCurrentTab(val)
+            const sp = new URLSearchParams(Array.from(searchParams.entries()))
+            sp.set('tab', val)
+            lastSyncedTabRef.current = val
+            router.replace(`${pathname}?${sp.toString()}`)
+          }
+        }}
+        className="space-y-6"
+      >
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="usage">Usage</TabsTrigger>
@@ -379,17 +388,35 @@ export default function BillingContent({ companyId }: BillingContentProps) {
 
         {/* Usage Tab */}
         <TabsContent value="usage" className="space-y-6">
+          {/* Header Section */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">Usage Analytics</h2>
+              <p className="text-muted-foreground">Track your AI service consumption and costs</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                Export Data
+              </Button>
+            </div>
+          </div>
+
           {/* Filters */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Usage Filters</CardTitle>
+          <Card className="border-dashed">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2">
+                <SettingsIcon className="h-5 w-5" />
+                Filter Usage Data
+              </CardTitle>
+              <CardDescription>Customize your view of usage analytics</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-4">
                 <div>
-                  <Label>Job Description</Label>
+                  <Label className="text-sm font-medium">Job Description</Label>
                   <Select value={selectedJob} onValueChange={setSelectedJob}>
-                    <SelectTrigger>
+                    <SelectTrigger className="mt-2">
                       <SelectValue placeholder="All Jobs" />
                     </SelectTrigger>
                     <SelectContent>
@@ -403,9 +430,9 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                   </Select>
                 </div>
                 <div>
-                  <Label>Usage Type</Label>
+                  <Label className="text-sm font-medium">Usage Type</Label>
                   <Select value={usageTypeFilter} onValueChange={setUsageTypeFilter}>
-                    <SelectTrigger>
+                    <SelectTrigger className="mt-2">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -418,9 +445,9 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                   </Select>
                 </div>
                 <div>
-                  <Label>Date Range</Label>
+                  <Label className="text-sm font-medium">Date Range</Label>
                   <Select value={dateRange} onValueChange={setDateRange}>
-                    <SelectTrigger>
+                    <SelectTrigger className="mt-2">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -431,76 +458,233 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="flex items-end">
+                  <Button className="w-full" onClick={() => {/* Refresh data */}}>
+                    Apply Filters
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Usage Summary */}
+          {/* Usage Overview Cards */}
           {usageData?.totals && (
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">CV Parsing</CardTitle>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              <Card className="border-l-4 border-l-blue-500">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-blue-700">CV Parsing</CardTitle>
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <FileText className="h-4 w-4 text-blue-600" />
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">${usageData.totals.cvParsing.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">{usageData.totals.cvCount} CVs parsed</p>
+                  <div className="text-2xl font-bold text-blue-900">${usageData.totals.cvParsing.toFixed(2)}</div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {usageData.totals.cvCount} CVs
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">parsed</span>
+                  </div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">JD Questions</CardTitle>
+
+              <Card className="border-l-4 border-l-green-500">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-green-700">JD Questions</CardTitle>
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">${usageData.totals.jdQuestions.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">{usageData.totals.tokenCount.toLocaleString()} tokens</p>
+                  <div className="text-2xl font-bold text-green-900">${usageData.totals.jdQuestions.toFixed(2)}</div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {usageData.totals.tokenCount.toLocaleString()}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">tokens</span>
+                  </div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">Video Interviews</CardTitle>
+
+              <Card className="border-l-4 border-l-purple-500">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-purple-700">Video Interviews</CardTitle>
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Calendar className="h-4 w-4 text-purple-600" />
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">${usageData.totals.video.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">{usageData.totals.videoMinutes.toFixed(1)} minutes</p>
+                  <div className="text-2xl font-bold text-purple-900">${usageData.totals.video.toFixed(2)}</div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {usageData.totals.videoMinutes.toFixed(1)} min
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">recorded</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-orange-500">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-orange-700">Total Usage</CardTitle>
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <DollarSign className="h-4 w-4 text-orange-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-900">
+                    ${(usageData.totals.cvParsing + usageData.totals.jdQuestions + usageData.totals.video).toFixed(2)}
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary" className="text-xs">
+                      All Services
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">combined</span>
+                  </div>
                 </CardContent>
               </Card>
             </div>
           )}
 
-          {/* Per-Job Usage */}
+          {/* Usage Type Breakdown */}
           <Card>
             <CardHeader>
-              <CardTitle>Usage by Job</CardTitle>
-              <CardDescription>Detailed breakdown per job description</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Usage Type Analysis
+              </CardTitle>
+              <CardDescription>Cost breakdown by service type</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {usageData?.jobUsage?.length > 0 ? (
-                  usageData.jobUsage.map((job: any) => (
-                    <div key={job.jobId} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium">{job.jobTitle}</h4>
-                        <Badge variant="outline">${job.totalCost.toFixed(2)}</Badge>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-gray-800">Service Categories</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-5 w-5 text-blue-600" />
+                        <span className="font-medium text-blue-800">CV Parsing</span>
                       </div>
-                      <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-600">CV Parsing</p>
-                          <p className="font-medium">{job.cvParsingCount} × ${job.cvParsingCost.toFixed(2)}</p>
+                      <Badge variant="secondary">${usageData?.totals?.cvParsing?.toFixed(2) || '0.00'}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <TrendingUp className="h-5 w-5 text-green-600" />
+                        <span className="font-medium text-green-800">JD Questions</span>
+                      </div>
+                      <Badge variant="secondary">${usageData?.totals?.jdQuestions?.toFixed(2) || '0.00'}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Calendar className="h-5 w-5 text-purple-600" />
+                        <span className="font-medium text-purple-800">Video Interviews</span>
+                      </div>
+                      <Badge variant="secondary">${usageData?.totals?.video?.toFixed(2) || '0.00'}</Badge>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-gray-800">Usage Statistics</h4>
+                  <div className="space-y-3">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Total CVs Processed</span>
+                        <span className="font-semibold">{usageData?.totals?.cvCount || 0}</span>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Total Tokens Used</span>
+                        <span className="font-semibold">{(usageData?.totals?.tokenCount || 0).toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Total Video Minutes</span>
+                        <span className="font-semibold">{(usageData?.totals?.videoMinutes || 0).toFixed(1)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Usage by Job - Enhanced Design */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Usage Breakdown by Job
+              </CardTitle>
+              <CardDescription>Detailed cost analysis for each job description</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {usageData?.jobUsage?.length > 0 ? (
+                  usageData.jobUsage.map((job: any, index: number) => (
+                    <div key={job.jobId} className="border rounded-xl p-6 hover:shadow-md transition-shadow">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-gray-100 rounded-lg">
+                            <span className="text-sm font-bold text-gray-600">#{index + 1}</span>
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-lg">{job.jobTitle}</h4>
+                            <p className="text-sm text-muted-foreground">Job ID: {job.jobId}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-gray-600">Questions</p>
-                          <p className="font-medium">{(job.jdQuestionTokensIn + job.jdQuestionTokensOut).toLocaleString()} tok × ${job.jdQuestionsCost.toFixed(2)}</p>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-green-600">${job.totalCost.toFixed(2)}</div>
+                          <Badge variant="outline" className="mt-1">Total Cost</Badge>
                         </div>
-                        <div>
-                          <p className="text-gray-600">Video</p>
-                          <p className="font-medium">{job.videoMinutes.toFixed(1)} min × ${job.videoCost.toFixed(2)}</p>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-blue-50 rounded-lg p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <FileText className="h-4 w-4 text-blue-600" />
+                            <span className="text-sm font-medium text-blue-800">CV Parsing</span>
+                          </div>
+                          <div className="text-lg font-semibold text-blue-900">${job.cvParsingCost.toFixed(2)}</div>
+                          <div className="text-xs text-blue-700 mt-1">
+                            {job.cvParsingCount} CVs × $0.50 each
+                          </div>
+                        </div>
+                        
+                        <div className="bg-green-50 rounded-lg p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <TrendingUp className="h-4 w-4 text-green-600" />
+                            <span className="text-sm font-medium text-green-800">Questions</span>
+                          </div>
+                          <div className="text-lg font-semibold text-green-900">${job.jdQuestionsCost.toFixed(2)}</div>
+                          <div className="text-xs text-green-700 mt-1">
+                            {(job.jdQuestionTokensIn + job.jdQuestionTokensOut).toLocaleString()} tokens
+                          </div>
+                        </div>
+                        
+                        <div className="bg-purple-50 rounded-lg p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Calendar className="h-4 w-4 text-purple-600" />
+                            <span className="text-sm font-medium text-purple-800">Video</span>
+                          </div>
+                          <div className="text-lg font-semibold text-purple-900">${job.videoCost.toFixed(2)}</div>
+                          <div className="text-xs text-purple-700 mt-1">
+                            {job.videoMinutes.toFixed(1)} minutes × $0.10/min
+                          </div>
                         </div>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <p className="text-center text-gray-500 py-8">No usage data available</p>
+                  <div className="text-center py-12">
+                    <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                      <TrendingUp className="h-8 w-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-600 mb-2">No Usage Data Available</h3>
+                    <p className="text-sm text-gray-500">Start using our AI services to see detailed usage analytics here.</p>
+                  </div>
                 )}
               </div>
             </CardContent>
