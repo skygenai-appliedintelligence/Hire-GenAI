@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
+import Script from "next/script"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -50,6 +51,8 @@ export default function BillingContent({ companyId }: BillingContentProps) {
   const [autoRecharge, setAutoRecharge] = useState(true)
   const [monthlyCapEnabled, setMonthlyCapEnabled] = useState(false)
   const [monthlyCapAmount, setMonthlyCapAmount] = useState("1000")
+  const [paypalLoaded, setPaypalLoaded] = useState(false)
+  const paypalButtonRef = useRef<HTMLDivElement>(null)
 
   // Filters
   const [selectedJob, setSelectedJob] = useState<string>("all")
@@ -156,6 +159,45 @@ export default function BillingContent({ companyId }: BillingContentProps) {
       loadUsageData()
     }
   }, [selectedJob, usageTypeFilter, dateRange])
+
+  // Load PayPal SDK and render button
+  useEffect(() => {
+    if (paypalLoaded && paypalButtonRef.current && (window as any).paypal) {
+      // Clear existing buttons
+      paypalButtonRef.current.innerHTML = ''
+      
+      // Render PayPal button
+      ;(window as any).paypal.Buttons({
+        style: {
+          shape: 'rect',
+          color: 'gold',
+          layout: 'vertical',
+          label: 'subscribe'
+        },
+        createSubscription: function (data: any, actions: any) {
+          return actions.subscription.create({
+            plan_id: 'P-4N498891U73853430ND4MFXY'
+          })
+        },
+        onApprove: function (data: any, actions: any) {
+          toast({
+            title: 'Success!',
+            description: `Subscription successful! ID: ${data.subscriptionID}`,
+          })
+          // Reload billing data after successful subscription
+          loadBillingData()
+        },
+        onError: function (err: any) {
+          toast({
+            title: 'Error',
+            description: 'Failed to process subscription. Please try again.',
+            variant: 'destructive'
+          })
+          console.error('PayPal error:', err)
+        }
+      }).render(paypalButtonRef.current)
+    }
+  }, [paypalLoaded])
 
   if (loading) {
     return (
@@ -304,46 +346,35 @@ export default function BillingContent({ companyId }: BillingContentProps) {
             </Card>
           </div>
 
-          {/* Payment Method */}
+          {/* PayPal Subscription */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
-                Payment Method
+                Subscribe with PayPal
               </CardTitle>
-              <CardDescription>Manage your payment information</CardDescription>
+              <CardDescription>Subscribe to our service using PayPal</CardDescription>
             </CardHeader>
             <CardContent>
-              {billingData?.paymentMethod ? (
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white rounded border">
-                      <CreditCard className="h-5 w-5 text-gray-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium">
-                        {billingData.paymentMethod.brand?.toUpperCase() || 'Card'} ****{billingData.paymentMethod.last4}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Expires {billingData.paymentMethod.exp}
-                      </p>
-                    </div>
+              <div className="max-w-md mx-auto">
+                {!paypalLoaded ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin h-8 w-8 border-4 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading PayPal...</p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => router.push('/dashboard/settings/billing/payment/add')}>
-                    Update
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <CreditCard className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-600 mb-4">No payment method on file</p>
-                  <Button onClick={() => router.push('/dashboard/settings/billing/payment/add')}>
-                    Add Payment Method
-                  </Button>
-                </div>
-              )}
+                ) : (
+                  <div ref={paypalButtonRef} id="paypal-button-container-P-4N498891U73853430ND4MFXY"></div>
+                )}
+              </div>
             </CardContent>
           </Card>
+
+          {/* PayPal SDK Script */}
+          <Script
+            src="https://www.paypal.com/sdk/js?client-id=AQbce0p4a4o3MirF8A9e3B8QjmxcyvdM7sElrPr9yj985xukZ7w0sCQaeY95UO0SLgv91tOREpx94rkQ&vault=true&intent=subscription"
+            onLoad={() => setPaypalLoaded(true)}
+            strategy="lazyOnload"
+          />
         </TabsContent>
 
         {/* Usage Tab */}

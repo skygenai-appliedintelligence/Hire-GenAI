@@ -929,13 +929,13 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
         >
           <TabsList className="w-full flex items-center gap-1 sm:gap-2 p-1 rounded-lg border bg-muted/40 text-muted-foreground my-2 min-h-[48px] sm:h-[56px] overflow-x-auto no-scrollbar">
             <div className="flex items-center gap-1 sm:gap-2 flex-nowrap">
-              <TabsTrigger value="basic" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Basic Info</TabsTrigger>
-              <TabsTrigger value="requirements" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Requirements</TabsTrigger>
-              <TabsTrigger value="responsibilities" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Responsibilities</TabsTrigger>
-              <TabsTrigger value="compensation" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Compensation</TabsTrigger>
-              <TabsTrigger value="logistics" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Visa & Others</TabsTrigger>
-              <TabsTrigger value="resume-screening" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Resume Screening</TabsTrigger>
-              <TabsTrigger value="interview" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Interview Process</TabsTrigger>
+              <TabsTrigger value="basic" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Basic Info</TabsTrigger>
+              <TabsTrigger value="requirements" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Requirements</TabsTrigger>
+              <TabsTrigger value="responsibilities" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Responsibilities</TabsTrigger>
+              <TabsTrigger value="compensation" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Compensation</TabsTrigger>
+              <TabsTrigger value="logistics" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Visa & Others</TabsTrigger>
+              <TabsTrigger value="resume-screening" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Resume Screening</TabsTrigger>
+              <TabsTrigger value="interview" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Interview Process</TabsTrigger>
             </div>
           </TabsList>
 
@@ -1538,7 +1538,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                               description: compiledDescription || formData.description || '',
                               requirements: formData.requirements || '',
                               companyId: company?.id,
-                              createdBy: user?.id || null,
+                              createdBy: user?.email || null,
                             }),
                           })
                           const data = await res.json()

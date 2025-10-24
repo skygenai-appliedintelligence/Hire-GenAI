@@ -967,11 +967,13 @@ export class DatabaseService {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
     }
     const q = `
-      SELECT id, title, location_text, status, employment_type, level,
-             salary_min, salary_max, salary_period, created_by_email, created_at
-      FROM jobs
-      WHERE company_id = $1::uuid
-      ORDER BY created_at DESC
+      SELECT j.id, j.title, j.location_text, j.status, j.employment_type, j.level,
+             j.salary_min, j.salary_max, j.salary_period, j.created_at,
+             COALESCE(u.email, j.created_by_email) as created_by_email
+      FROM jobs j
+      LEFT JOIN users u ON j.created_by_email = u.id::text
+      WHERE j.company_id = $1::uuid
+      ORDER BY j.created_at DESC
       LIMIT $2
     `
     const rows = (await this.query(q, [companyId, limit])) as any[]
