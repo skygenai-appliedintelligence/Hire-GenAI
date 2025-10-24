@@ -47,6 +47,7 @@ export interface ParsedResume {
   location?: string
   summary?: string
   skills: string[]
+  usage?: { promptTokens: number, completionTokens: number }
   experience: Array<{
     company?: string
     title?: string
@@ -182,7 +183,7 @@ export async function parseResume(
 
   // Use OpenAI to parse resume into structured format
   try {
-    const { text } = await generateText({
+    const { text, usage } = await generateText({
       model: openai("gpt-4o"),
       system: `You are a resume parser. Extract structured information from resumes and return valid JSON only.`,
       prompt: `
@@ -250,9 +251,16 @@ Rules:
     
     const parsed = JSON.parse(match[0])
     
+    // Extract real token usage from OpenAI response
+    const tokenUsage = usage ? {
+      promptTokens: (usage as any).promptTokens || 0,
+      completionTokens: (usage as any).completionTokens || 0
+    } : undefined
+
     // Validate and normalize the parsed data
     const result: ParsedResume = {
       rawText,
+      usage: tokenUsage,
       name: typeof parsed.name === "string" ? parsed.name : undefined,
       email: typeof parsed.email === "string" ? parsed.email : undefined,
       phone: typeof parsed.phone === "string" ? parsed.phone : undefined,
@@ -300,12 +308,13 @@ Rules:
   } catch (error) {
     console.error("AI resume parsing error:", error)
     
-    // Fallback to basic parsing
+    // Fallback to basic parsing (no usage data since no API call)
     return {
       rawText,
       skills: extractBasicSkills(rawText),
       experience: [],
       education: [],
+      usage: undefined
     }
   }
 }

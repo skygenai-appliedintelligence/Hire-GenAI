@@ -113,7 +113,7 @@ export class AIService {
     skills?: string[],
     existingQuestions?: string[],
     agentName?: string
-  ): Promise<string[]> {
+  ): Promise<{ questions: string[], usage?: { promptTokens: number, completionTokens: number } }> {
     // Check if we're in the browser
     if (typeof window !== "undefined") {
       // Use the API route for browser-side calls
@@ -138,12 +138,16 @@ export class AIService {
             const errText = await response.text()
             console.error('AI API returned non-OK status', response.status, errText)
           } catch {}
-          return this.getJDAndSkillsMock(jobDescription, Array.isArray(skills) ? skills : [], agentType, numberOfQuestions)
+          return { 
+            questions: this.getJDAndSkillsMock(jobDescription, Array.isArray(skills) ? skills : [], agentType, numberOfQuestions),
+            usage: undefined
+          }
         }
 
         try {
           const data = await response.json()
           const raw: string[] = Array.isArray(data.questions) ? data.questions : []
+          const apiUsage = data.usage || undefined
           // Apply the same dedupe/backfill logic on client to enforce uniqueness even if API doesn't
           const norm = (s: string) => {
             let t = String(s || '')
@@ -250,21 +254,33 @@ export class AIService {
               if (unique.length >= numberOfQuestions) break
             }
           }
-          return unique.slice(0, numberOfQuestions)
+          return { 
+            questions: unique.slice(0, numberOfQuestions),
+            usage: apiUsage
+          }
         } catch (e) {
           console.error('Failed to parse AI API response as JSON', e)
-          return this.getJDAndSkillsMock(jobDescription, Array.isArray(skills) ? skills : [], agentType, numberOfQuestions)
+          return { 
+            questions: this.getJDAndSkillsMock(jobDescription, Array.isArray(skills) ? skills : [], agentType, numberOfQuestions),
+            usage: undefined
+          }
         }
       } catch (error) {
         console.error('Error calling AI API:', error)
         // Fall back to mock questions
-        return this.getJDAndSkillsMock(jobDescription, Array.isArray(skills) ? skills : [], agentType, numberOfQuestions)
+        return { 
+          questions: this.getJDAndSkillsMock(jobDescription, Array.isArray(skills) ? skills : [], agentType, numberOfQuestions),
+          usage: undefined
+        }
       }
     }
 
     // Server-side logic
     if (!hasOpenAIKey()) {
-      return this.getJDAndSkillsMock(jobDescription, Array.isArray(skills) ? skills : [], agentType, numberOfQuestions)
+      return { 
+        questions: this.getJDAndSkillsMock(jobDescription, Array.isArray(skills) ? skills : [], agentType, numberOfQuestions),
+        usage: undefined
+      }
     }
 
     const agentTypePrompts = {
@@ -318,7 +334,7 @@ Only provide the questions, no explanations or additional text.
       // Fail fast on quota/latency: no retries and a short timeout
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 10000) // 10s ceiling
-      const { text } = await generateText({
+      const { text, usage } = await generateText({
         model: openai("gpt-4o"),
         prompt,
         system: "You are an AI Interview Question Generator. Generate relevant, clear, and role-specific interview questions based on the job description and interview stage.",
@@ -326,6 +342,12 @@ Only provide the questions, no explanations or additional text.
         abortSignal: controller.signal,
       })
       clearTimeout(timeout)
+
+      // Extract real token usage from OpenAI response
+      const tokenUsage = usage ? {
+        promptTokens: (usage as any).promptTokens || 0,
+        completionTokens: (usage as any).completionTokens || 0
+      } : undefined
 
       // Parse the response to extract questions
       const lines = text.split('\n').filter(line => line.trim().startsWith('Q'))
@@ -439,10 +461,16 @@ Only provide the questions, no explanations or additional text.
         }
       }
 
-      return unique.slice(0, numberOfQuestions)
+      return { 
+        questions: unique.slice(0, numberOfQuestions),
+        usage: tokenUsage
+      }
     } catch (error) {
       console.error("Interview question generation error:", error)
-      return this.getJDAndSkillsMock(jobDescription, Array.isArray(skills) ? skills : [], agentType, numberOfQuestions)
+      return { 
+        questions: this.getJDAndSkillsMock(jobDescription, Array.isArray(skills) ? skills : [], agentType, numberOfQuestions),
+        usage: undefined
+      }
     }
   }
 
