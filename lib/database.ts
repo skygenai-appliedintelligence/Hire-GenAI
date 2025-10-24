@@ -2863,4 +2863,412 @@ export class DatabaseService {
       }
     }
   }
+
+  // ==================== BILLING METHODS ====================
+
+  // Get company billing status
+  static async getCompanyBilling(companyId: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      SELECT * FROM company_billing
+      WHERE company_id = $1::uuid
+    `
+    const result = await this.query(query, [companyId]) as any[]
+    return result[0] || null
+  }
+
+  // Update company billing settings
+  static async updateBillingSettings(companyId: string, settings: {
+    autoRechargeEnabled?: boolean
+    monthlySpendCap?: number | null
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const updates: string[] = []
+    const params: any[] = []
+    let paramIndex = 1
+
+    if (settings.autoRechargeEnabled !== undefined) {
+      updates.push(`auto_recharge_enabled = $${paramIndex++}`)
+      params.push(settings.autoRechargeEnabled)
+    }
+
+    if (settings.monthlySpendCap !== undefined) {
+      updates.push(`monthly_spend_cap = $${paramIndex++}`)
+      params.push(settings.monthlySpendCap)
+    }
+
+    updates.push(`updated_at = NOW()`)
+    params.push(companyId)
+
+    const query = `
+      UPDATE company_billing
+      SET ${updates.join(', ')}
+      WHERE company_id = $${paramIndex}::uuid
+      RETURNING *
+    `
+
+    const result = await this.query(query, params) as any[]
+    return result[0] || null
+  }
+
+  // Get current pricing
+  static async getCurrentPricing() {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      SELECT * FROM pricing_history
+      WHERE effective_until IS NULL OR effective_until > NOW()
+      ORDER BY effective_from DESC
+      LIMIT 1
+    `
+    const result = await this.query(query, []) as any[]
+    return result[0] || {
+      cv_parse_price: 0.50,
+      question_price_per_1k_tokens: 0.002,
+      video_price_per_min: 0.10,
+      recharge_amount: 100.00
+    }
+  }
+
+  // Record CV parsing usage
+  static async recordCVParsingUsage(data: {
+    companyId: string
+    jobId: string
+    candidateId?: string
+    fileId?: string
+    fileSizeKb?: number
+    parseSuccessful?: boolean
+    successRate?: number
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const pricing = await this.getCurrentPricing()
+    const cost = pricing.cv_parse_price
+
+    const query = `
+      INSERT INTO cv_parsing_usage (
+        company_id, job_id, candidate_id, file_id, file_size_kb,
+        parse_successful, unit_price, cost, success_rate, created_at
+      )
+      VALUES (
+        $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5,
+        $6, $7, $8, $9, NOW()
+      )
+      RETURNING *
+    `
+
+    const result = await this.query(query, [
+      data.companyId,
+      data.jobId,
+      data.candidateId || null,
+      data.fileId || null,
+      data.fileSizeKb || 0,
+      data.parseSuccessful !== false,
+      pricing.cv_parse_price,
+      cost,
+      data.successRate || null
+    ]) as any[]
+
+    return result[0]
+  }
+
+  // Record question generation usage
+  static async recordQuestionGenerationUsage(data: {
+    companyId: string
+    jobId: string
+    promptTokens: number
+    completionTokens: number
+    questionCount: number
+    modelUsed?: string
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const pricing = await this.getCurrentPricing()
+    const totalTokens = data.promptTokens + data.completionTokens
+    const cost = (totalTokens / 1000) * pricing.question_price_per_1k_tokens
+
+    const query = `
+      INSERT INTO question_generation_usage (
+        company_id, job_id, prompt_tokens, completion_tokens,
+        total_tokens, question_count, token_price_per_1k, cost,
+        model_used, created_at
+      )
+      VALUES (
+        $1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, NOW()
+      )
+      RETURNING *
+    `
+
+    const result = await this.query(query, [
+      data.companyId,
+      data.jobId,
+      data.promptTokens,
+      data.completionTokens,
+      totalTokens,
+      data.questionCount,
+      pricing.question_price_per_1k_tokens,
+      cost,
+      data.modelUsed || 'gpt-4'
+    ]) as any[]
+
+    return result[0]
+  }
+
+  // Record video interview usage
+  static async recordVideoInterviewUsage(data: {
+    companyId: string
+    jobId: string
+    interviewId?: string
+    candidateId?: string
+    durationMinutes: number
+    completedQuestions?: number
+    totalQuestions?: number
+    videoQuality?: string
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const pricing = await this.getCurrentPricing()
+    const cost = data.durationMinutes * pricing.video_price_per_min
+
+    const query = `
+      INSERT INTO video_interview_usage (
+        company_id, job_id, interview_id, candidate_id,
+        duration_minutes, video_quality, minute_price, cost,
+        completed_questions, total_questions, created_at
+      )
+      VALUES (
+        $1::uuid, $2::uuid, $3::uuid, $4::uuid,
+        $5, $6, $7, $8, $9, $10, NOW()
+      )
+      RETURNING *
+    `
+
+    const result = await this.query(query, [
+      data.companyId,
+      data.jobId,
+      data.interviewId || null,
+      data.candidateId || null,
+      data.durationMinutes,
+      data.videoQuality || 'HD',
+      pricing.video_price_per_min,
+      cost,
+      data.completedQuestions || 0,
+      data.totalQuestions || 0
+    ]) as any[]
+
+    return result[0]
+  }
+
+  // Get usage data for company
+  static async getCompanyUsage(companyId: string, filters?: {
+    jobId?: string
+    entryType?: string
+    startDate?: Date
+    endDate?: Date
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const params: any[] = [companyId]
+    let paramIndex = 2
+
+    // Build WHERE clauses
+    const whereClauses = ['company_id = $1::uuid']
+    
+    if (filters?.startDate) {
+      whereClauses.push(`created_at >= $${paramIndex++}::timestamptz`)
+      params.push(filters.startDate)
+    }
+    
+    if (filters?.endDate) {
+      whereClauses.push(`created_at <= $${paramIndex++}::timestamptz`)
+      params.push(filters.endDate)
+    }
+
+    const whereClause = whereClauses.join(' AND ')
+
+    // Get CV parsing totals
+    const cvQuery = `
+      SELECT 
+        COUNT(*) as count,
+        COALESCE(SUM(cost), 0) as total_cost
+      FROM cv_parsing_usage
+      WHERE ${whereClause}
+      ${filters?.jobId ? `AND job_id = $${paramIndex}::uuid` : ''}
+    `
+    const cvParams = [...params]
+    if (filters?.jobId) cvParams.push(filters.jobId)
+    const cvResult = await this.query(cvQuery, cvParams) as any[]
+
+    // Get question generation totals
+    const questionQuery = `
+      SELECT 
+        COUNT(*) as count,
+        COALESCE(SUM(total_tokens), 0) as total_tokens,
+        COALESCE(SUM(cost), 0) as total_cost
+      FROM question_generation_usage
+      WHERE ${whereClause}
+      ${filters?.jobId ? `AND job_id = $${paramIndex}::uuid` : ''}
+    `
+    const questionParams = [...params]
+    if (filters?.jobId) questionParams.push(filters.jobId)
+    const questionResult = await this.query(questionQuery, questionParams) as any[]
+
+    // Get video interview totals
+    const videoQuery = `
+      SELECT 
+        COUNT(*) as count,
+        COALESCE(SUM(duration_minutes), 0) as total_minutes,
+        COALESCE(SUM(cost), 0) as total_cost
+      FROM video_interview_usage
+      WHERE ${whereClause}
+      ${filters?.jobId ? `AND job_id = $${paramIndex}::uuid` : ''}
+    `
+    const videoParams = [...params]
+    if (filters?.jobId) videoParams.push(filters.jobId)
+    const videoResult = await this.query(videoQuery, videoParams) as any[]
+
+    return {
+      cvParsing: parseFloat(cvResult[0]?.total_cost || 0),
+      cvCount: parseInt(cvResult[0]?.count || 0),
+      jdQuestions: parseFloat(questionResult[0]?.total_cost || 0),
+      tokenCount: parseInt(questionResult[0]?.total_tokens || 0),
+      video: parseFloat(videoResult[0]?.total_cost || 0),
+      videoMinutes: parseFloat(videoResult[0]?.total_minutes || 0)
+    }
+  }
+
+  // Get usage by job
+  static async getUsageByJob(companyId: string, filters?: {
+    startDate?: Date
+    endDate?: Date
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const params: any[] = [companyId]
+    let paramIndex = 2
+
+    const whereClauses = ['jus.company_id = $1::uuid']
+    
+    if (filters?.startDate) {
+      whereClauses.push(`jus.last_updated >= $${paramIndex++}::timestamptz`)
+      params.push(filters.startDate)
+    }
+    
+    if (filters?.endDate) {
+      whereClauses.push(`jus.last_updated <= $${paramIndex++}::timestamptz`)
+      params.push(filters.endDate)
+    }
+
+    const whereClause = whereClauses.join(' AND ')
+
+    const query = `
+      SELECT 
+        jus.*,
+        j.title as job_title,
+        j.id as job_id
+      FROM job_usage_summary jus
+      JOIN jobs j ON jus.job_id = j.id
+      WHERE ${whereClause}
+      ORDER BY jus.total_cost DESC
+    `
+
+    const result = await this.query(query, params) as any[]
+
+    return result.map((row: any) => ({
+      jobId: row.job_id,
+      jobTitle: row.job_title,
+      cvParsingCount: parseInt(row.cv_parsing_count || 0),
+      cvParsingCost: parseFloat(row.cv_parsing_cost || 0),
+      jdQuestionCount: parseInt(row.question_gen_count || 0),
+      jdQuestionTokensIn: parseInt(row.total_tokens_used || 0) / 2, // Approximate
+      jdQuestionTokensOut: parseInt(row.total_tokens_used || 0) / 2, // Approximate
+      jdQuestionsCost: parseFloat(row.question_gen_cost || 0),
+      videoCount: parseInt(row.interview_count || 0),
+      videoMinutes: parseFloat(row.total_interview_minutes || 0),
+      videoCost: parseFloat(row.video_interview_cost || 0),
+      totalCost: parseFloat(row.total_cost || 0)
+    }))
+  }
+
+  // Get invoices for company
+  static async getCompanyInvoices(companyId: string, limit: number = 20) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      SELECT * FROM invoices
+      WHERE company_id = $1::uuid
+      ORDER BY created_at DESC
+      LIMIT $2
+    `
+
+    const result = await this.query(query, [companyId, limit]) as any[]
+    return result
+  }
+
+  // Create invoice
+  static async createInvoice(data: {
+    companyId: string
+    subtotal: number
+    taxRate?: number
+    taxAmount?: number
+    total: number
+    description?: string
+    lineItems?: any[]
+    timePeriod?: { start: Date; end: Date }
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    // Generate invoice number
+    const now = new Date()
+    const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+    const randomSuffix = Math.floor(10000 + Math.random() * 90000)
+    const invoiceNumber = `INV-${yearMonth}-${randomSuffix}`
+
+    const query = `
+      INSERT INTO invoices (
+        company_id, invoice_number, status, subtotal, tax_rate,
+        tax_amount, total, description, line_items, time_period, created_at
+      )
+      VALUES (
+        $1::uuid, $2, 'pending', $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, NOW()
+      )
+      RETURNING *
+    `
+
+    const result = await this.query(query, [
+      data.companyId,
+      invoiceNumber,
+      data.subtotal,
+      data.taxRate || null,
+      data.taxAmount || null,
+      data.total,
+      data.description || 'Monthly usage charges',
+      JSON.stringify(data.lineItems || []),
+      JSON.stringify(data.timePeriod || {})
+    ]) as any[]
+
+    return result[0]
+  }
 }

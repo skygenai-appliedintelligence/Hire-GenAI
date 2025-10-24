@@ -78,9 +78,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Track company and job for billing
+    let companyIdForBilling: string | null = null
+    let jobIdForBilling: string | null = null
+
     // Optionally save parsed data to database
     if (applicationId && parsed.rawText) {
       try {
+        // Get company_id and job_id from application for billing
+        const appInfo = await (DatabaseService as any)["query"]?.call(
+          DatabaseService,
+          `SELECT a.job_id, j.company_id 
+           FROM applications a
+           JOIN jobs j ON a.job_id = j.id
+           WHERE a.id = $1::uuid`,
+          [applicationId]
+        )
+        if (appInfo && appInfo.length > 0) {
+          companyIdForBilling = appInfo[0].company_id
+          jobIdForBilling = appInfo[0].job_id
+        }
+
         // Check if resume_text column exists in applications table
         const checkCol = await (DatabaseService as any)["query"]?.call(
           DatabaseService,
@@ -318,6 +336,24 @@ export async function POST(request: NextRequest) {
       } catch (err) {
         console.warn('Failed to update candidate with parsed data:', err)
         // Non-fatal, continue
+      }
+    }
+
+    // Record CV parsing usage for billing
+    if (companyIdForBilling && jobIdForBilling && parsed.rawText) {
+      try {
+        await DatabaseService.recordCVParsingUsage({
+          companyId: companyIdForBilling,
+          jobId: jobIdForBilling,
+          candidateId: candidateId || undefined,
+          fileSizeKb: Math.round(file.size / 1024),
+          parseSuccessful: true,
+          successRate: parsed.skills && parsed.skills.length > 0 ? 95 : 80
+        })
+        console.log('[Resume Parse] ✅ Billing tracked: CV parsing usage recorded')
+      } catch (billingErr) {
+        console.error('[Resume Parse] ⚠️ Failed to record billing usage:', billingErr)
+        // Non-fatal, don't block the response
       }
     }
 

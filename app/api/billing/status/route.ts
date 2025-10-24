@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get pricing info
-    const pricing = DatabaseService.getPricing()
+    const pricing = await DatabaseService.getCurrentPricing()
 
     // Calculate trial usage if in trial
     let trialInfo = null

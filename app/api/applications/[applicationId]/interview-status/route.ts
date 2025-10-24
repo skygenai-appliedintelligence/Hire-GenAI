@@ -229,6 +229,53 @@ export async function POST(
 
     console.log(`✅ Interview marked as completed for application ${applicationId}`)
 
+    // Record video interview usage for billing
+    if (interviewId) {
+      try {
+        // Get company_id, job_id, and interview duration
+        const billingInfoQuery = `
+          SELECT 
+            j.company_id,
+            j.id as job_id,
+            i.started_at,
+            i.completed_at,
+            EXTRACT(EPOCH FROM (i.completed_at - i.started_at)) / 60 as duration_minutes
+          FROM interviews i
+          JOIN application_rounds ar ON ar.id = i.application_round_id
+          JOIN applications a ON a.id = ar.application_id
+          JOIN jobs j ON j.id = a.job_id
+          WHERE i.id = $1::uuid
+        `
+        const billingInfo = await (DatabaseService as any)["query"].call(
+          DatabaseService,
+          billingInfoQuery,
+          [interviewId]
+        ) as any[]
+
+        if (billingInfo && billingInfo.length > 0) {
+          const { company_id, job_id, duration_minutes } = billingInfo[0]
+          
+          // Record usage (minimum 1 minute for billing)
+          const durationToRecord = Math.max(1, Math.round(duration_minutes || 1))
+          
+          await DatabaseService.recordVideoInterviewUsage({
+            companyId: company_id,
+            jobId: job_id,
+            interviewId: interviewId,
+            candidateId: undefined, // Can be added if needed
+            durationMinutes: durationToRecord,
+            completedQuestions: 0, // Can be tracked if needed
+            totalQuestions: 0, // Can be tracked if needed
+            videoQuality: 'HD'
+          })
+          console.log(`[Interview] ✅ Billing tracked: Video interview usage recorded (${durationToRecord} minutes)`)
+        }
+      } catch (billingErr) {
+        console.error('[Interview] ⚠️ Failed to record billing usage:', billingErr)
+        // Non-fatal, don't block the response
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       interviewId,

@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const invoices = await DatabaseService.getInvoices(companyId, { status, limit })
+    const invoices = await DatabaseService.getCompanyInvoices(companyId, limit)
 
     return NextResponse.json({
       ok: true,
