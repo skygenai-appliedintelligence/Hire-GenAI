@@ -156,7 +156,7 @@ export default function QualifiedCandidatesInterviewFlowPage() {
           candidateName: selectedCandidate.candidateName,
           candidateEmail: selectedCandidate.email,
           jobTitle: selectedCandidate.appliedJD,
-          companyName: (company as any)?.name || 'TATA',
+          companyName: (company as any)?.name || '',
           messageContent: message,
           category: category
         }),

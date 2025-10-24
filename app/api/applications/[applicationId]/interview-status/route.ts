@@ -76,11 +76,12 @@ export async function POST(
     const p = 'then' in (ctx as any).params ? await (ctx as any).params : (ctx as any).params
     const applicationId = p.applicationId
     const body = await req.json().catch(() => ({}))
-    const { transcript } = body
+    const { transcript, startedAt } = body
 
     console.log('📝 Marking interview as completed:', applicationId)
     console.log('📝 Transcript length:', transcript?.length || 0)
     console.log('📝 Transcript preview:', transcript?.substring(0, 200))
+    console.log('📝 Interview started at:', startedAt ? new Date(startedAt).toISOString() : 'Not provided')
 
     if (!applicationId) {
       return NextResponse.json({ error: 'Missing applicationId' }, { status: 400 })
@@ -108,22 +109,26 @@ export async function POST(
       // Update existing interview
       interviewId = existingRows[0].id
       console.log('✅ Found existing interview:', interviewId)
+      
+      // Use provided startedAt or fallback to NOW()
+      const actualStartedAt = startedAt ? new Date(startedAt).toISOString() : null
+      
       const updateQuery = `
         UPDATE interviews
         SET 
           status = 'success',
           completed_at = NOW(),
           raw_transcript = $2,
-          started_at = COALESCE(started_at, NOW())
+          started_at = COALESCE($3::timestamp, started_at, NOW())
         WHERE id = $1::uuid
         RETURNING id
       `
       const result = await (DatabaseService as any)["query"].call(
         DatabaseService,
         updateQuery,
-        [interviewId, transcript || null]
+        [interviewId, transcript || null, actualStartedAt]
       )
-      console.log('✅ Updated interview with transcript')
+      console.log('✅ Updated interview with transcript and actual start time')
     } else {
       // Create new interview record with proper structure (requires round_agent_id)
       console.log('⚠️ No existing interview found, creating new interview record')
@@ -204,6 +209,9 @@ export async function POST(
       }
 
       // 4) Create the interview with mandatory round_agent_id
+      // Use actual startedAt from client, or default to NOW() if not provided
+      const actualStartedAt = startedAt ? new Date(startedAt).toISOString() : null
+      
       const createInterviewQuery = `
         INSERT INTO interviews (
           application_round_id,
@@ -214,17 +222,17 @@ export async function POST(
           status,
           raw_transcript
         )
-        VALUES ($1::uuid, $2::uuid, NOW() - INTERVAL '30 minutes', NOW(), 'async_ai', 'success', $3)
+        VALUES ($1::uuid, $2::uuid, COALESCE($4::timestamp, NOW()), NOW(), 'async_ai', 'success', $3)
         RETURNING id
       `
       const createResult = await (DatabaseService as any)["query"].call(
         DatabaseService,
         createInterviewQuery,
-        [applicationRoundId, roundAgentId, transcript || null]
+        [applicationRoundId, roundAgentId, transcript || null, actualStartedAt]
       ) as any[]
 
       interviewId = createResult?.[0]?.id || null
-      console.log('✅ Created new interview record:', interviewId)
+      console.log('✅ Created new interview record:', interviewId, 'with actual start time')
     }
 
     console.log(`✅ Interview marked as completed for application ${applicationId}`)

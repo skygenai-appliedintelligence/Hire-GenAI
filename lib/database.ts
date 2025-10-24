@@ -2952,8 +2952,12 @@ export class DatabaseService {
       throw new Error('Database not configured')
     }
 
+    const { applyProfitMargin } = await import('./config')
     const pricing = await this.getCurrentPricing()
-    const cost = pricing.cv_parse_price
+    const baseCost = pricing.cv_parse_price
+    
+    // Apply profit margin to get final cost
+    const { finalCost } = applyProfitMargin(baseCost)
 
     const query = `
       INSERT INTO cv_parsing_usage (
@@ -2975,7 +2979,7 @@ export class DatabaseService {
       data.fileSizeKb || 0,
       data.parseSuccessful !== false,
       pricing.cv_parse_price,
-      cost,
+      finalCost, // Store final cost with profit margin
       data.successRate || null
     ]) as any[]
 
@@ -2995,9 +2999,13 @@ export class DatabaseService {
       throw new Error('Database not configured')
     }
 
+    const { applyProfitMargin } = await import('./config')
     const pricing = await this.getCurrentPricing()
     const totalTokens = data.promptTokens + data.completionTokens
-    const cost = (totalTokens / 1000) * pricing.question_price_per_1k_tokens
+    const baseCost = (totalTokens / 1000) * pricing.question_price_per_1k_tokens
+    
+    // Apply profit margin to get final cost
+    const { finalCost } = applyProfitMargin(baseCost)
 
     const query = `
       INSERT INTO question_generation_usage (
@@ -3019,7 +3027,7 @@ export class DatabaseService {
       totalTokens,
       data.questionCount,
       pricing.question_price_per_1k_tokens,
-      cost,
+      finalCost, // Store final cost with profit margin
       data.modelUsed || 'gpt-4'
     ]) as any[]
 
@@ -3041,8 +3049,12 @@ export class DatabaseService {
       throw new Error('Database not configured')
     }
 
+    const { applyProfitMargin } = await import('./config')
     const pricing = await this.getCurrentPricing()
-    const cost = data.durationMinutes * pricing.video_price_per_min
+    const baseCost = data.durationMinutes * pricing.video_price_per_min
+    
+    // Apply profit margin to get final cost
+    const { finalCost } = applyProfitMargin(baseCost)
 
     const query = `
       INSERT INTO video_interview_usage (
@@ -3065,7 +3077,7 @@ export class DatabaseService {
       data.durationMinutes,
       data.videoQuality || 'HD',
       pricing.video_price_per_min,
-      cost,
+      finalCost, // Store final cost with profit margin
       data.completedQuestions || 0,
       data.totalQuestions || 0
     ]) as any[]
