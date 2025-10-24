@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Delegate to AIService which handles AI generation, normalization/dedup, and mock backfill
-    const questions = await AIService.generateStagedInterviewQuestions(
+    const result = await AIService.generateStagedInterviewQuestions(
       jobDescription,
       agentType,
       numberOfQuestions,
@@ -25,29 +25,34 @@ export async function POST(request: NextRequest) {
       agentName
     )
 
-    // Record billing usage for question generation
-    // Estimate token usage: ~100 tokens per question for prompt + ~50 tokens per question for completion
-    if (companyId && jobId && questions.length > 0) {
+    // Record billing usage for question generation using REAL OpenAI token counts
+    if (companyId && jobId && result.questions.length > 0) {
       try {
-        const estimatedPromptTokens = Math.round(jobDescription.length / 4) + (numberOfQuestions * 100)
-        const estimatedCompletionTokens = questions.length * 50
+        // Use real token counts from OpenAI API if available, otherwise estimate
+        const promptTokens = result.usage?.promptTokens || Math.round(jobDescription.length / 4) + (numberOfQuestions * 100)
+        const completionTokens = result.usage?.completionTokens || result.questions.length * 50
         
         await DatabaseService.recordQuestionGenerationUsage({
           companyId,
           jobId,
-          promptTokens: estimatedPromptTokens,
-          completionTokens: estimatedCompletionTokens,
-          questionCount: questions.length,
+          promptTokens,
+          completionTokens,
+          questionCount: result.questions.length,
           modelUsed: 'gpt-4o'
         })
-        console.log('[Question Generation] ✅ Billing tracked: Question generation usage recorded')
+        
+        if (result.usage) {
+          console.log(`[Question Generation] ✅ Billing tracked: ${promptTokens} prompt + ${completionTokens} completion tokens (REAL OpenAI data)`)
+        } else {
+          console.log(`[Question Generation] ✅ Billing tracked: ${promptTokens} prompt + ${completionTokens} completion tokens (estimated - no API key)`)
+        }
       } catch (billingErr) {
         console.error('[Question Generation] ⚠️ Failed to record billing usage:', billingErr)
         // Non-fatal, don't block the response
       }
     }
 
-    return NextResponse.json({ questions })
+    return NextResponse.json({ questions: result.questions, usage: result.usage })
   } catch (error) {
     // Final safety: if anything unexpected happens earlier (e.g., JSON parse of request), keep prior behavior
     console.error('AI question generation error (outer):', error)
