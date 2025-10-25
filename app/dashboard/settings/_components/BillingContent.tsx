@@ -114,20 +114,40 @@ export default function BillingContent({ companyId }: BillingContentProps) {
 
   const loadUsageData = async () => {
     try {
-      const params = new URLSearchParams({ companyId })
-      if (selectedJob !== 'all') params.append('jobId', selectedJob)
-      
+      // Calculate date range
       const startDate = new Date()
       startDate.setDate(startDate.getDate() - parseInt(dateRange))
-      params.append('startDate', startDate.toISOString())
+      
+      // Build query
+      const params = new URLSearchParams({
+        startDate: startDate.toISOString(),
+        endDate: new Date().toISOString(),
+        companyId
+      })
+      if (selectedJob && selectedJob !== 'all') {
+        params.append('jobId', selectedJob)
+      }
 
-      const res = await fetch(`/api/billing/usage?${params}`)
+      const res = await fetch(`/api/billing/openai-usage?${params.toString()}`)
       const data = await res.json()
+      
       if (data.ok) {
         setUsageData(data)
+      } else {
+        console.error('OpenAI usage API error:', data.error)
+        toast({
+          title: 'Error',
+          description: data.error || 'Failed to load usage data from OpenAI',
+          variant: 'destructive'
+        })
       }
     } catch (error) {
       console.error('Failed to load usage data:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch usage data. Please check your OpenAI API key.',
+        variant: 'destructive'
+      })
     } finally {
       setLoading(false)
     }
