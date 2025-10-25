@@ -17,6 +17,12 @@ export const config = {
   // Environment
   env: process.env.NODE_ENV || 'development',
   
+  // Billing Configuration
+  billing: {
+    // Profit margin percentage to add on top of OpenAI costs (e.g., 20 = 20% markup)
+    profitMarginPercentage: parseFloat(process.env.PROFIT_MARGIN_PERCENTAGE || '20'),
+  },
+  
   // Feature flags
   features: {
     aiEnabled: !!(process.env.OPENAI_API_KEY),
@@ -32,4 +38,22 @@ export const isAIEnabled = () => {
 // Helper function to check if database is available
 export const isDatabaseEnabled = () => {
   return config.features.databaseEnabled
+}
+
+// Helper function to calculate cost with profit margin
+export const applyProfitMargin = (baseCost: number): { baseCost: number, markup: number, finalCost: number } => {
+  const profitMargin = config.billing.profitMarginPercentage
+  const markup = (baseCost * profitMargin) / 100
+  const finalCost = baseCost + markup
+  
+  return {
+    baseCost: parseFloat(baseCost.toFixed(4)),
+    markup: parseFloat(markup.toFixed(4)),
+    finalCost: parseFloat(finalCost.toFixed(4))
+  }
+}
+
+// Get profit margin percentage
+export const getProfitMarginPercentage = () => {
+  return config.billing.profitMarginPercentage
 }
