@@ -1525,36 +1525,6 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                     type="button"
                     disabled={!isCurrentTabValid()}
                     onClick={async () => {
-                      // Save job on resume-screening tab
-                      if (currentTab === 'resume-screening' && !createdJobId) {
-                        setIsSubmitting(true)
-                        try {
-                          const compiledDescription = generateStructuredDescription()
-                          const res = await fetch('/api/jobs', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              ...formData,
-                              description: compiledDescription || formData.description || '',
-                              requirements: formData.requirements || '',
-                              companyId: company?.id,
-                              createdBy: user?.email || null,
-                            }),
-                          })
-                          const data = await res.json()
-                          if (res.ok && data?.ok && data?.jobId) {
-                            setCreatedJobId(data.jobId)
-                            // Update URL with jobId
-                            const params = new URLSearchParams(searchParams.toString())
-                            params.set('jobId', data.jobId)
-                            router.push(`/dashboard/jobs/new?${params.toString()}`, { scroll: false })
-                          }
-                        } catch (error) {
-                          console.error('Error creating job:', error)
-                        } finally {
-                          setIsSubmitting(false)
-                        }
-                      }
                       goToNextTab()
                     }}
                     className="min-w-[120px]"
