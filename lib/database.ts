@@ -2389,70 +2389,6 @@ export class DatabaseService {
     return result[0]
   }
 
-  // Create invoice
-  static async createInvoice(params: {
-    companyId: string
-    description: string
-    subtotal: number
-    taxRate?: number
-    total: number
-    lineItems: any[]
-  }) {
-    if (!this.isDatabaseConfigured()) {
-      throw new Error('Database not configured')
-    }
-
-    // Generate invoice number
-    const now = new Date()
-    const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
-    const randomNum = Math.floor(10000 + Math.random() * 90000)
-    const invoiceNumber = `INV-${yearMonth}-${randomNum}`
-
-    const taxAmount = params.taxRate ? params.subtotal * params.taxRate : 0
-
-    const query = `
-      INSERT INTO invoices (
-        company_id,
-        invoice_number,
-        status,
-        subtotal,
-        tax_rate,
-        tax_amount,
-        total,
-        description,
-        line_items,
-        created_at,
-        updated_at
-      ) VALUES (
-        $1::uuid,
-        $2,
-        'pending',
-        $3,
-        $4,
-        $5,
-        $6,
-        $7,
-        $8::jsonb,
-        NOW(),
-        NOW()
-      )
-      RETURNING *
-    `
-
-    const result = await this.query(query, [
-      params.companyId,
-      invoiceNumber,
-      params.subtotal,
-      params.taxRate || null,
-      taxAmount,
-      params.total,
-      params.description,
-      JSON.stringify(params.lineItems)
-    ]) as any[]
-
-    return result[0]
-  }
-
   // Mark invoice as paid
   static async markInvoicePaid(invoiceId: string) {
     if (!this.isDatabaseConfigured()) {
@@ -2864,59 +2800,6 @@ export class DatabaseService {
     }
   }
 
-  // ==================== BILLING METHODS ====================
-
-  // Get company billing status
-  static async getCompanyBilling(companyId: string) {
-    if (!this.isDatabaseConfigured()) {
-      throw new Error('Database not configured')
-    }
-
-    const query = `
-      SELECT * FROM company_billing
-      WHERE company_id = $1::uuid
-    `
-    const result = await this.query(query, [companyId]) as any[]
-    return result[0] || null
-  }
-
-  // Update company billing settings
-  static async updateBillingSettings(companyId: string, settings: {
-    autoRechargeEnabled?: boolean
-    monthlySpendCap?: number | null
-  }) {
-    if (!this.isDatabaseConfigured()) {
-      throw new Error('Database not configured')
-    }
-
-    const updates: string[] = []
-    const params: any[] = []
-    let paramIndex = 1
-
-    if (settings.autoRechargeEnabled !== undefined) {
-      updates.push(`auto_recharge_enabled = $${paramIndex++}`)
-      params.push(settings.autoRechargeEnabled)
-    }
-
-    if (settings.monthlySpendCap !== undefined) {
-      updates.push(`monthly_spend_cap = $${paramIndex++}`)
-      params.push(settings.monthlySpendCap)
-    }
-
-    updates.push(`updated_at = NOW()`)
-    params.push(companyId)
-
-    const query = `
-      UPDATE company_billing
-      SET ${updates.join(', ')}
-      WHERE company_id = $${paramIndex}::uuid
-      RETURNING *
-    `
-
-    const result = await this.query(query, params) as any[]
-    return result[0] || null
-  }
-
   // Get current pricing
   static async getCurrentPricing() {
     if (!this.isDatabaseConfigured()) {
@@ -2933,12 +2816,12 @@ export class DatabaseService {
     return result[0] || {
       cv_parse_price: 0.50,
       question_price_per_1k_tokens: 0.002,
-      video_price_per_min: 0.10,
+      video_price_per_min: 0.30, // OpenAI Realtime API: $0.06 input + $0.24 output = $0.30/min
       recharge_amount: 100.00
     }
   }
 
-  // Record CV parsing usage
+  // Record CV parsing usage with REAL OpenAI cost
   static async recordCVParsingUsage(data: {
     companyId: string
     jobId: string
@@ -2952,38 +2835,99 @@ export class DatabaseService {
       throw new Error('Database not configured')
     }
 
-    const { applyProfitMargin } = await import('./config')
-    const pricing = await this.getCurrentPricing()
-    const baseCost = pricing.cv_parse_price
+    // Fetch REAL cost from OpenAI API for the last few minutes
+    let realCost = 0
+    let unitPrice = 0
     
-    // Apply profit margin to get final cost
-    const { finalCost } = applyProfitMargin(baseCost)
+    try {
+      const { OpenAIUsageService } = await import('./openai-usage-service')
+      const { applyProfitMargin } = await import('./config')
+      
+      // Fetch usage from last 5 minutes to capture this CV parsing
+      const endDate = new Date()
+      const startDate = new Date(endDate.getTime() - 5 * 60 * 1000) // 5 minutes ago
+      
+      const openAIUsage = await OpenAIUsageService.getUsageForCustomRange(startDate, endDate)
+      
+      // Get the real cost from OpenAI for CV parsing
+      const openAIBaseCost = openAIUsage.cvParsing?.cost || 0
+      
+      // If OpenAI returned a cost, use it; otherwise fallback to estimation
+      if (openAIBaseCost > 0) {
+        realCost = openAIBaseCost
+        unitPrice = openAIBaseCost
+        console.log(`[Billing] ✅ Real OpenAI cost fetched for CV parsing: $${openAIBaseCost}`)
+      } else {
+        // Fallback: Use GPT-4 estimation (~$0.50 per CV)
+        unitPrice = 0.50
+        realCost = unitPrice
+        console.log(`[Billing] ⚠️ OpenAI cost not available for CV, using estimate: $${realCost}`)
+      }
+      
+      // Apply profit margin to real cost
+      const { finalCost } = applyProfitMargin(realCost)
+      
+      const query = `
+        INSERT INTO cv_parsing_usage (
+          company_id, job_id, candidate_id, file_id, file_size_kb,
+          parse_successful, unit_price, cost, success_rate, created_at
+        )
+        VALUES (
+          $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5,
+          $6, $7, $8, $9, NOW()
+        )
+        RETURNING *
+      `
 
-    const query = `
-      INSERT INTO cv_parsing_usage (
-        company_id, job_id, candidate_id, file_id, file_size_kb,
-        parse_successful, unit_price, cost, success_rate, created_at
-      )
-      VALUES (
-        $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5,
-        $6, $7, $8, $9, NOW()
-      )
-      RETURNING *
-    `
+      const result = await this.query(query, [
+        data.companyId,
+        data.jobId,
+        data.candidateId || null,
+        data.fileId || null,
+        data.fileSizeKb || 0,
+        data.parseSuccessful !== false,
+        unitPrice, // Real unit price from OpenAI
+        finalCost, // Real OpenAI cost + profit margin
+        data.successRate || null
+      ]) as any[]
 
-    const result = await this.query(query, [
-      data.companyId,
-      data.jobId,
-      data.candidateId || null,
-      data.fileId || null,
-      data.fileSizeKb || 0,
-      data.parseSuccessful !== false,
-      pricing.cv_parse_price,
-      finalCost, // Store final cost with profit margin
-      data.successRate || null
-    ]) as any[]
+      console.log(`[Billing] 💰 Stored CV cost: $${finalCost} (base: $${realCost} + margin)`)
+      return result[0]
+      
+    } catch (error) {
+      console.error('[Billing] ❌ Failed to fetch OpenAI cost for CV, using fallback:', error)
+      
+      // Fallback: Use GPT-4 estimation
+      const { applyProfitMargin } = await import('./config')
+      const fallbackUnitPrice = 0.50
+      const { finalCost } = applyProfitMargin(fallbackUnitPrice)
+      
+      const query = `
+        INSERT INTO cv_parsing_usage (
+          company_id, job_id, candidate_id, file_id, file_size_kb,
+          parse_successful, unit_price, cost, success_rate, created_at
+        )
+        VALUES (
+          $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5,
+          $6, $7, $8, $9, NOW()
+        )
+        RETURNING *
+      `
 
-    return result[0]
+      const result = await this.query(query, [
+        data.companyId,
+        data.jobId,
+        data.candidateId || null,
+        data.fileId || null,
+        data.fileSizeKb || 0,
+        data.parseSuccessful !== false,
+        fallbackUnitPrice,
+        finalCost,
+        data.successRate || null
+      ]) as any[]
+
+      return result[0]
+    }
   }
 
   // Record question generation usage
@@ -3034,7 +2978,7 @@ export class DatabaseService {
     return result[0]
   }
 
-  // Record video interview usage
+  // Record video interview usage with REAL OpenAI cost
   static async recordVideoInterviewUsage(data: {
     companyId: string
     jobId: string
@@ -3049,43 +2993,166 @@ export class DatabaseService {
       throw new Error('Database not configured')
     }
 
-    const { applyProfitMargin } = await import('./config')
-    const pricing = await this.getCurrentPricing()
-    const baseCost = data.durationMinutes * pricing.video_price_per_min
+    // Fetch REAL cost from OpenAI API for the last few minutes
+    let realCost = 0
+    let costPerMinute = 0
     
-    // Apply profit margin to get final cost
-    const { finalCost } = applyProfitMargin(baseCost)
+    try {
+      const { OpenAIUsageService } = await import('./openai-usage-service')
+      const { applyProfitMargin } = await import('./config')
+      
+      // Fetch usage from last 5 minutes to capture this interview
+      const endDate = new Date()
+      const startDate = new Date(endDate.getTime() - 5 * 60 * 1000) // 5 minutes ago
+      
+      const openAIUsage = await OpenAIUsageService.getUsageForCustomRange(startDate, endDate)
+      
+      // Get the real cost from OpenAI for video/realtime usage
+      const openAIBaseCost = openAIUsage.videoInterview?.cost || 0
+      
+      // If OpenAI returned a cost, use it; otherwise fallback to estimation
+      if (openAIBaseCost > 0) {
+        realCost = openAIBaseCost
+        costPerMinute = openAIBaseCost / data.durationMinutes
+        console.log(`[Billing] ✅ Real OpenAI cost fetched: $${openAIBaseCost} for ${data.durationMinutes} min`)
+      } else {
+        // Fallback: Use Realtime API pricing ($0.06 input + $0.24 output = $0.30/min)
+        costPerMinute = 0.30
+        realCost = data.durationMinutes * costPerMinute
+        console.log(`[Billing] ⚠️ OpenAI cost not available, using Realtime API estimate: $${realCost}`)
+      }
+      
+      // Apply profit margin to real cost
+      const { finalCost } = applyProfitMargin(realCost)
+      
+      const query = `
+        INSERT INTO video_interview_usage (
+          company_id, job_id, interview_id, candidate_id,
+          duration_minutes, video_quality, minute_price, cost,
+          completed_questions, total_questions, created_at
+        )
+        VALUES (
+          $1::uuid, $2::uuid, $3::uuid, $4::uuid,
+          $5, $6, $7, $8, $9, $10, NOW()
+        )
+        RETURNING *
+      `
 
-    const query = `
-      INSERT INTO video_interview_usage (
-        company_id, job_id, interview_id, candidate_id,
-        duration_minutes, video_quality, minute_price, cost,
-        completed_questions, total_questions, created_at
-      )
-      VALUES (
-        $1::uuid, $2::uuid, $3::uuid, $4::uuid,
-        $5, $6, $7, $8, $9, $10, NOW()
-      )
-      RETURNING *
-    `
+      const result = await this.query(query, [
+        data.companyId,
+        data.jobId,
+        data.interviewId || null,
+        data.candidateId || null,
+        data.durationMinutes,
+        data.videoQuality || 'HD',
+        costPerMinute, // Real cost per minute from OpenAI
+        finalCost, // Real OpenAI cost + profit margin
+        data.completedQuestions || 0,
+        data.totalQuestions || 0
+      ]) as any[]
 
-    const result = await this.query(query, [
-      data.companyId,
-      data.jobId,
-      data.interviewId || null,
-      data.candidateId || null,
-      data.durationMinutes,
-      data.videoQuality || 'HD',
-      pricing.video_price_per_min,
-      finalCost, // Store final cost with profit margin
-      data.completedQuestions || 0,
-      data.totalQuestions || 0
-    ]) as any[]
+      console.log(`[Billing] 💰 Stored cost: $${finalCost} (base: $${realCost} + margin)`)
+      return result[0]
+      
+    } catch (error) {
+      console.error('[Billing] ❌ Failed to fetch OpenAI cost, using fallback:', error)
+      
+      // Fallback: Use Realtime API pricing
+      const { applyProfitMargin } = await import('./config')
+      const fallbackCostPerMin = 0.30
+      const fallbackBaseCost = data.durationMinutes * fallbackCostPerMin
+      const { finalCost } = applyProfitMargin(fallbackBaseCost)
+      
+      const query = `
+        INSERT INTO video_interview_usage (
+          company_id, job_id, interview_id, candidate_id,
+          duration_minutes, video_quality, minute_price, cost,
+          completed_questions, total_questions, created_at
+        )
+        VALUES (
+          $1::uuid, $2::uuid, $3::uuid, $4::uuid,
+          $5, $6, $7, $8, $9, $10, NOW()
+        )
+        RETURNING *
+      `
 
-    return result[0]
+      const result = await this.query(query, [
+        data.companyId,
+        data.jobId,
+        data.interviewId || null,
+        data.candidateId || null,
+        data.durationMinutes,
+        data.videoQuality || 'HD',
+        fallbackCostPerMin,
+        finalCost,
+        data.completedQuestions || 0,
+        data.totalQuestions || 0
+      ]) as any[]
+
+      return result[0]
+    }
   }
 
-  // Get usage data for company
+  // Get usage records (counts/durations only, no fixed pricing)
+  static async getCompanyUsageRecords(companyId: string, filters?: {
+    jobId?: string
+    startDate?: Date
+    endDate?: Date
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const params: any[] = [companyId]
+    let paramIndex = 2
+
+    // Build WHERE clauses
+    const whereClauses = ['company_id = $1::uuid']
+    
+    if (filters?.startDate) {
+      whereClauses.push(`created_at >= $${paramIndex++}::timestamptz`)
+      params.push(filters.startDate)
+    }
+    
+    if (filters?.endDate) {
+      whereClauses.push(`created_at <= $${paramIndex++}::timestamptz`)
+      params.push(filters.endDate)
+    }
+
+    const whereClause = whereClauses.join(' AND ')
+
+    // Get CV parsing counts
+    const cvQuery = `
+      SELECT COUNT(*) as count
+      FROM cv_parsing_usage
+      WHERE ${whereClause}
+      ${filters?.jobId ? `AND job_id = $${paramIndex}::uuid` : ''}
+    `
+    const cvParams = [...params]
+    if (filters?.jobId) cvParams.push(filters.jobId)
+    const cvResult = await this.query(cvQuery, cvParams) as any[]
+
+    // Get video interview durations
+    const videoQuery = `
+      SELECT 
+        COUNT(*) as count,
+        COALESCE(SUM(duration_minutes), 0) as total_minutes
+      FROM video_interview_usage
+      WHERE ${whereClause}
+      ${filters?.jobId ? `AND job_id = $${paramIndex}::uuid` : ''}
+    `
+    const videoParams = [...params]
+    if (filters?.jobId) videoParams.push(filters.jobId)
+    const videoResult = await this.query(videoQuery, videoParams) as any[]
+
+    return {
+      cvCount: parseInt(cvResult[0]?.count || 0),
+      videoCount: parseInt(videoResult[0]?.count || 0),
+      videoMinutes: parseFloat(videoResult[0]?.total_minutes || 0)
+    }
+  }
+
+  // Get usage data for company (with fixed pricing - legacy)
   static async getCompanyUsage(companyId: string, filters?: {
     jobId?: string
     entryType?: string
@@ -3165,7 +3232,74 @@ export class DatabaseService {
     }
   }
 
-  // Get usage by job
+  // Get usage by job with real OpenAI costs
+  static async getUsageByJobWithOpenAICosts(companyId: string, filters?: {
+    startDate?: Date
+    endDate?: Date
+    openAIUsage?: any
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const params: any[] = [companyId]
+    let paramIndex = 2
+
+    const whereClauses = ['jus.company_id = $1::uuid']
+    
+    if (filters?.startDate) {
+      whereClauses.push(`jus.last_updated >= $${paramIndex++}::timestamptz`)
+      params.push(filters.startDate)
+    }
+    
+    if (filters?.endDate) {
+      whereClauses.push(`jus.last_updated <= $${paramIndex++}::timestamptz`)
+      params.push(filters.endDate)
+    }
+
+    const whereClause = whereClauses.join(' AND ')
+
+    const query = `
+      SELECT 
+        jus.*,
+        j.title as job_title,
+        j.id as job_id
+      FROM job_usage_summary jus
+      JOIN jobs j ON jus.job_id = j.id
+      WHERE ${whereClause}
+      ORDER BY jus.last_updated DESC
+    `
+
+    const result = await this.query(query, params) as any[]
+
+    // If OpenAI usage data provided, use real costs; otherwise use DB costs
+    const { applyProfitMargin } = await import('./config')
+    const openAI = filters?.openAIUsage
+
+    return result.map((row: any) => {
+      // Calculate proportional costs from OpenAI usage if available
+      const cvCost = openAI ? applyProfitMargin(openAI.cvParsing.cost).finalCost : parseFloat(row.cv_parsing_cost || 0)
+      const questionsCost = openAI ? applyProfitMargin(openAI.questionGeneration.cost).finalCost : parseFloat(row.question_gen_cost || 0)
+      const videoCost = openAI ? applyProfitMargin(openAI.videoInterview.cost).finalCost : parseFloat(row.video_interview_cost || 0)
+
+      return {
+        jobId: row.job_id,
+        jobTitle: row.job_title,
+        cvParsingCount: parseInt(row.cv_parsing_count || 0),
+        cvParsingCost: cvCost,
+        jdQuestionCount: parseInt(row.question_gen_count || 0),
+        jdQuestionTokensIn: parseInt(row.total_tokens_used || 0) / 2,
+        jdQuestionTokensOut: parseInt(row.total_tokens_used || 0) / 2,
+        jdQuestionsCost: questionsCost,
+        videoCount: parseInt(row.interview_count || 0),
+        videoMinutes: parseFloat(row.total_interview_minutes || 0),
+        videoCost: videoCost,
+        totalCost: cvCost + questionsCost + videoCost
+      }
+    })
+  }
+
+  // Get usage by job (legacy - uses fixed pricing from DB)
   static async getUsageByJob(companyId: string, filters?: {
     startDate?: Date
     endDate?: Date
