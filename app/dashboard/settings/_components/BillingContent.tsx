@@ -59,7 +59,6 @@ export default function BillingContent({ companyId }: BillingContentProps) {
 
   // Filters
   const [selectedJob, setSelectedJob] = useState<string>("all")
-  const [usageTypeFilter, setUsageTypeFilter] = useState<string>("all")
   const [dateRange, setDateRange] = useState<string>("30")
 
   // Tab state management
@@ -117,7 +116,6 @@ export default function BillingContent({ companyId }: BillingContentProps) {
     try {
       const params = new URLSearchParams({ companyId })
       if (selectedJob !== 'all') params.append('jobId', selectedJob)
-      if (usageTypeFilter !== 'all') params.append('entryType', usageTypeFilter)
       
       const startDate = new Date()
       startDate.setDate(startDate.getDate() - parseInt(dateRange))
@@ -198,7 +196,7 @@ export default function BillingContent({ companyId }: BillingContentProps) {
     if (companyId) {
       loadUsageData()
     }
-  }, [selectedJob, usageTypeFilter, dateRange])
+  }, [selectedJob, dateRange])
 
   // Load PayPal SDK and render button
   useEffect(() => {
@@ -426,7 +424,7 @@ export default function BillingContent({ companyId }: BillingContentProps) {
               <CardDescription>Customize your view of usage analytics</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-3">
                 <div>
                   <Label className="text-sm font-medium">Job Description</Label>
                   <Select value={selectedJob} onValueChange={setSelectedJob}>
@@ -440,21 +438,6 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                           {job.title}
                         </SelectItem>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Usage Type</Label>
-                  <Select value={usageTypeFilter} onValueChange={setUsageTypeFilter}>
-                    <SelectTrigger className="mt-2">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="CV_PARSE">CV Parsing</SelectItem>
-                      <SelectItem value="JD_QUESTIONS">JD Questions</SelectItem>
-                      <SelectItem value="VIDEO_MINUTES">Video Minutes</SelectItem>
-                      <SelectItem value="TRIAL_CREDIT">Trial Credits</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -582,12 +565,6 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                         </div>
                         <Badge variant="secondary">${usageData?.totals?.cvParsing?.toFixed(2) || '0.00'}</Badge>
                       </div>
-                      {profitMargin > 0 && usageData?.totals?.cvParsing > 0 && (
-                        <div className="text-xs text-blue-700 pl-8">
-                          Base: ${(usageData.totals.cvParsing / (1 + profitMargin / 100)).toFixed(2)} + 
-                          {profitMargin}% markup (${(usageData.totals.cvParsing - (usageData.totals.cvParsing / (1 + profitMargin / 100))).toFixed(2)})
-                        </div>
-                      )}
                     </div>
                     <div className="p-3 bg-green-50 rounded-lg space-y-2">
                       <div className="flex items-center justify-between">
@@ -597,12 +574,6 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                         </div>
                         <Badge variant="secondary">${usageData?.totals?.jdQuestions?.toFixed(2) || '0.00'}</Badge>
                       </div>
-                      {profitMargin > 0 && usageData?.totals?.jdQuestions > 0 && (
-                        <div className="text-xs text-green-700 pl-8">
-                          Base: ${(usageData.totals.jdQuestions / (1 + profitMargin / 100)).toFixed(2)} + 
-                          {profitMargin}% markup (${(usageData.totals.jdQuestions - (usageData.totals.jdQuestions / (1 + profitMargin / 100))).toFixed(2)})
-                        </div>
-                      )}
                     </div>
                     <div className="p-3 bg-purple-50 rounded-lg space-y-2">
                       <div className="flex items-center justify-between">
@@ -612,12 +583,6 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                         </div>
                         <Badge variant="secondary">${usageData?.totals?.video?.toFixed(2) || '0.00'}</Badge>
                       </div>
-                      {profitMargin > 0 && usageData?.totals?.video > 0 && (
-                        <div className="text-xs text-purple-700 pl-8">
-                          Base: ${(usageData.totals.video / (1 + profitMargin / 100)).toFixed(2)} + 
-                          {profitMargin}% markup (${(usageData.totals.video - (usageData.totals.video / (1 + profitMargin / 100))).toFixed(2)})
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -686,9 +651,6 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                             <span className="text-sm font-medium text-blue-800">CV Parsing</span>
                           </div>
                           <div className="text-lg font-semibold text-blue-900">${job.cvParsingCost.toFixed(2)}</div>
-                          <div className="text-xs text-blue-700 mt-1">
-                            {job.cvParsingCount} CVs × $0.50 each
-                          </div>
                         </div>
                         
                         <div className="bg-green-50 rounded-lg p-4">
@@ -697,9 +659,6 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                             <span className="text-sm font-medium text-green-800">Questions</span>
                           </div>
                           <div className="text-lg font-semibold text-green-900">${job.jdQuestionsCost.toFixed(2)}</div>
-                          <div className="text-xs text-green-700 mt-1">
-                            {(job.jdQuestionTokensIn + job.jdQuestionTokensOut).toLocaleString()} tokens
-                          </div>
                         </div>
                         
                         <div className="bg-purple-50 rounded-lg p-4">
@@ -708,9 +667,6 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                             <span className="text-sm font-medium text-purple-800">Video</span>
                           </div>
                           <div className="text-lg font-semibold text-purple-900">${job.videoCost.toFixed(2)}</div>
-                          <div className="text-xs text-purple-700 mt-1">
-                            {job.videoMinutes.toFixed(1)} minutes × $0.10/min
-                          </div>
                         </div>
                       </div>
                     </div>
@@ -839,34 +795,6 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                 <Button onClick={updateSettings}>
                   Save Settings
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Pricing Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Current Pricing</CardTitle>
-              <CardDescription>Your usage rates</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between py-2 border-b">
-                  <span className="text-gray-600">CV Parsing</span>
-                  <span className="font-medium">$0.05 per CV</span>
-                </div>
-                <div className="flex justify-between py-2 border-b">
-                  <span className="text-gray-600">JD Question Generation</span>
-                  <span className="font-medium">$0.002 per 1K tokens</span>
-                </div>
-                <div className="flex justify-between py-2 border-b">
-                  <span className="text-gray-600">Video Interview</span>
-                  <span className="font-medium">$0.03 per minute</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-gray-600">Auto-Recharge Amount</span>
-                  <span className="font-medium">$100.00</span>
-                </div>
               </div>
             </CardContent>
           </Card>
