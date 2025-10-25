@@ -48,6 +48,7 @@ export default function BillingContent({ companyId }: BillingContentProps) {
   const [usageData, setUsageData] = useState<any>(null)
   const [invoices, setInvoices] = useState<any[]>([])
   const [jobs, setJobs] = useState<any[]>([])
+  const [profitMargin, setProfitMargin] = useState<number>(20)
   
   // Settings
   const [autoRecharge, setAutoRecharge] = useState(true)
@@ -71,6 +72,7 @@ export default function BillingContent({ companyId }: BillingContentProps) {
       loadUsageData()
       loadInvoices()
       loadJobs()
+      loadProfitMargin()
     }
   }, [companyId])
 
@@ -154,6 +156,18 @@ export default function BillingContent({ companyId }: BillingContentProps) {
       }
     } catch (error) {
       console.error('Failed to load jobs:', error)
+    }
+  }
+
+  const loadProfitMargin = async () => {
+    try {
+      const res = await fetch('/api/billing/profit-margin')
+      const data = await res.json()
+      if (data.profitMarginPercentage !== undefined) {
+        setProfitMargin(data.profitMarginPercentage)
+      }
+    } catch (error) {
+      console.error('Failed to load profit margin:', error)
     }
   }
 
@@ -560,26 +574,50 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                 <div className="space-y-4">
                   <h4 className="font-semibold text-gray-800">Service Categories</h4>
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-blue-600" />
-                        <span className="font-medium text-blue-800">CV Parsing</span>
+                    <div className="p-3 bg-blue-50 rounded-lg space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-blue-600" />
+                          <span className="font-medium text-blue-800">CV Parsing</span>
+                        </div>
+                        <Badge variant="secondary">${usageData?.totals?.cvParsing?.toFixed(2) || '0.00'}</Badge>
                       </div>
-                      <Badge variant="secondary">${usageData?.totals?.cvParsing?.toFixed(2) || '0.00'}</Badge>
+                      {profitMargin > 0 && usageData?.totals?.cvParsing > 0 && (
+                        <div className="text-xs text-blue-700 pl-8">
+                          Base: ${(usageData.totals.cvParsing / (1 + profitMargin / 100)).toFixed(2)} + 
+                          {profitMargin}% markup (${(usageData.totals.cvParsing - (usageData.totals.cvParsing / (1 + profitMargin / 100))).toFixed(2)})
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <TrendingUp className="h-5 w-5 text-green-600" />
-                        <span className="font-medium text-green-800">JD Questions</span>
+                    <div className="p-3 bg-green-50 rounded-lg space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <TrendingUp className="h-5 w-5 text-green-600" />
+                          <span className="font-medium text-green-800">JD Questions</span>
+                        </div>
+                        <Badge variant="secondary">${usageData?.totals?.jdQuestions?.toFixed(2) || '0.00'}</Badge>
                       </div>
-                      <Badge variant="secondary">${usageData?.totals?.jdQuestions?.toFixed(2) || '0.00'}</Badge>
+                      {profitMargin > 0 && usageData?.totals?.jdQuestions > 0 && (
+                        <div className="text-xs text-green-700 pl-8">
+                          Base: ${(usageData.totals.jdQuestions / (1 + profitMargin / 100)).toFixed(2)} + 
+                          {profitMargin}% markup (${(usageData.totals.jdQuestions - (usageData.totals.jdQuestions / (1 + profitMargin / 100))).toFixed(2)})
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Calendar className="h-5 w-5 text-purple-600" />
-                        <span className="font-medium text-purple-800">Video Interviews</span>
+                    <div className="p-3 bg-purple-50 rounded-lg space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Calendar className="h-5 w-5 text-purple-600" />
+                          <span className="font-medium text-purple-800">Video Interviews</span>
+                        </div>
+                        <Badge variant="secondary">${usageData?.totals?.video?.toFixed(2) || '0.00'}</Badge>
                       </div>
-                      <Badge variant="secondary">${usageData?.totals?.video?.toFixed(2) || '0.00'}</Badge>
+                      {profitMargin > 0 && usageData?.totals?.video > 0 && (
+                        <div className="text-xs text-purple-700 pl-8">
+                          Base: ${(usageData.totals.video / (1 + profitMargin / 100)).toFixed(2)} + 
+                          {profitMargin}% markup (${(usageData.totals.video - (usageData.totals.video / (1 + profitMargin / 100))).toFixed(2)})
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

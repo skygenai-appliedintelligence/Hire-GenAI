@@ -112,15 +112,15 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, on
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
       const interviewLink = `${baseUrl}/interview/${encodeURIComponent(candidate.id)}/start`
       
-      // Try to get company data from localStorage (saved from auth context)
+      // Prefer company prop, then enhance from localStorage if available
       const savedCompanyData = localStorage.getItem('companyData')
-      let companyName = "TATA" // Correct company name
+      let companyName = (company as any)?.name || ""
       let userJobTitle = "HR Manager"
       
       if (savedCompanyData) {
         try {
           const parsed = JSON.parse(savedCompanyData)
-          companyName = parsed.name || companyName
+          companyName = companyName || parsed.name || ""
           userJobTitle = parsed.userRole || userJobTitle
         } catch (e) {
           console.error('Error parsing company data:', e)
@@ -137,7 +137,7 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, on
       // Fallback to defaults with correct company name
       const baseUrl = "http://localhost:3000"
       setCompanyData({
-        companyName: "TATA",
+        companyName: (company as any)?.name || "",
         userJobTitle: "HR Manager", 
         interviewLink: `${baseUrl}/interview/${encodeURIComponent(candidate.id)}/start`
       })

@@ -292,6 +292,10 @@ export default function InterviewPage() {
     pcRef.current = pc
     pc.onconnectionstatechange = () => {
       logTs('RTC connectionState =', pc.connectionState)
+      // When agent fully connected, kick off avatar video once
+      if (pc.connectionState === 'connected') {
+        try { avatarVideoRef.current?.play().catch(() => {}) } catch {}
+      }
     }
     pc.oniceconnectionstatechange = () => {
       logTs('RTC iceConnectionState =', pc.iceConnectionState)
@@ -323,6 +327,8 @@ export default function InterviewPage() {
     dcRef.current = dc
     dc.onopen = () => {
       logTs('DC open')
+      // Agent session is ready; start avatar animation once
+      try { avatarVideoRef.current?.play().catch(() => {}) } catch {}
       try {
         // Build structured 6-step interview instructions
         let instructions = `You are Olivia, a professional AI recruiter conducting a structured video interview. Follow this EXACT 6-step process:
@@ -548,6 +554,72 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
     }
   }, [agentReady])
 
+  // Extra: lightweight VAD to pause avatar when agent is silent
+  useEffect(() => {
+    const agentAudio = agentAudioRef.current
+    const avatarVideo = avatarVideoRef.current
+    if (!agentAudio || !avatarVideo) return
+
+    const stream = agentAudio.srcObject as MediaStream | null
+    if (!stream || stream.getAudioTracks().length === 0) return
+
+    let audioCtx: AudioContext | null = null
+    let analyser: AnalyserNode | null = null
+    let source: MediaStreamAudioSourceNode | null = null
+    let rafId: number | null = null
+    let silentFrames = 0
+    let speakingFrames = 0
+
+    const startVAD = () => {
+      try {
+        audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+        source = audioCtx.createMediaStreamSource(stream)
+        analyser = audioCtx.createAnalyser()
+        analyser.fftSize = 2048
+        source.connect(analyser)
+
+        const data = new Uint8Array(analyser.frequencyBinCount)
+        const threshold = 8 // lower = more sensitive
+
+        const tick = () => {
+          if (!analyser) return
+          analyser.getByteTimeDomainData(data)
+          // Calculate average absolute deviation from midpoint (128)
+          let sum = 0
+          for (let i = 0; i < data.length; i++) sum += Math.abs(data[i] - 128)
+          const avg = sum / data.length
+
+          if (avg > threshold) {
+            speakingFrames++
+            silentFrames = 0
+          } else {
+            silentFrames++
+            speakingFrames = 0
+          }
+
+          // Debounce to avoid flicker
+          if (speakingFrames > 2) {
+            avatarVideo.play().catch(() => {})
+          } else if (silentFrames > 8) {
+            avatarVideo.pause()
+          }
+
+          rafId = requestAnimationFrame(tick)
+        }
+        rafId = requestAnimationFrame(tick)
+      } catch (e) {
+        console.warn('VAD init failed:', e)
+      }
+    }
+
+    startVAD()
+
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId)
+      try { source && source.disconnect(); analyser && analyser.disconnect(); audioCtx && audioCtx.close() } catch {}
+    }
+  }, [agentReady])
+
   const toggleMic = () => {
     const audioTracks = streamRef.current?.getAudioTracks() || []
     audioTracks.forEach(t => (t.enabled = !t.enabled))
@@ -594,7 +666,10 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
       const response = await fetch(`/api/applications/${encodeURIComponent(applicationId)}/interview-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript })
+        body: JSON.stringify({ 
+          transcript,
+          startedAt: interviewStartTime // Send actual start time for accurate duration
+        })
       }).catch(e => {
         console.error('❌ Failed to mark interview as completed:', e)
         return null
@@ -707,6 +782,7 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
                 className="w-[220px] h-[124px] md:w-[260px] md:h-[146px] object-cover"
                 muted
                 playsInline
+                preload="auto"
                 onEnded={() => {
                   // First play: video plays fully from 0 to end
                   // Subsequent plays: loop from 3 seconds to end
