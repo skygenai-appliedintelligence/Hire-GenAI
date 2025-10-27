@@ -31,8 +31,33 @@ export async function POST(request: NextRequest) {
         // Use real token counts from OpenAI API if available, otherwise estimate
         const promptTokens = result.usage?.promptTokens || Math.round(jobDescription.length / 4) + (numberOfQuestions * 100)
         const completionTokens = result.usage?.completionTokens || result.questions.length * 50
+
+        console.log('\n' + '='.repeat(60))
+        console.log('💰 [QUESTION GENERATION] Starting billing tracking...')
+        console.log('📋 Company ID:', companyId)
+        console.log('💼 Job ID:', jobId)
+        console.log('❓ Questions Generated:', result.questions.length)
+
+        if (result.usage) {
+          // Even if token counts are 0, we got real usage data from OpenAI
+          console.log('✅ [QUESTION GENERATION] Using REAL OpenAI token data!')
+          console.log('🤖 Prompt Tokens:', promptTokens)
+          console.log('✍️  Completion Tokens:', completionTokens)
+          console.log('📝 Total Tokens:', promptTokens + completionTokens)
+          console.log('🏷️  Source: OpenAI API (Real Usage)')
+          console.log('🔍 Note: Token counts may be 0 for very short/simple requests')
+        } else {
+          console.log('⚠️  [QUESTION GENERATION] Using ESTIMATED token data (No OpenAI API key)')
+          console.log('🤖 Prompt Tokens (estimated):', promptTokens)
+          console.log('✍️  Completion Tokens (estimated):', completionTokens)
+          console.log('📝 Total Tokens (estimated):', promptTokens + completionTokens)
+          console.log('🏷️  Source: Estimation (No API key available)')
+        }
+
+        console.log('💾 [QUESTION GENERATION] Saving to database...')
+        console.log('📊 Table: question_generation_usage')
         
-        await DatabaseService.recordQuestionGenerationUsage({
+        const savedRecord = await DatabaseService.recordQuestionGenerationUsage({
           companyId,
           jobId,
           promptTokens,
@@ -40,14 +65,16 @@ export async function POST(request: NextRequest) {
           questionCount: result.questions.length,
           modelUsed: 'gpt-4o'
         })
-        
-        if (result.usage) {
-          console.log(`[Question Generation] ✅ Billing tracked: ${promptTokens} prompt + ${completionTokens} completion tokens (REAL OpenAI data)`)
-        } else {
-          console.log(`[Question Generation] ✅ Billing tracked: ${promptTokens} prompt + ${completionTokens} completion tokens (estimated - no API key)`)
-        }
+
+        console.log('✅ [QUESTION GENERATION] Database insert successful!')
+        console.log('🆔 Record ID:', savedRecord?.id || 'N/A')
+        console.log('💰 Cost Saved:', savedRecord?.cost ? `$${savedRecord.cost}` : 'N/A')
+        console.log('🎉 [QUESTION GENERATION] Billing tracking completed successfully!')
+        console.log('='.repeat(60) + '\n')
       } catch (billingErr) {
-        console.error('[Question Generation] ⚠️ Failed to record billing usage:', billingErr)
+        console.error('❌ [QUESTION GENERATION] ERROR: Failed to record billing usage:')
+        console.error('🔥 Error Details:', billingErr)
+        console.error('⚠️  Billing tracking failed, but question generation succeeded')
         // Non-fatal, don't block the response
       }
     }
