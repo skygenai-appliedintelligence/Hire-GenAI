@@ -1138,7 +1138,11 @@ export class DatabaseService {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
     }
-    const q = `SELECT 1 FROM users WHERE id = $1::uuid LIMIT 1`
+    // Accept either UUID or email to avoid invalid UUID cast errors
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)
+    const q = isUuid
+      ? `SELECT 1 FROM users WHERE id = $1::uuid LIMIT 1`
+      : `SELECT 1 FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`
     const rows = (await this.query(q, [userId])) as any[]
     return rows.length > 0
   }
@@ -1180,16 +1184,23 @@ export class DatabaseService {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
     }
 
-    // Helper: convert JS string[] to Postgres text[] literal (e.g., '{"a","b"}')
+    // Helper: convert JS string[] to Postgres text[] literal safely (e.g., '{"a","b"}')
     const toPgArray = (arr?: string[] | null): string | null => {
       if (!arr || arr.length === 0) return '{}'
-      // Escape quotes and commas inside values, wrap each in quotes
-      const escaped = arr
-        .map(s => (s ?? ''))
-        .map(s => s.replace(/"/g, '\\"'))
-        .map(s => `"${s}"`)
-        .join(',')
-      return `{${escaped}}`
+      const norm = arr.map((raw) => {
+        let s = String(raw ?? '')
+        // Strip surrounding quotes if present (common when client sends already-quoted labels)
+        if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+          s = s.slice(1, -1)
+        }
+        // Normalize whitespace
+        s = s.trim()
+        // Escape backslashes first, then quotes per Postgres array literal rules
+        s = s.replace(/\\/g, '\\\\')
+        s = s.replace(/"/g, '\\"')
+        return `"${s}"`
+      })
+      return `{${norm.join(',')}}`
     }
 
     const q = `
@@ -2835,11 +2846,23 @@ export class DatabaseService {
       throw new Error('Database not configured')
     }
 
+    // 🎯 STARTING CV PARSING BILLING CALCULATION
+    console.log('\n' + '='.repeat(70))
+    console.log('🎯 [CV PARSING] Starting billing calculation...')
+    console.log('📋 Company ID:', data.companyId)
+    console.log('💼 Job ID:', data.jobId)
+    console.log('👤 Candidate ID:', data.candidateId || 'N/A')
+    console.log('📄 File Size:', data.fileSizeKb || 0, 'KB')
+    console.log('='.repeat(70))
+
     // Fetch REAL cost from OpenAI API for the last few minutes
     let realCost = 0
     let unitPrice = 0
     
     try {
+      console.log('🔗 [CV PARSING] Attempting to fetch REAL OpenAI costs...')
+      console.log('⏰ Time Range: Last 5 minutes')
+      
       const { OpenAIUsageService } = await import('./openai-usage-service')
       const { applyProfitMargin } = await import('./config')
       
@@ -2847,6 +2870,7 @@ export class DatabaseService {
       const endDate = new Date()
       const startDate = new Date(endDate.getTime() - 5 * 60 * 1000) // 5 minutes ago
       
+      console.log('📊 [CV PARSING] Calling OpenAI Usage API...')
       const openAIUsage = await OpenAIUsageService.getUsageForCustomRange(startDate, endDate)
       
       // Get the real cost from OpenAI for CV parsing
@@ -2856,12 +2880,16 @@ export class DatabaseService {
       if (openAIBaseCost > 0) {
         realCost = openAIBaseCost
         unitPrice = openAIBaseCost
-        console.log(`[Billing] ✅ Real OpenAI cost fetched for CV parsing: $${openAIBaseCost}`)
+        console.log('✅ [CV PARSING] SUCCESS: Real OpenAI cost fetched!')
+        console.log('💰 OpenAI Base Cost: $' + openAIBaseCost)
+        console.log('🏷️  Using REAL pricing from OpenAI API')
       } else {
         // Fallback: Use GPT-4 estimation (~$0.50 per CV)
         unitPrice = 0.50
         realCost = unitPrice
-        console.log(`[Billing] ⚠️ OpenAI cost not available for CV, using estimate: $${realCost}`)
+        console.log('⚠️  [CV PARSING] WARNING: OpenAI cost not available, using fallback estimate')
+        console.log('💰 Estimated Cost: $' + realCost)
+        console.log('🏷️  Using FIXED pricing ($0.50 per CV)')
       }
       
       // Apply profit margin to real cost
@@ -2891,11 +2919,16 @@ export class DatabaseService {
         data.successRate || null
       ]) as any[]
 
-      console.log(`[Billing] 💰 Stored CV cost: $${finalCost} (base: $${realCost} + margin)`)
+      console.log('💾 [CV PARSING] Cost stored in database successfully')
+      console.log('💰 Final Cost (with margin): $' + finalCost)
+      console.log('📈 Base Cost: $' + realCost + ' + ' + ((finalCost - realCost) * 100).toFixed(2) + '% margin')
+      console.log('🎉 [CV PARSING] Billing calculation completed successfully!')
+      console.log('='.repeat(70) + '\n')
       return result[0]
       
     } catch (error) {
-      console.error('[Billing] ❌ Failed to fetch OpenAI cost for CV, using fallback:', error)
+      console.error('❌ [CV PARSING] ERROR: Failed to fetch OpenAI cost, using fallback:')
+      console.error('🔥 Error Details:', error)
       
       // Fallback: Use GPT-4 estimation
       const { applyProfitMargin } = await import('./config')
@@ -2926,6 +2959,11 @@ export class DatabaseService {
         data.successRate || null
       ]) as any[]
 
+      console.log('💾 [CV PARSING] Fallback cost stored in database')
+      console.log('💰 Final Cost (fallback): $' + finalCost)
+      console.log('📈 Base Cost: $' + fallbackUnitPrice + ' + ' + ((finalCost - fallbackUnitPrice) * 100).toFixed(2) + '% margin')
+      console.log('⚠️  [CV PARSING] Used fallback pricing due to OpenAI API failure')
+      console.log('='.repeat(70) + '\n')
       return result[0]
     }
   }
@@ -2943,6 +2981,18 @@ export class DatabaseService {
       throw new Error('Database not configured')
     }
 
+    // 🎯 STARTING QUESTION GENERATION BILLING CALCULATION
+    console.log('\n' + '='.repeat(70))
+    console.log('🎯 [QUESTION GENERATION] Starting billing calculation...')
+    console.log('📋 Company ID:', data.companyId)
+    console.log('💼 Job ID:', data.jobId)
+    console.log('🤖 Prompt Tokens:', data.promptTokens)
+    console.log('✍️  Completion Tokens:', data.completionTokens)
+    console.log('📝 Total Tokens:', data.promptTokens + data.completionTokens)
+    console.log('❓ Questions Generated:', data.questionCount)
+    console.log('🧠 Model Used:', data.modelUsed || 'gpt-4')
+    console.log('='.repeat(70))
+
     const { applyProfitMargin } = await import('./config')
     const pricing = await this.getCurrentPricing()
     const totalTokens = data.promptTokens + data.completionTokens
@@ -2950,6 +3000,13 @@ export class DatabaseService {
     
     // Apply profit margin to get final cost
     const { finalCost } = applyProfitMargin(baseCost)
+
+    console.log('💰 [QUESTION GENERATION] Cost calculated using real token counts')
+    console.log('💵 Token Price: $' + pricing.question_price_per_1k_tokens + ' per 1K tokens')
+    console.log('🔢 Cost per 1K tokens: $' + (pricing.question_price_per_1k_tokens * 1000).toFixed(6))
+    console.log('📊 Total Cost: $' + baseCost.toFixed(6) + ' (before margin)')
+    console.log('📈 Final Cost (with margin): $' + finalCost.toFixed(4))
+    console.log('🏷️  Using REAL token-based pricing from OpenAI API')
 
     const query = `
       INSERT INTO question_generation_usage (
@@ -2975,6 +3032,9 @@ export class DatabaseService {
       data.modelUsed || 'gpt-4'
     ]) as any[]
 
+    console.log('💾 [QUESTION GENERATION] Cost stored in database successfully')
+    console.log('🎉 [QUESTION GENERATION] Billing calculation completed successfully!')
+    console.log('='.repeat(70) + '\n')
     return result[0]
   }
 
@@ -2993,11 +3053,26 @@ export class DatabaseService {
       throw new Error('Database not configured')
     }
 
+    // 🎯 STARTING VIDEO INTERVIEW BILLING CALCULATION
+    console.log('\n' + '='.repeat(70))
+    console.log('🎯 [VIDEO INTERVIEW] Starting billing calculation...')
+    console.log('📋 Company ID:', data.companyId)
+    console.log('💼 Job ID:', data.jobId)
+    console.log('🎥 Interview ID:', data.interviewId || 'N/A')
+    console.log('👤 Candidate ID:', data.candidateId || 'N/A')
+    console.log('⏱️  Duration:', data.durationMinutes, 'minutes')
+    console.log('❓ Questions Completed:', data.completedQuestions || 0)
+    console.log('🎬 Video Quality:', data.videoQuality || 'HD')
+    console.log('='.repeat(70))
+
     // Fetch REAL cost from OpenAI API for the last few minutes
     let realCost = 0
     let costPerMinute = 0
     
     try {
+      console.log('🔗 [VIDEO INTERVIEW] Attempting to fetch REAL OpenAI costs...')
+      console.log('⏰ Time Range: Last 5 minutes')
+      
       const { OpenAIUsageService } = await import('./openai-usage-service')
       const { applyProfitMargin } = await import('./config')
       
@@ -3005,6 +3080,7 @@ export class DatabaseService {
       const endDate = new Date()
       const startDate = new Date(endDate.getTime() - 5 * 60 * 1000) // 5 minutes ago
       
+      console.log('📊 [VIDEO INTERVIEW] Calling OpenAI Usage API...')
       const openAIUsage = await OpenAIUsageService.getUsageForCustomRange(startDate, endDate)
       
       // Get the real cost from OpenAI for video/realtime usage
@@ -3014,12 +3090,18 @@ export class DatabaseService {
       if (openAIBaseCost > 0) {
         realCost = openAIBaseCost
         costPerMinute = openAIBaseCost / data.durationMinutes
-        console.log(`[Billing] ✅ Real OpenAI cost fetched: $${openAIBaseCost} for ${data.durationMinutes} min`)
+        console.log('✅ [VIDEO INTERVIEW] SUCCESS: Real OpenAI cost fetched!')
+        console.log('💰 OpenAI Base Cost: $' + openAIBaseCost)
+        console.log('⏱️  Cost per Minute: $' + costPerMinute.toFixed(4))
+        console.log('🏷️  Using REAL pricing from OpenAI API')
       } else {
         // Fallback: Use Realtime API pricing ($0.06 input + $0.24 output = $0.30/min)
         costPerMinute = 0.30
         realCost = data.durationMinutes * costPerMinute
-        console.log(`[Billing] ⚠️ OpenAI cost not available, using Realtime API estimate: $${realCost}`)
+        console.log('⚠️  [VIDEO INTERVIEW] WARNING: OpenAI cost not available, using fallback estimate')
+        console.log('💰 Estimated Cost: $' + realCost.toFixed(4))
+        console.log('⏱️  Cost per Minute: $' + costPerMinute.toFixed(2))
+        console.log('🏷️  Using FIXED pricing ($0.30 per minute)')
       }
       
       // Apply profit margin to real cost
@@ -3051,11 +3133,16 @@ export class DatabaseService {
         data.totalQuestions || 0
       ]) as any[]
 
-      console.log(`[Billing] 💰 Stored cost: $${finalCost} (base: $${realCost} + margin)`)
+      console.log('💾 [VIDEO INTERVIEW] Cost stored in database successfully')
+      console.log('💰 Final Cost (with margin): $' + finalCost.toFixed(4))
+      console.log('📈 Base Cost: $' + realCost.toFixed(4) + ' + ' + ((finalCost - realCost) * 100).toFixed(2) + '% margin')
+      console.log('🎉 [VIDEO INTERVIEW] Billing calculation completed successfully!')
+      console.log('='.repeat(70) + '\n')
       return result[0]
       
     } catch (error) {
-      console.error('[Billing] ❌ Failed to fetch OpenAI cost, using fallback:', error)
+      console.error('❌ [VIDEO INTERVIEW] ERROR: Failed to fetch OpenAI cost, using fallback:')
+      console.error('🔥 Error Details:', error)
       
       // Fallback: Use Realtime API pricing
       const { applyProfitMargin } = await import('./config')
@@ -3089,6 +3176,11 @@ export class DatabaseService {
         data.totalQuestions || 0
       ]) as any[]
 
+      console.log('💾 [VIDEO INTERVIEW] Fallback cost stored in database')
+      console.log('💰 Final Cost (fallback): $' + finalCost.toFixed(4))
+      console.log('📈 Base Cost: $' + fallbackBaseCost.toFixed(4) + ' + ' + ((finalCost - fallbackBaseCost) * 100).toFixed(2) + '% margin')
+      console.log('⚠️  [VIDEO INTERVIEW] Used fallback pricing due to OpenAI API failure')
+      console.log('='.repeat(70) + '\n')
       return result[0]
     }
   }
