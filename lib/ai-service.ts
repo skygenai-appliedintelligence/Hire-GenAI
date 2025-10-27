@@ -345,9 +345,18 @@ Only provide the questions, no explanations or additional text.
 
       // Extract real token usage from OpenAI response
       const tokenUsage = usage ? {
-        promptTokens: (usage as any).promptTokens || 0,
-        completionTokens: (usage as any).completionTokens || 0
+        promptTokens: (usage as any).promptTokens || (usage as any).prompt_tokens || 0,
+        completionTokens: (usage as any).completionTokens || (usage as any).completion_tokens || 0
       } : undefined
+
+      // Debug logging to see actual usage object structure
+      if (usage) {
+        console.log('🔍 [AI Service] OpenAI usage object received:', JSON.stringify(usage, null, 2))
+        console.log('🔍 [AI Service] Extracted tokens:', {
+          promptTokens: tokenUsage?.promptTokens,
+          completionTokens: tokenUsage?.completionTokens
+        })
+      }
 
       // Parse the response to extract questions
       const lines = text.split('\n').filter(line => line.trim().startsWith('Q'))

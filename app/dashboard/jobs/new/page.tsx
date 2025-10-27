@@ -23,6 +23,16 @@ export default function CreateJobPage() {
   const { company, user } = useAuth()
   const isEditing = !!searchParams.get('jobId')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Generate temporary UUID for draft jobs (for billing tracking)
+  useEffect(() => {
+    if (!searchParams.get('jobId') && !draftJobId) {
+      // Generate a temporary UUID for this draft job session
+      const tempId = crypto.randomUUID()
+      setDraftJobId(tempId)
+      console.log('🆔 [DRAFT JOB] Generated temporary job ID for billing:', tempId)
+    }
+  }, [])
   const [currentTab, setCurrentTab] = useState("basic")
   const lastSyncedTabRef = useRef<string | null>(null)
   const statusInitializedRef = useRef(false)
@@ -34,6 +44,7 @@ export default function CreateJobPage() {
     "Phone Screening": ["Communication", "Culture fit", "Technical", "Team player"]
   })
   const [createdJobId, setCreatedJobId] = useState<string | null>(null)
+  const [draftJobId, setDraftJobId] = useState<string | null>(null)
   const [generatingQuestions, setGeneratingQuestions] = useState(false)
   
   // Job status: open | on_hold | closed | cancelled
@@ -613,7 +624,21 @@ export default function CreateJobPage() {
     setGeneratingQuestions(true)
     try {
       const jobDescription = generateStructuredDescription()
-      
+      // Use actual jobId if exists, otherwise use draft UUID for billing
+      const jobIdForUsage = createdJobId || searchParams.get('jobId') || draftJobId
+      // Billing-style logs: indicate OpenAI usage API reference
+      try {
+        console.log('\n' + '='.repeat(70))
+        console.log('💰 [QUESTION GENERATION] Starting usage calculation & question generation...')
+        console.log('🔗 OpenAI Platform Usage API:', 'https://platform.openai.com/settings/organization/usage')
+        console.log('📋 Company ID:', company?.id || 'N/A')
+        console.log('💼 Job ID:', jobIdForUsage || 'N/A (draft)')
+        console.log('🧠 Agent Type:', 'Screening Agent')
+        console.log('❓ Requested Questions:', 10)
+        console.log('🏷️ Source: OpenAI Platform (org-wide usage, see Billing ➜ Usage)')
+        console.log('='.repeat(70))
+      } catch {}
+
       const res = await fetch('/api/ai/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -621,7 +646,9 @@ export default function CreateJobPage() {
           jobDescription,
           agentType: 'Screening Agent',
           numberOfQuestions: 10,
-          skills: agentCriteria[round] || []
+          skills: agentCriteria[round] || [],
+          companyId: company?.id || null,
+          jobId: jobIdForUsage || null
         })
       })
 
@@ -630,6 +657,29 @@ export default function CreateJobPage() {
       }
 
       const data = await res.json()
+
+      // Mirror billing page logs based on returned usage
+      try {
+        const usage = data?.usage
+        if (usage && typeof usage.promptTokens === 'number') {
+          // Real OpenAI usage data received (even if counts are 0)
+          console.log('\n' + '-'.repeat(60))
+          console.log('✅ [QUESTION GENERATION] Using REAL OpenAI token data!')
+          console.log('🤖 Prompt Tokens:', usage.promptTokens)
+          console.log('✍️  Completion Tokens:', usage.completionTokens)
+          console.log('📝 Total Tokens:', (usage.promptTokens || 0) + (usage.completionTokens || 0))
+          console.log('🏷️  Source: OpenAI API (Real Usage)')
+          if (usage.promptTokens === 0 && usage.completionTokens === 0) {
+            console.log('🔍 Note: Token counts are 0 - this can happen with very short/simple requests')
+          }
+          console.log('-'.repeat(60) + '\n')
+        } else {
+          console.log('\n' + '-'.repeat(60))
+          console.log('⚠️  [QUESTION GENERATION] Using ESTIMATED token data (No real usage from API)')
+          console.log('🏷️  Source: Estimation / No API usage payload')
+          console.log('-'.repeat(60) + '\n')
+        }
+      } catch {}
       const generatedQuestions = data.questions || []
       
       // Categorize questions: 2 intro, 3 behavioral, 5 technical
@@ -644,9 +694,17 @@ export default function CreateJobPage() {
         [round]: categorizedQuestions
       })
 
+      try {
+        console.log('🎉 [QUESTION GENERATION] Billing tracking invoked. OpenAI Platform usage reflected on Billing ➜ Usage tab.')
+      } catch {}
+
       alert(`Generated ${categorizedQuestions.length} questions successfully!`)
     } catch (error) {
       console.error('Error generating questions:', error)
+      try {
+        console.log('❌ [QUESTION GENERATION] ERROR: Failed to generate questions or record usage')
+        console.log('🏷️  Tip: Ensure OPENAI_API_KEY is set and valid. If missing, usage will be estimated.')
+      } catch {}
       alert('Failed to generate questions. Please try again.')
     } finally {
       setGeneratingQuestions(false)
