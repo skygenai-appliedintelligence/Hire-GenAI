@@ -265,7 +265,17 @@ export async function POST(
           
           // Record usage (minimum 1 minute for billing)
           const durationToRecord = Math.max(1, Math.round(duration_minutes || 1))
-          
+
+          console.log('\n' + '='.repeat(60))
+          console.log('💰 [VIDEO INTERVIEW] Starting billing tracking...')
+          console.log('📋 Company ID:', company_id)
+          console.log('💼 Job ID:', job_id)
+          console.log('🎥 Interview ID:', interviewId)
+          console.log('👤 Application ID:', applicationId)
+          console.log('⏱️  Actual Duration:', Math.round(duration_minutes || 0), 'minutes')
+          console.log('💰 Billed Duration:', durationToRecord, 'minutes (minimum 1 minute)')
+          console.log('📝 Transcript Length:', transcript?.length || 0, 'characters')
+
           await DatabaseService.recordVideoInterviewUsage({
             companyId: company_id,
             jobId: job_id,
@@ -276,10 +286,14 @@ export async function POST(
             totalQuestions: 0, // Can be tracked if needed
             videoQuality: 'HD'
           })
-          console.log(`[Interview] ✅ Billing tracked: Video interview usage recorded (${durationToRecord} minutes)`)
+
+          console.log('🎉 [VIDEO INTERVIEW] Billing tracking completed successfully!')
+          console.log('='.repeat(60) + '\n')
         }
       } catch (billingErr) {
-        console.error('[Interview] ⚠️ Failed to record billing usage:', billingErr)
+        console.error('❌ [VIDEO INTERVIEW] ERROR: Failed to record billing usage:')
+        console.error('🔥 Error Details:', billingErr)
+        console.error('⚠️  Billing tracking failed, but interview completion succeeded')
         // Non-fatal, don't block the response
       }
     }

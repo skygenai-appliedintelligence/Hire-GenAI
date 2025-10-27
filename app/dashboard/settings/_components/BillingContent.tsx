@@ -49,6 +49,7 @@ export default function BillingContent({ companyId }: BillingContentProps) {
   const [invoices, setInvoices] = useState<any[]>([])
   const [jobs, setJobs] = useState<any[]>([])
   const [profitMargin, setProfitMargin] = useState<number>(20)
+  const [companyData, setCompanyData] = useState<any>(null)
   
   // Settings
   const [autoRecharge, setAutoRecharge] = useState(true)
@@ -60,6 +61,11 @@ export default function BillingContent({ companyId }: BillingContentProps) {
   // Filters
   const [selectedJob, setSelectedJob] = useState<string>("all")
   const [dateRange, setDateRange] = useState<string>("30")
+  
+  // Invoice Filters
+  const [invoiceJobFilter, setInvoiceJobFilter] = useState<string>("all")
+  const [invoiceDateRange, setInvoiceDateRange] = useState<string>("30")
+  const [invoiceUsageData, setInvoiceUsageData] = useState<any>(null)
 
   // Tab state management
   const [currentTab, setCurrentTab] = useState<string>("overview")
@@ -72,8 +78,21 @@ export default function BillingContent({ companyId }: BillingContentProps) {
       loadInvoices()
       loadJobs()
       loadProfitMargin()
+      loadCompanyData()
     }
   }, [companyId])
+  
+  const loadCompanyData = async () => {
+    try {
+      const res = await fetch(`/api/company?companyId=${companyId}`)
+      const data = await res.json()
+      if (data.ok) {
+        setCompanyData(data.company)
+      }
+    } catch (error) {
+      console.error('Failed to load company data:', error)
+    }
+  }
 
   // Handle URL tab synchronization
   useEffect(() => {
@@ -163,6 +182,79 @@ export default function BillingContent({ companyId }: BillingContentProps) {
     } catch (error) {
       console.error('Failed to load invoices:', error)
     }
+  }
+
+  const [generating, setGenerating] = useState(false)
+  const generateInvoice = async () => {
+    if (!companyId) return
+    try {
+      setGenerating(true)
+      
+      // Check for duplicate invoices in the last 30 days
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      
+      const recentInvoices = invoices.filter((inv: any) => {
+        const invDate = new Date(inv.createdAt)
+        return invDate >= thirtyDaysAgo
+      })
+      
+      if (recentInvoices.length > 0) {
+        const lastInvoice = recentInvoices[0]
+        const lastInvoiceDate = new Date(lastInvoice.createdAt).toLocaleDateString()
+        
+        toast({ 
+          title: 'Duplicate Invoice Detected', 
+          description: `An invoice (${lastInvoice.invoiceNumber}) already exists for ${lastInvoiceDate}. Please wait before generating a new one.`,
+          variant: 'destructive'
+        })
+        setGenerating(false)
+        return
+      }
+      
+      const res = await fetch('/api/billing/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyId })
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || 'Failed to generate invoice')
+      await loadInvoices()
+      toast({ title: 'Invoice generated', description: `Invoice ${data.invoice.invoiceNumber} created.` })
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message || 'Failed to generate invoice', variant: 'destructive' })
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const loadInvoiceUsageData = async () => {
+    try {
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - parseInt(invoiceDateRange))
+      
+      const params = new URLSearchParams({
+        startDate: startDate.toISOString(),
+        endDate: new Date().toISOString(),
+        companyId
+      })
+      if (invoiceJobFilter && invoiceJobFilter !== 'all') {
+        params.append('jobId', invoiceJobFilter)
+      }
+
+      const res = await fetch(`/api/billing/openai-usage?${params.toString()}`)
+      const data = await res.json()
+      
+      if (data.ok) {
+        setInvoiceUsageData(data)
+      }
+    } catch (error) {
+      console.error('Failed to load invoice usage data:', error)
+    }
+  }
+
+  const applyInvoiceFilters = () => {
+    loadInvoiceUsageData()
   }
 
   const loadJobs = async () => {
@@ -707,6 +799,151 @@ export default function BillingContent({ companyId }: BillingContentProps) {
 
         {/* Invoices Tab */}
         <TabsContent value="invoices" className="space-y-6">
+          {/* Filter Invoice Data Card */}
+          <Card className="border-l-4 border-l-emerald-500">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <SettingsIcon className="h-5 w-5" />
+                Filter Invoice Data
+              </CardTitle>
+              <CardDescription>Customize your view of invoice analytics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="invoice-job-filter" className="text-sm font-medium mb-2 block">
+                    Job Description
+                  </Label>
+                  <Select value={invoiceJobFilter} onValueChange={setInvoiceJobFilter}>
+                    <SelectTrigger id="invoice-job-filter">
+                      <SelectValue placeholder="All Jobs" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Jobs</SelectItem>
+                      {jobs.map((job) => (
+                        <SelectItem key={job.id} value={job.id}>
+                          {job.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="invoice-date-range" className="text-sm font-medium mb-2 block">
+                    Date Range
+                  </Label>
+                  <Select value={invoiceDateRange} onValueChange={setInvoiceDateRange}>
+                    <SelectTrigger id="invoice-date-range">
+                      <SelectValue placeholder="Last 30 days" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7">Last 7 days</SelectItem>
+                      <SelectItem value="30">Last 30 days</SelectItem>
+                      <SelectItem value="60">Last 60 days</SelectItem>
+                      <SelectItem value="90">Last 90 days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex items-end">
+                  <Button 
+                    onClick={applyInvoiceFilters} 
+                    className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    Apply Filters
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Usage Summary Cards */}
+          {invoiceUsageData && (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card className="border-l-4 border-l-blue-500">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-blue-700">CV Parsing</CardTitle>
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <FileText className="h-4 w-4 text-blue-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-900">
+                    ${invoiceUsageData.totals.cvParsing.toFixed(2)}
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {invoiceUsageData.totals.cvCount} CVs
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">parsed</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-green-500">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-green-700">JD Questions</CardTitle>
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-900">
+                    ${invoiceUsageData.totals.jdQuestions.toFixed(2)}
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {invoiceUsageData.totals.tokenCount.toLocaleString()}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">tokens</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-purple-500">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-purple-700">Video Interviews</CardTitle>
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Calendar className="h-4 w-4 text-purple-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-purple-900">
+                    ${invoiceUsageData.totals.video.toFixed(2)}
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {invoiceUsageData.totals.videoMinutes.toFixed(1)} min
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">recorded</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-l-4 border-l-orange-500">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-orange-700">Total Usage</CardTitle>
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <DollarSign className="h-4 w-4 text-orange-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-900">
+                    ${(invoiceUsageData.totals.cvParsing + invoiceUsageData.totals.jdQuestions + invoiceUsageData.totals.video).toFixed(2)}
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary" className="text-xs">
+                      All Services
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">combined</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Invoice History */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -716,6 +953,12 @@ export default function BillingContent({ companyId }: BillingContentProps) {
               <CardDescription>Download and view your past invoices</CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-sm text-gray-600">Generate an invoice from recent usage.</div>
+                <Button size="sm" onClick={generateInvoice} disabled={generating}>
+                  {generating ? 'Generating…' : 'Generate Invoice'}
+                </Button>
+              </div>
               <div className="space-y-3">
                 {invoices.length > 0 ? (
                   invoices.map((invoice) => (
@@ -742,7 +985,21 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                             {invoice.status}
                           </Badge>
                         </div>
-                        <Button variant="outline" size="sm">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={async () => {
+                            const { generateInvoicePDF } = await import('@/lib/invoice-pdf')
+                            const invoiceWithCompany = {
+                              ...invoice,
+                              companyName: companyData?.name || 'Your Company',
+                              companyAddress: companyData?.street 
+                                ? `${companyData.street}${companyData.city ? ', ' + companyData.city : ''}${companyData.state ? ', ' + companyData.state : ''}${companyData.zipCode ? ' ' + companyData.zipCode : ''}`
+                                : 'Company Address'
+                            }
+                            await generateInvoicePDF(invoiceWithCompany)
+                          }}
+                        >
                           <Download className="h-4 w-4 mr-1" />
                           PDF
                         </Button>

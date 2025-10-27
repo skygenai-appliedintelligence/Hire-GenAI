@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { CVEvaluator } from '@/lib/cv-evaluator'
 import { DatabaseService } from '@/lib/database'
+import { checkOpenAIPermissions } from '@/lib/config'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,6 +18,16 @@ export async function POST(request: NextRequest) {
         { error: 'resumeText and jobDescription are required' },
         { status: 400 }
       )
+    }
+
+    // Check OpenAI permissions first
+    const openAIStatus = await checkOpenAIPermissions()
+    if (!openAIStatus.hasPermissions) {
+      console.log('🔐 [CV EVALUATOR] OpenAI API key permissions issue detected')
+      console.log('📝 Error:', openAIStatus.error)
+      console.log('🏷️  Using fallback mock evaluation')
+    } else {
+      console.log('✅ [CV EVALUATOR] OpenAI API key has proper permissions')
     }
 
     // Truncate resume text if too long (max 15000 chars to stay under token limits)
@@ -42,6 +53,16 @@ export async function POST(request: NextRequest) {
       score: evaluation.overall.score_percent,
       qualified: evaluation.overall.qualified
     })
+
+    // Check if this is a mock evaluation (due to API key issues)
+    if (evaluation.overall.reason_summary.includes('Mock evaluation') ||
+        evaluation.overall.reason_summary.includes('OpenAI API unavailable')) {
+      console.log('⚠️  [CV EVALUATOR] Using fallback evaluation due to OpenAI API key permissions')
+      console.log('🔑 [CV EVALUATOR] OpenAI API key needs "api.responses.write" scope')
+      console.log('📝 [CV EVALUATOR] Current evaluation is simulated data')
+    } else {
+      console.log('✅ [CV EVALUATOR] Real AI evaluation completed successfully')
+    }
 
     // Save evaluation to database if applicationId provided
     if (applicationId) {

@@ -199,6 +199,12 @@ export async function POST(request: NextRequest) {
                     passThreshold
                   )
 
+                  console.log('[Resume Parse] ✅ CV Evaluation completed:', {
+                    score: evaluation.overall.score_percent,
+                    qualified: evaluation.overall.qualified,
+                    reason: evaluation.overall.reason_summary
+                  })
+
                   // Save evaluation results to applications (mirror evaluate-cv route)
                   try {
                     const checkCols = await (DatabaseService as any)["query"]?.call(
@@ -218,7 +224,9 @@ export async function POST(request: NextRequest) {
 
                       if (cols.has('qualification_score')) {
                         updates.push(`qualification_score = $${p++}`)
-                        params.push(Math.round(evaluation.overall.score_percent))
+                        const scoreToSave = Math.round(evaluation.overall.score_percent)
+                        params.push(scoreToSave)
+                        console.log('[Resume Parse] 💾 Saving qualification_score:', scoreToSave)
                       }
                       if (cols.has('is_qualified')) {
                         updates.push(`is_qualified = $${p++}`)
@@ -342,6 +350,17 @@ export async function POST(request: NextRequest) {
     // Record CV parsing usage for billing
     if (companyIdForBilling && jobIdForBilling && parsed.rawText) {
       try {
+        console.log('\n' + '='.repeat(60))
+        console.log('💰 [CV PARSING] Starting billing tracking...')
+        console.log('📋 Company ID:', companyIdForBilling)
+        console.log('💼 Job ID:', jobIdForBilling)
+        console.log('👤 Candidate ID:', candidateId || 'N/A')
+        console.log('📄 File Size:', Math.round(file.size / 1024), 'KB')
+        console.log('✅ Parse Successful: Yes')
+        console.log('📊 Success Rate:', (parsed.skills && parsed.skills.length > 0 ? 95 : 80) + '%')
+        console.log('📝 Resume Text Length:', parsed.rawText.length, 'characters')
+        console.log('🔍 Skills Found:', parsed.skills?.length || 0)
+
         await DatabaseService.recordCVParsingUsage({
           companyId: companyIdForBilling,
           jobId: jobIdForBilling,
@@ -350,9 +369,13 @@ export async function POST(request: NextRequest) {
           parseSuccessful: true,
           successRate: parsed.skills && parsed.skills.length > 0 ? 95 : 80
         })
-        console.log('[Resume Parse] ✅ Billing tracked: CV parsing usage recorded')
+
+        console.log('🎉 [CV PARSING] Billing tracking completed successfully!')
+        console.log('='.repeat(60) + '\n')
       } catch (billingErr) {
-        console.error('[Resume Parse] ⚠️ Failed to record billing usage:', billingErr)
+        console.error('❌ [CV PARSING] ERROR: Failed to record billing usage:')
+        console.error('🔥 Error Details:', billingErr)
+        console.error('⚠️  Billing tracking failed, but CV parsing succeeded')
         // Non-fatal, don't block the response
       }
     }

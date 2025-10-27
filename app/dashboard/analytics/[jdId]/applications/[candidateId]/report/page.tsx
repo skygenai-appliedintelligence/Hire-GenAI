@@ -230,7 +230,7 @@ export default function CandidateReportPage() {
     ? (evaluation!.overallScore as number)
     : (typeof dbScore === 'number' ? dbScore : null)
   // Resume/Qualification score must come from DB qualification_score
-  const resumeScore = typeof dbScore === 'number' ? dbScore : 0
+  const resumeScore = typeof dbScore === 'number' ? dbScore : (qualificationDetails?.overall?.score_percent || 0)
   // Display overall score from evaluation: always show out of 100
   const overallScoreDisplay = (() => {
     if (overallScore === null || overallScore === undefined || isNaN(overallScore as any)) return "--"
