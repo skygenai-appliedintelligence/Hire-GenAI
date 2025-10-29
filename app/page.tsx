@@ -133,9 +133,11 @@ export default function HomePage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button className="sr-button-dark">Explore the Benefits</Button>
-                <Button className="sr-button-secondary" onClick={() => setShowLoginModal(true)}>
-                  <Play className="w-4 h-4 mr-2" />
-                  Try Demo
+                <Button className="sr-button-secondary" asChild>
+                  <Link href="/demo-en">
+                    <Play className="w-4 h-4 mr-2" />
+                    Try Demo
+                  </Link>
                 </Button>
               </div>
             </div>
