@@ -299,7 +299,7 @@ export default function HomePage() {
               <div className="text-sm text-slate-500 mt-1">with AI precision</div>
             </div>
             <div>
-              <div className="text-5xl font-bold sr-text-gradient mb-2">500+</div>
+              <div className="text-5xl font-bold sr-text-gradient mb-2">500+</</div>
               <div className="text-slate-600 font-medium">Companies</div>
               <div className="text-sm text-slate-500 mt-1">trust our platform</div>
             </div>
