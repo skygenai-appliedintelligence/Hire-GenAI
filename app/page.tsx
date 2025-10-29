@@ -133,9 +133,11 @@ export default function HomePage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button className="sr-button-dark">Explore the Benefits</Button>
-                <Button className="sr-button-secondary" onClick={() => setShowLoginModal(true)}>
-                  <Play className="w-4 h-4 mr-2" />
-                  Try Demo
+                <Button className="sr-button-secondary" asChild>
+                  <Link href="/demo-en">
+                    <Play className="w-4 h-4 mr-2" />
+                    Try Demo
+                  </Link>
                 </Button>
               </div>
             </div>
@@ -297,7 +299,7 @@ export default function HomePage() {
               <div className="text-sm text-slate-500 mt-1">with AI precision</div>
             </div>
             <div>
-              <div className="text-5xl font-bold sr-text-gradient mb-2">500+</div>
+              <div className="text-5xl font-bold sr-text-gradient mb-2">500+</</div>
               <div className="text-slate-600 font-medium">Companies</div>
               <div className="text-sm text-slate-500 mt-1">trust our platform</div>
             </div>
