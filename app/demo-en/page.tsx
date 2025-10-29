@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 // Screen identifiers
 const SCREENS = ["job", "candidate", "interview", "assessment"] as const;
@@ -98,6 +98,15 @@ export default function DemoEnPage() {
   // Assessment state
   const [scores, setScores] = useState(initialScores);
   const [generalNotes, setGeneralNotes] = useState(initialNotes);
+
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+    const timer = window.setTimeout(() => setInitialLoading(false), 700);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const questionPlan = useMemo(
     () => buildQuestionPlan(jobTitle, jobDescription, resumeText),
@@ -489,8 +498,25 @@ export default function DemoEnPage() {
     if (next === "interview") resetInterview();
   }
 
+  if (!hydrated) {
+    return (
+      <div className="page-wrap page-wrap--loading">
+        <div className="initial-loading">
+          <div className="initial-loading__spinner" />
+          <p className="initial-loading__text">Preparing demo experience…</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="page-wrap">
+    <div className={`page-wrap ${initialLoading ? "page-wrap--loading" : ""}`}>
+      {initialLoading && (
+        <div className="initial-loading">
+          <div className="initial-loading__spinner" />
+          <p className="initial-loading__text">Preparing demo experience…</p>
+        </div>
+      )}
       <div className="bg-ornament bg-ornament-1" />
       <div className="bg-ornament bg-ornament-2" />
       <div className="content-shell">
@@ -830,6 +856,51 @@ export default function DemoEnPage() {
           min-height: 100vh;
           padding: 0;
           background: #ffffff;
+        }
+        .page-wrap--loading .content-shell {
+          opacity: 0;
+        }
+        .page-wrap--loading .content-shell,
+        .page-wrap--loading .progress-bar,
+        .page-wrap--loading .app-header,
+        .page-wrap--loading .screen,
+        .page-wrap--loading .assessment-container {
+          pointer-events: none;
+          user-select: none;
+        }
+        .initial-loading {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: rgba(248, 250, 252, 0.92);
+          z-index: 50;
+          backdrop-filter: blur(6px);
+        }
+        .initial-loading__spinner {
+          width: 56px;
+          height: 56px;
+          border-radius: 50%;
+          border: 4px solid rgba(16, 185, 129, 0.25);
+          border-top-color: #10b981;
+          animation: spin 0.9s linear infinite;
+          margin-bottom: 18px;
+        }
+        .initial-loading__text {
+          font-size: 16px;
+          color: #047857;
+          font-weight: 600;
+          letter-spacing: 0.02em;
+        }
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
         }
         .bg-ornament {
           display: none;
