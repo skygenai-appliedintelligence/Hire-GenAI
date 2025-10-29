@@ -1,0 +1,344 @@
+// Copy this entire content to: app/demo-en/page.tsx
+
+"use client";
+
+import { useMemo, useRef, useState } from "react";
+
+const SCREENS = ["job", "candidate", "interview", "assessment"] as const;
+
+export default function DemoEnPage() {
+  const [screen, setScreen] = useState<(typeof SCREENS)[number]>("job");
+  const [jobTitle, setJobTitle] = useState("SEO Specialist");
+  const [jobDescription, setJobDescription] = useState(
+    "Key Responsibilities:\n- Conduct keyword research and analysis.\n- Optimize website content and landing pages for SEO.\n- Monitor and analyze SEO performance metrics.\n- Stay up-to-date with the latest SEO trends and algorithm changes."
+  );
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [resumeFileName, setResumeFileName] = useState<string>("");
+  const [resumeText, setResumeText] = useState<string>("");
+
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const [pc, setPc] = useState<RTCPeerConnection | null>(null);
+  const [dc, setDc] = useState<RTCDataChannel | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [running, setRunning] = useState(false);
+
+  const [transcript, setTranscript] = useState<string[]>([]);
+  const questionElRef = useRef<HTMLDivElement | null>(null);
+  const currentBufferRef = useRef<string>("");
+
+  const [scores] = useState({
+    technical: 7,
+    communication: 8,
+    problemSolving: 7,
+    leadership: 6,
+    cultural: 8,
+    conduct: 8,
+  });
+  const [generalNotes] = useState(
+    "Based on the interview evaluation, here are the key observations:\n\n• Strong communication skills and professional conduct\n• Good understanding of SEO fundamentals\n• Shows enthusiasm and cultural alignment\n• Areas for growth in advanced technical skills"
+  );
+
+  const totalScore = useMemo(() => {
+    const vals = Object.values(scores);
+    if (!vals.length) return 0;
+    return Math.round((vals.reduce((a, b) => a + b, 0) * 10) / vals.length);
+  }, [scores]);
+
+  function appendTranscript(line: string) {
+    setTranscript((prev) => [...prev, line]);
+  }
+
+  function handleResume(file: File) {
+    setResumeFileName(file.name);
+    if (file.type?.startsWith("text")) {
+      const reader = new FileReader();
+      reader.onload = (e) => setResumeText(String(e.target?.result || ""));
+      reader.readAsText(file);
+    } else {
+      setResumeText("");
+    }
+  }
+
+  async function startSession() {
+    setRunning(true);
+    try {
+      const resp = await fetch("/api/azure/session", { method: "POST" });
+      if (!resp.ok) throw new Error("Failed to create session");
+      const data = await resp.json();
+      const clientSecret: string | undefined = data?.client_secret?.value;
+      if (!clientSecret) throw new Error("No client_secret returned");
+
+      const peer = new RTCPeerConnection();
+      setPc(peer);
+
+      const channel = peer.createDataChannel("realtime-channel");
+      setDc(channel);
+
+      channel.onopen = () => console.log("Data channel open");
+      channel.onmessage = (event) => {
+        try {
+          const obj = JSON.parse(event.data);
+          const type = String(obj?.type || "");
+
+          const delta = extractEventText(obj);
+          if (type.includes(".delta") || type.includes("content_part") || type.includes("audio_transcript")) {
+            if (delta?.trim()) {
+              currentBufferRef.current += delta;
+              if (questionElRef.current) {
+                const content = questionElRef.current.querySelector(".message-content") as HTMLDivElement | null;
+                if (content) content.textContent = currentBufferRef.current;
+              }
+            }
+            return;
+          }
+
+          if (
+            type.endsWith(".done") ||
+            type === "response" ||
+            type === "response.output_text" ||
+            type === "response.done" ||
+            type.includes("output_item")
+          ) {
+            const finalText = delta || currentBufferRef.current;
+            if (finalText?.trim()) {
+              if (questionElRef.current) {
+                const content = questionElRef.current.querySelector(".message-content") as HTMLDivElement | null;
+                if (content) content.textContent = finalText;
+              }
+              const trimmed = String(finalText).trim();
+              const last = transcript[transcript.length - 1];
+              if (!last || !last.endsWith(trimmed)) {
+                appendTranscript(`AI: ${trimmed}`);
+              }
+            }
+            currentBufferRef.current = "";
+            return;
+          }
+
+          if (delta?.trim()) {
+            if (questionElRef.current) {
+              const content = questionElRef.current.querySelector(".message-content") as HTMLDivElement | null;
+              if (content) content.textContent = delta;
+            }
+            appendTranscript(`AI: ${String(delta)}`);
+            currentBufferRef.current = "";
+            return;
+          }
+        } catch {
+          const text = String(event.data);
+          if (questionElRef.current) {
+            const content = questionElRef.current.querySelector(".message-content") as HTMLDivElement | null;
+            if (content) content.textContent = text;
+          }
+          appendTranscript(`AI: ${text}`);
+          currentBufferRef.current = "";
+        }
+      };
+
+      peer.ontrack = (event) => {
+        const stream = event.streams[0];
+        if (!stream) return;
+        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = stream;
+        if (remoteAudioRef.current) remoteAudioRef.current.srcObject = stream;
+      };
+
+      const local = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      setLocalStream(local);
+      if (localVideoRef.current) localVideoRef.current.srcObject = local;
+      local.getTracks().forEach((t) => peer.addTrack(t, local));
+
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+
+      const rtcUrl = process.env.NEXT_PUBLIC_AZURE_REALTIME_RTC_URL!;
+      const model = process.env.NEXT_PUBLIC_AZURE_REALTIME_DEPLOYMENT!;
+
+      const sdpResp = await fetch(`${rtcUrl}?model=${encodeURIComponent(model)}`, {
+        method: "POST",
+        body: offer.sdp!,
+        headers: {
+          Authorization: `Bearer ${clientSecret}`,
+          "Content-Type": "application/sdp",
+        },
+      });
+      const answer = { type: "answer" as const, sdp: await sdpResp.text() };
+      await peer.setRemoteDescription(answer);
+
+      setScreen("interview");
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message || "Failed to start interview");
+      setRunning(false);
+    }
+  }
+
+  function stopSession() {
+    try { dc?.close(); } catch {}
+    try { pc?.close(); } catch {}
+    if (localStream) {
+      localStream.getTracks().forEach((t) => t.stop());
+    }
+    if (localVideoRef.current) localVideoRef.current.srcObject = null;
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
+    setDc(null);
+    setPc(null);
+    setLocalStream(null);
+    setRunning(false);
+    setScreen("assessment");
+  }
+
+  async function exportPdf() {
+    try {
+      const { jsPDF } = await import("jspdf");
+      const doc = new jsPDF("p", "pt", "a4");
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 40;
+      const contentWidth = pageWidth - margin * 2;
+      let y = margin;
+
+      const addTitle = (txt: string) => {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(18);
+        doc.text(txt, margin, y);
+        y += 28;
+      };
+      const addText = (txt: string, fs = 12) => {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(fs);
+        const lines = doc.splitTextToSize(txt, contentWidth);
+        doc.text(lines, margin, y);
+        y += lines.length * (fs * 1.2) + 10;
+      };
+
+      addTitle("AI Recruiter - Interview Report");
+      addText(`Report Generated: ${new Date().toLocaleString()}`);
+
+      addTitle("Job Details");
+      addText(`Position: ${jobTitle || "-"}`);
+      addText("Job Description:");
+      addText(jobDescription || "-");
+
+      addTitle("Candidate Information");
+      const candidateName = `${firstName} ${lastName}`.trim() || "-";
+      addText(`Name: ${candidateName}`);
+      if (resumeFileName) addText(`Resume: ${resumeFileName}`);
+      if (resumeText) { addText("Resume Content:"); addText(resumeText); }
+
+      addTitle("Evaluation Summary");
+      addText(generalNotes);
+
+      const blocks: Array<[string, number]> = [
+        ["Technical Expertise", scores.technical],
+        ["Communication Skills", scores.communication],
+        ["Problem Solving", scores.problemSolving],
+        ["Leadership Potential", scores.leadership],
+        ["Cultural Fit", scores.cultural],
+        ["Professional Conduct", scores.conduct],
+      ];
+      for (const [label, val] of blocks) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.text(`${label} - ${val}/10`, margin, y);
+        y += 20;
+      }
+
+      doc.addPage();
+      y = margin;
+      addTitle("Interview Transcript");
+      for (const line of transcript) {
+        addText(line, 11);
+      }
+
+      const safeName = (firstName || lastName ? `${firstName}_${lastName}` : "candidate").replace(/\s+/g, "_");
+      doc.save(`${safeName}_interview_report.pdf`);
+    } catch (error) {
+      console.error("PDF export error:", error);
+      alert("Failed to export PDF. Please try again.");
+    }
+  }
+
+  function extractEventText(obj: any): string {
+    if (!obj) return "";
+    if (typeof obj === "string") return obj;
+    if (obj.delta) return obj.delta;
+    if (obj.output_text) return obj.output_text;
+    if (obj.transcript) return obj.transcript;
+    if (obj.item?.content) {
+      const c = obj.item.content;
+      if (typeof c === "string") return c;
+      if (Array.isArray(c)) return c.map((x) => x?.text || x?.content || "").join(" ");
+      if (c?.text) return c.text;
+    }
+    if (obj.item?.text) return obj.item.text;
+    try {
+      const found = JSON.stringify(obj).match(/"text":"([^"]+)"/g);
+      if (found) return found.map((s) => s.replace(/\"text\":\"|\"/g, "")).join(" ");
+    } catch {}
+    return "";
+  }
+
+  const canNextFromJob = jobTitle.trim().length > 0;
+  const candidateName = useMemo(() => {
+    const n = `${firstName} ${lastName}`.trim();
+    return n || "Candidate";
+  }, [firstName, lastName]);
+
+  return (
+    <div className="page-wrap">
+      <div className="progress-bar">
+        {SCREENS.map((s, i) => {
+          const idx = i + 1;
+          const current = SCREENS.indexOf(screen) + 1;
+          const cls = idx === current ? "active" : idx < current ? "completed" : "";
+          return (
+            <div key={s} className={`progress-step ${cls}`} data-step={idx}>
+              <div className="step-number">{idx}</div>
+              <div className="step-label">
+                {s === "job" && <>Job Details<br/>(as a recruiter)</>}
+                {s === "candidate" && <>Candidate Details<br/>(as a candidate)</>}
+                {s === "interview" && <>AI Interview<br/>(as a candidate)</>}
+                {s === "assessment" && <>Assessment Report<br/>(as a recruiter)</>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="app-header"><h1>Hello HireGenAI</h1></div>
+
+      {/* SCREENS - See DEMO_PAGE_SCREENS.txt for the complete JSX */}
+      {screen === "job" && (
+        <section className="screen">
+          <div className="card">
+            <h2>Job Details</h2>
+            <div className="form-group">
+              <label className="input-label">Job Title</label>
+              <input className="form-input" value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="input-label">Job Description</label>
+              <textarea className="form-input" rows={8} value={jobDescription} onChange={(e) => setJobDescription(e.target.value)} />
+            </div>
+            <div className="button-row">
+              <button className="btn btn-next" disabled={!canNextFromJob} onClick={() => setScreen("candidate")}>Next</button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* See full file in GitHub Gist or documentation */}
+      
+      <style jsx>{`
+        /* Complete styles in DEMO_PAGE_STYLES.txt */
+        body { background: #f8f9fa; }
+        .page-wrap { min-height: 100vh; padding: 20px; color: #333; }
+        /* ... rest of styles ... */
+      `}</style>
+    </div>
+  );
+}
