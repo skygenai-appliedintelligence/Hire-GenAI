@@ -34,6 +34,7 @@ function buildQuestionPlan(jobTitle: string, jobDescription: string, resume: str
   const sentences = jobDescription
     .split(/\r?\n|•|\u2022|\-/)
     .map((line) => line.replace(/^[^a-zA-Z0-9]+/, "").trim())
+    .map((line) => (line.endsWith(".") ? line : line ? `${line}.` : line))
     .filter((line) => line.length > 0);
   const unique: string[] = [];
   sentences.forEach((line) => {
