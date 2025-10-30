@@ -6,10 +6,17 @@ export type OpenAIProject = {
 
 export async function createOpenAIProject(name: string, description?: string): Promise<OpenAIProject | null> {
   try {
-    const apiKey = process.env.OPENAI_API_KEY
+    // Use admin key for project creation (separate from regular API key)
+    const adminKey = process.env.OPENAI_ADMIN_KEY
     const orgId = process.env.OPENAI_ORG_ID
-    if (!apiKey) {
-      console.warn('[OpenAI Projects] Skipping project creation: OPENAI_API_KEY not set')
+    
+    if (!adminKey) {
+      console.warn('[OpenAI Projects] Skipping project creation: OPENAI_ADMIN_KEY not set')
+      return null
+    }
+    
+    if (!orgId) {
+      console.warn('[OpenAI Projects] Skipping project creation: OPENAI_ORG_ID not set')
       return null
     }
 
@@ -19,14 +26,20 @@ export async function createOpenAIProject(name: string, description?: string): P
       return null
     }
 
-    const res = await fetch('https://api.openai.com/v1/projects', {
+    const cleanedOrgId = orgId.trim()
+    const endpoint = `https://api.openai.com/v1/organizations/${cleanedOrgId}/projects`
+
+    console.log(`[OpenAI Projects] Creating project: ${projectName}`)
+    console.log(`[OpenAI Projects] API endpoint: ${endpoint}`)
+    console.log(`[OpenAI Projects] Using admin key prefix: ${adminKey.substring(0, 12)}…`)
+    console.log(`[OpenAI Projects] Organization ID: ${cleanedOrgId}`)
+
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${adminKey}`,
         'Content-Type': 'application/json',
-        // Projects API requires beta header for now
-        'OpenAI-Beta': 'projects=v2',
-        ...(orgId ? { 'OpenAI-Organization': orgId } : {}),
+        'OpenAI-Organization': cleanedOrgId,
       },
       body: JSON.stringify({
         name: projectName,
@@ -34,10 +47,17 @@ export async function createOpenAIProject(name: string, description?: string): P
       }),
     })
 
+    console.log(`[OpenAI Projects] Response status: ${res.status}`)
+
     if (!res.ok) {
-      let errText: any
-      try { errText = await res.json() } catch { errText = await res.text() }
-      console.warn('[OpenAI Projects] Failed to create project:', res.status, errText)
+      const errText = await res.text()
+      let errData: any
+      try {
+        errData = JSON.parse(errText)
+      } catch {
+        errData = errText
+      }
+      console.warn('[OpenAI Projects] Failed to create project:', res.status, errData)
       return null
     }
 

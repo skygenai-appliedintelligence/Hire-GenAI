@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { createOpenAIProject } from './openai-projects'
 
 // Database service for authentication operations using raw SQL
 export class DatabaseService {
@@ -107,6 +108,22 @@ export class DatabaseService {
       finalCompanyName = `${signupData.companyName} (${domain.split('.')[0]}-${timestamp})`
     }
 
+    // Create OpenAI project for the company
+    let openaiProjectId: string | null = null
+    try {
+      const projectDescription = `Project for ${finalCompanyName}${signupData.industry ? ` - ${signupData.industry}` : ''}`
+      const project = await createOpenAIProject(finalCompanyName, projectDescription)
+      if (project?.id) {
+        openaiProjectId = project.id
+        console.log(`[Company Signup] ✅ OpenAI project created: ${project.id} for ${finalCompanyName}`)
+      } else {
+        console.warn(`[Company Signup] ⚠️ OpenAI project creation skipped for ${finalCompanyName}`)
+      }
+    } catch (error) {
+      console.error(`[Company Signup] ❌ Failed to create OpenAI project for ${finalCompanyName}:`, error)
+      // Continue with company creation even if OpenAI project fails
+    }
+
     const insertCompanyQuery = `
       INSERT INTO companies (
         name, 
@@ -122,9 +139,10 @@ export class DatabaseService {
         legal_company_name,
         tax_id_ein,
         business_registration_number,
+        openai_project_id,
         created_at
       )
-      VALUES ($1, 'active', false, $2, $3, $4, $5::company_size, $6, $7, $8, $9, $10, $11, NOW())
+      VALUES ($1, 'active', false, $2, $3, $4, $5::company_size, $6, $7, $8, $9, $10, $11, $12, NOW())
       RETURNING *
     `
     const newCompany = await this.query(insertCompanyQuery, [
@@ -139,6 +157,7 @@ export class DatabaseService {
       signupData.legalCompanyName || null,
       signupData.taxId || null,
       signupData.registrationNumber || null,
+      openaiProjectId,
     ]) as any[]
 
     if (newCompany.length === 0) {
@@ -3508,5 +3527,71 @@ export class DatabaseService {
     ]) as any[]
 
     return result[0]
+  }
+
+  // Update company's OpenAI project ID
+  static async updateCompanyOpenAIProject(companyId: string, projectId: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      UPDATE companies 
+      SET openai_project_id = $1,
+          updated_at = NOW()
+      WHERE id = $2::uuid
+      RETURNING *
+    `
+
+    const result = await this.query(query, [projectId, companyId]) as any[]
+    return result[0]
+  }
+
+  // Get company's OpenAI project ID
+  static async getCompanyOpenAIProject(companyId: string): Promise<string | null> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      SELECT openai_project_id 
+      FROM companies 
+      WHERE id = $1::uuid
+    `
+
+    const result = await this.query(query, [companyId]) as any[]
+    return result[0]?.openai_project_id || null
+  }
+
+  // Ensure openai_project_id column exists
+  static async ensureOpenAIProjectIdColumn() {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      ALTER TABLE companies 
+      ADD COLUMN IF NOT EXISTS openai_project_id TEXT
+    `
+
+    await this.query(query, [])
+  }
+
+  // Get all companies without OpenAI projects
+  static async getCompaniesWithoutProjects(limit: number = 100) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      SELECT id, name, industry, description_md
+      FROM companies 
+      WHERE openai_project_id IS NULL
+      ORDER BY created_at DESC
+      LIMIT $1
+    `
+
+    const result = await this.query(query, [limit]) as any[]
+    return result
   }
 }
