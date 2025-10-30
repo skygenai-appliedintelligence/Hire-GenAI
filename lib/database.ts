@@ -109,15 +109,20 @@ export class DatabaseService {
     }
 
     // Create OpenAI project for the company
+    console.log(`[Company Signup] 🔨 Attempting to create OpenAI project for: ${finalCompanyName}`)
     let openaiProjectId: string | null = null
     try {
       const projectDescription = `Project for ${finalCompanyName}${signupData.industry ? ` - ${signupData.industry}` : ''}`
+      console.log(`[Company Signup] 📝 Project description: ${projectDescription}`)
+      
       const project = await createOpenAIProject(finalCompanyName, projectDescription)
+      console.log(`[Company Signup] 📦 Received project response:`, project)
+      
       if (project?.id) {
         openaiProjectId = project.id
         console.log(`[Company Signup] ✅ OpenAI project created: ${project.id} for ${finalCompanyName}`)
       } else {
-        console.warn(`[Company Signup] ⚠️ OpenAI project creation skipped for ${finalCompanyName}`)
+        console.warn(`[Company Signup] ⚠️ OpenAI project creation returned null for ${finalCompanyName}`)
       }
     } catch (error) {
       console.error(`[Company Signup] ❌ Failed to create OpenAI project for ${finalCompanyName}:`, error)

@@ -6,17 +6,12 @@ export type OpenAIProject = {
 
 export async function createOpenAIProject(name: string, description?: string): Promise<OpenAIProject | null> {
   try {
-    // Use admin key for project creation (separate from regular API key)
-    const adminKey = process.env.OPENAI_ADMIN_KEY
-    const orgId = process.env.OPENAI_ORG_ID
+    // Use OPENAI_ADMIN_KEY for project creation (falls back to OPENAI_API_KEY)
+    const apiKey = process.env.OPENAI_ADMIN_KEY || process.env.OPENAI_API_KEY
+    const orgId = process.env.OPENAI_ORG_ID?.trim()
     
-    if (!adminKey) {
-      console.warn('[OpenAI Projects] Skipping project creation: OPENAI_ADMIN_KEY not set')
-      return null
-    }
-    
-    if (!orgId) {
-      console.warn('[OpenAI Projects] Skipping project creation: OPENAI_ORG_ID not set')
+    if (!apiKey) {
+      console.warn('[OpenAI Projects] Skipping project creation: OPENAI_ADMIN_KEY or OPENAI_API_KEY not set')
       return null
     }
 
@@ -26,20 +21,25 @@ export async function createOpenAIProject(name: string, description?: string): P
       return null
     }
 
-    const cleanedOrgId = orgId.trim()
-    const endpoint = `https://api.openai.com/v1/organizations/${cleanedOrgId}/projects`
+    if (!orgId) {
+      console.warn('[OpenAI Projects] Skipping project creation: OPENAI_ORG_ID not set')
+      return null
+    }
+
+    const endpoint = `https://api.openai.com/v1/organization/projects`
 
     console.log(`[OpenAI Projects] Creating project: ${projectName}`)
     console.log(`[OpenAI Projects] API endpoint: ${endpoint}`)
-    console.log(`[OpenAI Projects] Using admin key prefix: ${adminKey.substring(0, 12)}…`)
-    console.log(`[OpenAI Projects] Organization ID: ${cleanedOrgId}`)
+    console.log(`[OpenAI Projects] Using admin key prefix: ${apiKey.substring(0, 15)}…`)
+    console.log(`[OpenAI Projects] Organization ID: ${orgId}`)
 
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${adminKey}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'OpenAI-Organization': cleanedOrgId,
+        'OpenAI-Beta': 'projects=v2',
+        ...(orgId ? { 'OpenAI-Organization': orgId } : {}),
       },
       body: JSON.stringify({
         name: projectName,
@@ -57,11 +57,12 @@ export async function createOpenAIProject(name: string, description?: string): P
       } catch {
         errData = errText
       }
-      console.warn('[OpenAI Projects] Failed to create project:', res.status, errData)
+      console.error('[OpenAI Projects] ❌ Failed to create project:', res.status, errData)
       return null
     }
 
     const data = await res.json()
+    console.log('[OpenAI Projects] ✅ Project created successfully:', data)
     return { id: data.id, name: data.name, created_at: data.created_at }
   } catch (e) {
     console.warn('[OpenAI Projects] Error creating project:', e)
