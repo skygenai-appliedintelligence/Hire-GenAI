@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import { createOpenAIProject } from './openai-projects'
+import { createServiceAccount } from './openai-service-accounts'
 
 // Database service for authentication operations using raw SQL
 export class DatabaseService {
@@ -108,9 +109,11 @@ export class DatabaseService {
       finalCompanyName = `${signupData.companyName} (${domain.split('.')[0]}-${timestamp})`
     }
 
-    // Create OpenAI project for the company
+    // Create OpenAI project and service account for the company
     console.log(`[Company Signup] 🔨 Attempting to create OpenAI project for: ${finalCompanyName}`)
     let openaiProjectId: string | null = null
+    let openaiServiceAccountKey: string | null = null
+    
     try {
       const projectDescription = `Project for ${finalCompanyName}${signupData.industry ? ` - ${signupData.industry}` : ''}`
       console.log(`[Company Signup] 📝 Project description: ${projectDescription}`)
@@ -121,11 +124,23 @@ export class DatabaseService {
       if (project?.id) {
         openaiProjectId = project.id
         console.log(`[Company Signup] ✅ OpenAI project created: ${project.id} for ${finalCompanyName}`)
+        
+        // Create service account for the project
+        console.log(`[Company Signup] 🔑 Creating service account for project: ${project.id}`)
+        const serviceAccount = await createServiceAccount(project.id)
+        console.log(`[Company Signup] 📦 Received service account response:`, serviceAccount)
+        
+        if (serviceAccount?.api_key) {
+          openaiServiceAccountKey = serviceAccount.api_key
+          console.log(`[Company Signup] ✅ Service account created for project: ${project.id}`)
+        } else {
+          console.warn(`[Company Signup] ⚠️ Service account creation returned null for project: ${project.id}`)
+        }
       } else {
         console.warn(`[Company Signup] ⚠️ OpenAI project creation returned null for ${finalCompanyName}`)
       }
     } catch (error) {
-      console.error(`[Company Signup] ❌ Failed to create OpenAI project for ${finalCompanyName}:`, error)
+      console.error(`[Company Signup] ❌ Failed to create OpenAI project/service account for ${finalCompanyName}:`, error)
       // Continue with company creation even if OpenAI project fails
     }
 
@@ -145,9 +160,10 @@ export class DatabaseService {
         tax_id_ein,
         business_registration_number,
         openai_project_id,
+        openai_service_account_key,
         created_at
       )
-      VALUES ($1, 'active', false, $2, $3, $4, $5::company_size, $6, $7, $8, $9, $10, $11, $12, NOW())
+      VALUES ($1, 'active', false, $2, $3, $4, $5::company_size, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
       RETURNING *
     `
     const newCompany = await this.query(insertCompanyQuery, [
@@ -163,6 +179,7 @@ export class DatabaseService {
       signupData.taxId || null,
       signupData.registrationNumber || null,
       openaiProjectId,
+      openaiServiceAccountKey,
     ]) as any[]
 
     if (newCompany.length === 0) {
@@ -3550,6 +3567,22 @@ export class DatabaseService {
 
     const result = await this.query(query, [projectId, companyId]) as any[]
     return result[0]
+  }
+
+  // Get company by ID
+  static async getCompanyById(companyId: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      SELECT id, name, openai_project_id, openai_service_account_key
+      FROM companies 
+      WHERE id = $1::uuid
+    `
+
+    const result = await this.query(query, [companyId]) as any[]
+    return result[0] || null
   }
 
   // Get company's OpenAI project ID

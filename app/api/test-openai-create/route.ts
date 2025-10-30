@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createOpenAIProject } from '@/lib/openai-projects'
+import { createServiceAccount } from '@/lib/openai-service-accounts'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -50,10 +51,19 @@ export async function GET(request: Request) {
       parsed = text
     }
 
+    // If project creation succeeded, create service account
+    let serviceAccountResponse = null
+    if (response.ok && parsed?.id) {
+      console.log('🧪 [TEST] Creating service account for project:', parsed.id)
+      const serviceAccount = await createServiceAccount(parsed.id)
+      serviceAccountResponse = serviceAccount
+    }
+
     return NextResponse.json({
       success: response.ok,
       status: response.status,
-      response: parsed,
+      project: parsed,
+      serviceAccount: serviceAccountResponse,
       headersUsed: {
         hasOrgHeader: !!orgId,
       },
