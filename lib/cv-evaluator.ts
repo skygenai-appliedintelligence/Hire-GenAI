@@ -1,5 +1,4 @@
 import { openai } from "@ai-sdk/openai"
-import { generateText } from "ai"
 
 const SYSTEM_PROMPT = `You are a fair but moderately lenient CV parser and JD evaluator. Your goal is to identify promising candidates without being overly strict, while ensuring relevance to the job description.
 - Extract structured facts from the resume.
@@ -10,35 +9,6 @@ const SYSTEM_PROMPT = `You are a fair but moderately lenient CV parser and JD ev
 - Cite evidence by quoting short spans from the resume (max 20 words each).
 - Acknowledge related technologies (e.g., React vs. Vue, AWS vs. GCP) but weigh direct matches higher.
 - Be realistic: a full-stack developer is not an RPA developer, but they have some transferable skills. Your scoring should reflect this nuance.`
-
-// Check OpenAI API status on module load
-let openAIStatusChecked = false
-async function checkOpenAIStatus() {
-  if (openAIStatusChecked) return
-  openAIStatusChecked = true
-
-  try {
-    await generateText({
-      model: openai("gpt-3.5-turbo"),
-      prompt: "Test",
-      system: "Test",
-      temperature: 0.1,
-    })
-    console.log('✅ [CV EVALUATOR] OpenAI API key has proper permissions - Real AI evaluation available')
-  } catch (error: any) {
-    const errorMessage = error?.message || String(error)
-    if (errorMessage.includes('insufficient permissions') ||
-        errorMessage.includes('Missing scopes') ||
-        errorMessage.includes('api.responses.write')) {
-      console.log('🔐 [CV EVALUATOR] OpenAI API key lacks permissions (api.responses.write)')
-      console.log('🏷️  [CV EVALUATOR] Using fallback mock evaluation system')
-      console.log('🔧 [CV EVALUATOR] To fix: Go to OpenAI Platform → API Keys → Enable all scopes')
-    } else {
-      console.log('❌ [CV EVALUATOR] OpenAI API connection failed:', errorMessage)
-      console.log('🏷️  [CV EVALUATOR] Using fallback mock evaluation system')
-    }
-  }
-}
 
 interface CVEvaluationResult {
   overall: {
@@ -82,11 +52,10 @@ export class CVEvaluator {
   static async evaluateCandidate(
     resumeText: string,
     jobDescription: string,
-    passThreshold: number = 40
+    passThreshold: number = 40,
+    companyId?: string,
+    openaiClient?: any
   ): Promise<CVEvaluationResult> {
-    // Check OpenAI API status on first use
-    await checkOpenAIStatus()
-
     // --- Deterministic pre-filters to avoid obvious false positives ---
     const text = (resumeText || '').toLowerCase()
     const jd = (jobDescription || '').toLowerCase()
