@@ -83,9 +83,15 @@ export class OpenAIUsageService {
     endDate: string,
     apiKey?: string
   ): Promise<OpenAIUsageData> {
-    const key = apiKey || process.env.OPENAI_API_KEY
+    // Accept either explicit apiKey, OPENAI_API_KEY, or OPENAI_ADMIN_KEY
+    const key = apiKey || process.env.OPENAI_API_KEY || process.env.OPENAI_ADMIN_KEY
 
     if (!key) {
+      const hasEnvPrimary = Boolean(process.env.OPENAI_API_KEY)
+      const hasEnvAdmin = Boolean(process.env.OPENAI_ADMIN_KEY)
+      console.error('[OpenAIUsageService] Admin API key not configured. '
+        + `OPENAI_API_KEY present: ${hasEnvPrimary}, OPENAI_ADMIN_KEY present: ${hasEnvAdmin}. `
+        + 'Set an Admin key (sk-admin-...) in .env.local as OPENAI_API_KEY or OPENAI_ADMIN_KEY.')
       throw new Error('OpenAI API key not configured')
     }
 
@@ -231,8 +237,9 @@ export class OpenAIUsageService {
     startDate: Date,
     endDate: Date
   ): Promise<ProcessedUsageData> {
-    const startDateStr = startDate.toISOString().split('T')[0]
-    const endDateStr = endDate.toISOString().split('T')[0]
+    // Use full ISO strings to preserve the exact time window
+    const startDateStr = startDate.toISOString()
+    const endDateStr = endDate.toISOString()
 
     const rawData = await this.fetchUsageData(startDateStr, endDateStr)
     return this.processUsageData(rawData)

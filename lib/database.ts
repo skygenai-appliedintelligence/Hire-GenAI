@@ -2887,7 +2887,6 @@ export class DatabaseService {
       throw new Error('Database not configured')
     }
 
-    // 🎯 STARTING CV PARSING BILLING CALCULATION
     console.log('\n' + '='.repeat(70))
     console.log('🎯 [CV PARSING] Starting billing calculation...')
     console.log('📋 Company ID:', data.companyId)
@@ -2896,117 +2895,51 @@ export class DatabaseService {
     console.log('📄 File Size:', data.fileSizeKb || 0, 'KB')
     console.log('='.repeat(70))
 
-    // Fetch REAL cost from OpenAI API for the last few minutes
-    let realCost = 0
-    let unitPrice = 0
+    // Use centralized OpenAI Usage Tracker
+    const { OpenAIUsageTracker } = await import('./openai-usage-tracker')
+    const usageResult = await OpenAIUsageTracker.trackCVParsing()
     
-    try {
-      console.log('🔗 [CV PARSING] Attempting to fetch REAL OpenAI costs...')
-      console.log('⏰ Time Range: Last 5 minutes')
-      
-      const { OpenAIUsageService } = await import('./openai-usage-service')
-      const { applyProfitMargin } = await import('./config')
-      
-      // Fetch usage from last 5 minutes to capture this CV parsing
-      const endDate = new Date()
-      const startDate = new Date(endDate.getTime() - 5 * 60 * 1000) // 5 minutes ago
-      
-      console.log('📊 [CV PARSING] Calling OpenAI Usage API...')
-      const openAIUsage = await OpenAIUsageService.getUsageForCustomRange(startDate, endDate)
-      
-      // Get the real cost from OpenAI for CV parsing
-      const openAIBaseCost = openAIUsage.cvParsing?.cost || 0
-      
-      // If OpenAI returned a cost, use it; otherwise fallback to estimation
-      if (openAIBaseCost > 0) {
-        realCost = openAIBaseCost
-        unitPrice = openAIBaseCost
-        console.log('✅ [CV PARSING] SUCCESS: Real OpenAI cost fetched!')
-        console.log('💰 OpenAI Base Cost: $' + openAIBaseCost)
-        console.log('🏷️  Using REAL pricing from OpenAI API')
-      } else {
-        // Fallback: Use GPT-4 estimation (~$0.50 per CV)
-        unitPrice = 0.50
-        realCost = unitPrice
-        console.log('⚠️  [CV PARSING] WARNING: OpenAI cost not available, using fallback estimate')
-        console.log('💰 Estimated Cost: $' + realCost)
-        console.log('🏷️  Using FIXED pricing ($0.50 per CV)')
-      }
-      
-      // Apply profit margin to real cost
-      const { finalCost } = applyProfitMargin(realCost)
-      
-      const query = `
-        INSERT INTO cv_parsing_usage (
-          company_id, job_id, candidate_id, file_id, file_size_kb,
-          parse_successful, unit_price, cost, success_rate, created_at
-        )
-        VALUES (
-          $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5,
-          $6, $7, $8, $9, NOW()
-        )
-        RETURNING *
-      `
+    const profitMarginPercent = parseFloat(process.env.PROFIT_MARGIN_PERCENTAGE || '25')
+    
+    const query = `
+      INSERT INTO cv_parsing_usage (
+        company_id, job_id, candidate_id, file_id, file_size_kb,
+        parse_successful, unit_price, cost, success_rate,
+        openai_base_cost, pricing_source, tokens_used, profit_margin_percent,
+        created_at
+      )
+      VALUES (
+        $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5,
+        $6, $7, $8, $9,
+        $10, $11, $12, $13,
+        NOW()
+      )
+      RETURNING *
+    `
 
-      const result = await this.query(query, [
-        data.companyId,
-        data.jobId,
-        data.candidateId || null,
-        data.fileId || null,
-        data.fileSizeKb || 0,
-        data.parseSuccessful !== false,
-        unitPrice, // Real unit price from OpenAI
-        finalCost, // Real OpenAI cost + profit margin
-        data.successRate || null
-      ]) as any[]
+    const result = await this.query(query, [
+      data.companyId,
+      data.jobId,
+      data.candidateId || null,
+      data.fileId || null,
+      data.fileSizeKb || 0,
+      data.parseSuccessful !== false,
+      usageResult.baseCost, // Keep for backward compatibility
+      usageResult.finalCost, // Final cost with profit margin
+      data.successRate || null,
+      usageResult.baseCost, // Real OpenAI base cost
+      usageResult.source, // 'openai-api' or 'fallback'
+      usageResult.tokens || null, // Tokens used
+      profitMarginPercent // Profit margin percentage
+    ]) as any[]
 
-      console.log('💾 [CV PARSING] Cost stored in database successfully')
-      console.log('💰 Final Cost (with margin): $' + finalCost)
-      console.log('📈 Base Cost: $' + realCost + ' + ' + ((finalCost - realCost) * 100).toFixed(2) + '% margin')
-      console.log('🎉 [CV PARSING] Billing calculation completed successfully!')
-      console.log('='.repeat(70) + '\n')
-      return result[0]
-      
-    } catch (error) {
-      console.error('❌ [CV PARSING] ERROR: Failed to fetch OpenAI cost, using fallback:')
-      console.error('🔥 Error Details:', error)
-      
-      // Fallback: Use GPT-4 estimation
-      const { applyProfitMargin } = await import('./config')
-      const fallbackUnitPrice = 0.50
-      const { finalCost } = applyProfitMargin(fallbackUnitPrice)
-      
-      const query = `
-        INSERT INTO cv_parsing_usage (
-          company_id, job_id, candidate_id, file_id, file_size_kb,
-          parse_successful, unit_price, cost, success_rate, created_at
-        )
-        VALUES (
-          $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5,
-          $6, $7, $8, $9, NOW()
-        )
-        RETURNING *
-      `
-
-      const result = await this.query(query, [
-        data.companyId,
-        data.jobId,
-        data.candidateId || null,
-        data.fileId || null,
-        data.fileSizeKb || 0,
-        data.parseSuccessful !== false,
-        fallbackUnitPrice,
-        finalCost,
-        data.successRate || null
-      ]) as any[]
-
-      console.log('💾 [CV PARSING] Fallback cost stored in database')
-      console.log('💰 Final Cost (fallback): $' + finalCost)
-      console.log('📈 Base Cost: $' + fallbackUnitPrice + ' + ' + ((finalCost - fallbackUnitPrice) * 100).toFixed(2) + '% margin')
-      console.log('⚠️  [CV PARSING] Used fallback pricing due to OpenAI API failure')
-      console.log('='.repeat(70) + '\n')
-      return result[0]
-    }
+    console.log('💾 [CV PARSING] Cost stored in database successfully')
+    console.log('💰 Final Cost (with margin): $' + usageResult.finalCost.toFixed(4))
+    console.log('📈 Base Cost: $' + usageResult.baseCost.toFixed(4))
+    console.log('🏷️  Source: ' + usageResult.source)
+    console.log('🎉 [CV PARSING] Billing calculation completed successfully!')
+    console.log('='.repeat(70) + '\n')
+    return result[0]
   }
 
   // Record question generation usage
@@ -3022,7 +2955,6 @@ export class DatabaseService {
       throw new Error('Database not configured')
     }
 
-    // 🎯 STARTING QUESTION GENERATION BILLING CALCULATION
     console.log('\n' + '='.repeat(70))
     console.log('🎯 [QUESTION GENERATION] Starting billing calculation...')
     console.log('📋 Company ID:', data.companyId)
@@ -3034,29 +2966,23 @@ export class DatabaseService {
     console.log('🧠 Model Used:', data.modelUsed || 'gpt-4')
     console.log('='.repeat(70))
 
-    const { applyProfitMargin } = await import('./config')
+    // Use centralized OpenAI Usage Tracker
+    const { OpenAIUsageTracker } = await import('./openai-usage-tracker')
+    const usageResult = await OpenAIUsageTracker.trackQuestionGeneration()
+    
     const pricing = await this.getCurrentPricing()
     const totalTokens = data.promptTokens + data.completionTokens
-    const baseCost = (totalTokens / 1000) * pricing.question_price_per_1k_tokens
-    
-    // Apply profit margin to get final cost
-    const { finalCost } = applyProfitMargin(baseCost)
-
-    console.log('💰 [QUESTION GENERATION] Cost calculated using real token counts')
-    console.log('💵 Token Price: $' + pricing.question_price_per_1k_tokens + ' per 1K tokens')
-    console.log('🔢 Cost per 1K tokens: $' + (pricing.question_price_per_1k_tokens * 1000).toFixed(6))
-    console.log('📊 Total Cost: $' + baseCost.toFixed(6) + ' (before margin)')
-    console.log('📈 Final Cost (with margin): $' + finalCost.toFixed(4))
-    console.log('🏷️  Using REAL token-based pricing from OpenAI API')
+    const profitMarginPercent = parseFloat(process.env.PROFIT_MARGIN_PERCENTAGE || '25')
 
     const query = `
       INSERT INTO question_generation_usage (
         company_id, job_id, prompt_tokens, completion_tokens,
         total_tokens, question_count, token_price_per_1k, cost,
-        model_used, created_at
+        model_used, openai_base_cost, pricing_source, profit_margin_percent,
+        created_at
       )
       VALUES (
-        $1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, NOW()
+        $1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW()
       )
       RETURNING *
     `
@@ -3069,11 +2995,17 @@ export class DatabaseService {
       totalTokens,
       data.questionCount,
       pricing.question_price_per_1k_tokens,
-      finalCost, // Store final cost with profit margin
-      data.modelUsed || 'gpt-4'
+      usageResult.finalCost, // Final cost with profit margin
+      data.modelUsed || 'gpt-4',
+      usageResult.baseCost, // Real OpenAI base cost
+      usageResult.source, // 'openai-api' or 'fallback'
+      profitMarginPercent // Profit margin percentage
     ]) as any[]
 
     console.log('💾 [QUESTION GENERATION] Cost stored in database successfully')
+    console.log('💰 Final Cost (with margin): $' + usageResult.finalCost.toFixed(4))
+    console.log('📈 Base Cost: $' + usageResult.baseCost.toFixed(4))
+    console.log('🏷️  Source: ' + usageResult.source)
     console.log('🎉 [QUESTION GENERATION] Billing calculation completed successfully!')
     console.log('='.repeat(70) + '\n')
     return result[0]
@@ -3094,7 +3026,6 @@ export class DatabaseService {
       throw new Error('Database not configured')
     }
 
-    // 🎯 STARTING VIDEO INTERVIEW BILLING CALCULATION
     console.log('\n' + '='.repeat(70))
     console.log('🎯 [VIDEO INTERVIEW] Starting billing calculation...')
     console.log('📋 Company ID:', data.companyId)
@@ -3106,124 +3037,55 @@ export class DatabaseService {
     console.log('🎬 Video Quality:', data.videoQuality || 'HD')
     console.log('='.repeat(70))
 
-    // Fetch REAL cost from OpenAI API for the last few minutes
-    let realCost = 0
-    let costPerMinute = 0
+    // Use centralized OpenAI Usage Tracker
+    const { OpenAIUsageTracker } = await import('./openai-usage-tracker')
+    const usageResult = await OpenAIUsageTracker.trackVideoInterview(data.durationMinutes)
     
-    try {
-      console.log('🔗 [VIDEO INTERVIEW] Attempting to fetch REAL OpenAI costs...')
-      console.log('⏰ Time Range: Last 5 minutes')
-      
-      const { OpenAIUsageService } = await import('./openai-usage-service')
-      const { applyProfitMargin } = await import('./config')
-      
-      // Fetch usage from last 5 minutes to capture this interview
-      const endDate = new Date()
-      const startDate = new Date(endDate.getTime() - 5 * 60 * 1000) // 5 minutes ago
-      
-      console.log('📊 [VIDEO INTERVIEW] Calling OpenAI Usage API...')
-      const openAIUsage = await OpenAIUsageService.getUsageForCustomRange(startDate, endDate)
-      
-      // Get the real cost from OpenAI for video/realtime usage
-      const openAIBaseCost = openAIUsage.videoInterview?.cost || 0
-      
-      // If OpenAI returned a cost, use it; otherwise fallback to estimation
-      if (openAIBaseCost > 0) {
-        realCost = openAIBaseCost
-        costPerMinute = openAIBaseCost / data.durationMinutes
-        console.log('✅ [VIDEO INTERVIEW] SUCCESS: Real OpenAI cost fetched!')
-        console.log('💰 OpenAI Base Cost: $' + openAIBaseCost)
-        console.log('⏱️  Cost per Minute: $' + costPerMinute.toFixed(4))
-        console.log('🏷️  Using REAL pricing from OpenAI API')
-      } else {
-        // Fallback: Use Realtime API pricing ($0.06 input + $0.24 output = $0.30/min)
-        costPerMinute = 0.30
-        realCost = data.durationMinutes * costPerMinute
-        console.log('⚠️  [VIDEO INTERVIEW] WARNING: OpenAI cost not available, using fallback estimate')
-        console.log('💰 Estimated Cost: $' + realCost.toFixed(4))
-        console.log('⏱️  Cost per Minute: $' + costPerMinute.toFixed(2))
-        console.log('🏷️  Using FIXED pricing ($0.30 per minute)')
-      }
-      
-      // Apply profit margin to real cost
-      const { finalCost } = applyProfitMargin(realCost)
-      
-      const query = `
-        INSERT INTO video_interview_usage (
-          company_id, job_id, interview_id, candidate_id,
-          duration_minutes, video_quality, minute_price, cost,
-          completed_questions, total_questions, created_at
-        )
-        VALUES (
-          $1::uuid, $2::uuid, $3::uuid, $4::uuid,
-          $5, $6, $7, $8, $9, $10, NOW()
-        )
-        RETURNING *
-      `
+    const costPerMinute = usageResult.baseCost / (data.durationMinutes || 1)
+    const profitMarginPercent = parseFloat(process.env.PROFIT_MARGIN_PERCENTAGE || '25')
+    
+    const query = `
+      INSERT INTO video_interview_usage (
+        company_id, job_id, interview_id, candidate_id,
+        duration_minutes, video_quality, minute_price, cost,
+        completed_questions, total_questions,
+        openai_base_cost, pricing_source, tokens_used, profit_margin_percent,
+        created_at
+      )
+      VALUES (
+        $1::uuid, $2::uuid, $3::uuid, $4::uuid,
+        $5, $6, $7, $8, $9, $10,
+        $11, $12, $13, $14,
+        NOW()
+      )
+      RETURNING *
+    `
 
-      const result = await this.query(query, [
-        data.companyId,
-        data.jobId,
-        data.interviewId || null,
-        data.candidateId || null,
-        data.durationMinutes,
-        data.videoQuality || 'HD',
-        costPerMinute, // Real cost per minute from OpenAI
-        finalCost, // Real OpenAI cost + profit margin
-        data.completedQuestions || 0,
-        data.totalQuestions || 0
-      ]) as any[]
+    const result = await this.query(query, [
+      data.companyId,
+      data.jobId,
+      data.interviewId || null,
+      data.candidateId || null,
+      data.durationMinutes,
+      data.videoQuality || 'HD',
+      costPerMinute, // Keep for backward compatibility
+      usageResult.finalCost, // Final cost with profit margin
+      data.completedQuestions || 0,
+      data.totalQuestions || 0,
+      usageResult.baseCost, // Real OpenAI base cost
+      usageResult.source, // 'openai-api' or 'fallback'
+      usageResult.tokens || null, // Tokens used
+      profitMarginPercent // Profit margin percentage
+    ]) as any[]
 
-      console.log('💾 [VIDEO INTERVIEW] Cost stored in database successfully')
-      console.log('💰 Final Cost (with margin): $' + finalCost.toFixed(4))
-      console.log('📈 Base Cost: $' + realCost.toFixed(4) + ' + ' + ((finalCost - realCost) * 100).toFixed(2) + '% margin')
-      console.log('🎉 [VIDEO INTERVIEW] Billing calculation completed successfully!')
-      console.log('='.repeat(70) + '\n')
-      return result[0]
-      
-    } catch (error) {
-      console.error('❌ [VIDEO INTERVIEW] ERROR: Failed to fetch OpenAI cost, using fallback:')
-      console.error('🔥 Error Details:', error)
-      
-      // Fallback: Use Realtime API pricing
-      const { applyProfitMargin } = await import('./config')
-      const fallbackCostPerMin = 0.30
-      const fallbackBaseCost = data.durationMinutes * fallbackCostPerMin
-      const { finalCost } = applyProfitMargin(fallbackBaseCost)
-      
-      const query = `
-        INSERT INTO video_interview_usage (
-          company_id, job_id, interview_id, candidate_id,
-          duration_minutes, video_quality, minute_price, cost,
-          completed_questions, total_questions, created_at
-        )
-        VALUES (
-          $1::uuid, $2::uuid, $3::uuid, $4::uuid,
-          $5, $6, $7, $8, $9, $10, NOW()
-        )
-        RETURNING *
-      `
-
-      const result = await this.query(query, [
-        data.companyId,
-        data.jobId,
-        data.interviewId || null,
-        data.candidateId || null,
-        data.durationMinutes,
-        data.videoQuality || 'HD',
-        fallbackCostPerMin,
-        finalCost,
-        data.completedQuestions || 0,
-        data.totalQuestions || 0
-      ]) as any[]
-
-      console.log('💾 [VIDEO INTERVIEW] Fallback cost stored in database')
-      console.log('💰 Final Cost (fallback): $' + finalCost.toFixed(4))
-      console.log('📈 Base Cost: $' + fallbackBaseCost.toFixed(4) + ' + ' + ((finalCost - fallbackBaseCost) * 100).toFixed(2) + '% margin')
-      console.log('⚠️  [VIDEO INTERVIEW] Used fallback pricing due to OpenAI API failure')
-      console.log('='.repeat(70) + '\n')
-      return result[0]
-    }
+    console.log('💾 [VIDEO INTERVIEW] Cost stored in database successfully')
+    console.log('💰 Final Cost (with margin): $' + usageResult.finalCost.toFixed(4))
+    console.log('📈 Base Cost: $' + usageResult.baseCost.toFixed(4))
+    console.log('⏱️  Cost per Minute: $' + costPerMinute.toFixed(4))
+    console.log('🏷️  Source: ' + usageResult.source)
+    console.log('🎉 [VIDEO INTERVIEW] Billing calculation completed successfully!')
+    console.log('='.repeat(70) + '\n')
+    return result[0]
   }
 
   // Get usage records (counts/durations only, no fixed pricing)

@@ -40,7 +40,8 @@ export default async function ApplyCompanyJobPage(props: { params: Promise<{ com
              j.status,
              COALESCE(j.employment_type::text, 'full_time') AS employment_type,
              j.level::text AS experience_level,
-             c.name           AS company_name
+             c.name           AS company_name,
+             j.company_id     AS company_id
         FROM public.jobs j
         JOIN public.companies c ON c.id = j.company_id
        WHERE j.id = CAST(${jobId} AS uuid)
