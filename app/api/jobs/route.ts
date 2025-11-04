@@ -27,6 +27,7 @@ type CreateJobBody = {
   interviewDuration?: string
   platforms?: string[]
   createdBy?: string | null
+  draftJobId?: string | null // Temporary UUID for draft job billing reconciliation
   // New form fields (raw)
   education?: string
   years?: string
@@ -345,6 +346,16 @@ Work Authorization: ${raw.visa || 'Work authorization required'}`
       }
 
       const jobId = created.id
+
+      // Reconcile draft question usage if draftJobId is provided
+      if (raw.draftJobId) {
+        try {
+          console.log('🔄 [JOB CREATION] Reconciling draft usage for job:', jobId)
+          await DatabaseService.reconcileDraftQuestionUsage(raw.draftJobId, jobId)
+        } catch (draftErr) {
+          console.warn('⚠️  Failed to reconcile draft usage (non-fatal):', draftErr)
+        }
+      }
 
       // Optional: insert job_rounds
       const rounds = Array.isArray(body.interviewRounds) ? body.interviewRounds : []

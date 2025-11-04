@@ -122,8 +122,10 @@ export class DatabaseService {
       console.log(`[Company Signup] 📦 Received project response:`, project)
       
       if (project?.id) {
-        openaiProjectId = project.id
-        console.log(`[Company Signup] ✅ OpenAI project created: ${project.id} for ${finalCompanyName}`)
+        // Encrypt the project ID before storing
+        const { encrypt } = await import('./encryption')
+        openaiProjectId = encrypt(project.id)
+        console.log(`[Company Signup] ✅ OpenAI project created and encrypted: ${project.id} for ${finalCompanyName}`)
         
         // Create service account for the project
         console.log(`[Company Signup] 🔑 Creating service account for project: ${project.id}`)
@@ -131,8 +133,9 @@ export class DatabaseService {
         console.log(`[Company Signup] 📦 Received service account response:`, serviceAccount)
         
         if (serviceAccount?.api_key) {
-          openaiServiceAccountKey = serviceAccount.api_key
-          console.log(`[Company Signup] ✅ Service account created for project: ${project.id}`)
+          // Encrypt the API key before storing
+          openaiServiceAccountKey = encrypt(serviceAccount.api_key)
+          console.log(`[Company Signup] ✅ Service account created and encrypted for project: ${project.id}`)
         } else {
           console.warn(`[Company Signup] ⚠️ Service account creation returned null for project: ${project.id}`)
         }
@@ -2887,7 +2890,6 @@ export class DatabaseService {
       throw new Error('Database not configured')
     }
 
-    // 🎯 STARTING CV PARSING BILLING CALCULATION
     console.log('\n' + '='.repeat(70))
     console.log('🎯 [CV PARSING] Starting billing calculation...')
     console.log('📋 Company ID:', data.companyId)
@@ -2896,60 +2898,58 @@ export class DatabaseService {
     console.log('📄 File Size:', data.fileSizeKb || 0, 'KB')
     console.log('='.repeat(70))
 
-    // Use HARDCODED pricing from environment variables
-    try {
-      const { getCVParsingPrice } = await import('./config')
-      
-      // Get hardcoded price from .env.local (NEVER exposed to UI/DB)
-      const unitPrice = getCVParsingPrice()
-      const finalCost = unitPrice // No profit margin - direct pricing
-      
-      console.log('💰 [CV PARSING] Using hardcoded pricing from environment')
-      console.log('💵 Price per CV: $' + unitPrice.toFixed(2))
-      console.log('🔒 [INTERNAL] Pricing configured in .env.local only')
-      
-      const query = `
-        INSERT INTO cv_parsing_usage (
-          company_id, job_id, candidate_id, file_id, file_size_kb,
-          parse_successful, unit_price, cost, success_rate, created_at
-        )
-        VALUES (
-          $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5,
-          $6, $7, $8, $9, NOW()
-        )
-        RETURNING *
-      `
+    // Use centralized OpenAI Usage Tracker
+    const { OpenAIUsageTracker } = await import('./openai-usage-tracker')
+    const usageResult = await OpenAIUsageTracker.trackCVParsing()
+    
+    const profitMarginPercent = parseFloat(process.env.PROFIT_MARGIN_PERCENTAGE || '25')
+    
+    const query = `
+      INSERT INTO cv_parsing_usage (
+        company_id, job_id, candidate_id, file_id, file_size_kb,
+        parse_successful, unit_price, cost, success_rate,
+        openai_base_cost, pricing_source, tokens_used, profit_margin_percent,
+        created_at
+      )
+      VALUES (
+        $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5,
+        $6, $7, $8, $9,
+        $10, $11, $12, $13,
+        NOW()
+      )
+      RETURNING *
+    `
 
-      const result = await this.query(query, [
-        data.companyId,
-        data.jobId,
-        data.candidateId || null,
-        data.fileId || null,
-        data.fileSizeKb || 0,
-        data.parseSuccessful !== false,
-        unitPrice, // Hardcoded price from .env.local
-        finalCost, // Same as unitPrice (no margin)
-        data.successRate || null
-      ]) as any[]
+    const result = await this.query(query, [
+      data.companyId,
+      data.jobId,
+      data.candidateId || null,
+      data.fileId || null,
+      data.fileSizeKb || 0,
+      data.parseSuccessful !== false,
+      usageResult.baseCost, // Keep for backward compatibility
+      usageResult.finalCost, // Final cost with profit margin
+      data.successRate || null,
+      usageResult.baseCost, // Real OpenAI base cost
+      usageResult.source, // 'openai-api' or 'fallback'
+      usageResult.tokens || null, // Tokens used
+      profitMarginPercent // Profit margin percentage
+    ]) as any[]
 
-      console.log('💾 [CV PARSING] Cost stored in database successfully')
-      console.log('💰 Final Cost: $' + finalCost.toFixed(2))
-      console.log('🎉 [CV PARSING] Billing calculation completed successfully!')
-      console.log('='.repeat(70) + '\n')
-      return result[0]
-      
-    } catch (error) {
-      console.error('❌ [CV PARSING] ERROR: Failed to record billing:')
-      console.error('🔥 Error Details:', error)
-      console.log('='.repeat(70) + '\n')
-      throw error
-    }
+    console.log('💾 [CV PARSING] Cost stored in database successfully')
+    console.log('💰 Final Cost (with margin): $' + usageResult.finalCost.toFixed(4))
+    console.log('📈 Base Cost: $' + usageResult.baseCost.toFixed(4))
+    console.log('🏷️  Source: ' + usageResult.source)
+    console.log('🎉 [CV PARSING] Billing calculation completed successfully!')
+    console.log('='.repeat(70) + '\n')
+    return result[0]
   }
 
-  // Record question generation usage
+  // Record question generation usage (supports draft jobs)
   static async recordQuestionGenerationUsage(data: {
     companyId: string
-    jobId: string
+    jobId?: string | null
+    draftJobId?: string | null
     promptTokens: number
     completionTokens: number
     questionCount: number
@@ -2959,38 +2959,32 @@ export class DatabaseService {
       throw new Error('Database not configured')
     }
 
-    // 🎯 STARTING QUESTION GENERATION BILLING CALCULATION
+    const isDraft = !data.jobId && data.draftJobId
+    const totalTokens = data.promptTokens + data.completionTokens
+
     console.log('\n' + '='.repeat(70))
     console.log('🎯 [QUESTION GENERATION] Starting billing calculation...')
     console.log('📋 Company ID:', data.companyId)
-    console.log('💼 Job ID:', data.jobId)
+    console.log('💼 Job ID:', data.jobId || 'NULL (draft)')
+    console.log('🔖 Draft ID:', data.draftJobId || 'N/A')
+    console.log('📝 Status:', isDraft ? 'DRAFT (will reconcile when job saved)' : 'PERSISTED')
     console.log('🤖 Prompt Tokens:', data.promptTokens)
     console.log('✍️  Completion Tokens:', data.completionTokens)
-    console.log('📝 Total Tokens:', data.promptTokens + data.completionTokens)
+    console.log('📝 Total Tokens:', totalTokens)
     console.log('❓ Questions Generated:', data.questionCount)
-    console.log('🧠 Model Used:', data.modelUsed || 'gpt-4')
+    console.log('🧠 Model Used:', data.modelUsed || 'gpt-4o')
     console.log('='.repeat(70))
 
-    const { applyProfitMargin } = await import('./config')
-    const pricing = await this.getCurrentPricing()
-    const totalTokens = data.promptTokens + data.completionTokens
-    const baseCost = (totalTokens / 1000) * pricing.question_price_per_1k_tokens
-    
-    // Apply profit margin to get final cost
+    // Calculate flat rate pricing: $0.10 for 10 questions
+    const { getQuestionGenerationPricePer10Questions, applyProfitMargin } = await import('./config')
+    const pricePer10Questions = getQuestionGenerationPricePer10Questions()
+    const baseCost = (data.questionCount / 10) * pricePer10Questions
     const { finalCost } = applyProfitMargin(baseCost)
-
-    console.log('💰 [QUESTION GENERATION] Cost calculated using real token counts')
-    console.log('💵 Token Price: $' + pricing.question_price_per_1k_tokens + ' per 1K tokens')
-    console.log('🔢 Cost per 1K tokens: $' + (pricing.question_price_per_1k_tokens * 1000).toFixed(6))
-    console.log('📊 Total Cost: $' + baseCost.toFixed(6) + ' (before margin)')
-    console.log('📈 Final Cost (with margin): $' + finalCost.toFixed(4))
-    console.log('🏷️  Using REAL token-based pricing from OpenAI API')
 
     const query = `
       INSERT INTO question_generation_usage (
-        company_id, job_id, prompt_tokens, completion_tokens,
-        total_tokens, question_count, token_price_per_1k, cost,
-        model_used, created_at
+        company_id, job_id, draft_job_id, prompt_tokens, completion_tokens,
+        total_tokens, question_count, cost, model_used, created_at
       )
       VALUES (
         $1::uuid, $2::uuid, $3, $4, $5, $6, $7, $8, $9, NOW()
@@ -3000,20 +2994,64 @@ export class DatabaseService {
 
     const result = await this.query(query, [
       data.companyId,
-      data.jobId,
+      data.jobId || null,
+      data.draftJobId || null,
       data.promptTokens,
       data.completionTokens,
       totalTokens,
       data.questionCount,
-      pricing.question_price_per_1k_tokens,
-      finalCost, // Store final cost with profit margin
-      data.modelUsed || 'gpt-4'
+      finalCost,
+      data.modelUsed || 'gpt-4o'
     ]) as any[]
 
     console.log('💾 [QUESTION GENERATION] Cost stored in database successfully')
-    console.log('🎉 [QUESTION GENERATION] Billing calculation completed successfully!')
+    console.log('🆔 Record ID:', result[0]?.id || 'N/A')
+    console.log('💰 Cost: $' + finalCost.toFixed(4))
+    console.log('💵 Rate: $' + pricePer10Questions.toFixed(2) + ' per 10 questions')
+    console.log('❓ Questions: ' + data.questionCount)
+    console.log('🎉 [QUESTION GENERATION] Billing tracking completed successfully!')
     console.log('='.repeat(70) + '\n')
     return result[0]
+  }
+
+  // Check if job exists in database
+  static async jobExists(jobId: string): Promise<boolean> {
+    if (!this.isDatabaseConfigured()) {
+      return false
+    }
+
+    try {
+      const query = `SELECT 1 FROM jobs WHERE id = $1::uuid LIMIT 1`
+      const result = await this.query(query, [jobId]) as any[]
+      return result.length > 0
+    } catch (error) {
+      console.error('❌ [DATABASE] Error checking job existence:', error)
+      return false
+    }
+  }
+
+  // Reconcile draft question usage when job is saved
+  static async reconcileDraftQuestionUsage(draftJobId: string, realJobId: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    console.log('🔄 [QUESTION GENERATION] Reconciling draft usage...')
+    console.log('🔖 Draft ID:', draftJobId)
+    console.log('💼 Real Job ID:', realJobId)
+
+    const query = `
+      UPDATE question_generation_usage
+      SET job_id = $1::uuid,
+          draft_job_id = NULL
+      WHERE draft_job_id = $2
+      RETURNING *
+    `
+
+    const result = await this.query(query, [realJobId, draftJobId]) as any[]
+
+    console.log('✅ [QUESTION GENERATION] Reconciled', result.length, 'draft usage records')
+    return result
   }
 
   // Record video interview usage with REAL OpenAI cost
@@ -3031,7 +3069,6 @@ export class DatabaseService {
       throw new Error('Database not configured')
     }
 
-    // 🎯 STARTING VIDEO INTERVIEW BILLING CALCULATION
     console.log('\n' + '='.repeat(70))
     console.log('🎯 [VIDEO INTERVIEW] Starting billing calculation...')
     console.log('📋 Company ID:', data.companyId)
@@ -3043,58 +3080,55 @@ export class DatabaseService {
     console.log('🎬 Video Quality:', data.videoQuality || 'HD')
     console.log('='.repeat(70))
 
-    // Use HARDCODED pricing from environment variables
-    try {
-      const { getVideoInterviewPricePerMinute } = await import('./config')
-      
-      // Get hardcoded price from .env.local (NEVER exposed to UI/DB)
-      const costPerMinute = getVideoInterviewPricePerMinute()
-      const finalCost = data.durationMinutes * costPerMinute // No profit margin - direct pricing
-      
-      console.log('💰 [VIDEO INTERVIEW] Using hardcoded pricing from environment')
-      console.log('💵 Price per Minute: $' + costPerMinute.toFixed(2))
-      console.log('⏱️  Total Duration: ' + data.durationMinutes + ' minutes')
-      console.log('💰 Total Cost: $' + finalCost.toFixed(2))
-      console.log('🔒 [INTERNAL] Pricing configured in .env.local only')
-      
-      const query = `
-        INSERT INTO video_interview_usage (
-          company_id, job_id, interview_id, candidate_id,
-          duration_minutes, video_quality, minute_price, cost,
-          completed_questions, total_questions, created_at
-        )
-        VALUES (
-          $1::uuid, $2::uuid, $3::uuid, $4::uuid,
-          $5, $6, $7, $8, $9, $10, NOW()
-        )
-        RETURNING *
-      `
+    // Use centralized OpenAI Usage Tracker
+    const { OpenAIUsageTracker } = await import('./openai-usage-tracker')
+    const usageResult = await OpenAIUsageTracker.trackVideoInterview(data.durationMinutes)
+    
+    const costPerMinute = usageResult.baseCost / (data.durationMinutes || 1)
+    const profitMarginPercent = parseFloat(process.env.PROFIT_MARGIN_PERCENTAGE || '25')
+    
+    const query = `
+      INSERT INTO video_interview_usage (
+        company_id, job_id, interview_id, candidate_id,
+        duration_minutes, video_quality, minute_price, cost,
+        completed_questions, total_questions,
+        openai_base_cost, pricing_source, tokens_used, profit_margin_percent,
+        created_at
+      )
+      VALUES (
+        $1::uuid, $2::uuid, $3::uuid, $4::uuid,
+        $5, $6, $7, $8, $9, $10,
+        $11, $12, $13, $14,
+        NOW()
+      )
+      RETURNING *
+    `
 
-      const result = await this.query(query, [
-        data.companyId,
-        data.jobId,
-        data.interviewId || null,
-        data.candidateId || null,
-        data.durationMinutes,
-        data.videoQuality || 'HD',
-        costPerMinute, // Hardcoded price from .env.local
-        finalCost, // Total cost (duration × price per minute)
-        data.completedQuestions || 0,
-        data.totalQuestions || 0
-      ]) as any[]
+    const result = await this.query(query, [
+      data.companyId,
+      data.jobId,
+      data.interviewId || null,
+      data.candidateId || null,
+      data.durationMinutes,
+      data.videoQuality || 'HD',
+      costPerMinute, // Keep for backward compatibility
+      usageResult.finalCost, // Final cost with profit margin
+      data.completedQuestions || 0,
+      data.totalQuestions || 0,
+      usageResult.baseCost, // Real OpenAI base cost
+      usageResult.source, // 'openai-api' or 'fallback'
+      usageResult.tokens || null, // Tokens used
+      profitMarginPercent // Profit margin percentage
+    ]) as any[]
 
-      console.log('💾 [VIDEO INTERVIEW] Cost stored in database successfully')
-      console.log('💰 Final Cost: $' + finalCost.toFixed(2))
-      console.log('🎉 [VIDEO INTERVIEW] Billing calculation completed successfully!')
-      console.log('='.repeat(70) + '\n')
-      return result[0]
-      
-    } catch (error) {
-      console.error('❌ [VIDEO INTERVIEW] ERROR: Failed to record billing:')
-      console.error('🔥 Error Details:', error)
-      console.log('='.repeat(70) + '\n')
-      throw error
-    }
+    console.log('💾 [VIDEO INTERVIEW] Cost stored in database successfully')
+    console.log('💰 Final Cost (with margin): $' + usageResult.finalCost.toFixed(4))
+    console.log('📈 Base Cost: $' + usageResult.baseCost.toFixed(4))
+    console.log('⏱️  Cost per Minute: $' + costPerMinute.toFixed(4))
+    console.log('🏷️  Source: ' + usageResult.source)
+    console.log('🎉 [VIDEO INTERVIEW] Billing calculation completed successfully!')
+    console.log('='.repeat(70) + '\n')
+    return result[0]
   }
 
   // Get usage records (counts/durations only, no fixed pricing)
@@ -3428,6 +3462,10 @@ export class DatabaseService {
       throw new Error('Database not configured')
     }
 
+    // Encrypt the project ID before storing
+    const { encrypt } = await import('./encryption')
+    const encryptedProjectId = encrypt(projectId)
+
     const query = `
       UPDATE companies 
       SET openai_project_id = $1,
@@ -3436,7 +3474,18 @@ export class DatabaseService {
       RETURNING *
     `
 
-    const result = await this.query(query, [projectId, companyId]) as any[]
+    const result = await this.query(query, [encryptedProjectId, companyId]) as any[]
+    
+    if (result[0]?.openai_project_id) {
+      // Decrypt before returning
+      const { decrypt } = await import('./encryption')
+      try {
+        result[0].openai_project_id = decrypt(result[0].openai_project_id)
+      } catch (error) {
+        console.error('❌ [DATABASE] Failed to decrypt project ID:', error)
+      }
+    }
+    
     return result[0]
   }
 
@@ -3453,6 +3502,25 @@ export class DatabaseService {
     `
 
     const result = await this.query(query, [companyId]) as any[]
+    
+    if (result[0]) {
+      // Decrypt sensitive fields before returning
+      const { decrypt } = await import('./encryption')
+      try {
+        if (result[0].openai_project_id) {
+          result[0].openai_project_id = decrypt(result[0].openai_project_id)
+        }
+        if (result[0].openai_service_account_key) {
+          result[0].openai_service_account_key = decrypt(result[0].openai_service_account_key)
+        }
+      } catch (error) {
+        console.error('❌ [DATABASE] Failed to decrypt OpenAI credentials:', error)
+        // Return null for credentials if decryption fails
+        result[0].openai_project_id = null
+        result[0].openai_service_account_key = null
+      }
+    }
+    
     return result[0] || null
   }
 
@@ -3469,7 +3537,19 @@ export class DatabaseService {
     `
 
     const result = await this.query(query, [companyId]) as any[]
-    return result[0]?.openai_project_id || null
+    
+    if (result[0]?.openai_project_id) {
+      // Decrypt the project ID before returning
+      const { decrypt } = await import('./encryption')
+      try {
+        return decrypt(result[0].openai_project_id)
+      } catch (error) {
+        console.error('❌ [DATABASE] Failed to decrypt OpenAI project ID:', error)
+        return null
+      }
+    }
+    
+    return null
   }
 
   // Ensure openai_project_id column exists

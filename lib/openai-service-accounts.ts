@@ -59,7 +59,16 @@ export async function createServiceAccount(projectId: string): Promise<OpenAISer
 
     const data = await res.json()
     console.log('[OpenAI Service Account] ✅ Service account created successfully:', { id: data.id, name: data.name })
-    return { id: data.id, api_key: data.api_key, name: data.name }
+    
+    // OpenAI returns api_key as an object with 'value' property
+    const apiKey = data.api_key?.value || data.api_key
+    
+    if (!apiKey) {
+      console.error('[OpenAI Service Account] ❌ No API key in response:', data)
+      return null
+    }
+    
+    return { id: data.id, api_key: apiKey, name: data.name }
   } catch (e) {
     console.error('[OpenAI Service Account] Error creating service account:', e)
     return null
