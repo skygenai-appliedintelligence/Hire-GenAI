@@ -2896,45 +2896,17 @@ export class DatabaseService {
     console.log('📄 File Size:', data.fileSizeKb || 0, 'KB')
     console.log('='.repeat(70))
 
-    // Fetch REAL cost from OpenAI API for the last few minutes
-    let realCost = 0
-    let unitPrice = 0
-    
+    // Use HARDCODED pricing from environment variables
     try {
-      console.log('🔗 [CV PARSING] Attempting to fetch REAL OpenAI costs...')
-      console.log('⏰ Time Range: Last 5 minutes')
+      const { getCVParsingPrice } = await import('./config')
       
-      const { OpenAIUsageService } = await import('./openai-usage-service')
-      const { applyProfitMargin } = await import('./config')
+      // Get hardcoded price from .env.local (NEVER exposed to UI/DB)
+      const unitPrice = getCVParsingPrice()
+      const finalCost = unitPrice // No profit margin - direct pricing
       
-      // Fetch usage from last 5 minutes to capture this CV parsing
-      const endDate = new Date()
-      const startDate = new Date(endDate.getTime() - 5 * 60 * 1000) // 5 minutes ago
-      
-      console.log('📊 [CV PARSING] Calling OpenAI Usage API...')
-      const openAIUsage = await OpenAIUsageService.getUsageForCustomRange(startDate, endDate)
-      
-      // Get the real cost from OpenAI for CV parsing
-      const openAIBaseCost = openAIUsage.cvParsing?.cost || 0
-      
-      // If OpenAI returned a cost, use it; otherwise fallback to estimation
-      if (openAIBaseCost > 0) {
-        realCost = openAIBaseCost
-        unitPrice = openAIBaseCost
-        console.log('✅ [CV PARSING] SUCCESS: Real OpenAI cost fetched!')
-        console.log('💰 OpenAI Base Cost: $' + openAIBaseCost)
-        console.log('🏷️  Using REAL pricing from OpenAI API')
-      } else {
-        // Fallback: Use GPT-4 estimation (~$0.50 per CV)
-        unitPrice = 0.50
-        realCost = unitPrice
-        console.log('⚠️  [CV PARSING] WARNING: OpenAI cost not available, using fallback estimate')
-        console.log('💰 Estimated Cost: $' + realCost)
-        console.log('🏷️  Using FIXED pricing ($0.50 per CV)')
-      }
-      
-      // Apply profit margin to real cost
-      const { finalCost } = applyProfitMargin(realCost)
+      console.log('💰 [CV PARSING] Using hardcoded pricing from environment')
+      console.log('💵 Price per CV: $' + unitPrice.toFixed(2))
+      console.log('🔒 [INTERNAL] Pricing configured in .env.local only')
       
       const query = `
         INSERT INTO cv_parsing_usage (
@@ -2955,57 +2927,22 @@ export class DatabaseService {
         data.fileId || null,
         data.fileSizeKb || 0,
         data.parseSuccessful !== false,
-        unitPrice, // Real unit price from OpenAI
-        finalCost, // Real OpenAI cost + profit margin
+        unitPrice, // Hardcoded price from .env.local
+        finalCost, // Same as unitPrice (no margin)
         data.successRate || null
       ]) as any[]
 
       console.log('💾 [CV PARSING] Cost stored in database successfully')
-      console.log('💰 Final Cost (with margin): $' + finalCost)
-      console.log('📈 Base Cost: $' + realCost + ' + ' + ((finalCost - realCost) * 100).toFixed(2) + '% margin')
+      console.log('💰 Final Cost: $' + finalCost.toFixed(2))
       console.log('🎉 [CV PARSING] Billing calculation completed successfully!')
       console.log('='.repeat(70) + '\n')
       return result[0]
       
     } catch (error) {
-      console.error('❌ [CV PARSING] ERROR: Failed to fetch OpenAI cost, using fallback:')
+      console.error('❌ [CV PARSING] ERROR: Failed to record billing:')
       console.error('🔥 Error Details:', error)
-      
-      // Fallback: Use GPT-4 estimation
-      const { applyProfitMargin } = await import('./config')
-      const fallbackUnitPrice = 0.50
-      const { finalCost } = applyProfitMargin(fallbackUnitPrice)
-      
-      const query = `
-        INSERT INTO cv_parsing_usage (
-          company_id, job_id, candidate_id, file_id, file_size_kb,
-          parse_successful, unit_price, cost, success_rate, created_at
-        )
-        VALUES (
-          $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5,
-          $6, $7, $8, $9, NOW()
-        )
-        RETURNING *
-      `
-
-      const result = await this.query(query, [
-        data.companyId,
-        data.jobId,
-        data.candidateId || null,
-        data.fileId || null,
-        data.fileSizeKb || 0,
-        data.parseSuccessful !== false,
-        fallbackUnitPrice,
-        finalCost,
-        data.successRate || null
-      ]) as any[]
-
-      console.log('💾 [CV PARSING] Fallback cost stored in database')
-      console.log('💰 Final Cost (fallback): $' + finalCost)
-      console.log('📈 Base Cost: $' + fallbackUnitPrice + ' + ' + ((finalCost - fallbackUnitPrice) * 100).toFixed(2) + '% margin')
-      console.log('⚠️  [CV PARSING] Used fallback pricing due to OpenAI API failure')
       console.log('='.repeat(70) + '\n')
-      return result[0]
+      throw error
     }
   }
 
@@ -3106,47 +3043,19 @@ export class DatabaseService {
     console.log('🎬 Video Quality:', data.videoQuality || 'HD')
     console.log('='.repeat(70))
 
-    // Fetch REAL cost from OpenAI API for the last few minutes
-    let realCost = 0
-    let costPerMinute = 0
-    
+    // Use HARDCODED pricing from environment variables
     try {
-      console.log('🔗 [VIDEO INTERVIEW] Attempting to fetch REAL OpenAI costs...')
-      console.log('⏰ Time Range: Last 5 minutes')
+      const { getVideoInterviewPricePerMinute } = await import('./config')
       
-      const { OpenAIUsageService } = await import('./openai-usage-service')
-      const { applyProfitMargin } = await import('./config')
+      // Get hardcoded price from .env.local (NEVER exposed to UI/DB)
+      const costPerMinute = getVideoInterviewPricePerMinute()
+      const finalCost = data.durationMinutes * costPerMinute // No profit margin - direct pricing
       
-      // Fetch usage from last 5 minutes to capture this interview
-      const endDate = new Date()
-      const startDate = new Date(endDate.getTime() - 5 * 60 * 1000) // 5 minutes ago
-      
-      console.log('📊 [VIDEO INTERVIEW] Calling OpenAI Usage API...')
-      const openAIUsage = await OpenAIUsageService.getUsageForCustomRange(startDate, endDate)
-      
-      // Get the real cost from OpenAI for video/realtime usage
-      const openAIBaseCost = openAIUsage.videoInterview?.cost || 0
-      
-      // If OpenAI returned a cost, use it; otherwise fallback to estimation
-      if (openAIBaseCost > 0) {
-        realCost = openAIBaseCost
-        costPerMinute = openAIBaseCost / data.durationMinutes
-        console.log('✅ [VIDEO INTERVIEW] SUCCESS: Real OpenAI cost fetched!')
-        console.log('💰 OpenAI Base Cost: $' + openAIBaseCost)
-        console.log('⏱️  Cost per Minute: $' + costPerMinute.toFixed(4))
-        console.log('🏷️  Using REAL pricing from OpenAI API')
-      } else {
-        // Fallback: Use Realtime API pricing ($0.06 input + $0.24 output = $0.30/min)
-        costPerMinute = 0.30
-        realCost = data.durationMinutes * costPerMinute
-        console.log('⚠️  [VIDEO INTERVIEW] WARNING: OpenAI cost not available, using fallback estimate')
-        console.log('💰 Estimated Cost: $' + realCost.toFixed(4))
-        console.log('⏱️  Cost per Minute: $' + costPerMinute.toFixed(2))
-        console.log('🏷️  Using FIXED pricing ($0.30 per minute)')
-      }
-      
-      // Apply profit margin to real cost
-      const { finalCost } = applyProfitMargin(realCost)
+      console.log('💰 [VIDEO INTERVIEW] Using hardcoded pricing from environment')
+      console.log('💵 Price per Minute: $' + costPerMinute.toFixed(2))
+      console.log('⏱️  Total Duration: ' + data.durationMinutes + ' minutes')
+      console.log('💰 Total Cost: $' + finalCost.toFixed(2))
+      console.log('🔒 [INTERNAL] Pricing configured in .env.local only')
       
       const query = `
         INSERT INTO video_interview_usage (
@@ -3168,61 +3077,23 @@ export class DatabaseService {
         data.candidateId || null,
         data.durationMinutes,
         data.videoQuality || 'HD',
-        costPerMinute, // Real cost per minute from OpenAI
-        finalCost, // Real OpenAI cost + profit margin
+        costPerMinute, // Hardcoded price from .env.local
+        finalCost, // Total cost (duration × price per minute)
         data.completedQuestions || 0,
         data.totalQuestions || 0
       ]) as any[]
 
       console.log('💾 [VIDEO INTERVIEW] Cost stored in database successfully')
-      console.log('💰 Final Cost (with margin): $' + finalCost.toFixed(4))
-      console.log('📈 Base Cost: $' + realCost.toFixed(4) + ' + ' + ((finalCost - realCost) * 100).toFixed(2) + '% margin')
+      console.log('💰 Final Cost: $' + finalCost.toFixed(2))
       console.log('🎉 [VIDEO INTERVIEW] Billing calculation completed successfully!')
       console.log('='.repeat(70) + '\n')
       return result[0]
       
     } catch (error) {
-      console.error('❌ [VIDEO INTERVIEW] ERROR: Failed to fetch OpenAI cost, using fallback:')
+      console.error('❌ [VIDEO INTERVIEW] ERROR: Failed to record billing:')
       console.error('🔥 Error Details:', error)
-      
-      // Fallback: Use Realtime API pricing
-      const { applyProfitMargin } = await import('./config')
-      const fallbackCostPerMin = 0.30
-      const fallbackBaseCost = data.durationMinutes * fallbackCostPerMin
-      const { finalCost } = applyProfitMargin(fallbackBaseCost)
-      
-      const query = `
-        INSERT INTO video_interview_usage (
-          company_id, job_id, interview_id, candidate_id,
-          duration_minutes, video_quality, minute_price, cost,
-          completed_questions, total_questions, created_at
-        )
-        VALUES (
-          $1::uuid, $2::uuid, $3::uuid, $4::uuid,
-          $5, $6, $7, $8, $9, $10, NOW()
-        )
-        RETURNING *
-      `
-
-      const result = await this.query(query, [
-        data.companyId,
-        data.jobId,
-        data.interviewId || null,
-        data.candidateId || null,
-        data.durationMinutes,
-        data.videoQuality || 'HD',
-        fallbackCostPerMin,
-        finalCost,
-        data.completedQuestions || 0,
-        data.totalQuestions || 0
-      ]) as any[]
-
-      console.log('💾 [VIDEO INTERVIEW] Fallback cost stored in database')
-      console.log('💰 Final Cost (fallback): $' + finalCost.toFixed(4))
-      console.log('📈 Base Cost: $' + fallbackBaseCost.toFixed(4) + ' + ' + ((finalCost - fallbackBaseCost) * 100).toFixed(2) + '% margin')
-      console.log('⚠️  [VIDEO INTERVIEW] Used fallback pricing due to OpenAI API failure')
       console.log('='.repeat(70) + '\n')
-      return result[0]
+      throw error
     }
   }
 
