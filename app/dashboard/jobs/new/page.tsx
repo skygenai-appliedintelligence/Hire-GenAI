@@ -48,6 +48,20 @@ export default function CreateJobPage() {
   const [generatingQuestions, setGeneratingQuestions] = useState(false)
   
   // Job status: open | on_hold | closed | cancelled
+  
+  // Set default question and criteria when in edit mode
+  useEffect(() => {
+    if (isEditing) {
+      setAgentQuestions({
+        "Phone Screening": [
+          "Can you walk me through your experience relevant to this role?"
+        ]
+      });
+      setAgentCriteria({
+        "Phone Screening": ["Communication", "Technical Skills", "Relevant Experience", "Problem Solving"]
+      });
+    }
+  }, [isEditing]);
 
   // Helper: parse varied salary labels into structured fields
   const normalizeStatus = (val?: string | null): 'open' | 'on_hold' | 'closed' | 'cancelled' | undefined => {
@@ -1331,8 +1345,9 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                     variant="outline"
                                     size="sm"
                                     className="h-7 text-xs"
-                                    disabled={generatingQuestions}
+                                    disabled={generatingQuestions || isEditing}
                                     onClick={() => handleGenerateQuestions(round)}
+                                    title={isEditing ? "Cannot generate questions in edit mode" : "Generate questions"}
                                   >
                                     {generatingQuestions ? (
                                       <>
@@ -1357,12 +1372,15 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                           <Input
                                             value={question}
                                             onChange={(e) => {
-                                              const newQuestions = [...questions]
-                                              newQuestions[idx] = e.target.value
-                                              setAgentQuestions({ ...agentQuestions, [round]: newQuestions })
+                                              if (!isEditing) {
+                                                const newQuestions = [...questions]
+                                                newQuestions[idx] = e.target.value
+                                                setAgentQuestions({ ...agentQuestions, [round]: newQuestions })
+                                              }
                                             }}
                                             className="flex-1 text-sm"
-                                            placeholder="Enter question..."
+                                            placeholder={isEditing ? "Questions are not editable in view mode" : "Enter question..."}
+                                            readOnly={isEditing}
                                           />
                                           <Button
                                             type="button"
@@ -1386,14 +1404,17 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                       size="sm"
                                       className="w-full h-8 text-xs border-dashed"
                                       onClick={() => {
-                                        setAgentQuestions({
-                                          ...agentQuestions,
-                                          [round]: [...questions, ""]
-                                        })
+                                        if (!isEditing) {
+                                          setAgentQuestions({
+                                            ...agentQuestions,
+                                            [round]: [...questions, ""]
+                                          })
+                                        }
                                       }}
+                                      disabled={isEditing}
                                     >
                                       <Plus className="w-3 h-3 mr-1" />
-                                      Add a custom question...
+                                      {isEditing ? "View mode - questions cannot be modified" : "Add a custom question..."}
                                     </Button>
                                   </>
                                 ) : (
@@ -1406,14 +1427,17 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                       size="sm"
                                       className="h-8 text-xs"
                                       onClick={() => {
-                                        setAgentQuestions({
-                                          ...agentQuestions,
-                                          [round]: [""]
-                                        })
+                                        if (!isEditing) {
+                                          setAgentQuestions({
+                                            ...agentQuestions,
+                                            [round]: [""]
+                                          })
+                                        }
                                       }}
+                                      disabled={isEditing}
                                     >
                                       <Plus className="w-3 h-3 mr-1" />
-                                      Add a custom question...
+                                      {isEditing ? "View mode - questions cannot be modified" : "Add a custom question..."}
                                     </Button>
                                   </div>
                                 )}
@@ -1427,60 +1451,68 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                     <Badge
                                       key={idx}
                                       variant="secondary"
-                                      className="px-3 py-1 text-xs flex items-center gap-1"
+                                      className={`px-3 py-1 text-xs flex items-center gap-1 ${isEditing ? 'opacity-100' : ''}`}
                                     >
                                       {criterion}
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          const newCriteria = criteria.filter((_, i) => i !== idx)
-                                          setAgentCriteria({ ...agentCriteria, [round]: newCriteria })
-                                        }}
-                                        className="ml-1 hover:text-red-500"
-                                      >
-                                        ×
-                                      </button>
+                                      {!isEditing && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const newCriteria = criteria.filter((_, i) => i !== idx)
+                                            setAgentCriteria({ ...agentCriteria, [round]: newCriteria })
+                                          }}
+                                          className="ml-1 hover:text-red-500"
+                                        >
+                                          ×
+                                        </button>
+                                      )}
                                     </Badge>
                                   ))}
                                 </div>
                                 
-                                <div className="flex gap-2">
-                                  <Input
-                                    placeholder="Add evaluation criteria..."
-                                    className="text-sm h-8"
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault()
-                                        const input = e.currentTarget
-                                        if (input.value.trim()) {
+                                {!isEditing ? (
+                                  <div className="flex gap-2">
+                                    <Input
+                                      placeholder="Add evaluation criteria..."
+                                      className="text-sm h-8"
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault()
+                                          const input = e.currentTarget
+                                          if (input.value.trim()) {
+                                            setAgentCriteria({
+                                              ...agentCriteria,
+                                              [round]: [...criteria, input.value.trim()]
+                                            })
+                                            input.value = ''
+                                          }
+                                        }
+                                      }}
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 px-3"
+                                      onClick={(e) => {
+                                        const input = e.currentTarget.previousElementSibling as HTMLInputElement
+                                        if (input?.value.trim()) {
                                           setAgentCriteria({
                                             ...agentCriteria,
                                             [round]: [...criteria, input.value.trim()]
                                           })
                                           input.value = ''
                                         }
-                                      }
-                                    }}
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 px-3"
-                                    onClick={(e) => {
-                                      const input = e.currentTarget.previousElementSibling as HTMLInputElement
-                                      if (input?.value.trim()) {
-                                        setAgentCriteria({
-                                          ...agentCriteria,
-                                          [round]: [...criteria, input.value.trim()]
-                                        })
-                                        input.value = ''
-                                      }
-                                    }}
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                  </Button>
-                                </div>
+                                      }}
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="text-sm text-gray-500 py-1">
+                                    Evaluation criteria cannot be modified in view mode
+                                  </div>
+                                )}
                               </div>
                             </CardContent>
                           )}

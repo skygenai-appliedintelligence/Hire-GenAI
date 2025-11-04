@@ -21,6 +21,11 @@ export const config = {
   billing: {
     // Profit margin percentage to add on top of OpenAI costs (e.g., 20 = 20% markup)
     profitMarginPercentage: parseFloat(process.env.PROFIT_MARGIN_PERCENTAGE || '20'),
+    
+    // Hardcoded pricing (NEVER shown in database or UI)
+    // These values are ONLY used internally for billing calculations
+    cvParsingPrice: parseFloat(process.env.CV_PARSING_PRICE || '0.50'),
+    videoInterviewPricePerMinute: parseFloat(process.env.VIDEO_INTERVIEW_PRICE_PER_MINUTE || '0.50'),
   },
   
   // Feature flags
@@ -131,4 +136,14 @@ export const applyProfitMargin = (baseCost: number): { baseCost: number, markup:
 // Get profit margin percentage
 export const getProfitMarginPercentage = () => {
   return config.billing.profitMarginPercentage
+}
+
+// Get hardcoded CV parsing price (INTERNAL USE ONLY - Never expose to UI/DB)
+export const getCVParsingPrice = () => {
+  return config.billing.cvParsingPrice
+}
+
+// Get hardcoded video interview price per minute (INTERNAL USE ONLY - Never expose to UI/DB)
+export const getVideoInterviewPricePerMinute = () => {
+  return config.billing.videoInterviewPricePerMinute
 }
