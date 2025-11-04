@@ -9,9 +9,12 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { applicationId, resumeText, jobDescription, passThreshold = 40 } = body
+    const { applicationId, resumeText, jobDescription, passThreshold = 40, companyId } = body
 
     console.log('[CV Evaluator] Starting evaluation for application:', applicationId)
+    console.log('[CV Evaluator] Received companyId:', companyId)
+    console.log('[CV Evaluator] ResumeText length:', resumeText?.length || 0)
+    console.log('[CV Evaluator] JobDescription length:', jobDescription?.length || 0)
 
     if (!resumeText || !jobDescription) {
       return NextResponse.json(
@@ -20,14 +23,38 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check OpenAI permissions first
-    const openAIStatus = await checkOpenAIPermissions()
-    if (!openAIStatus.hasPermissions) {
-      console.log('🔐 [CV EVALUATOR] OpenAI API key permissions issue detected')
-      console.log('📝 Error:', openAIStatus.error)
-      console.log('🏷️  Using fallback mock evaluation')
-    } else {
-      console.log('✅ [CV EVALUATOR] OpenAI API key has proper permissions')
+    // Fetch company's OpenAI service account key if companyId provided
+    let openaiApiKey: string | undefined = undefined
+    if (companyId) {
+      try {
+        const companyData = await (DatabaseService as any)["query"]?.call(
+          DatabaseService,
+          `SELECT openai_service_account_key FROM companies WHERE id = $1::uuid LIMIT 1`,
+          [companyId]
+        ) as any[]
+        
+        if (companyData && companyData.length > 0 && companyData[0].openai_service_account_key) {
+          try {
+            const keyObj = JSON.parse(companyData[0].openai_service_account_key)
+            openaiApiKey = keyObj.value
+            console.log('[CV Evaluator] Using company service account key for evaluation')
+          } catch (parseErr) {
+            console.warn('[CV Evaluator] Failed to parse company service account key:', parseErr)
+          }
+        }
+      } catch (fetchErr) {
+        console.warn('[CV Evaluator] Failed to fetch company service account key:', fetchErr)
+      }
+    }
+
+    // Fallback to environment variable if no company key
+    if (!openaiApiKey) {
+      openaiApiKey = process.env.OPENAI_API_KEY || process.env.OPENAI_EVAL_KEY
+      if (openaiApiKey) {
+        console.log('[CV Evaluator] Using environment OPENAI_API_KEY for evaluation')
+      } else {
+        console.log('🔐 [CV EVALUATOR] No OpenAI API key configured (no company key, no env key)')
+      }
     }
 
     // Truncate resume text if too long (max 15000 chars to stay under token limits)
@@ -46,7 +73,9 @@ export async function POST(request: NextRequest) {
     const evaluation = await CVEvaluator.evaluateCandidate(
       truncatedResume,
       truncatedJD,
-      passThreshold
+      passThreshold,
+      companyId,
+      openaiApiKey ? { apiKey: openaiApiKey } : undefined
     )
 
     console.log('[CV Evaluator] Evaluation complete:', {

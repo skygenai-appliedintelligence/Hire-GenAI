@@ -241,6 +241,8 @@ export default function ApplyForm({ job }: { job: any }) {
         // Step 2: Evaluate CV against JD using a balanced rubric (always run; JD-based scoring)
         try {
           setParseStep('evaluating')
+          console.log('[Application] Calling evaluation API with companyId:', job?.company_id)
+          console.log('[Application] Job object keys:', Object.keys(job || {}))
           const evalRes = await fetch('/api/applications/evaluate-cv', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -249,6 +251,7 @@ export default function ApplyForm({ job }: { job: any }) {
               resumeText: resumeTextForEval,
               jobDescription: job?.description || '',
               passThreshold: 40,
+              companyId: job?.company_id,
             })
           })
 

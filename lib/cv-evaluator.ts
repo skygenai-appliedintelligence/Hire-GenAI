@@ -1,3 +1,4 @@
+import { generateText } from "ai"
 import { openai } from "@ai-sdk/openai"
 
 const SYSTEM_PROMPT = `You are a fair but moderately lenient CV parser and JD evaluator. Your goal is to identify promising candidates without being overly strict, while ensuring relevance to the job description.
@@ -194,12 +195,34 @@ FAIR SCORING GUIDELINES:
 }`
 
     try {
-      const { text } = await generateText({
-        model: openai("gpt-4o"),
-        system: SYSTEM_PROMPT,
-        prompt: userPrompt,
-        temperature: 0.1,
-      })
+      // Use provided API key or fall back to environment
+      const apiKey = openaiClient?.apiKey || process.env.OPENAI_API_KEY || process.env.OPENAI_EVAL_KEY
+      
+      if (!apiKey) {
+        throw new Error('No OpenAI API key configured')
+      }
+
+      // Temporarily set the API key in environment for this call
+      const originalKey = process.env.OPENAI_API_KEY
+      process.env.OPENAI_API_KEY = apiKey
+
+      let text: string
+      try {
+        const response = await generateText({
+          model: openai("gpt-4o"),
+          system: SYSTEM_PROMPT,
+          prompt: userPrompt,
+          temperature: 0.1,
+        })
+        text = response.text
+      } finally {
+        // Restore original key
+        if (originalKey) {
+          process.env.OPENAI_API_KEY = originalKey
+        } else {
+          delete process.env.OPENAI_API_KEY
+        }
+      }
 
       // Parse JSON response
       const cleaned = text.trim()

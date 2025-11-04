@@ -26,6 +26,7 @@ export const config = {
     // These values are ONLY used internally for billing calculations
     cvParsingPrice: parseFloat(process.env.CV_PARSING_PRICE || '0.50'),
     videoInterviewPricePerMinute: parseFloat(process.env.VIDEO_INTERVIEW_PRICE_PER_MINUTE || '0.50'),
+    questionGenerationPricePer10Questions: parseFloat(process.env.QUESTION_GENERATION_PRICE_PER_10_QUESTIONS || '0.10'),
   },
   
   // Feature flags
@@ -146,4 +147,9 @@ export const getCVParsingPrice = () => {
 // Get hardcoded video interview price per minute (INTERNAL USE ONLY - Never expose to UI/DB)
 export const getVideoInterviewPricePerMinute = () => {
   return config.billing.videoInterviewPricePerMinute
+}
+
+// Get hardcoded question generation price per 10 questions (INTERNAL USE ONLY - Never expose to UI/DB)
+export const getQuestionGenerationPricePer10Questions = () => {
+  return config.billing.questionGenerationPricePer10Questions
 }

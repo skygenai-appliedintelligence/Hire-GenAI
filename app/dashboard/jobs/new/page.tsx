@@ -840,6 +840,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
             requirements: compiledRequirements || formData.requirements || '',
             companyId: company?.id, // Pass companyId directly
             createdBy: user?.email || null, // Pass email instead of user ID
+            draftJobId: draftJobId || null, // Pass draft job ID for usage reconciliation
           }),
         })
         data = await res.json()

@@ -25,27 +25,40 @@ export async function POST(request: NextRequest) {
       agentName
     )
 
-    // Record billing usage for question generation using REAL OpenAI token counts
-    if (companyId && jobId && result.questions.length > 0) {
+    // Record billing usage for question generation (supports draft jobs)
+    if (companyId && result.questions.length > 0) {
       try {
         // Use real token counts from OpenAI API if available, otherwise estimate
         const promptTokens = result.usage?.promptTokens || Math.round(jobDescription.length / 4) + (numberOfQuestions * 100)
         const completionTokens = result.usage?.completionTokens || result.questions.length * 50
 
+        // Check if jobId exists in database (real job) or is just a draft UUID
+        let isPersistedJob = false
+        if (jobId) {
+          try {
+            // Check if job exists in database
+            const jobExists = await DatabaseService.jobExists(jobId)
+            isPersistedJob = jobExists
+          } catch (err) {
+            console.log('🔍 [QUESTION GENERATION] Job existence check failed, treating as draft')
+            isPersistedJob = false
+          }
+        }
+        const isDraft = !isPersistedJob
+
         console.log('\n' + '='.repeat(60))
         console.log('💰 [QUESTION GENERATION] Starting billing tracking...')
         console.log('📋 Company ID:', companyId)
-        console.log('💼 Job ID:', jobId)
+        console.log('💼 Job ID:', jobId || 'N/A')
+        console.log('📝 Type:', isDraft ? 'DRAFT (not yet saved)' : 'PERSISTED')
         console.log('❓ Questions Generated:', result.questions.length)
 
         if (result.usage) {
-          // Even if token counts are 0, we got real usage data from OpenAI
           console.log('✅ [QUESTION GENERATION] Using REAL OpenAI token data!')
           console.log('🤖 Prompt Tokens:', promptTokens)
           console.log('✍️  Completion Tokens:', completionTokens)
           console.log('📝 Total Tokens:', promptTokens + completionTokens)
           console.log('🏷️  Source: OpenAI API (Real Usage)')
-          console.log('🔍 Note: Token counts may be 0 for very short/simple requests')
         } else {
           console.log('⚠️  [QUESTION GENERATION] Using ESTIMATED token data (No OpenAI API key)')
           console.log('🤖 Prompt Tokens (estimated):', promptTokens)
@@ -59,7 +72,8 @@ export async function POST(request: NextRequest) {
         
         const savedRecord = await DatabaseService.recordQuestionGenerationUsage({
           companyId,
-          jobId,
+          jobId: isDraft ? null : jobId,
+          draftJobId: isDraft ? jobId : null,
           promptTokens,
           completionTokens,
           questionCount: result.questions.length,
@@ -69,6 +83,9 @@ export async function POST(request: NextRequest) {
         console.log('✅ [QUESTION GENERATION] Database insert successful!')
         console.log('🆔 Record ID:', savedRecord?.id || 'N/A')
         console.log('💰 Cost Saved:', savedRecord?.cost ? `$${savedRecord.cost}` : 'N/A')
+        if (isDraft) {
+          console.log('🔖 Draft will be reconciled when job is saved')
+        }
         console.log('🎉 [QUESTION GENERATION] Billing tracking completed successfully!')
         console.log('='.repeat(60) + '\n')
       } catch (billingErr) {
