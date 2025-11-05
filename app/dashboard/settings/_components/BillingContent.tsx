@@ -62,9 +62,7 @@ export default function BillingContent({ companyId }: BillingContentProps) {
   const [selectedJob, setSelectedJob] = useState<string>("all")
   const [dateRange, setDateRange] = useState<string>("30")
   
-  // Invoice Filters
-  const [invoiceJobFilter, setInvoiceJobFilter] = useState<string>("all")
-  const [invoiceDateRange, setInvoiceDateRange] = useState<string>("30")
+  // Invoice Filters - REMOVED
   const [invoiceUsageData, setInvoiceUsageData] = useState<any>(null)
 
   // Tab state management
@@ -228,34 +226,7 @@ export default function BillingContent({ companyId }: BillingContentProps) {
     }
   }
 
-  const loadInvoiceUsageData = async () => {
-    try {
-      const startDate = new Date()
-      startDate.setDate(startDate.getDate() - parseInt(invoiceDateRange))
-      
-      const params = new URLSearchParams({
-        startDate: startDate.toISOString(),
-        endDate: new Date().toISOString(),
-        companyId
-      })
-      if (invoiceJobFilter && invoiceJobFilter !== 'all') {
-        params.append('jobId', invoiceJobFilter)
-      }
-
-      const res = await fetch(`/api/billing/openai-usage?${params.toString()}`)
-      const data = await res.json()
-      
-      if (data.ok) {
-        setInvoiceUsageData(data)
-      }
-    } catch (error) {
-      console.error('Failed to load invoice usage data:', error)
-    }
-  }
-
-  const applyInvoiceFilters = () => {
-    loadInvoiceUsageData()
-  }
+  // REMOVED: applyInvoiceFilters function
 
   const loadJobs = async () => {
     try {
@@ -799,149 +770,9 @@ export default function BillingContent({ companyId }: BillingContentProps) {
 
         {/* Invoices Tab */}
         <TabsContent value="invoices" className="space-y-6">
-          {/* Filter Invoice Data Card */}
-          <Card className="border-l-4 border-l-emerald-500">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <SettingsIcon className="h-5 w-5" />
-                Filter Invoice Data
-              </CardTitle>
-              <CardDescription>Customize your view of invoice analytics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="invoice-job-filter" className="text-sm font-medium mb-2 block">
-                    Job Description
-                  </Label>
-                  <Select value={invoiceJobFilter} onValueChange={setInvoiceJobFilter}>
-                    <SelectTrigger id="invoice-job-filter">
-                      <SelectValue placeholder="All Jobs" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Jobs</SelectItem>
-                      {jobs.map((job) => (
-                        <SelectItem key={job.id} value={job.id}>
-                          {job.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="invoice-date-range" className="text-sm font-medium mb-2 block">
-                    Date Range
-                  </Label>
-                  <Select value={invoiceDateRange} onValueChange={setInvoiceDateRange}>
-                    <SelectTrigger id="invoice-date-range">
-                      <SelectValue placeholder="Last 30 days" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="7">Last 7 days</SelectItem>
-                      <SelectItem value="30">Last 30 days</SelectItem>
-                      <SelectItem value="60">Last 60 days</SelectItem>
-                      <SelectItem value="90">Last 90 days</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="flex items-end">
-                  <Button 
-                    onClick={applyInvoiceFilters} 
-                    className="w-full bg-emerald-600 hover:bg-emerald-700"
-                  >
-                    Apply Filters
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* REMOVED: Filter Invoice Data Card */}
 
-          {/* Usage Summary Cards */}
-          {invoiceUsageData && (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card className="border-l-4 border-l-blue-500">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-blue-700">CV Parsing</CardTitle>
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <FileText className="h-4 w-4 text-blue-600" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-900">
-                    ${invoiceUsageData.totals.cvParsing.toFixed(2)}
-                  </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="secondary" className="text-xs">
-                      {invoiceUsageData.totals.cvCount} CVs
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">parsed</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-l-4 border-l-green-500">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-green-700">JD Questions</CardTitle>
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <TrendingUp className="h-4 w-4 text-green-600" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-900">
-                    ${invoiceUsageData.totals.jdQuestions.toFixed(2)}
-                  </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="secondary" className="text-xs">
-                      {invoiceUsageData.totals.tokenCount.toLocaleString()}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">tokens</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-l-4 border-l-purple-500">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-purple-700">Video Interviews</CardTitle>
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <Calendar className="h-4 w-4 text-purple-600" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-purple-900">
-                    ${invoiceUsageData.totals.video.toFixed(2)}
-                  </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="secondary" className="text-xs">
-                      {invoiceUsageData.totals.videoMinutes.toFixed(1)} min
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">recorded</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-l-4 border-l-orange-500">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-orange-700">Total Usage</CardTitle>
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <DollarSign className="h-4 w-4 text-orange-600" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-orange-900">
-                    ${(invoiceUsageData.totals.cvParsing + invoiceUsageData.totals.jdQuestions + invoiceUsageData.totals.video).toFixed(2)}
-                  </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge variant="secondary" className="text-xs">
-                      All Services
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">combined</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+          {/* REMOVED: Usage Summary Cards */}
 
           {/* Invoice History */}
           <Card>

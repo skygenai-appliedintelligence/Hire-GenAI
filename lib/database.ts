@@ -5,17 +5,42 @@ import { createServiceAccount } from './openai-service-accounts'
 // Database service for authentication operations using raw SQL
 export class DatabaseService {
   // Get database connection from existing prisma instance
-  static async query(sql: string, params: any[] = []) {
-    try {
-      const { prisma } = await import('./prisma')
-      if (!prisma) {
-        throw new Error('Prisma client not initialized')
-      }
-      return await prisma.$queryRawUnsafe(sql, ...params)
-    } catch (error: any) {
-      console.error('Database query error:', error)
-      throw new Error(`Database connection failed: ${error.message}`)
+  static async query(sql: string, params: any[] = [], retries: number = 3): Promise<any[]> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
     }
+
+    let lastError: any
+
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const { prisma } = await import('./prisma')
+        if (!prisma) {
+          throw new Error('Prisma client not initialized')
+        }
+        return await prisma.$queryRawUnsafe(sql, ...params)
+      } catch (error: any) {
+        lastError = error
+        console.error(`Database query attempt ${attempt}/${retries} failed:`, error.message)
+
+        // Check if this is a connection error that we should retry
+        const isRetryableError = error.code === 'P1001' ||
+          error.message?.includes('Can\'t reach database server') ||
+          error.message?.includes('connection') ||
+          error.message?.includes('timeout')
+
+        if (!isRetryableError || attempt === retries) {
+          throw new Error(`Database connection failed: ${error.message}`)
+        }
+
+        // Wait before retrying (exponential backoff)
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000)
+        console.log(`Retrying database query in ${delay}ms...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
+      }
+    }
+
+    throw new Error(`Database connection failed after ${retries} attempts: ${lastError.message}`)
   }
 
   // Check if database is configured
@@ -2035,7 +2060,55 @@ export class DatabaseService {
       WHERE company_id = $1::uuid
     `
     const result = await this.query(query, [companyId]) as any[]
-    return result[0] || null
+    const billing = result[0] || null
+
+    if (!billing) {
+      return null
+    }
+
+    // Calculate real-time spending from usage tables
+    const currentMonthStart = new Date()
+    currentMonthStart.setDate(1)
+    currentMonthStart.setHours(0, 0, 0, 0)
+
+    // Get current month spending
+    const currentMonthQuery = `
+      SELECT
+        COALESCE(SUM(cost), 0) as total
+      FROM (
+        SELECT cost FROM cv_parsing_usage
+        WHERE company_id = $1::uuid AND created_at >= $2::timestamptz
+        UNION ALL
+        SELECT cost FROM question_generation_usage
+        WHERE company_id = $1::uuid AND created_at >= $2::timestamptz
+        UNION ALL
+        SELECT cost FROM video_interview_usage
+        WHERE company_id = $1::uuid AND created_at >= $2::timestamptz
+      ) as all_usage
+    `
+    const currentMonthResult = await this.query(currentMonthQuery, [companyId, currentMonthStart.toISOString()]) as any[]
+    const currentMonthSpent = parseFloat(currentMonthResult[0]?.total || '0')
+
+    // Get total spending (all time)
+    const totalQuery = `
+      SELECT 
+        COALESCE(SUM(cost), 0) as total
+      FROM (
+        SELECT cost FROM cv_parsing_usage WHERE company_id = $1::uuid
+        UNION ALL
+        SELECT cost FROM question_generation_usage WHERE company_id = $1::uuid
+        UNION ALL
+        SELECT cost FROM video_interview_usage WHERE company_id = $1::uuid
+      ) as all_usage
+    `
+    const totalResult = await this.query(totalQuery, [companyId]) as any[]
+    const totalSpent = parseFloat(totalResult[0]?.total || '0')
+
+    // Update billing object with calculated values
+    billing.current_month_spent = currentMonthSpent.toFixed(2)
+    billing.total_spent = totalSpent.toFixed(2)
+
+    return billing
   }
 
   // Check if company is in trial and if usage qualifies for free credit
@@ -2898,11 +2971,13 @@ export class DatabaseService {
     console.log('📄 File Size:', data.fileSizeKb || 0, 'KB')
     console.log('='.repeat(70))
 
-    // Use centralized OpenAI Usage Tracker
+    // Use centralized OpenAI Usage Tracker (no profit margin)
     const { OpenAIUsageTracker } = await import('./openai-usage-tracker')
     const usageResult = await OpenAIUsageTracker.trackCVParsing()
     
-    const profitMarginPercent = parseFloat(process.env.PROFIT_MARGIN_PERCENTAGE || '25')
+    // Use only base cost without profit margin
+    const finalCost = usageResult.baseCost
+    const profitMarginPercent = 0 // No profit margin
     
     const query = `
       INSERT INTO cv_parsing_usage (
@@ -2928,7 +3003,7 @@ export class DatabaseService {
       data.fileSizeKb || 0,
       data.parseSuccessful !== false,
       usageResult.baseCost, // Keep for backward compatibility
-      usageResult.finalCost, // Final cost with profit margin
+      finalCost, // Final cost (no profit margin)
       data.successRate || null,
       usageResult.baseCost, // Real OpenAI base cost
       usageResult.source, // 'openai-api' or 'fallback'
@@ -2937,7 +3012,7 @@ export class DatabaseService {
     ]) as any[]
 
     console.log('💾 [CV PARSING] Cost stored in database successfully')
-    console.log('💰 Final Cost (with margin): $' + usageResult.finalCost.toFixed(4))
+    console.log('💰 Final Cost (no profit margin): $' + finalCost.toFixed(4))
     console.log('📈 Base Cost: $' + usageResult.baseCost.toFixed(4))
     console.log('🏷️  Source: ' + usageResult.source)
     console.log('🎉 [CV PARSING] Billing calculation completed successfully!')
@@ -2975,11 +3050,10 @@ export class DatabaseService {
     console.log('🧠 Model Used:', data.modelUsed || 'gpt-4o')
     console.log('='.repeat(70))
 
-    // Calculate flat rate pricing: $0.10 for 10 questions
-    const { getQuestionGenerationPricePer10Questions, applyProfitMargin } = await import('./config')
+    // Calculate flat rate pricing: $0.10 for 10 questions (no profit margin)
+    const { getQuestionGenerationPricePer10Questions } = await import('./config')
     const pricePer10Questions = getQuestionGenerationPricePer10Questions()
-    const baseCost = (data.questionCount / 10) * pricePer10Questions
-    const { finalCost } = applyProfitMargin(baseCost)
+    const finalCost = (data.questionCount / 10) * pricePer10Questions
 
     const query = `
       INSERT INTO question_generation_usage (
@@ -3006,7 +3080,7 @@ export class DatabaseService {
 
     console.log('💾 [QUESTION GENERATION] Cost stored in database successfully')
     console.log('🆔 Record ID:', result[0]?.id || 'N/A')
-    console.log('💰 Cost: $' + finalCost.toFixed(4))
+    console.log('💰 Final Cost: $' + finalCost.toFixed(4) + ' (no profit margin applied)')
     console.log('💵 Rate: $' + pricePer10Questions.toFixed(2) + ' per 10 questions')
     console.log('❓ Questions: ' + data.questionCount)
     console.log('🎉 [QUESTION GENERATION] Billing tracking completed successfully!')
@@ -3080,12 +3154,14 @@ export class DatabaseService {
     console.log('🎬 Video Quality:', data.videoQuality || 'HD')
     console.log('='.repeat(70))
 
-    // Use centralized OpenAI Usage Tracker
+    // Use centralized OpenAI Usage Tracker (no profit margin)
     const { OpenAIUsageTracker } = await import('./openai-usage-tracker')
     const usageResult = await OpenAIUsageTracker.trackVideoInterview(data.durationMinutes)
     
+    // Use only base cost without profit margin
+    const finalCost = usageResult.baseCost
     const costPerMinute = usageResult.baseCost / (data.durationMinutes || 1)
-    const profitMarginPercent = parseFloat(process.env.PROFIT_MARGIN_PERCENTAGE || '25')
+    const profitMarginPercent = 0 // No profit margin
     
     const query = `
       INSERT INTO video_interview_usage (
@@ -3112,7 +3188,7 @@ export class DatabaseService {
       data.durationMinutes,
       data.videoQuality || 'HD',
       costPerMinute, // Keep for backward compatibility
-      usageResult.finalCost, // Final cost with profit margin
+      finalCost, // Final cost (no profit margin)
       data.completedQuestions || 0,
       data.totalQuestions || 0,
       usageResult.baseCost, // Real OpenAI base cost
@@ -3122,7 +3198,7 @@ export class DatabaseService {
     ]) as any[]
 
     console.log('💾 [VIDEO INTERVIEW] Cost stored in database successfully')
-    console.log('💰 Final Cost (with margin): $' + usageResult.finalCost.toFixed(4))
+    console.log('💰 Final Cost (no profit margin): $' + finalCost.toFixed(4))
     console.log('📈 Base Cost: $' + usageResult.baseCost.toFixed(4))
     console.log('⏱️  Cost per Minute: $' + costPerMinute.toFixed(4))
     console.log('🏷️  Source: ' + usageResult.source)

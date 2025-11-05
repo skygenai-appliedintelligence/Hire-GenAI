@@ -58,7 +58,7 @@ export async function GET(req: Request) {
       })
     }
 
-    // Use raw SQL query since Prisma models might not be available
+    // Use raw SQL query with retry-enabled DatabaseService
     const membersQuery = `
       SELECT u.id, u.email, u.full_name, ur.role, c.name as company_name
       FROM users u
@@ -67,7 +67,7 @@ export async function GET(req: Request) {
       WHERE u.company_id = $1::uuid
       ORDER BY u.created_at ASC
     `
-    const rawMembers = await prisma.$queryRawUnsafe(membersQuery, companyId) as any[]
+    const rawMembers = await DatabaseService.query(membersQuery, [companyId]) as any[]
 
     // Map to UI expected format
     const members = rawMembers.map(member => ({
@@ -109,33 +109,33 @@ export async function POST(req: Request) {
     const adminOk = await ensureAdmin(companyId, actorEmail)
     if (adminOk !== true) return adminOk
 
-    // Check if user already exists using raw SQL
+    // Check if user already exists using DatabaseService
     const existingUserQuery = `SELECT id FROM users WHERE email = $1 LIMIT 1`
-    const existingUsers = await prisma.$queryRawUnsafe(existingUserQuery, email) as any[]
+    const existingUsers = await DatabaseService.query(existingUserQuery, [email]) as any[]
     
     if (existingUsers.length > 0) {
       return NextResponse.json({ error: 'User email already exists' }, { status: 400 })
     }
 
-    // Check if company exists using raw SQL
+    // Check if company exists using DatabaseService
     const companyQuery = `SELECT id FROM companies WHERE id = $1::uuid LIMIT 1`
-    const companies = await prisma.$queryRawUnsafe(companyQuery, companyId) as any[]
+    const companies = await DatabaseService.query(companyQuery, [companyId]) as any[]
     
     if (companies.length === 0) {
       return NextResponse.json({ error: 'Company not found' }, { status: 400 })
     }
 
-    // Create user using raw SQL
+    // Create user using DatabaseService
     const insertUserQuery = `
       INSERT INTO users (company_id, email, full_name, status, created_at)
       VALUES ($1::uuid, $2, $3, 'active', NOW())
       RETURNING id
     `
-    const newUsers = await prisma.$queryRawUnsafe(insertUserQuery, 
+    const newUsers = await DatabaseService.query(insertUserQuery, [
       companyId, 
       email, 
       name && name.trim().length > 0 ? name : email.split('@')[0]
-    ) as any[]
+    ]) as any[]
 
     // Add user role if specified
     if (role && newUsers.length > 0) {
@@ -145,7 +145,7 @@ export async function POST(req: Request) {
         ON CONFLICT DO NOTHING
       `
       const dbRole = mapUiRoleToDb(role)
-      await prisma.$queryRawUnsafe(insertRoleQuery, newUsers[0].id, dbRole)
+      await DatabaseService.query(insertRoleQuery, [newUsers[0].id, dbRole])
     }
 
     return NextResponse.json({ ok: true, id: newUsers[0]?.id })
@@ -175,14 +175,14 @@ export async function PUT(req: Request) {
     const adminOk = await ensureAdmin(companyId, actorEmail)
     if (adminOk !== true) return adminOk
 
-    // Find user by email using raw SQL
+    // Find user by email using DatabaseService
     const findUserQuery = `
       SELECT id, company_id
       FROM users
       WHERE email = $1
       LIMIT 1
     `
-    const users = await prisma.$queryRawUnsafe(findUserQuery, email) as any[]
+    const users = await DatabaseService.query(findUserQuery, [email]) as any[]
     const user = users[0]
 
     if (!user || user.company_id !== companyId) {
@@ -191,7 +191,7 @@ export async function PUT(req: Request) {
 
     // Ensure only one role we manage per user: delete any existing roles, then insert new
     const deleteRolesQuery = `DELETE FROM user_roles WHERE user_id = $1::uuid`
-    await prisma.$queryRawUnsafe(deleteRolesQuery, user.id)
+    await DatabaseService.query(deleteRolesQuery, [user.id])
 
     const insertRoleQuery = `
       INSERT INTO user_roles (user_id, role)
@@ -199,7 +199,7 @@ export async function PUT(req: Request) {
       ON CONFLICT DO NOTHING
     `
     const dbRole = mapUiRoleToDb(role)
-    await prisma.$queryRawUnsafe(insertRoleQuery, user.id, dbRole)
+    await DatabaseService.query(insertRoleQuery, [user.id, dbRole])
 
     return NextResponse.json({ ok: true })
   } catch (err: any) {
@@ -232,7 +232,7 @@ export async function DELETE(req: Request) {
       WHERE email = $1 AND company_id = $2::uuid
       LIMIT 1
     `
-    const users = await prisma.$queryRawUnsafe(findUserQuery, email, companyId) as any[]
+    const users = await DatabaseService.query(findUserQuery, [email, companyId]) as any[]
     const user = users[0]
     if (!user) {
       return NextResponse.json({ error: 'Member not found' }, { status: 404 })
@@ -240,7 +240,7 @@ export async function DELETE(req: Request) {
 
     // Delete the user (will cascade delete roles due to FK ON DELETE CASCADE)
     const deleteUserQuery = `DELETE FROM users WHERE id = $1::uuid`
-    await prisma.$queryRawUnsafe(deleteUserQuery, user.id)
+    await DatabaseService.query(deleteUserQuery, [user.id])
     return NextResponse.json({ ok: true })
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err?.message ?? 'unknown' }, { status: 500 })
