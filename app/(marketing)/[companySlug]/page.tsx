@@ -9,16 +9,16 @@ export default async function CompanyPublicPage({ params }: { params: Promise<{ 
   try {
     const { companySlug } = await params
     
-    // Use raw SQL query since we don't have generated Prisma models
-    // Note: Using name instead of slug since companies table doesn't have slug column
-    const companies = await prisma.$queryRaw<any[]>(Prisma.sql`
-      SELECT * FROM companies 
-       WHERE LOWER(name) = LOWER(${companySlug})
-          OR LOWER(REPLACE(name, ' ', '-')) = LOWER(${companySlug})
+    // Use DatabaseService with retry logic instead of direct Prisma queries
+    const companyQuery = `
+      SELECT * FROM companies
+       WHERE LOWER(name) = LOWER($1)
+          OR LOWER(REPLACE(name, ' ', '-')) = LOWER($1)
        LIMIT 1
-    `)
+    `
+    const companies = await DatabaseService.query(companyQuery, [companySlug]) as any[]
     const company = companies[0]
-    
+
     if (!company) {
       return (
         <div className="max-w-3xl mx-auto py-12">
@@ -27,33 +27,34 @@ export default async function CompanyPublicPage({ params }: { params: Promise<{ 
       )
     }
 
-    // Prefer legacy view if present, else fallback to jobs table (avoid regclass type)
-    const rel = await prisma.$queryRaw<any[]>(Prisma.sql`
+    // Check if job_descriptions table exists
+    const tableCheckQuery = `
       SELECT EXISTS (
         SELECT 1 FROM information_schema.tables
          WHERE table_schema = 'public' AND table_name = 'job_descriptions'
       ) AS exists
-    `)
+    `
+    const rel = await DatabaseService.query(tableCheckQuery, []) as any[]
     const hasJobDescriptions = !!rel?.[0]?.exists
 
     const jobs = hasJobDescriptions
-      ? await prisma.$queryRaw<any[]>(Prisma.sql`
+      ? await DatabaseService.query(`
           SELECT id, title, location
             FROM public.job_descriptions
-           WHERE company_name = ${company.name}
+           WHERE company_name = $1
            ORDER BY created_at DESC
            LIMIT 100
-        `)
-      : await prisma.$queryRaw<any[]>(Prisma.sql`
+        `, [company.name]) as any[]
+      : await DatabaseService.query(`
           SELECT j.id, j.title, j.location_text
             FROM public.jobs j
             JOIN public.companies c ON c.id = j.company_id
-           WHERE c.name = ${company.name}
+           WHERE c.name = $1
              AND j.is_public = true
              AND LOWER(j.status) IN ('open','active')
            ORDER BY j.created_at DESC
            LIMIT 100
-        `)
+        `, [company.name]) as any[]
 
     return (
       <div className="max-w-4xl mx-auto py-12 px-4 space-y-6">
