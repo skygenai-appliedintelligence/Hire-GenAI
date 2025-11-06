@@ -38,12 +38,37 @@ export async function GET(request: NextRequest) {
     // Calculate trial usage if in trial
     let trialInfo = null
     if (billing.billing_status === 'trial') {
+      // Count JDs created by this company
+      const jdCountQuery = `SELECT COUNT(*) as count FROM jobs WHERE company_id = $1::uuid`
+      const jdCountResult = await (DatabaseService as any)["query"].call(
+        DatabaseService,
+        jdCountQuery,
+        [companyId]
+      ) as any[]
+      const jdCount = parseInt(jdCountResult[0]?.count || '0')
+      
+      // Count successful interviews for this company
+      const interviewCountQuery = `
+        SELECT COUNT(*) as count 
+        FROM interviews i
+        JOIN application_rounds ar ON ar.id = i.application_round_id
+        JOIN applications a ON a.id = ar.application_id
+        JOIN jobs j ON j.id = a.job_id
+        WHERE j.company_id = $1::uuid AND i.status = 'success'
+      `
+      const interviewCountResult = await (DatabaseService as any)["query"].call(
+        DatabaseService,
+        interviewCountQuery,
+        [companyId]
+      ) as any[]
+      const interviewCount = parseInt(interviewCountResult[0]?.count || '0')
+      
       trialInfo = {
-        trialJdId: billing.trial_jd_id,
-        trialInterviewCount: billing.trial_interview_count,
         trialActive: true,
-        canCreateJD: !billing.trial_jd_id,
-        canRunInterview: billing.trial_interview_count < 1
+        jdCount: jdCount,
+        interviewCount: interviewCount,
+        canCreateJD: jdCount < 1,
+        canRunInterview: interviewCount < 1
       }
     }
 

@@ -112,7 +112,6 @@ export default function ApplicationsPage() {
                   <TableHead>CV Link</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Report</TableHead>
-                  <TableHead>Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -178,19 +177,6 @@ export default function ApplicationsPage() {
                         <Link href={`/dashboard/analytics/${row.jobId}/applications/${row.id}/report`}>
                           <Button variant="outline" size="sm">Show CV Report</Button>
                         </Link>
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          className={
-                            isQualified
-                              ? "bg-blue-600 text-white hover:bg-blue-700"
-                              : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                          }
-                          disabled={!isQualified || saving[row.id]}
-                        >
-                          {saving[row.id] ? 'Updating...' : 'Processed to Next Round'}
-                        </Button>
                       </TableCell>
                     </TableRow>
                   )

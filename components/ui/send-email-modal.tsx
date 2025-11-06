@@ -17,6 +17,7 @@ interface SendEmailModalProps {
     email: string
     appliedJD: string
     jobId: string
+    jobTitle?: string
   }
   company?: {
     id: string
@@ -147,8 +148,11 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, on
   const replacePlaceholders = (text: string): string => {
     if (!text) return ""
     
+    const jobTitle = candidate.jobTitle || candidate.appliedJD || "N/A"
+    
     return text
-      .replace(/\[Job Title\]/g, candidate.appliedJD)
+      .replace(/\[Job Title\]/g, jobTitle)
+      .replace(/\[Role Name\]/g, jobTitle)
       .replace(/\[Company Name\]/g, companyData.companyName)
       .replace(/\[Candidate Name\]/g, candidate.candidateName)
       .replace(/\[Insert Meeting Link\]/g, companyData.interviewLink)
@@ -203,7 +207,7 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, on
           <div className="bg-gray-50 p-3 rounded-lg">
             <div className="text-sm text-gray-600">
               <p><strong>Email:</strong> {candidate.email}</p>
-              <p><strong>Position:</strong> {candidate.appliedJD}</p>
+              <p><strong>Position:</strong> {candidate.jobTitle || candidate.appliedJD || 'N/A'}</p>
             </div>
           </div>
 
