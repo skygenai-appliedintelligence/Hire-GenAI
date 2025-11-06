@@ -33,11 +33,13 @@ export async function GET(request: NextRequest) {
     const endDate = endDateParam ? new Date(endDateParam) : undefined
 
     // Get ALL usage data from database (costs already include real OpenAI costs + profit margin)
+    console.log('📊 [API] Fetching usage for company:', companyId, 'Date range:', startDate, 'to', endDate)
     const dbTotals = await DatabaseService.getCompanyUsage(companyId, { 
       jobId: jobId || undefined, 
       startDate, 
       endDate 
     })
+    console.log('✅ [API] DB Totals:', dbTotals)
 
     // Get job breakdown
     const jobUsage = await DatabaseService.getUsageByJob(companyId, { startDate, endDate })
@@ -50,12 +52,18 @@ export async function GET(request: NextRequest) {
         cvCount: dbTotals.cvCount,
         jdQuestions: dbTotals.jdQuestions,
         tokenCount: dbTotals.tokenCount,
+        questionCount: dbTotals.questionCount,
         video: dbTotals.video,
-        videoMinutes: dbTotals.videoMinutes
+        videoMinutes: dbTotals.videoMinutes,
+        interviewCount: dbTotals.interviewCount
       },
       jobUsage,
       source: 'database-with-real-openai-costs',
-      message: 'Costs fetched from OpenAI at record time and stored in DB with profit margin'
+      message: 'Costs fetched from OpenAI at record time and stored in DB with profit margin',
+      debugInfo: {
+        companyId,
+        dateRange: { start: startDate, end: endDate }
+      }
     }
 
     return NextResponse.json(response)

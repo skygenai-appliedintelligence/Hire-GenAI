@@ -3313,6 +3313,7 @@ export class DatabaseService {
       SELECT 
         COUNT(*) as count,
         COALESCE(SUM(total_tokens), 0) as total_tokens,
+        COALESCE(SUM(question_count), 0) as total_questions,
         COALESCE(SUM(cost), 0) as total_cost
       FROM question_generation_usage
       WHERE ${whereClause}
@@ -3341,8 +3342,10 @@ export class DatabaseService {
       cvCount: parseInt(cvResult[0]?.count || 0),
       jdQuestions: parseFloat(questionResult[0]?.total_cost || 0),
       tokenCount: parseInt(questionResult[0]?.total_tokens || 0),
+      questionCount: parseInt(questionResult[0]?.total_questions || 0),
       video: parseFloat(videoResult[0]?.total_cost || 0),
-      videoMinutes: parseFloat(videoResult[0]?.total_minutes || 0)
+      videoMinutes: parseFloat(videoResult[0]?.total_minutes || 0),
+      interviewCount: parseInt(videoResult[0]?.count || 0)
     }
   }
 

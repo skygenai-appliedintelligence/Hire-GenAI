@@ -145,13 +145,15 @@ export default function BillingContent({ companyId }: BillingContentProps) {
         params.append('jobId', selectedJob)
       }
 
+      console.log('📊 [Billing] Fetching usage for company:', companyId, 'Date range:', dateRange, 'days')
       const res = await fetch(`/api/billing/openai-usage?${params.toString()}`)
       const data = await res.json()
       
       if (data.ok) {
+        console.log('✅ [Billing] Usage data loaded:', data.totals)
         setUsageData(data)
       } else {
-        console.error('OpenAI usage API error:', data.error)
+        console.error('❌ [Billing] OpenAI usage API error:', data.error)
         toast({
           title: 'Error',
           description: data.error || 'Failed to load usage data from OpenAI',
@@ -187,28 +189,6 @@ export default function BillingContent({ companyId }: BillingContentProps) {
     if (!companyId) return
     try {
       setGenerating(true)
-      
-      // Check for duplicate invoices in the last 30 days
-      const thirtyDaysAgo = new Date()
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-      
-      const recentInvoices = invoices.filter((inv: any) => {
-        const invDate = new Date(inv.createdAt)
-        return invDate >= thirtyDaysAgo
-      })
-      
-      if (recentInvoices.length > 0) {
-        const lastInvoice = recentInvoices[0]
-        const lastInvoiceDate = new Date(lastInvoice.createdAt).toLocaleDateString()
-        
-        toast({ 
-          title: 'Duplicate Invoice Detected', 
-          description: `An invoice (${lastInvoice.invoiceNumber}) already exists for ${lastInvoiceDate}. Please wait before generating a new one.`,
-          variant: 'destructive'
-        })
-        setGenerating(false)
-        return
-      }
       
       const res = await fetch('/api/billing/invoices', {
         method: 'POST',
@@ -539,7 +519,7 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                   </Select>
                 </div>
                 <div className="flex items-end">
-                  <Button className="w-full" onClick={() => {/* Refresh data */}}>
+                  <Button className="w-full" onClick={loadUsageData}>
                     Apply Filters
                   </Button>
                 </div>
@@ -579,9 +559,9 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                   <div className="text-2xl font-bold text-green-900">${usageData.totals.jdQuestions.toFixed(2)}</div>
                   <div className="flex items-center gap-2 mt-2">
                     <Badge variant="secondary" className="text-xs">
-                      {usageData.totals.tokenCount.toLocaleString()}
+                      {usageData.totals.questionCount || 0}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">tokens</span>
+                    <span className="text-xs text-muted-foreground">questions</span>
                   </div>
                 </CardContent>
               </Card>
@@ -597,9 +577,9 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                   <div className="text-2xl font-bold text-purple-900">${usageData.totals.video.toFixed(2)}</div>
                   <div className="flex items-center gap-2 mt-2">
                     <Badge variant="secondary" className="text-xs">
-                      {usageData.totals.videoMinutes.toFixed(1)} min
+                      {usageData.totals.interviewCount || 0}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">recorded</span>
+                    <span className="text-xs text-muted-foreground">interviews</span>
                   </div>
                 </CardContent>
               </Card>
@@ -821,12 +801,21 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                           size="sm"
                           onClick={async () => {
                             const { generateInvoicePDF } = await import('@/lib/invoice-pdf')
+                            // Build full address with all available fields
+                            let fullAddress = ''
+                            if (companyData?.street) {
+                              fullAddress = companyData.street
+                              if (companyData.city) fullAddress += ', ' + companyData.city
+                              if (companyData.state) fullAddress += ', ' + companyData.state
+                              if (companyData.zipCode) fullAddress += ' ' + companyData.zipCode
+                              if (companyData.country) fullAddress += ', ' + companyData.country
+                            }
+                            console.log('📄 [Invoice] Company Address:', fullAddress)
+                            console.log('📄 [Invoice] Company Data:', companyData)
                             const invoiceWithCompany = {
                               ...invoice,
                               companyName: companyData?.name || 'Your Company',
-                              companyAddress: companyData?.street 
-                                ? `${companyData.street}${companyData.city ? ', ' + companyData.city : ''}${companyData.state ? ', ' + companyData.state : ''}${companyData.zipCode ? ' ' + companyData.zipCode : ''}`
-                                : 'Company Address'
+                              companyAddress: fullAddress || 'Company Address'
                             }
                             await generateInvoicePDF(invoiceWithCompany)
                           }}

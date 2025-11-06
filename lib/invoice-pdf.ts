@@ -141,6 +141,12 @@ export const generateInvoicePDF = async (invoice: InvoiceData) => {
       grid-template-columns: 1fr 1fr;
       gap: 40px;
       margin: 40px 0;
+      width: 100%;
+    }
+    
+    .info-section {
+      overflow: visible;
+      word-wrap: break-word;
     }
     
     .info-section h3 {
@@ -157,6 +163,9 @@ export const generateInvoicePDF = async (invoice: InvoiceData) => {
       color: #111;
       margin: 3px 0;
       line-height: 1.6;
+      word-wrap: break-word;
+      word-break: break-word;
+      white-space: normal;
     }
     
     .info-section p strong {
@@ -303,7 +312,7 @@ export const generateInvoicePDF = async (invoice: InvoiceData) => {
       <div class="info-section">
         <h3>Bill To</h3>
         <p><strong>${invoice.companyName || 'Your Company'}</strong></p>
-        <p>${invoice.companyAddress || 'Company Address'}</p>
+        ${invoice.companyAddress ? `<p style="white-space: pre-wrap; word-break: break-word;">${invoice.companyAddress}</p>` : `<p>Company Address</p>`}
       </div>
     </div>
     
@@ -318,13 +327,15 @@ export const generateInvoicePDF = async (invoice: InvoiceData) => {
       </thead>
       <tbody>
         ${invoice.lineItems && invoice.lineItems.length > 0 
-          ? invoice.lineItems.map((item: any) => `
+          ? invoice.lineItems
+              .filter((item: any) => item.amount > 0)
+              .map((item: any) => `
             <tr>
               <td class="description">
                 <strong>${item.label || item.key}</strong>
-                <span class="period">Usage charges ${usagePeriod}</span>
+                <span class="period">${item.quantity ? item.quantity.toLocaleString() + ' ' + (item.unit || 'units') : 'Usage charges'} ${usagePeriod}</span>
               </td>
-              <td class="text-center">1</td>
+              <td class="text-center">${item.quantity || 1}</td>
               <td class="text-right">$${item.amount.toFixed(2)}</td>
             </tr>
           `).join('')

@@ -90,9 +90,9 @@ export async function POST(request: NextRequest) {
     const totals = await DatabaseService.getCompanyUsage(companyId, { startDate, endDate })
 
     const lineItems = [
-      { key: 'cvParsing', label: 'CV Parsing', amount: Number((totals.cvParsing || 0).toFixed(2)) },
-      { key: 'jdQuestions', label: 'Question Generation', amount: Number((totals.jdQuestions || 0).toFixed(2)) },
-      { key: 'videoInterview', label: 'Video Interviews', amount: Number((totals.video || 0).toFixed(2)) },
+      { key: 'cvParsing', label: 'CV Parsing', amount: Number((totals.cvParsing || 0).toFixed(2)), quantity: totals.cvCount || 0, unit: 'CVs' },
+      { key: 'jdQuestions', label: 'Question Generation', amount: Number((totals.jdQuestions || 0).toFixed(2)), quantity: totals.questionCount || 0, unit: 'Questions' },
+      { key: 'videoInterview', label: 'Video Interviews', amount: Number((totals.video || 0).toFixed(2)), quantity: totals.interviewCount || 0, unit: 'Interviews' },
     ]
 
     const subtotal = Number((lineItems.reduce((s, li) => s + li.amount, 0)).toFixed(2))
