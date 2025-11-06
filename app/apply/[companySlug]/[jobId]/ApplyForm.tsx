@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast'
 import { AIInterviewService, type CandidateApplication } from '@/lib/ai-interview-service'
 import { Loader2, Send } from 'lucide-react'
 
-export default function ApplyForm({ job }: { job: any }) {
+export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOpen?: boolean }) {
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
@@ -524,14 +524,19 @@ export default function ApplyForm({ job }: { job: any }) {
 
         {/* Submit bar */}
         <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-200">
-          <Button type="button" variant="outline" className="rounded-md border-slate-300 text-slate-700 hover:bg-slate-50 shadow-sm hover:shadow-md motion-safe:transition-shadow motion-safe:duration-200" onClick={() => history.back()} disabled={loading}>
+          <Button type="button" variant="outline" className="rounded-md border-slate-300 text-slate-700 hover:bg-slate-50 shadow-sm hover:shadow-md motion-safe:transition-shadow motion-safe:duration-200" onClick={() => history.back()} disabled={loading || !isJobOpen}>
             Cancel
           </Button>
-          <Button type="submit" className="bg-emerald-600 hover:bg-emerald-600/90 text-white text-base px-5 py-3 rounded-md font-semibold shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow motion-safe:duration-300 overflow-hidden emerald-glow" disabled={loading}>
+          <Button type="submit" className={`text-white text-base px-5 py-3 rounded-md font-semibold shadow-lg hover:shadow-2xl ring-1 ring-transparent ring-offset-1 ring-offset-white motion-safe:transition-shadow motion-safe:duration-300 overflow-hidden ${isJobOpen ? 'bg-emerald-600 hover:bg-emerald-600/90 hover:ring-emerald-300 emerald-glow' : 'bg-slate-400 cursor-not-allowed opacity-60'}`} disabled={loading || !isJobOpen} title={!isJobOpen ? 'This position is not accepting applications' : ''}>
             {loading ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Processing...
+              </>
+            ) : !isJobOpen ? (
+              <>
+                <Send className="w-5 h-5 mr-2" />
+                Position Closed
               </>
             ) : (
               <>
