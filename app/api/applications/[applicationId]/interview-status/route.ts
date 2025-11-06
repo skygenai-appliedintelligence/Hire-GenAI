@@ -262,6 +262,43 @@ export async function POST(
 
         if (billingInfo && billingInfo.length > 0) {
           const { company_id, job_id, duration_minutes } = billingInfo[0]
+
+          // Check free trial limits if wallet balance is $0
+          try {
+            const billing = await DatabaseService.getCompanyBilling(company_id)
+            if (billing && billing.wallet_balance <= 0 && billing.billing_status === 'trial') {
+              // Check if user already has an interview completed (count from interviews table)
+              const countQuery = `
+                SELECT COUNT(*) as count 
+                FROM interviews i
+                JOIN application_rounds ar ON ar.id = i.application_round_id
+                JOIN applications a ON a.id = ar.application_id
+                JOIN jobs j ON j.id = a.job_id
+                WHERE j.company_id = $1::uuid AND i.status = 'success'
+              `
+              const countResult = await (DatabaseService as any)["query"].call(
+                DatabaseService,
+                countQuery,
+                [company_id]
+              ) as any[]
+              const interviewCount = parseInt(countResult[0]?.count || '0')
+              
+              if (interviewCount >= 1) {
+                console.warn('⚠️  [INTERVIEW] Free trial interview limit reached')
+                return NextResponse.json(
+                  { 
+                    ok: false, 
+                    error: 'Free trial ended. You have already conducted 1 interview during your free trial. Please recharge your wallet to conduct more interviews.',
+                    code: 'TRIAL_INTERVIEW_LIMIT_REACHED'
+                  }, 
+                  { status: 403 }
+                )
+              }
+            }
+          } catch (trialErr) {
+            console.warn('⚠️  [INTERVIEW] Failed to check trial status:', trialErr)
+            // Continue anyway - don't block on trial check failure
+          }
           
           // Record usage (minimum 1 minute for billing)
           const durationToRecord = Math.max(1, Math.round(duration_minutes || 1))

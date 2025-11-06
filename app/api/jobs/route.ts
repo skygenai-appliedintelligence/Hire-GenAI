@@ -109,6 +109,37 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Missing required fields: ${missing.join(', ')}` }, { status: 400 })
     }
 
+    // Check free trial limits if wallet balance is $0
+    if (body.companyId && DatabaseService.isDatabaseConfigured()) {
+      try {
+        const billing = await DatabaseService.getCompanyBilling(body.companyId)
+        if (billing && billing.wallet_balance <= 0 && billing.billing_status === 'trial') {
+          // Check if user already has a JD created (count from jobs table)
+          const countQuery = `SELECT COUNT(*) as count FROM jobs WHERE company_id = $1::uuid`
+          const countResult = await (DatabaseService as any)["query"].call(
+            DatabaseService,
+            countQuery,
+            [body.companyId]
+          ) as any[]
+          const jobCount = parseInt(countResult[0]?.count || '0')
+          
+          if (jobCount >= 1) {
+            return NextResponse.json(
+              { 
+                ok: false, 
+                error: 'Free trial ended. You have already created 1 JD during your free trial. Please recharge your wallet to create more JDs.',
+                code: 'TRIAL_JD_LIMIT_REACHED'
+              }, 
+              { status: 403 }
+            )
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️  [JOB CREATION] Failed to check trial status:', err)
+        // Continue anyway - don't block on trial check failure
+      }
+    }
+
     // Map form values to match enum types
     const employment = normalizeJobType(raw.jobType)
     const expLevel = normalizeExperience(body.experienceLevel)

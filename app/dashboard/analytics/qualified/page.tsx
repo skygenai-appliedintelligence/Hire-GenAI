@@ -19,6 +19,7 @@ type CandidateRow = {
   jobId: string
   candidateName: string
   appliedJD: string
+  jobTitle?: string
   email: string
   phone: string
   cvUrl: string

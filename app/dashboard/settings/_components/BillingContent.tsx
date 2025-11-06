@@ -350,6 +350,31 @@ export default function BillingContent({ companyId }: BillingContentProps) {
         </Card>
       )}
 
+      {/* Free Trial Banner */}
+      {billingData?.status === 'trial' && billingData?.walletBalance <= 0 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <AlertCircle className="h-6 w-6 text-amber-600" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-amber-900 mb-1">🎉 Free Trial Active</h3>
+                <p className="text-sm text-amber-700 mb-3">
+                  You have limited access during your free trial:
+                </p>
+                <ul className="text-sm text-amber-700 space-y-1 ml-4 list-disc">
+                  <li>Create <strong>1 Job Description</strong> {billingData?.trialInfo?.canCreateJD ? '✅' : '❌'}</li>
+                  <li>Conduct <strong>1 Interview</strong> {billingData?.trialInfo?.canRunInterview ? '✅' : '❌'}</li>
+                  <li>Send <strong>1 Interview Link</strong></li>
+                </ul>
+                <p className="text-sm text-amber-700 mt-3">
+                  <strong>Recharge your wallet to unlock unlimited access!</strong>
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs 
         value={currentTab} 
         onValueChange={(val) => {

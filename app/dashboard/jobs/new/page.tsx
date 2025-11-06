@@ -846,6 +846,14 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
         data = await res.json()
       }
       if (!res.ok || !data?.ok) {
+        // Check if it's a trial limit error
+        if (data?.code === 'TRIAL_JD_LIMIT_REACHED') {
+          alert('🎉 Free Trial Limit Reached!\n\n' + 
+                data?.error + '\n\n' +
+                'Go to Billing → Settings to recharge your wallet and unlock unlimited access.')
+        } else {
+          alert(data?.error || 'Failed to save job')
+        }
         throw new Error(data?.error || 'Failed to save job')
       }
 
