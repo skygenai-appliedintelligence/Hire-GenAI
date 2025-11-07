@@ -12,8 +12,8 @@ import Link from "next/link"
 
 interface DashboardStats {
   totalJobs: number
-  activeCandidates: number
-  scheduledInterviews: number
+  qualifiedCandidates: number
+  completedInterviews: number
   successRate: number
 }
 
@@ -32,8 +32,8 @@ export default function DashboardPage() {
   const { company } = useAuth()
   const [stats, setStats] = useState<DashboardStats>({
     totalJobs: 0,
-    activeCandidates: 0,
-    scheduledInterviews: 0,
+    qualifiedCandidates: 0,
+    completedInterviews: 0,
     successRate: 0,
   })
   useEffect(() => {
@@ -65,23 +65,22 @@ export default function DashboardPage() {
       console.error('Failed to load jobs for dashboard:', e)
     }
 
-    // Fetch candidate statistics
-    const { data: candidates } = await supabase
-      .from("candidates")
-      .select("*, job_descriptions!inner(*)")
-      .eq("job_descriptions.company_id", company.id)
+    // Fetch qualified candidate statistics
+    const qualifiedRes = await fetch(`/api/analytics/qualified?companyId=${company.id}`)
+    const qualifiedData = await qualifiedRes.json().catch(() => ({ ok: false, candidates: [] }))
+    const qualifiedCandidatesCount = qualifiedData.ok ? (qualifiedData.candidates?.length || 0) : 0
 
     // Fetch interview statistics
     const { data: interviews } = await supabase
       .from("interview_rounds")
       .select("*, job_descriptions!inner(*)")
       .eq("job_descriptions.company_id", company.id)
-      .eq("status", "scheduled")
+      .eq("status", "success")
 
     setStats({
       totalJobs: openJobsCount,
-      activeCandidates: candidates?.length || 0,
-      scheduledInterviews: interviews?.length || 0,
+      qualifiedCandidates: qualifiedCandidatesCount,
+      completedInterviews: interviews?.length || 0,
       successRate: 85, // This would be calculated based on actual data
     })
   }
@@ -103,30 +102,30 @@ export default function DashboardPage() {
             <Briefcase className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalJobs}</div>
+            <div className="text-2xl font-bold">{stats.totalJobs || 0}</div>
             <p className="text-xs text-muted-foreground">+2 from last month</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/dashboard/analytics/qualified'}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Candidates</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.activeCandidates}</div>
-            <p className="text-xs text-muted-foreground">+12% from last week</p>
+            <div className="text-2xl font-bold">{stats.qualifiedCandidates || 0}</div>
+            <p className="text-xs text-muted-foreground">Ready for next steps</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/dashboard/analytics/interviews'}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Scheduled Interviews</CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.scheduledInterviews}</div>
-            <p className="text-xs text-muted-foreground">Next 7 days</p>
+            <div className="text-2xl font-bold">{stats.completedInterviews || 0}</div>
+            <p className="text-xs text-muted-foreground">Upcoming and planned</p>
           </CardContent>
         </Card>
 
@@ -136,7 +135,7 @@ export default function DashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.successRate}%</div>
+            <div className="text-2xl font-bold">{stats.successRate || 0}%</div>
             <p className="text-xs text-muted-foreground">+5% from last month</p>
           </CardContent>
         </Card>

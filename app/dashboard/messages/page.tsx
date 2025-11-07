@@ -6,10 +6,17 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
-import { MessageSquare, Send, Mail, Phone, User, Loader2, Briefcase, Users2 } from "lucide-react"
+import { MessageSquare, Send, Mail, Phone, User, Loader2, Briefcase, Users2, X, Lightbulb } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface Message {
   id: string
@@ -41,6 +48,15 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [lastSavedDraft, setLastSavedDraft] = useState<{ id: string; category: 'interview' | 'new_job' | 'general' } | null>(null)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+
+  // Check if user has saved any draft on first visit
+  useEffect(() => {
+    const hasSavedDraft = localStorage.getItem('messagesPageDraftSaved')
+    if (!hasSavedDraft) {
+      setShowOnboarding(true)
+    }
+  }, [])
 
   // Load messages from localStorage on component mount
   useEffect(() => {
@@ -185,6 +201,10 @@ export default function MessagesPage() {
         if (data.message?.id) {
           setLastSavedDraft({ id: data.message.id, category: data.message.category })
         }
+        
+        // Mark that user has saved a draft - hide onboarding popup
+        localStorage.setItem('messagesPageDraftSaved', 'true')
+        setShowOnboarding(false)
       } else {
         console.error('Draft save failed:', data)
         toast.error(data.error || 'Failed to save draft')
@@ -214,6 +234,66 @@ export default function MessagesPage() {
 
   return (
     <div className="space-y-4 px-4 md:px-6 py-6 bg-gradient-to-b from-blue-50/30 via-white to-blue-50/20">
+      {/* Onboarding Dialog */}
+      <Dialog open={showOnboarding} onOpenChange={setShowOnboarding}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <Lightbulb className="h-6 w-6 text-emerald-600" />
+              </div>
+              <DialogTitle>Welcome to Draft Messages</DialogTitle>
+            </div>
+            <div className="text-base pt-2">
+              <div className="space-y-4">
+                <div className="text-gray-700">
+                  This is your <span className="font-semibold text-gray-900">Draft Message</span> section where you can prepare professional emails to send to candidates.
+                </div>
+                
+                <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-3">
+                  <div className="flex gap-3">
+                    <div className="flex-shrink-0 text-emerald-600 font-bold">1</div>
+                    <div>
+                      <div className="font-medium text-gray-900">Choose a Category</div>
+                      <div className="text-sm text-gray-600">Select between Interview or New Job messages</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <div className="flex-shrink-0 text-emerald-600 font-bold">2</div>
+                    <div>
+                      <div className="font-medium text-gray-900">Compose Your Message</div>
+                      <div className="text-sm text-gray-600">Write your email in the text area</div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <div className="flex-shrink-0 text-emerald-600 font-bold">3</div>
+                    <div>
+                      <div className="font-medium text-gray-900">Save as Draft</div>
+                      <div className="text-sm text-gray-600">Your message is automatically saved and persists across sessions</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="text-sm text-gray-600 italic">
+                  💡 Tip: Use <span className="font-mono bg-gray-100 px-2 py-1 rounded text-gray-800">Ctrl+Enter</span> to quickly save your draft
+                </div>
+              </div>
+            </div>
+          </DialogHeader>
+          
+          <div className="pt-4">
+            <Button
+              onClick={() => setShowOnboarding(false)}
+              className="w-full bg-emerald-600 hover:bg-emerald-700"
+            >
+              OK
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
       <div className="flex justify-between items-center mb-2">
         <div>

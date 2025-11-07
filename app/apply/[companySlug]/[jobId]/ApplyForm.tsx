@@ -536,7 +536,7 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
             ) : !isJobOpen ? (
               <>
                 <Send className="w-5 h-5 mr-2" />
-                Position Closed
+                Position {job.status?.toLowerCase() === 'on_hold' ? 'On Hold' : job.status?.toLowerCase() === 'closed' ? 'Closed' : 'Closed'}
               </>
             ) : (
               <>

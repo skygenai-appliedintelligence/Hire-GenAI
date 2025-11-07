@@ -57,19 +57,18 @@ export default async function ApplyCompanyJobPage(props: { params: Promise<{ com
 
   // 3) Get job status (allow viewing form regardless of status)
   const jobStatus = String(job.status || '').toLowerCase()
-  const isJobOpen = ['active', 'open'].includes(jobStatus)
+  const isJobOpen = ['active', 'open', 'published'].includes(jobStatus) // Only these are truly accepting applications
 
-  // 4) Canonicalize slug using job.company_name
-  const canonicalSlug = String(job.company_name || '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-
-  if (canonicalSlug && canonicalSlug !== companySlug.toLowerCase()) {
-    // Only redirect when we actually have a canonical company name from DB
-    // For fallback/mock, canonicalSlug will equal provided slug
-    return redirect(`/apply/${canonicalSlug}/${jobId}`)
-  }
+  // 4) Skip canonical slug redirect to prevent unwanted redirects
+  // const canonicalSlug = String(job.company_name || '')
+  //   .trim()
+  //   .toLowerCase()
+  //   .replace(/\s+/g, '-');
+  // if (canonicalSlug && canonicalSlug !== companySlug.toLowerCase()) {
+  //   // Only redirect when we actually have a canonical company name from DB
+  //   // For fallback/mock, canonicalSlug will equal provided slug
+  //   return redirect(`/apply/${canonicalSlug}/${jobId}`)
+  // }
 
   // 5) Optional: ensure company exists; do not block render if not found
   try {
@@ -91,8 +90,8 @@ export default async function ApplyCompanyJobPage(props: { params: Promise<{ com
             <div className="flex items-start gap-3">
               <span className="text-2xl">⚠️</span>
               <div>
-                <h2 className="font-semibold text-amber-900">Position {jobStatus}</h2>
-                <p className="text-sm text-amber-800 mt-1">This position is currently <strong>{jobStatus}</strong> and is not accepting new applications at this time.</p>
+                <h2 className="font-semibold text-amber-900">Position {jobStatus === 'on_hold' ? 'On Hold' : jobStatus === 'closed' ? 'Closed' : jobStatus.charAt(0).toUpperCase() + jobStatus.slice(1)}</h2>
+                <p className="text-sm text-amber-800 mt-1">This position is currently <strong>{jobStatus === 'on_hold' ? 'on hold' : jobStatus === 'closed' ? 'closed' : jobStatus}</strong> and is not accepting new applications at this time.</p>
               </div>
             </div>
           </div>
