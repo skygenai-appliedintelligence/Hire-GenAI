@@ -1,11 +1,51 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
+import { DatabaseService } from "@/lib/database";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
+    // Get companyId from query parameters
+    const { searchParams } = new URL(req.url);
+    const companyId = searchParams.get("companyId");
+
+    if (!companyId) {
+      return NextResponse.json(
+        { error: "Missing companyId parameter" },
+        { status: 400 }
+      );
+    }
+
+    // Fetch company's service account key from database
+    let apiKey: string | null = null;
+    let projectId: string | null = null;
+
+    try {
+      const company = await DatabaseService.getCompanyById(companyId);
+      if (company?.openai_service_account_key) {
+        try {
+          const keyData = typeof company.openai_service_account_key === "string"
+            ? JSON.parse(company.openai_service_account_key)
+            : company.openai_service_account_key;
+          apiKey = keyData?.value || keyData;
+          projectId = company.openai_project_id;
+        } catch (e) {
+          apiKey = company.openai_service_account_key;
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching company credentials:", e);
+    }
+
+    // Fallback to environment variable if company key not available
+    if (!apiKey) {
+      apiKey = process.env.OPENAI_API_KEY || null;
+    }
+
     if (!apiKey) {
       return NextResponse.json(
-        { error: "Missing OPENAI_API_KEY. Add it to your environment/.env and restart the server." },
+        { 
+          error: "Missing OpenAI credentials",
+          message: "Please connect OpenAI in Settings → Billing or set OPENAI_API_KEY in environment"
+        },
         { status: 500 }
       );
     }

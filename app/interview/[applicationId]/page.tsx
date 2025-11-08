@@ -22,6 +22,7 @@ export default function InterviewPage() {
   const [jobDetails, setJobDetails] = useState<any>(null)
   const [interviewQuestions, setInterviewQuestions] = useState<any[]>([])
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [companyId, setCompanyId] = useState<string | null>(null)
   const [interviewPhase, setInterviewPhase] = useState<'setup' | 'greeting' | 'questions' | 'candidate_questions' | 'closing'>('setup')
   const [interviewStartTime, setInterviewStartTime] = useState<number | null>(null)
   const [interviewDuration, setInterviewDuration] = useState(30) // minutes
@@ -212,6 +213,14 @@ export default function InterviewPage() {
           // Set interview duration from first round or default to 30 minutes
           const duration = json.rounds?.[0]?.duration_minutes || 30
           
+          // Get company ID from response (use directly, don't wait for state update)
+          const cId = json.application?.companyId
+          
+          // Store company ID for session endpoint
+          if (cId) {
+            setCompanyId(cId)
+          }
+          
           setJobDetails(details)
           setInterviewQuestions(allQuestions)
           setInterviewDuration(duration)
@@ -219,25 +228,26 @@ export default function InterviewPage() {
           
           console.log('📋 Loaded interview questions:', allQuestions.length)
           console.log('⏱️ Interview duration:', duration, 'minutes')
+          console.log('🏢 Company ID:', cId)
           
-          // Then request permissions with job context
-          await requestPermissions(details, allQuestions, duration)
+          // Then request permissions with job context and company ID
+          await requestPermissions(details, allQuestions, duration, cId)
         } else {
           setCheckingStatus(false)
           // Fallback if questions not available
-          await requestPermissions(null, [], 30)
+          await requestPermissions(null, [], 30, null)
         }
       } catch (e) {
         console.error('Failed to fetch interview questions:', e)
         setCheckingStatus(false)
-        await requestPermissions(null, [], 30)
+        await requestPermissions(null, [], 30, null)
       }
     }
     
     checkStatus()
   }, [applicationId])
 
-  const requestPermissions = async (details: any, questions: any[] = [], duration: number = 30) => {
+  const requestPermissions = async (details: any, questions: any[] = [], duration: number = 30, cId: string | null = null) => {
     setInitializing(true)
     setError(null)
     try {
@@ -260,7 +270,12 @@ export default function InterviewPage() {
       
       // Initialize AI agent session
       logTs('Init: Requesting ephemeral session…')
-      const resp = await fetch('/api/session')
+      const companyIdToUse = cId || companyId
+      if (!companyIdToUse) {
+        throw new Error('Company ID not available for session initialization')
+      }
+      console.log('🏢 Using company ID for session:', companyIdToUse)
+      const resp = await fetch(`/api/session?companyId=${encodeURIComponent(companyIdToUse)}`)
       if (!resp.ok) {
         const j = await resp.json().catch(() => ({}))
         throw new Error(j?.error || 'Failed to init AI agent session')

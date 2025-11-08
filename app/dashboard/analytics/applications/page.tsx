@@ -7,6 +7,8 @@ import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Filter } from "lucide-react"
 
 // NOTE: Replace with real data fetch later
 // Status is either "CV Unqualified" | "CV Qualified"
@@ -29,13 +31,35 @@ export default function ApplicationsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState<Record<string, boolean>>({})
+  const [jobs, setJobs] = useState<{ id: string; title: string }[]>([])
+  const [selectedJobId, setSelectedJobId] = useState<string>(jobId || 'all')
 
   useEffect(() => {
-    const load = async () => {
+    const loadJobs = async () => {
       if (!(company as any)?.id) return
       try {
-        const url = jobId && jobId !== 'all' 
-          ? `/api/analytics/applications?companyId=${(company as any).id}&jobId=${encodeURIComponent(jobId)}`
+        const res = await fetch(`/api/jobs/titles?companyId=${(company as any).id}`, { 
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
+        const data = await res.json()
+        if (data.ok && data.jobs) {
+          setJobs(data.jobs)
+        }
+      } catch (e) {
+        console.error('Failed to load job titles:', e)
+      }
+    }
+
+    const loadApplications = async () => {
+      if (!(company as any)?.id) return
+      setLoading(true)
+      try {
+        const url = selectedJobId && selectedJobId !== 'all' 
+          ? `/api/analytics/applications?companyId=${(company as any).id}&jobId=${encodeURIComponent(selectedJobId)}`
           : `/api/analytics/applications?companyId=${(company as any).id}`
         const res = await fetch(url, { cache: 'no-store' })
         const json = await res.json()
@@ -58,10 +82,12 @@ export default function ApplicationsPage() {
         setLoading(false)
       }
     }
+
     if ((company as any)?.id) {
-      load()
+      loadJobs()
+      loadApplications()
     }
-  }, [jobId, company])
+  }, [selectedJobId, company])
 
   const updateStatus = async (row: ApplicationRow, qualified: boolean) => {
     setSaving((s) => ({ ...s, [row.id]: true }))
@@ -91,9 +117,27 @@ export default function ApplicationsPage() {
     <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Total Applications</h1>
-        <Link href="/dashboard/analytics" className="text-sm text-blue-600 hover:underline">
-          Back to Analytics
-        </Link>
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <Filter className="h-4 w-4 text-gray-500" />
+            <Select value={selectedJobId} onValueChange={setSelectedJobId}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by job title" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Jobs</SelectItem>
+                {jobs.map((job) => (
+                  <SelectItem key={job.id} value={job.id}>
+                    {job.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Link href="/dashboard/analytics" className="text-sm text-blue-600 hover:underline">
+            Back to Analytics
+          </Link>
+        </div>
       </div>
 
       <Card className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
