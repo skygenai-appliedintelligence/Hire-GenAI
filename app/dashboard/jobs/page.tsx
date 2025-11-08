@@ -323,8 +323,7 @@ export default function JobsPage() {
               jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'open').map((job) => (
                 <Card
                   key={job.id}
-                  className="group border border-gray-200 bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer hover:border-emerald-200 overflow-hidden"
-                  onClick={() => handleStoreJD(job)}
+                  className="group border border-gray-200 bg-white rounded-xl shadow-sm transition-all duration-300 overflow-hidden"
                 >
                   <CardHeader className="pb-4 pt-5 px-6">
                     <div className="flex items-start justify-between gap-4 mb-3">
@@ -473,17 +472,7 @@ export default function JobsPage() {
                           <Eye className="h-3.5 w-3.5 mr-1.5" />
                           View
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300 transition-all"
-                          onMouseDown={(e) => e.stopPropagation()}
-                          disabled={deletingId === job.id}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                          {deletingId === job.id ? 'Deleting…' : 'Delete'}
-                        </Button>
+                        
                       </div>
                     </div>
                   </CardContent>
@@ -507,8 +496,7 @@ export default function JobsPage() {
               jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'cancelled').map((job) => (
                 <Card
                   key={job.id}
-                  className="group border border-gray-200 bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer hover:border-emerald-200 overflow-hidden"
-                  onClick={() => handleStoreJD(job)}
+                  className="group border border-gray-200 bg-white rounded-xl shadow-sm transition-all duration-300 overflow-hidden"
                 >
                   <CardHeader className="pb-4 pt-5 px-6">
                     <div className="flex items-start justify-between gap-4 mb-3">
@@ -639,17 +627,7 @@ export default function JobsPage() {
                           <Eye className="h-3.5 w-3.5 mr-1.5" />
                           View
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300 transition-all"
-                          onMouseDown={(e) => e.stopPropagation()}
-                          disabled={deletingId === job.id}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                          {deletingId === job.id ? 'Deleting…' : 'Delete'}
-                        </Button>
+                        
                       </div>
                     </div>
                   </CardContent>
@@ -673,8 +651,7 @@ export default function JobsPage() {
               jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'on_hold').map((job) => (
                 <Card
                   key={job.id}
-                  className="group border border-gray-200 bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer hover:border-emerald-200 overflow-hidden"
-                  onClick={() => handleStoreJD(job)}
+                  className="group border border-gray-200 bg-white rounded-xl shadow-sm transition-all duration-300 overflow-hidden"
                 >
                   <CardHeader className="pb-4 pt-5 px-6">
                     <div className="flex items-start justify-between gap-4 mb-3">
@@ -805,17 +782,7 @@ export default function JobsPage() {
                           <Eye className="h-3.5 w-3.5 mr-1.5" />
                           View
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300 transition-all"
-                          onMouseDown={(e) => e.stopPropagation()}
-                          disabled={deletingId === job.id}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                          {deletingId === job.id ? 'Deleting…' : 'Delete'}
-                        </Button>
+                        
                       </div>
                     </div>
                   </CardContent>
@@ -839,8 +806,7 @@ export default function JobsPage() {
               jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'closed').map((job) => (
                 <Card
                   key={job.id}
-                  className="group border border-gray-200 bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 cursor-pointer hover:border-emerald-200 overflow-hidden"
-                  onClick={() => handleStoreJD(job)}
+                  className="group border border-gray-200 bg-white rounded-xl shadow-sm transition-all duration-300 overflow-hidden"
                 >
                   <CardHeader className="pb-4 pt-5 px-6">
                     <div className="flex items-start justify-between gap-4 mb-3">
@@ -984,17 +950,7 @@ export default function JobsPage() {
                           <Eye className="h-3.5 w-3.5 mr-1.5" />
                           View
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.id) }}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300 transition-all"
-                          onMouseDown={(e) => e.stopPropagation()}
-                          disabled={deletingId === job.id}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                          {deletingId === job.id ? 'Deleting…' : 'Delete'}
-                        </Button>
+                        
                       </div>
                     </div>
                   </CardContent>

@@ -93,7 +93,7 @@ export default async function JobDetailPage(
   const isJobOpen = jobStatus === 'open';
   
   // Only redirect for completely invalid/missing jobs, not for closed jobs
-  if (!jobStatus || !['active', 'open', 'closed', 'paused', 'draft'].includes(jobStatus)) {
+  if (!jobStatus || !['active', 'open', 'closed', 'paused', 'draft', 'on_hold'].includes(jobStatus)) {
     return redirect(`/${companySlug}`);
   }
 
@@ -162,7 +162,7 @@ export default async function JobDetailPage(
                   title={`Applications are currently ${jobStatus} for this position`}
                   className="inline-flex items-center justify-center rounded-xl bg-slate-400 text-slate-200 px-4 py-2 font-semibold shadow-md cursor-not-allowed opacity-60"
                 >
-                  Apply Now ({jobStatus})
+                  Apply Now ({jobStatus === 'on_hold' ? 'On Hold' : jobStatus.charAt(0).toUpperCase() + jobStatus.slice(1)})
                 </button>
               )}
             </div>
@@ -220,7 +220,7 @@ export default async function JobDetailPage(
               title={`Applications are currently ${jobStatus} for this position`}
               className="inline-flex w-full items-center justify-center rounded-xl bg-slate-400 text-slate-200 px-5 py-3 font-semibold shadow-md cursor-not-allowed opacity-60"
             >
-              Apply Now ({jobStatus})
+              Apply Now ({jobStatus === 'on_hold' ? 'On Hold' : jobStatus.charAt(0).toUpperCase() + jobStatus.slice(1)})
             </button>
           )}
         </div>
@@ -320,7 +320,7 @@ export default async function JobDetailPage(
                   <dd className={`font-medium leading-6 min-w-0 break-words whitespace-pre-line capitalize ${
                     isJobOpen ? 'text-emerald-700' : 'text-slate-600'
                   }`}>
-                    {jobStatus}
+                    {jobStatus === 'on_hold' ? 'On Hold' : jobStatus === 'closed' ? 'Closed' : jobStatus}
                     {!isJobOpen && ' - Applications not accepted'}
                   </dd>
                 </div>
@@ -344,7 +344,7 @@ export default async function JobDetailPage(
                     title={`Applications are currently ${jobStatus} for this position`}
                     className="inline-flex w-full items-center justify-center rounded-xl bg-slate-400 text-slate-200 px-5 py-2.5 font-semibold shadow-lg cursor-not-allowed opacity-60"
                   >
-                    Apply Now ({jobStatus})
+                    Apply Now ({jobStatus === 'on_hold' ? 'On Hold' : jobStatus.charAt(0).toUpperCase() + jobStatus.slice(1)})
                   </button>
                 )}
                 <button
