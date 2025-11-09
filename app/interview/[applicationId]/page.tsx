@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff } from "lucide-react"
+import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, CheckCircle2, X, Briefcase } from "lucide-react"
 
 export default function InterviewPage() {
   const params = useParams()
@@ -26,6 +26,7 @@ export default function InterviewPage() {
   const [interviewPhase, setInterviewPhase] = useState<'setup' | 'greeting' | 'questions' | 'candidate_questions' | 'closing'>('setup')
   const [interviewStartTime, setInterviewStartTime] = useState<number | null>(null)
   const [interviewDuration, setInterviewDuration] = useState(30) // minutes
+  const [showInstructions, setShowInstructions] = useState(true)
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const dcRef = useRef<RTCDataChannel | null>(null)
   const agentTextBufferRef = useRef<string>("")
@@ -764,82 +765,297 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
     )
   }
 
+  // Instruction Modal
+  const InstructionModal = () => (
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center transition-all duration-300 ${showInstructions ? 'bg-black/60 backdrop-blur-sm' : 'pointer-events-none'}`}>
+      <div className={`bg-gradient-to-br from-slate-900 to-slate-800 border border-emerald-500/30 rounded-2xl shadow-2xl max-w-xl w-full mx-4 transform transition-all duration-300 ${showInstructions ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
+        {/* Header */}
+        <div className="border-b border-emerald-500/20 px-5 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center">
+              <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Interview Instructions</h2>
+              <p className="text-xs text-slate-400">Please read before starting</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setShowInstructions(false)}
+            className="text-slate-400 hover:text-white transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="px-5 py-5 space-y-4">
+          {/* Checklist Items */}
+          <div className="space-y-3">
+            <div className="flex gap-3">
+              <div className="flex-shrink-0">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400 mt-0.5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-white text-sm mb-0.5">Ensure Good Lighting</h3>
+                <p className="text-xs text-slate-400">Position yourself in a well-lit area. Avoid backlighting or shadows on your face.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="flex-shrink-0">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400 mt-0.5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-white text-sm mb-0.5">Test Your Microphone & Camera</h3>
+                <p className="text-xs text-slate-400">Make sure both are working properly before you start. You'll see your video feed below.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="flex-shrink-0">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400 mt-0.5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-white text-sm mb-0.5">Stable Internet Connection</h3>
+                <p className="text-xs text-slate-400">Use a wired connection if possible. Avoid WiFi interference for better stability.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="flex-shrink-0">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400 mt-0.5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-white text-sm mb-0.5">Quiet Environment</h3>
+                <p className="text-xs text-slate-400">Choose a quiet place with minimal background noise for the best experience.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="flex-shrink-0">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400 mt-0.5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-white text-sm mb-0.5">Keep Camera On</h3>
+                <p className="text-xs text-slate-400">Your camera must remain on throughout the entire interview session.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="flex-shrink-0">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400 mt-0.5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-white text-sm mb-0.5">Professional Setting</h3>
+                <p className="text-xs text-slate-400">Ensure your background is clean and professional. Avoid distractions.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Important Note */}
+          <div className="bg-emerald-600/10 border border-emerald-500/30 rounded-lg p-3">
+            <p className="text-xs text-emerald-200">
+              <span className="font-semibold">💡 Tip:</span> The interview will be recorded for evaluation purposes. Speak clearly and take your time answering questions.
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-emerald-500/20 px-5 py-4 flex gap-2 justify-end">
+          <Button 
+            onClick={() => setShowInstructions(false)}
+            className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold shadow-lg text-sm px-4 py-2"
+          >
+            I Understand, Let's Start
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="border-b bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-slate-800">AI Video Interview</h1>
-          <div className="text-sm text-slate-500">Application ID: {applicationId.substring(0, 8)}...</div>
+    <>
+      {/* Instruction Modal */}
+      <InstructionModal />
+
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Header */}
+      <header className="border-b border-emerald-500/20 bg-slate-900/50 backdrop-blur-md sticky top-0 z-40">
+        <div className="mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg">
+              <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-white">AI Interview Session</h1>
+              <p className="text-xs text-slate-400">Real-time Assessment</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:block text-right">
+              <div className="text-[10px] uppercase tracking-wide text-slate-400">Job Role</div>
+              <div className="text-sm font-semibold text-emerald-300 max-w-[300px] truncate">{jobDetails?.jobTitle || 'Position'}</div>
+              <div className="text-[11px] text-slate-400 truncate">{jobDetails?.company || 'Company'}</div>
+            </div>
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-600/10 backdrop-blur px-3 py-2 flex items-center gap-2 shadow-sm">
+              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white shadow">
+                <Briefcase className="h-4 w-4" />
+              </div>
+              <div className="sm:hidden">
+                <div className="text-[10px] uppercase tracking-wide text-emerald-200">Job Role</div>
+                <div className="text-xs font-semibold text-emerald-100 max-w-[140px] truncate">{jobDetails?.jobTitle || 'Position'}</div>
+              </div>
+            </div>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Fixed 16:9 container */}
-        <div className="relative rounded-2xl overflow-hidden shadow-2xl bg-black max-w-4xl mx-auto aspect-video">
-          {/* User camera preview */}
-          <div className="absolute inset-0 flex items-center justify-center bg-black">
-            <video
-              ref={userVideoRef}
-              className={`block w-full h-full object-cover object-center ${camOn ? '' : 'opacity-40'}`}
-              style={{ transform: 'scaleX(-1)', transformOrigin: 'center center' }}
-              muted
-              playsInline
-              autoPlay
-            />
-          </div>
-
-
-          {/* Picture-in-picture Avatar overlay */}
-          <div className="absolute left-4 bottom-4">
-            <div className="relative rounded-xl overflow-hidden border border-white/20 shadow-xl bg-black/60 backdrop-blur-sm">
+      {/* Main Content */}
+      <main className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4 sm:px-6 lg:px-8 py-6">
+        {/* Video Container - Responsive with max-width constraint */}
+        <div className="w-full max-w-4xl">
+          {/* 16:9 Aspect Ratio Container */}
+          <div className="relative rounded-3xl overflow-hidden shadow-2xl bg-black aspect-video group">
+            {/* User camera preview */}
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 to-black">
               <video
-                ref={avatarVideoRef}
-                src="https://storage.googleapis.com/ai_recruiter_bucket_prod/assets/videos/olivia_character_no_audio.mp4"
-                className="w-[220px] h-[124px] md:w-[260px] md:h-[146px] object-cover"
+                ref={userVideoRef}
+                className={`block w-full h-full object-cover object-center transition-opacity duration-300 ${camOn ? 'opacity-100' : 'opacity-30'}`}
+                style={{ transform: 'scaleX(-1)', transformOrigin: 'center center' }}
                 muted
                 playsInline
-                preload="auto"
-                onEnded={() => {
-                  // First play: video plays fully from 0 to end
-                  // Subsequent plays: loop from 3 seconds to end
-                  if (avatarVideoRef.current) {
-                    avatarVideoRef.current.currentTime = 3
-                    avatarVideoRef.current.play()
-                    avatarFirstPlayRef.current = false
-                  }
-                }}
+                autoPlay
               />
-              <audio ref={agentAudioRef} className="hidden" />
-              <div className="absolute left-2 bottom-2 text-[10px] md:text-xs text-white/90">
-                Olivia
+              {!camOn && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
+                  <div className="h-20 w-20 rounded-full bg-slate-700 flex items-center justify-center mb-4">
+                    <VideoOff className="h-10 w-10 text-slate-400" />
+                  </div>
+                  <p className="text-slate-300 font-medium">Camera is off</p>
+                </div>
+              )}
+            </div>
+
+            {/* Picture-in-picture Avatar overlay */}
+            <div className="absolute right-4 bottom-6 md:right-6 md:bottom-8">
+              <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-500/40 shadow-2xl bg-black/80 backdrop-blur-md hover:border-emerald-500/60 transition-all duration-300">
+                <video
+                  ref={avatarVideoRef}
+                  src="https://storage.googleapis.com/ai_recruiter_bucket_prod/assets/videos/olivia_character_no_audio.mp4"
+                  className="w-[150px] h-[84px] md:w-[220px] md:h-[124px] object-cover"
+                  muted
+                  playsInline
+                  preload="auto"
+                  onEnded={() => {
+                    if (avatarVideoRef.current) {
+                      avatarVideoRef.current.currentTime = 3
+                      avatarVideoRef.current.play()
+                      avatarFirstPlayRef.current = false
+                    }
+                  }}
+                />
+                <audio ref={agentAudioRef} className="hidden" />
+                <div className="absolute left-2 bottom-2 text-[9px] md:text-xs font-semibold text-emerald-300 drop-shadow-lg">
+                  Olivia
+                </div>
+                {agentReady && (
+                  <div className="absolute top-2 right-2 flex items-center gap-1 bg-emerald-600/90 text-white text-[9px] md:text-xs px-2 py-0.5 rounded-full shadow-lg">
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-200 animate-pulse"></div>
+                    Connected
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Controls bar - Bottom center */}
+            <div className="absolute left-1/2 -translate-x-1/2 bottom-6 flex items-center gap-3 bg-slate-900/95 backdrop-blur-xl rounded-full shadow-2xl px-6 py-3 border border-emerald-500/20 z-50 group-hover:border-emerald-500/40 transition-all duration-300">
+              {/* Mic Button */}
+              <Button 
+                size="icon" 
+                variant="ghost" 
+                className={`rounded-full transition-all duration-300 ${
+                  micOn 
+                    ? 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 hover:text-emerald-300' 
+                    : 'bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300'
+                }`}
+                onClick={toggleMic} 
+                title={micOn ? 'Mute microphone' : 'Unmute microphone'}
+              >
+                {micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+              </Button>
+
+              {/* Camera Button */}
+              <Button 
+                size="icon" 
+                variant="ghost" 
+                className={`rounded-full transition-all duration-300 ${
+                  camOn 
+                    ? 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 hover:text-emerald-300' 
+                    : 'bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300'
+                }`}
+                onClick={toggleCam} 
+                title={camOn ? 'Turn off camera' : 'Turn on camera'}
+              >
+                {camOn ? <VideoIcon className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+              </Button>
+
+              {/* Divider */}
+              <div className="h-6 w-px bg-slate-700/50"></div>
+
+              {/* End Interview Button */}
+              <Button 
+                size="icon" 
+                className="rounded-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 relative z-50" 
+                onClick={endInterview} 
+                title="End interview session"
+              >
+                <PhoneOff className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Timer/Status - Top right */}
+            <div className="absolute top-6 right-6 flex flex-col items-end gap-2 z-40">
+              <div className="bg-slate-900/80 backdrop-blur-md border border-slate-700/50 text-white text-xs px-4 py-2 rounded-lg font-medium">
+                <span className="text-slate-400">Status: </span>
+                <span className="text-emerald-400 font-semibold">Recording</span>
               </div>
             </div>
           </div>
 
-          {/* Controls bar */}
-          <div className="absolute left-1/2 -translate-x-1/2 bottom-6 flex items-center gap-4 bg-white/90 backdrop-blur rounded-full shadow-lg px-4 py-2 z-50">
-            <Button size="icon" variant="ghost" className="rounded-full" onClick={toggleMic} title={micOn ? 'Mute mic' : 'Unmute mic'}>
-              {micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-            </Button>
-            <Button size="icon" variant="ghost" className="rounded-full" onClick={toggleCam} title={camOn ? 'Turn off camera' : 'Turn on camera'}>
-              {camOn ? <VideoIcon className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-            </Button>
-            <Button size="icon" className="rounded-full bg-red-500 hover:bg-red-600 text-white relative z-50" onClick={endInterview} title="End interview">
-              <PhoneOff className="h-5 w-5" />
-            </Button>
-          </div>
-
-          {/* Interview status */}
-          {agentReady && (
-            <div className="absolute right-4 bottom-6">
-              <div className="bg-emerald-600 text-white text-xs px-3 py-1 rounded-full shadow">
-                Agent Connected
+          {/* Instructions below video */}
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-slate-800/50 backdrop-blur border border-slate-700/50 rounded-xl p-4 text-sm text-slate-300">
+              <div className="flex items-center gap-2 mb-2">
+                <Mic className="h-4 w-4 text-emerald-400" />
+                <span className="font-semibold text-white">Microphone</span>
               </div>
+              <p className="text-xs text-slate-400">Ensure your mic is on and working properly</p>
             </div>
-          )}
-
+            <div className="bg-slate-800/50 backdrop-blur border border-slate-700/50 rounded-xl p-4 text-sm text-slate-300">
+              <div className="flex items-center gap-2 mb-2">
+                <VideoIcon className="h-4 w-4 text-emerald-400" />
+                <span className="font-semibold text-white">Camera</span>
+              </div>
+              <p className="text-xs text-slate-400">Keep your camera on throughout the interview</p>
+            </div>
+            <div className="bg-slate-800/50 backdrop-blur border border-slate-700/50 rounded-xl p-4 text-sm text-slate-300">
+              <div className="flex items-center gap-2 mb-2">
+                <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span className="font-semibold text-white">Connection</span>
+              </div>
+              <p className="text-xs text-slate-400">Maintain a stable internet connection</p>
+            </div>
+          </div>
         </div>
       </main>
     </div>
+    </>
   )
 }
