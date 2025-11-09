@@ -20,9 +20,9 @@ export default function InterviewPage() {
   const [agentReady, setAgentReady] = useState(false)
   const [sessionInfo, setSessionInfo] = useState<any>(null)
   const [jobDetails, setJobDetails] = useState<any>(null)
+  const [companyId, setCompanyId] = useState<string | null>(null)
   const [interviewQuestions, setInterviewQuestions] = useState<any[]>([])
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
-  const [companyId, setCompanyId] = useState<string | null>(null)
   const [interviewPhase, setInterviewPhase] = useState<'setup' | 'greeting' | 'questions' | 'candidate_questions' | 'closing'>('setup')
   const [interviewStartTime, setInterviewStartTime] = useState<number | null>(null)
   const [interviewDuration, setInterviewDuration] = useState(30) // minutes
@@ -200,6 +200,12 @@ export default function InterviewPage() {
             candidateName: json.application?.candidateName || 'Candidate'
           }
           
+          // Store companyId for session creation
+          const fetchedCompanyId = json.application?.companyId || null
+          if (fetchedCompanyId) {
+            setCompanyId(fetchedCompanyId)
+          }
+          
           // Extract all questions from all rounds
           const allQuestions = json.rounds?.flatMap((round: any) => 
             round.questions?.map((q: string, index: number) => ({
@@ -213,14 +219,6 @@ export default function InterviewPage() {
           // Set interview duration from first round or default to 30 minutes
           const duration = json.rounds?.[0]?.duration_minutes || 30
           
-          // Get company ID from response (use directly, don't wait for state update)
-          const cId = json.application?.companyId
-          
-          // Store company ID for session endpoint
-          if (cId) {
-            setCompanyId(cId)
-          }
-          
           setJobDetails(details)
           setInterviewQuestions(allQuestions)
           setInterviewDuration(duration)
@@ -228,10 +226,9 @@ export default function InterviewPage() {
           
           console.log('📋 Loaded interview questions:', allQuestions.length)
           console.log('⏱️ Interview duration:', duration, 'minutes')
-          console.log('🏢 Company ID:', cId)
           
-          // Then request permissions with job context and company ID
-          await requestPermissions(details, allQuestions, duration, cId)
+          // Then request permissions with job context
+          await requestPermissions(details, allQuestions, duration, fetchedCompanyId)
         } else {
           setCheckingStatus(false)
           // Fallback if questions not available
@@ -247,7 +244,7 @@ export default function InterviewPage() {
     checkStatus()
   }, [applicationId])
 
-  const requestPermissions = async (details: any, questions: any[] = [], duration: number = 30, cId: string | null = null) => {
+  const requestPermissions = async (details: any, questions: any[] = [], duration: number = 30, fetchedCompanyId: string | null = null) => {
     setInitializing(true)
     setError(null)
     try {
@@ -270,12 +267,16 @@ export default function InterviewPage() {
       
       // Initialize AI agent session
       logTs('Init: Requesting ephemeral session…')
-      const companyIdToUse = cId || companyId
-      if (!companyIdToUse) {
-        throw new Error('Company ID not available for session initialization')
+      
+      // Use fetchedCompanyId parameter or fall back to state
+      const activeCompanyId = fetchedCompanyId || companyId
+      
+      if (!activeCompanyId) {
+        throw new Error('Company ID not available. Please refresh the page.')
       }
-      console.log('🏢 Using company ID for session:', companyIdToUse)
-      const resp = await fetch(`/api/session?companyId=${encodeURIComponent(companyIdToUse)}`)
+      
+      console.log('🏢 Using Company ID:', activeCompanyId)
+      const resp = await fetch(`/api/session?companyId=${encodeURIComponent(activeCompanyId)}`)
       if (!resp.ok) {
         const j = await resp.json().catch(() => ({}))
         throw new Error(j?.error || 'Failed to init AI agent session')
