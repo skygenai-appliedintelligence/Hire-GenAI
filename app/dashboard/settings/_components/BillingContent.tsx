@@ -11,6 +11,13 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { 
   Wallet, 
   CreditCard, 
@@ -22,7 +29,6 @@ import {
   Download,
   Calendar,
   DollarSign,
-  Zap,
   Settings as SettingsIcon,
   Shield
 } from "lucide-react"
@@ -50,6 +56,7 @@ export default function BillingContent({ companyId }: BillingContentProps) {
   const [jobs, setJobs] = useState<any[]>([])
   const [profitMargin, setProfitMargin] = useState<number>(20)
   const [companyData, setCompanyData] = useState<any>(null)
+  const [showFreeTrialPopup, setShowFreeTrialPopup] = useState(false)
   
   // Settings
   const [autoRecharge, setAutoRecharge] = useState(true)
@@ -68,6 +75,17 @@ export default function BillingContent({ companyId }: BillingContentProps) {
   // Tab state management
   const [currentTab, setCurrentTab] = useState<string>("overview")
   const lastSyncedTabRef = useRef<string>("overview")
+
+  // Show free trial popup when on overview tab and wallet balance is $0
+  useEffect(() => {
+    if (currentTab === 'overview' && billingData && billingData.walletBalance <= 0 && billingData.status === 'trial') {
+      // Small delay to ensure smooth transition
+      const timer = setTimeout(() => {
+        setShowFreeTrialPopup(true)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [currentTab, billingData])
 
   useEffect(() => {
     if (companyId) {
@@ -313,7 +331,7 @@ export default function BillingContent({ companyId }: BillingContentProps) {
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { color: string; icon: any; label: string }> = {
-      trial: { color: 'bg-blue-100 text-blue-800', icon: Zap, label: 'Free Trial' },
+      trial: { color: 'bg-blue-100 text-blue-800', icon: AlertCircle, label: 'Free Trial' },
       active: { color: 'bg-green-100 text-green-800', icon: CheckCircle, label: 'Active' },
       past_due: { color: 'bg-red-100 text-red-800', icon: AlertCircle, label: 'Past Due' },
       suspended: { color: 'bg-gray-100 text-gray-800', icon: XCircle, label: 'Suspended' },
@@ -332,6 +350,79 @@ export default function BillingContent({ companyId }: BillingContentProps) {
 
   return (
     <div className="space-y-6">
+      {/* Free Trial Popup Dialog - Simple & Compact */}
+      <Dialog open={showFreeTrialPopup} onOpenChange={setShowFreeTrialPopup}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">
+              Welcome to HireGenAI! You're currently on a free trial with limited access.
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            {/* Trial Limits - Compact */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <h4 className="font-medium text-amber-900">Your Free Trial Includes:</h4>
+              </div>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-center gap-2">
+                  {billingData?.trialInfo?.canCreateJD ? (
+                    <XCircle className="h-4 w-4 text-red-600" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-red-600" />
+                  )}
+                  <span>Create <strong>1 Job Description</strong></span>
+                  <span className="text-xs text-red-600">
+                    {billingData?.trialInfo?.canCreateJD ? '' : 'Used - Recharge to create more jobs'}
+                  </span>
+                </li>
+                <li className="flex items-center gap-2">
+                  {billingData?.trialInfo?.canRunInterview ? (
+                    <XCircle className="h-4 w-4 text-red-600" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-red-600" />
+                  )}
+                  <span>Conduct <strong>1 Interview</strong></span>
+                  <span className="text-xs text-red-600">
+                    {billingData?.trialInfo?.canRunInterview ? '' : 'Used - Recharge to conduct more interviews'}
+                  </span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span>Send <strong>1 Interview Link</strong></span>
+                  <span className="text-xs text-gray-600">Share interview invitations with candidates</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Action Buttons - Compact */}
+            <div className="flex items-center gap-3 pt-2">
+              <Button 
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => {
+                  setShowFreeTrialPopup(false)
+                  setTimeout(() => {
+                    const paypalSection = document.getElementById('paypal-subscription-section')
+                    if (paypalSection) {
+                      paypalSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                    }
+                  }, 100)
+                }}
+              >
+                Recharge Wallet
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => setShowFreeTrialPopup(false)}
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Past Due Banner */}
       {billingData?.status === 'past_due' && (
@@ -350,30 +441,7 @@ export default function BillingContent({ companyId }: BillingContentProps) {
         </Card>
       )}
 
-      {/* Free Trial Banner */}
-      {billingData?.status === 'trial' && billingData?.walletBalance <= 0 && (
-        <Card className="border-amber-200 bg-amber-50">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-4">
-              <AlertCircle className="h-6 w-6 text-amber-600" />
-              <div className="flex-1">
-                <h3 className="font-semibold text-amber-900 mb-1">🎉 Free Trial Active</h3>
-                <p className="text-sm text-amber-700 mb-3">
-                  You have limited access during your free trial:
-                </p>
-                <ul className="text-sm text-amber-700 space-y-1 ml-4 list-disc">
-                  <li>Create <strong>1 Job Description</strong> {billingData?.trialInfo?.canCreateJD ? '✅' : '❌'}</li>
-                  <li>Conduct <strong>1 Interview</strong> {billingData?.trialInfo?.canRunInterview ? '✅' : '❌'}</li>
-                  <li>Send <strong>1 Interview Link</strong></li>
-                </ul>
-                <p className="text-sm text-amber-700 mt-3">
-                  <strong>Recharge your wallet to unlock unlimited access!</strong>
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Removed inline banner - now shown as popup */}
 
       <Tabs 
         value={currentTab} 
@@ -456,7 +524,7 @@ export default function BillingContent({ companyId }: BillingContentProps) {
           </div>
 
           {/* PayPal Subscription */}
-          <Card>
+          <Card id="paypal-subscription-section">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />

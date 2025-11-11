@@ -509,9 +509,9 @@ export default function PricingPage() {
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
-                    Blog
-                  </a>
+                  <Link href="/admin-hiregenai" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-400 transition-colors">
+                    Admin
+                  </Link>
                 </li>
               </ul>
             </div>
