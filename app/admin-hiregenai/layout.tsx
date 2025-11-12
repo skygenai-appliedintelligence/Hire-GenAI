@@ -36,7 +36,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/admin/logout", { method: "POST" })
+      await fetch("/api/admin/logout-direct", { method: "POST" })
     } catch (error) {
       console.error("Logout error:", error)
     }
@@ -47,8 +47,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     // Check if user is authenticated and is admin
     const checkAuth = async () => {
       try {
-        const res = await fetch("/api/admin/auth-check")
+        const res = await fetch("/api/admin/auth-check-direct")
         if (!res.ok) {
+          console.log("Auth check failed, redirecting to home")
           router.push("/")
           return
         }
