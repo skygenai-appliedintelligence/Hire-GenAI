@@ -34,6 +34,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   const currentTab = pathname.split("/").pop() || "overview"
 
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/admin/logout", { method: "POST" })
+    } catch (error) {
+      console.error("Logout error:", error)
+    }
+    router.push("/owner-login")
+  }
+
   useEffect(() => {
     // Check if user is authenticated and is admin
     const checkAuth = async () => {
@@ -125,10 +134,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             variant="outline"
             size="sm"
             className="w-full text-slate-300 border-slate-700 hover:bg-slate-800"
-            onClick={() => router.push("/")}
+            onClick={handleLogout}
           >
             <LogOut className="w-4 h-4 mr-2" />
-            {sidebarOpen && "Exit"}
+            {sidebarOpen && "Logout"}
           </Button>
         </div>
       </div>

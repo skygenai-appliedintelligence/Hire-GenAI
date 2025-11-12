@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
         `SELECT 
           COALESCE(SUM(cost), 0) as total,
           COALESCE(SUM(CASE WHEN DATE(created_at) = CURRENT_DATE THEN cost ELSE 0 END), 0) as today,
-          COALESCE(SUM(CASE WHEN DATE(created_at) = CURRENT_DATE - INTERVAL 1 DAY THEN cost ELSE 0 END), 0) as yesterday
+          COALESCE(SUM(CASE WHEN DATE(created_at) = CURRENT_DATE - INTERVAL '1 day' THEN cost ELSE 0 END), 0) as yesterday
         FROM (
           SELECT cost, created_at FROM cv_parsing_usage
           UNION ALL
@@ -27,7 +27,12 @@ export async function GET(req: NextRequest) {
           SELECT cost, created_at FROM video_interview_usage
         ) usage`
       )
-      spendData = totalSpendRes[0] || { total: 0, today: 0, yesterday: 0 }
+      const rawData = totalSpendRes[0] || { total: 0, today: 0, yesterday: 0 }
+      spendData = {
+        total: typeof rawData.total === 'number' ? rawData.total : parseFloat(rawData.total) || 0,
+        today: typeof rawData.today === 'number' ? rawData.today : parseFloat(rawData.today) || 0,
+        yesterday: typeof rawData.yesterday === 'number' ? rawData.yesterday : parseFloat(rawData.yesterday) || 0,
+      }
     } catch (err) {
       console.warn("Failed to fetch spend data, using defaults:", err)
     }
@@ -35,30 +40,34 @@ export async function GET(req: NextRequest) {
     try {
       const interviewsRes = await DatabaseService.query(
         `SELECT 
-          COUNT(*) as total,
-          SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful
+          COUNT(*)::int as total,
+          COALESCE(SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END), 0)::int as successful
         FROM interviews
-        WHERE DATE(created_at) = CURRENT_DATE`
+        WHERE DATE(completed_at) = CURRENT_DATE`
       )
-      interviewData = interviewsRes[0] || { total: 0, successful: 0 }
+      const rawInterviewData = interviewsRes[0] || { total: 0, successful: 0 }
+      interviewData = {
+        total: typeof rawInterviewData.total === 'number' ? rawInterviewData.total : parseInt(rawInterviewData.total) || 0,
+        successful: typeof rawInterviewData.successful === 'number' ? rawInterviewData.successful : parseInt(rawInterviewData.successful) || 0,
+      }
     } catch (err) {
       console.warn("Failed to fetch interview data, using defaults:", err)
     }
 
     try {
       const companiesRes = await DatabaseService.query(
-        `SELECT COUNT(DISTINCT id) as count FROM companies WHERE status IN ('active', 'trial')`
+        `SELECT COUNT(DISTINCT id)::int as count FROM companies WHERE status IN ('active', 'trial')`
       )
-      companiesCount = parseInt(companiesRes[0]?.count) || 0
+      companiesCount = companiesRes[0]?.count || 0
     } catch (err) {
       console.warn("Failed to fetch companies count, using default:", err)
     }
 
     try {
       const jobsRes = await DatabaseService.query(
-        `SELECT COUNT(DISTINCT id) as count FROM jobs WHERE status = 'open'`
+        `SELECT COUNT(DISTINCT id)::int as count FROM jobs WHERE status = 'open'`
       )
-      jobsCount = parseInt(jobsRes[0]?.count) || 0
+      jobsCount = jobsRes[0]?.count || 0
     } catch (err) {
       console.warn("Failed to fetch jobs count, using default:", err)
     }
@@ -83,7 +92,7 @@ export async function GET(req: NextRequest) {
       const spendTrendRes = await DatabaseService.query(
         `SELECT 
           DATE(created_at) as date,
-          COALESCE(SUM(cost), 0) as spend
+          COALESCE(SUM(cost), 0)::float as spend
         FROM (
           SELECT cost, created_at FROM cv_parsing_usage WHERE created_at >= $1
           UNION ALL
@@ -97,7 +106,7 @@ export async function GET(req: NextRequest) {
       )
       spendTrend = (spendTrendRes || []).map((row: any) => ({
         date: new Date(row.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-        spend: typeof row.spend === 'string' ? parseFloat(row.spend) : row.spend,
+        spend: typeof row.spend === 'string' ? parseFloat(row.spend) : (typeof row.spend === 'number' ? row.spend : 0),
       }))
     } catch (err) {
       console.warn("Failed to fetch spend trend:", err)
@@ -108,17 +117,17 @@ export async function GET(req: NextRequest) {
     try {
       const interviewTrendRes = await DatabaseService.query(
         `SELECT 
-          DATE(created_at) as date,
-          COUNT(*) as count
+          DATE(completed_at) as date,
+          COUNT(*)::int as count
         FROM interviews
-        WHERE created_at >= $1
-        GROUP BY DATE(created_at)
+        WHERE completed_at >= $1
+        GROUP BY DATE(completed_at)
         ORDER BY date ASC`,
         [thirtyDaysAgo]
       )
       interviewTrend = (interviewTrendRes || []).map((row: any) => ({
         date: new Date(row.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-        count: typeof row.count === 'string' ? parseInt(row.count) : row.count,
+        count: typeof row.count === 'string' ? parseInt(row.count) : (typeof row.count === 'number' ? row.count : 0),
       }))
     } catch (err) {
       console.warn("Failed to fetch interview trend:", err)
@@ -130,7 +139,7 @@ export async function GET(req: NextRequest) {
     // Alert: High spend companies
     try {
       const highSpendRes = await DatabaseService.query(
-        `SELECT name, monthly_spend_cap, 
+        `SELECT c.name, cb.monthly_spend_cap, 
           (SELECT COALESCE(SUM(cost), 0) FROM (
             SELECT cost FROM cv_parsing_usage WHERE company_id = c.id AND DATE(created_at) >= DATE_TRUNC('month', CURRENT_DATE)
             UNION ALL
@@ -139,14 +148,15 @@ export async function GET(req: NextRequest) {
             SELECT cost FROM video_interview_usage WHERE company_id = c.id AND DATE(created_at) >= DATE_TRUNC('month', CURRENT_DATE)
           ) m) as month_spent
         FROM companies c
-        WHERE monthly_spend_cap IS NOT NULL
-        HAVING (SELECT COALESCE(SUM(cost), 0) FROM (
+        JOIN company_billing cb ON c.id = cb.company_id
+        WHERE cb.monthly_spend_cap IS NOT NULL
+        AND (SELECT COALESCE(SUM(cost), 0) FROM (
           SELECT cost FROM cv_parsing_usage WHERE company_id = c.id AND DATE(created_at) >= DATE_TRUNC('month', CURRENT_DATE)
           UNION ALL
           SELECT cost FROM question_generation_usage WHERE company_id = c.id AND DATE(created_at) >= DATE_TRUNC('month', CURRENT_DATE)
           UNION ALL
           SELECT cost FROM video_interview_usage WHERE company_id = c.id AND DATE(created_at) >= DATE_TRUNC('month', CURRENT_DATE)
-        ) m) > monthly_spend_cap * 0.8`
+        ) m) > cb.monthly_spend_cap * 0.8`
       )
 
       if (highSpendRes && highSpendRes.length > 0) {
@@ -165,7 +175,9 @@ export async function GET(req: NextRequest) {
     // Alert: Low wallet balance
     try {
       const lowWalletRes = await DatabaseService.query(
-        `SELECT COUNT(*) as count FROM companies WHERE wallet_balance < 100 AND status = 'active'`
+        `SELECT COUNT(*)::int as count FROM company_billing cb
+        JOIN companies c ON cb.company_id = c.id
+        WHERE cb.wallet_balance < 100 AND c.status = 'active'`
       )
       if (lowWalletRes[0]?.count > 0) {
         alerts.push({
@@ -181,7 +193,7 @@ export async function GET(req: NextRequest) {
     // Alert: Failed interviews
     try {
       const failedRes = await DatabaseService.query(
-        `SELECT COUNT(*) as count FROM interviews WHERE status = 'failed' AND DATE(created_at) = CURRENT_DATE`
+        `SELECT COUNT(*)::int as count FROM interviews WHERE status = 'failed' AND DATE(completed_at) = CURRENT_DATE`
       )
       if (failedRes[0]?.count > 0) {
         alerts.push({
