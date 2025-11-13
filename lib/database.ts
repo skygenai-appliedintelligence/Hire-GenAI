@@ -2070,11 +2070,12 @@ export class DatabaseService {
     const currentMonthStart = new Date()
     currentMonthStart.setDate(1)
     currentMonthStart.setHours(0, 0, 0, 0)
+    const currentMonthStartISO = currentMonthStart.toISOString()
 
-    // Get current month spending
+    // Get current month spending - use CAST to ensure proper decimal handling
     const currentMonthQuery = `
       SELECT
-        COALESCE(SUM(cost), 0) as total
+        COALESCE(SUM(CAST(cost AS DECIMAL(10,2))), 0) as total
       FROM (
         SELECT cost FROM cv_parsing_usage
         WHERE company_id = $1::uuid AND created_at >= $2::timestamptz
@@ -2086,13 +2087,15 @@ export class DatabaseService {
         WHERE company_id = $1::uuid AND created_at >= $2::timestamptz
       ) as all_usage
     `
-    const currentMonthResult = await this.query(currentMonthQuery, [companyId, currentMonthStart.toISOString()]) as any[]
+    const currentMonthResult = await this.query(currentMonthQuery, [companyId, currentMonthStartISO]) as any[]
     const currentMonthSpent = parseFloat(currentMonthResult[0]?.total || '0')
+
+    console.log(`💰 [Billing] Current month (${currentMonthStart.toISOString()}) spending for ${companyId}: $${currentMonthSpent.toFixed(2)}`)
 
     // Get total spending (all time)
     const totalQuery = `
       SELECT 
-        COALESCE(SUM(cost), 0) as total
+        COALESCE(SUM(CAST(cost AS DECIMAL(10,2))), 0) as total
       FROM (
         SELECT cost FROM cv_parsing_usage WHERE company_id = $1::uuid
         UNION ALL
@@ -2104,9 +2107,11 @@ export class DatabaseService {
     const totalResult = await this.query(totalQuery, [companyId]) as any[]
     const totalSpent = parseFloat(totalResult[0]?.total || '0')
 
+    console.log(`💰 [Billing] Total spending (all-time) for ${companyId}: $${totalSpent.toFixed(2)}`)
+
     // Update billing object with calculated values
-    billing.current_month_spent = currentMonthSpent.toFixed(2)
-    billing.total_spent = totalSpent.toFixed(2)
+    billing.current_month_spent = currentMonthSpent
+    billing.total_spent = totalSpent
 
     return billing
   }
@@ -2379,6 +2384,89 @@ export class DatabaseService {
     }
 
     return result[0]
+  }
+
+  // Charge for CV parsing (with wallet deduction and ledger entry)
+  static async chargeForCVParsing(params: {
+    companyId: string
+    jobId: string
+    cost: number
+    candidateId?: string
+    fileName?: string
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const { companyId, jobId, cost, candidateId, fileName } = params
+
+    console.log(`\n${'='.repeat(70)}`)
+    console.log('💳 [CV PARSING CHARGE] Starting wallet deduction...')
+    console.log('📋 Company ID:', companyId)
+    console.log('💼 Job ID:', jobId)
+    console.log('💰 Amount to charge: $' + cost.toFixed(2))
+    console.log(`${'='.repeat(70)}`)
+
+    // Get current billing
+    const billing = await this.getCompanyBilling(companyId)
+    
+    if (!billing) {
+      throw new Error('Billing not initialized for company')
+    }
+
+    // Check if company is in trial
+    if (billing.billing_status === 'trial') {
+      console.log('✅ [CV PARSING CHARGE] Company in trial - no charge applied')
+      console.log(`${'='.repeat(70)}\n`)
+      return { charged: false, reason: 'trial' }
+    }
+
+    if (billing.billing_status === 'past_due') {
+      throw new Error('Account past due. Please update payment method.')
+    }
+
+    // Check monthly spend cap
+    if (billing.monthly_spend_cap && 
+        billing.current_month_spent + cost > billing.monthly_spend_cap) {
+      throw new Error(`Monthly spend cap of $${billing.monthly_spend_cap} reached`)
+    }
+
+    // Check wallet balance
+    if (billing.wallet_balance < cost) {
+      if (!billing.auto_recharge_enabled) {
+        throw new Error(`Insufficient wallet balance. Current: $${billing.wallet_balance}, Required: $${cost}`)
+      }
+
+      // Auto-recharge
+      console.log('⚡ [CV PARSING CHARGE] Auto-recharging wallet...')
+      await this.autoRecharge(companyId)
+    }
+
+    // Deduct from wallet
+    const balanceBefore = billing.wallet_balance
+    await this.deductFromWallet(companyId, cost)
+    const balanceAfter = balanceBefore - cost
+
+    console.log('✅ [CV PARSING CHARGE] Wallet deducted successfully')
+    console.log('💰 Balance before: $' + balanceBefore.toFixed(2))
+    console.log('💰 Balance after: $' + balanceAfter.toFixed(2))
+
+    // Add ledger entry
+    await this.addLedgerEntry({
+      companyId,
+      jobId,
+      entryType: 'CV_PARSING',
+      description: `CV parsing${candidateId ? ` for candidate ${candidateId}` : ''}${fileName ? ` (${fileName})` : ''}`,
+      amount: cost,
+      balanceBefore,
+      balanceAfter
+    })
+
+    console.log('📝 [CV PARSING CHARGE] Ledger entry created')
+    console.log('🎉 [CV PARSING CHARGE] Billing completed successfully!')
+    console.log(`${'='.repeat(70)}\n`)
+
+    return { charged: true, balanceBefore, balanceAfter }
   }
 
   // Add ledger entry

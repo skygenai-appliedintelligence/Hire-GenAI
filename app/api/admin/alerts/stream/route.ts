@@ -78,76 +78,72 @@ async function fetchCurrentAlerts() {
   const alerts: any[] = []
 
   try {
-    // Alert: High spend companies
-    const highSpendRes = await DatabaseService.query(
-      `SELECT name, monthly_spend_cap, 
-        (SELECT COALESCE(SUM(cost), 0) FROM (
-          SELECT cost FROM cv_parsing_usage WHERE company_id = c.id AND DATE(created_at) >= DATE_TRUNC('month', CURRENT_DATE)
-          UNION ALL
-          SELECT cost FROM question_generation_usage WHERE company_id = c.id AND DATE(created_at) >= DATE_TRUNC('month', CURRENT_DATE)
-          UNION ALL
-          SELECT cost FROM video_interview_usage WHERE company_id = c.id AND DATE(created_at) >= DATE_TRUNC('month', CURRENT_DATE)
-        ) m) as month_spent
-      FROM companies c
-      WHERE monthly_spend_cap IS NOT NULL
-      HAVING (SELECT COALESCE(SUM(cost), 0) FROM (
-        SELECT cost FROM cv_parsing_usage WHERE company_id = c.id AND DATE(created_at) >= DATE_TRUNC('month', CURRENT_DATE)
-        UNION ALL
-        SELECT cost FROM question_generation_usage WHERE company_id = c.id AND DATE(created_at) >= DATE_TRUNC('month', CURRENT_DATE)
-        UNION ALL
-        SELECT cost FROM video_interview_usage WHERE company_id = c.id AND DATE(created_at) >= DATE_TRUNC('month', CURRENT_DATE)
-      ) m) > monthly_spend_cap * 0.8`
-    )
-
-    highSpendRes.forEach((row: any) => {
-      alerts.push({
-        id: `high-spend-${row.name}`,
-        title: "High Spend Alert",
-        description: `${row.name} has spent $${typeof row.month_spent === 'string' ? parseFloat(row.month_spent).toFixed(2) : row.month_spent?.toFixed(2)} this month`,
-        severity: "warning",
-        timestamp: new Date().toISOString(),
-      })
-    })
-  } catch (err) {
-    console.warn("Failed to fetch high spend alerts:", err)
-  }
-
-  try {
-    // Alert: Low wallet balance
-    const lowWalletRes = await DatabaseService.query(
-      `SELECT id, name, wallet_balance FROM companies WHERE wallet_balance < 100 AND status = 'active' LIMIT 5`
-    )
-
-    if (lowWalletRes.length > 0) {
-      alerts.push({
-        id: "low-wallet",
-        title: "Low Wallet Balance",
-        description: `${lowWalletRes.length} companies have wallet balance below $100`,
-        severity: "warning",
-        timestamp: new Date().toISOString(),
-      })
-    }
-  } catch (err) {
-    console.warn("Failed to fetch wallet alerts:", err)
-  }
-
-  try {
-    // Alert: Failed interviews
+    // Alert: Recently failed interviews (in the last 24 hours)
     const failedRes = await DatabaseService.query(
-      `SELECT COUNT(*) as count FROM interviews WHERE status = 'failed' AND DATE(created_at) = CURRENT_DATE`
+      `SELECT COUNT(*) as count FROM interviews 
+       WHERE status = 'failed' 
+       AND completed_at IS NOT NULL 
+       AND completed_at >= NOW() - INTERVAL '24 hours'`
     )
 
     if (failedRes[0]?.count > 0) {
       alerts.push({
         id: "failed-interviews",
         title: "Failed Interviews",
-        description: `${failedRes[0].count} interviews failed today`,
-        severity: "info",
+        description: `${failedRes[0].count} interviews failed in the last 24 hours`,
+        severity: "warning",
         timestamp: new Date().toISOString(),
       })
     }
   } catch (err) {
     console.warn("Failed to fetch failed interview alerts:", err)
+  }
+
+  try {
+    // Alert: Companies with pending applications
+    const pendingAppsRes = await DatabaseService.query(
+      `SELECT c.id, c.name, COUNT(a.id) as pending_count
+       FROM companies c
+       LEFT JOIN jobs j ON j.company_id = c.id
+       LEFT JOIN applications a ON a.job_id = j.id AND a.status = 'applied'
+       WHERE c.status = 'active'
+       GROUP BY c.id, c.name
+       HAVING COUNT(a.id) > 10
+       LIMIT 5`
+    )
+
+    if (pendingAppsRes.length > 0) {
+      alerts.push({
+        id: "pending-applications",
+        title: "High Pending Applications",
+        description: `${pendingAppsRes.length} companies have more than 10 pending applications`,
+        severity: "info",
+        timestamp: new Date().toISOString(),
+      })
+    }
+  } catch (err) {
+    console.warn("Failed to fetch pending applications alerts:", err)
+  }
+
+  try {
+    // Alert: Expired interview links
+    const expiredLinksRes = await DatabaseService.query(
+      `SELECT COUNT(*) as count FROM interview_links 
+       WHERE expires_at < NOW() 
+       AND used_at IS NULL`
+    )
+
+    if (expiredLinksRes[0]?.count > 0) {
+      alerts.push({
+        id: "expired-links",
+        title: "Expired Interview Links",
+        description: `${expiredLinksRes[0].count} interview links have expired without being used`,
+        severity: "info",
+        timestamp: new Date().toISOString(),
+      })
+    }
+  } catch (err) {
+    console.warn("Failed to fetch expired links alerts:", err)
   }
 
   return alerts
