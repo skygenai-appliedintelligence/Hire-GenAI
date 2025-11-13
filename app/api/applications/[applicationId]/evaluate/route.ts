@@ -200,8 +200,34 @@ ${transcript}
 - If fewer questions exist in a category, adjust scoring proportionally
 - Provide specific examples from transcript in feedback`
 
+    // 🔑 Fetch company's OpenAI service account key from database
+    let companyOpenAIKey: string | undefined = undefined
+    try {
+      const companyData = await DatabaseService.query(
+        `SELECT c.openai_service_account_key FROM companies c
+         JOIN jobs j ON j.company_id = c.id
+         WHERE j.id = $1::uuid LIMIT 1`,
+        [jobId]
+      ) as any[]
+      
+      if (companyData && companyData.length > 0 && companyData[0].openai_service_account_key) {
+        try {
+          const keyObj = JSON.parse(companyData[0].openai_service_account_key)
+          companyOpenAIKey = keyObj.value
+          console.log('🔑 [INTERVIEW EVALUATION] Using company service account key from database')
+        } catch (parseErr) {
+          console.warn('🔑 [INTERVIEW EVALUATION] Failed to parse company service account key:', parseErr)
+        }
+      }
+    } catch (fetchErr) {
+      console.warn('🔑 [INTERVIEW EVALUATION] Failed to fetch company service account key:', fetchErr)
+    }
+
+    // Determine which API key to use
+    const apiKeyToUse = companyOpenAIKey || process.env.OPENAI_API_KEY
+    
     // Check if OpenAI API key is configured
-    if (!process.env.OPENAI_API_KEY) {
+    if (!apiKeyToUse) {
       console.warn('⚠️ OPENAI_API_KEY not configured, using mock evaluation')
       // Use enhanced mock evaluation data with question-wise scoring
       const mockEvaluation = {
@@ -394,7 +420,7 @@ ${questions.map((q: any) => `- **Q:** ${q.question}\n  **A:** ${q.candidate_resp
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Authorization': `Bearer ${apiKeyToUse}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

@@ -25,7 +25,7 @@ export default function OwnerLoginPage() {
     setLoading(true)
 
     try {
-      const response = await fetch("/api/admin/send-otp", {
+      const response = await fetch("/api/admin/send-otp-direct", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.toLowerCase().trim() }),
@@ -60,7 +60,7 @@ export default function OwnerLoginPage() {
     setLoading(true)
 
     try {
-      const response = await fetch("/api/admin/verify-otp", {
+      const response = await fetch("/api/admin/verify-otp-direct", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
