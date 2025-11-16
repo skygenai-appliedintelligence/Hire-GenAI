@@ -394,9 +394,9 @@ export default function HomePage() {
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
-                    Blog
-                  </a>
+                  <Link href="/owner-login" className="hover:text-emerald-400 transition-colors">
+                    Admin
+                  </Link>
                 </li>
               </ul>
             </div>
