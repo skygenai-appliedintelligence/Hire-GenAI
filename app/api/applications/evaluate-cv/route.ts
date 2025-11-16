@@ -38,15 +38,28 @@ export async function POST(request: NextRequest) {
           try {
             // Decrypt the encrypted key using ENCRYPTION_KEY from .env
             const encryptedKey = companyData[0].openai_service_account_key
+            console.log('🔑 [CV EVALUATOR] Encrypted key format:', encryptedKey.substring(0, 50) + '...')
+            
             const decryptedKey = decrypt(encryptedKey)
             const trimmedKey = decryptedKey.trim()
+            
+            console.log('🔑 [CV EVALUATOR] Decrypted key (first 100 chars):', trimmedKey.substring(0, 100))
             
             // Check if it's a JSON object (starts with {)
             if (trimmedKey.startsWith('{')) {
               try {
                 const keyObj = JSON.parse(trimmedKey)
+                console.log('🔑 [CV EVALUATOR] JSON keys available:', Object.keys(keyObj))
+                
                 // Extract the actual API key from the JSON object
-                openaiApiKey = keyObj.value || keyObj.apiKey || keyObj.key || keyObj
+                // Try multiple possible key names
+                openaiApiKey = keyObj.value || keyObj.apiKey || keyObj.api_key || keyObj.key || (typeof keyObj === 'string' ? keyObj : null)
+                
+                if (!openaiApiKey && keyObj.id) {
+                  // If it's a service account JSON, the API key might be stored differently
+                  openaiApiKey = keyObj.id
+                }
+                
                 console.log('🔑 [CV EVALUATOR] Extracted API key from JSON object')
               } catch (jsonErr) {
                 // If JSON parsing fails, use the whole thing
