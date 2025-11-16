@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { CVEvaluator } from '@/lib/cv-evaluator'
 import { DatabaseService } from '@/lib/database'
 import { checkOpenAIPermissions } from '@/lib/config'
+import { decrypt } from '@/lib/encryption'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -35,11 +36,13 @@ export async function POST(request: NextRequest) {
         
         if (companyData && companyData.length > 0 && companyData[0].openai_service_account_key) {
           try {
-            const keyObj = JSON.parse(companyData[0].openai_service_account_key)
-            openaiApiKey = keyObj.value
-            console.log('[CV Evaluator] Using company service account key for evaluation')
-          } catch (parseErr) {
-            console.warn('[CV Evaluator] Failed to parse company service account key:', parseErr)
+            // Decrypt the encrypted key using ENCRYPTION_KEY from .env
+            const encryptedKey = companyData[0].openai_service_account_key
+            const decryptedKey = decrypt(encryptedKey)
+            openaiApiKey = decryptedKey
+            console.log('🔑 [CV EVALUATOR] Using company service account key from database (decrypted)')
+          } catch (decryptErr) {
+            console.warn('🔑 [CV EVALUATOR] Failed to decrypt company service account key:', decryptErr)
           }
         }
       } catch (fetchErr) {
