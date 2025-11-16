@@ -19,7 +19,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ applicationId:
 
     // Get application details to find the job
     const applicationQuery = `
-      SELECT a.job_id, j.title as job_title, j.company_id, c.name as company_name,
+      SELECT a.job_id, j.title as job_title, c.name as company_name,
              cand.first_name, cand.last_name
       FROM applications a
       JOIN jobs j ON a.job_id = j.id
@@ -76,7 +76,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ applicationId:
       application: {
         id: applicationId,
         jobId: jobId,
-        companyId: application.company_id,
         jobTitle: application.job_title,
         companyName: application.company_name,
         candidateName: `${application.first_name || ''} ${application.last_name || ''}`.trim() || 'Candidate'
