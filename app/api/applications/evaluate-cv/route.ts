@@ -39,8 +39,10 @@ export async function POST(request: NextRequest) {
             // Decrypt the encrypted key using ENCRYPTION_KEY from .env
             const encryptedKey = companyData[0].openai_service_account_key
             const decryptedKey = decrypt(encryptedKey)
-            openaiApiKey = decryptedKey
+            openaiApiKey = decryptedKey.trim()
             console.log('🔑 [CV EVALUATOR] Using company service account key from database (decrypted)')
+            console.log('🔑 [CV EVALUATOR] Decrypted key length:', openaiApiKey.length)
+            console.log('🔑 [CV EVALUATOR] Key starts with:', openaiApiKey.substring(0, 10))
           } catch (decryptErr) {
             console.warn('🔑 [CV EVALUATOR] Failed to decrypt company service account key:', decryptErr)
           }
