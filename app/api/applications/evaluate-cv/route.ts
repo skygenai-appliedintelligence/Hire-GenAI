@@ -60,8 +60,10 @@ export async function POST(request: NextRequest) {
             }
             
             console.log('🔑 [CV EVALUATOR] Using company service account key from database (decrypted)')
-            console.log('🔑 [CV EVALUATOR] API key length:', openaiApiKey.length)
-            console.log('🔑 [CV EVALUATOR] Key starts with:', openaiApiKey.substring(0, 10))
+            if (openaiApiKey) {
+              console.log('🔑 [CV EVALUATOR] API key length:', openaiApiKey.length)
+              console.log('🔑 [CV EVALUATOR] Key starts with:', openaiApiKey.substring(0, 10))
+            }
           } catch (decryptErr) {
             console.warn('🔑 [CV EVALUATOR] Failed to decrypt company service account key:', decryptErr)
           }
