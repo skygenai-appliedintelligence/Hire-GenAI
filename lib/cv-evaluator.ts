@@ -202,11 +202,12 @@ FAIR SCORING GUIDELINES:
         throw new Error('No OpenAI API key configured')
       }
 
-      // Temporarily set the API key in environment for this call
+      let text: string
+      
+      // Set the API key in environment for this call
       const originalKey = process.env.OPENAI_API_KEY
       process.env.OPENAI_API_KEY = apiKey
-
-      let text: string
+      
       try {
         const response = await generateText({
           model: openai("gpt-4o"),

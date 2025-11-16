@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { CVEvaluator } from '@/lib/cv-evaluator'
 import { DatabaseService } from '@/lib/database'
 import { checkOpenAIPermissions } from '@/lib/config'
+import { decrypt } from '@/lib/encryption'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -35,11 +36,49 @@ export async function POST(request: NextRequest) {
         
         if (companyData && companyData.length > 0 && companyData[0].openai_service_account_key) {
           try {
-            const keyObj = JSON.parse(companyData[0].openai_service_account_key)
-            openaiApiKey = keyObj.value
-            console.log('[CV Evaluator] Using company service account key for evaluation')
-          } catch (parseErr) {
-            console.warn('[CV Evaluator] Failed to parse company service account key:', parseErr)
+            // Decrypt the encrypted key using ENCRYPTION_KEY from .env
+            const encryptedKey = companyData[0].openai_service_account_key
+            console.log('🔑 [CV EVALUATOR] Encrypted key format:', encryptedKey.substring(0, 50) + '...')
+            
+            const decryptedKey = decrypt(encryptedKey)
+            const trimmedKey = decryptedKey.trim()
+            
+            console.log('🔑 [CV EVALUATOR] Decrypted key (first 100 chars):', trimmedKey.substring(0, 100))
+            
+            // Check if it's a JSON object (starts with {)
+            if (trimmedKey.startsWith('{')) {
+              try {
+                const keyObj = JSON.parse(trimmedKey)
+                console.log('🔑 [CV EVALUATOR] JSON keys available:', Object.keys(keyObj))
+                
+                // Extract the actual API key from the JSON object
+                // Try multiple possible key names
+                openaiApiKey = keyObj.value || keyObj.apiKey || keyObj.api_key || keyObj.key || (typeof keyObj === 'string' ? keyObj : null)
+                
+                if (!openaiApiKey && keyObj.id) {
+                  // If it's a service account JSON, the API key might be stored differently
+                  openaiApiKey = keyObj.id
+                }
+                
+                console.log('🔑 [CV EVALUATOR] Extracted API key from JSON object')
+              } catch (jsonErr) {
+                // If JSON parsing fails, use the whole thing
+                openaiApiKey = trimmedKey
+                console.log('🔑 [CV EVALUATOR] Could not parse JSON, using raw decrypted value')
+              }
+            } else {
+              // It's a plain string API key
+              openaiApiKey = trimmedKey
+              console.log('🔑 [CV EVALUATOR] Using plain string API key')
+            }
+            
+            console.log('🔑 [CV EVALUATOR] Using company service account key from database (decrypted)')
+            if (openaiApiKey) {
+              console.log('🔑 [CV EVALUATOR] API key length:', openaiApiKey.length)
+              console.log('🔑 [CV EVALUATOR] Key starts with:', openaiApiKey.substring(0, 10))
+            }
+          } catch (decryptErr) {
+            console.warn('🔑 [CV EVALUATOR] Failed to decrypt company service account key:', decryptErr)
           }
         }
       } catch (fetchErr) {

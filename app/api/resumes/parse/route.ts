@@ -81,7 +81,6 @@ export async function POST(request: NextRequest) {
     // Track company and job for billing
     let companyIdForBilling: string | null = null
     let jobIdForBilling: string | null = null
-    let companyOpenAIKey: string | undefined = undefined
 
     // Optionally save parsed data to database
     if (applicationId && parsed.rawText) {
@@ -98,27 +97,6 @@ export async function POST(request: NextRequest) {
         if (appInfo && appInfo.length > 0) {
           companyIdForBilling = appInfo[0].company_id
           jobIdForBilling = appInfo[0].job_id
-
-          // 🔑 Fetch company's OpenAI service account key from database
-          try {
-            const companyData = await (DatabaseService as any)["query"]?.call(
-              DatabaseService,
-              `SELECT openai_service_account_key FROM companies WHERE id = $1::uuid LIMIT 1`,
-              [companyIdForBilling]
-            ) as any[]
-            
-            if (companyData && companyData.length > 0 && companyData[0].openai_service_account_key) {
-              try {
-                const keyObj = JSON.parse(companyData[0].openai_service_account_key)
-                companyOpenAIKey = keyObj.value
-                console.log('🔑 [CV PARSING] Using company service account key from database')
-              } catch (parseErr) {
-                console.warn('🔑 [CV PARSING] Failed to parse company service account key:', parseErr)
-              }
-            }
-          } catch (fetchErr) {
-            console.warn('🔑 [CV PARSING] Failed to fetch company service account key:', fetchErr)
-          }
         }
 
         // Check if resume_text column exists in applications table
@@ -214,13 +192,11 @@ export async function POST(request: NextRequest) {
                   const jdForEval = String(jdText)
                   const passThreshold = 40
 
-                  // Run evaluator with company OpenAI key
+                  // Run evaluator
                   const evaluation = await CVEvaluator.evaluateCandidate(
                     resumeForEval,
                     jdForEval,
-                    passThreshold,
-                    companyIdForBilling || undefined,
-                    companyOpenAIKey ? { apiKey: companyOpenAIKey } : undefined
+                    passThreshold
                   )
 
                   console.log('[Resume Parse] ✅ CV Evaluation completed:', {
@@ -385,7 +361,7 @@ export async function POST(request: NextRequest) {
         console.log('📝 Resume Text Length:', parsed.rawText.length, 'characters')
         console.log('🔍 Skills Found:', parsed.skills?.length || 0)
 
-        const usageRecord = await DatabaseService.recordCVParsingUsage({
+        await DatabaseService.recordCVParsingUsage({
           companyId: companyIdForBilling,
           jobId: jobIdForBilling,
           candidateId: candidateId || undefined,
@@ -396,23 +372,6 @@ export async function POST(request: NextRequest) {
 
         console.log('🎉 [CV PARSING] Billing tracking completed successfully!')
         console.log('='.repeat(60) + '\n')
-
-        // Charge for CV parsing (deduct from wallet)
-        try {
-          const chargeResult = await DatabaseService.chargeForCVParsing({
-            companyId: companyIdForBilling,
-            jobId: jobIdForBilling,
-            cost: parseFloat(usageRecord.cost || '0.50'),
-            candidateId: candidateId || undefined,
-            fileName: file.name
-          })
-          console.log('✅ [CV PARSING] Charge result:', chargeResult)
-        } catch (chargeErr: any) {
-          console.error('❌ [CV PARSING] ERROR: Failed to charge wallet:')
-          console.error('🔥 Error Details:', chargeErr.message)
-          // Non-fatal - usage is recorded, but charge failed
-          // In production, you might want to retry or alert admin
-        }
       } catch (billingErr) {
         console.error('❌ [CV PARSING] ERROR: Failed to record billing usage:')
         console.error('🔥 Error Details:', billingErr)
