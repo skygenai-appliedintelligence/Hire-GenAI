@@ -75,6 +75,7 @@ export async function GET(request: Request) {
     }
 
     if (!apiKey) {
+      console.error('❌ [REALTIME SESSION] No OpenAI API key available')
       return NextResponse.json(
         { error: "OpenAI credentials not configured. Please connect OpenAI in Settings → Billing." },
         { status: 500 }

@@ -203,8 +203,11 @@ export default function InterviewPage() {
           
           // Store companyId for session creation
           const fetchedCompanyId = json.application?.companyId || null
+          console.log('🏢 Fetched Company ID:', fetchedCompanyId)
           if (fetchedCompanyId) {
             setCompanyId(fetchedCompanyId)
+          } else {
+            console.warn('⚠️ No company ID found in application data')
           }
           
           // Extract all questions from all rounds
@@ -273,10 +276,13 @@ export default function InterviewPage() {
       const activeCompanyId = fetchedCompanyId || companyId
       
       if (!activeCompanyId) {
-        throw new Error('Company ID not available. Please refresh the page.')
+        console.error('❌ Company ID not available')
+        console.error('fetchedCompanyId:', fetchedCompanyId)
+        console.error('companyId state:', companyId)
+        throw new Error('Company ID not available. Cannot create interview session without company credentials.')
       }
       
-      console.log('🏢 Using Company ID:', activeCompanyId)
+      console.log('✅ Using Company ID:', activeCompanyId)
       const resp = await fetch(`/api/session?companyId=${encodeURIComponent(activeCompanyId)}`)
       if (!resp.ok) {
         const j = await resp.json().catch(() => ({}))
@@ -291,7 +297,8 @@ export default function InterviewPage() {
       setInterviewStartTime(Date.now())
       logTs('Agent Connected (peer connection established)')
     } catch (e: any) {
-      setError("Please allow camera and microphone to start the interview.")
+      console.error('❌ Interview initialization failed:', e)
+      setError(e?.message || "Please allow camera and microphone to start the interview.")
     } finally {
       setInitializing(false)
     }

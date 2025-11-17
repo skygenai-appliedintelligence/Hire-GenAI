@@ -39,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import DateRangeFilter from "@/components/filters/DateRangeFilter"
 
 interface BillingContentProps {
   companyId: string
@@ -65,9 +66,24 @@ export default function BillingContent({ companyId }: BillingContentProps) {
   const [paypalLoaded, setPaypalLoaded] = useState(false)
   const paypalButtonRef = useRef<HTMLDivElement>(null)
 
-  // Filters
+  // Filters for Usage Tab
   const [selectedJob, setSelectedJob] = useState<string>("all")
-  const [dateRange, setDateRange] = useState<string>("30")
+  const [usageDateRange, setUsageDateRange] = useState<string>("30") // in days
+  const [usageStartDate, setUsageStartDate] = useState<Date>(() => {
+    const date = new Date()
+    date.setDate(date.getDate() - 30)
+    return date
+  })
+  const [usageEndDate, setUsageEndDate] = useState<Date>(new Date())
+  
+  // Filters for Overview Tab
+  const [overviewStartDate, setOverviewStartDate] = useState<Date>(() => {
+    const date = new Date()
+    date.setDate(date.getDate() - 30)
+    return date
+  })
+  const [overviewEndDate, setOverviewEndDate] = useState<Date>(new Date())
+  const [overviewData, setOverviewData] = useState<any>(null)
   
   // Invoice Filters - REMOVED
   const [invoiceUsageData, setInvoiceUsageData] = useState<any>(null)
@@ -147,23 +163,25 @@ export default function BillingContent({ companyId }: BillingContentProps) {
     }
   }
 
-  const loadUsageData = async () => {
+  const loadUsageData = async (startOverride?: Date, endOverride?: Date) => {
     try {
-      // Calculate date range
-      const startDate = new Date()
-      startDate.setDate(startDate.getDate() - parseInt(dateRange))
+      setLoading(true)
       
+      // Decide which dates to use
+      const startToUse = startOverride || usageStartDate
+      const endToUse = endOverride || usageEndDate
+
       // Build query
       const params = new URLSearchParams({
-        startDate: startDate.toISOString(),
-        endDate: new Date().toISOString(),
+        startDate: startToUse.toISOString(),
+        endDate: endToUse.toISOString(),
         companyId
       })
       if (selectedJob && selectedJob !== 'all') {
         params.append('jobId', selectedJob)
       }
 
-      console.log('📊 [Billing] Fetching usage for company:', companyId, 'Date range:', dateRange, 'days')
+      console.log('📊 [Billing] Fetching usage for company:', companyId, 'Date range:', startToUse.toLocaleDateString(), 'to', endToUse.toLocaleDateString())
       const res = await fetch(`/api/billing/openai-usage?${params.toString()}`)
       const data = await res.json()
       
@@ -187,6 +205,27 @@ export default function BillingContent({ companyId }: BillingContentProps) {
       })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadOverviewData = async () => {
+    try {
+      const params = new URLSearchParams({
+        startDate: overviewStartDate.toISOString(),
+        endDate: overviewEndDate.toISOString(),
+        companyId
+      })
+      
+      console.log('📊 [Overview] Fetching usage for date range:', overviewStartDate.toLocaleDateString(), 'to', overviewEndDate.toLocaleDateString())
+      const res = await fetch(`/api/billing/openai-usage?${params.toString()}`)
+      const data = await res.json()
+      
+      if (data.ok) {
+        console.log('✅ [Overview] Usage data loaded:', data.totals)
+        setOverviewData(data)
+      }
+    } catch (error) {
+      console.error('Failed to load overview usage data:', error)
     }
   }
 
@@ -273,11 +312,12 @@ export default function BillingContent({ companyId }: BillingContentProps) {
     }
   }
 
+  // Load overview data when filters change
   useEffect(() => {
-    if (companyId) {
-      loadUsageData()
+    if (companyId && currentTab === 'overview') {
+      loadOverviewData()
     }
-  }, [selectedJob, dateRange])
+  }, [overviewStartDate, overviewEndDate, companyId, currentTab])
 
   // Load PayPal SDK and render button
   useEffect(() => {
@@ -465,6 +505,15 @@ export default function BillingContent({ companyId }: BillingContentProps) {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
+          {/* Date Range Filter for Overview */}
+          <DateRangeFilter
+            onApply={(start, end) => {
+              setOverviewStartDate(start)
+              setOverviewEndDate(end)
+            }}
+            loading={loading}
+          />
+
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -570,7 +619,7 @@ export default function BillingContent({ companyId }: BillingContentProps) {
             </div>
           </div>
 
-          {/* Filters */}
+          {/* Filters - original card UI */}
           <Card className="border-dashed">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2">
@@ -599,7 +648,12 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Date Range</Label>
-                  <Select value={dateRange} onValueChange={setDateRange}>
+                  <Select
+                    value={usageDateRange}
+                    onValueChange={(val) => {
+                      setUsageDateRange(val)
+                    }}
+                  >
                     <SelectTrigger className="mt-2">
                       <SelectValue />
                     </SelectTrigger>
@@ -612,7 +666,18 @@ export default function BillingContent({ companyId }: BillingContentProps) {
                   </Select>
                 </div>
                 <div className="flex items-end">
-                  <Button className="w-full" onClick={loadUsageData}>
+                  <Button
+                    className="w-full"
+                    onClick={() => {
+                      const days = parseInt(usageDateRange || "30")
+                      const end = new Date()
+                      const start = new Date()
+                      start.setDate(start.getDate() - days)
+                      setUsageStartDate(start)
+                      setUsageEndDate(end)
+                      loadUsageData(start, end)
+                    }}
+                  >
                     Apply Filters
                   </Button>
                 </div>

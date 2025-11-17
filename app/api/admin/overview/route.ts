@@ -3,9 +3,18 @@ import { DatabaseService } from "@/lib/database"
 
 export async function GET(req: NextRequest) {
   try {
+    // Get date range from query params
+    const searchParams = req.nextUrl.searchParams
+    const startDateParam = searchParams.get('startDate')
+    const endDateParam = searchParams.get('endDate')
+    
+    const endDate = endDateParam ? new Date(endDateParam) : new Date()
+    const startDate = startDateParam ? new Date(startDateParam) : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000)
+    
+    console.log('📊 [Admin Overview] Date range:', startDate.toLocaleDateString(), 'to', endDate.toLocaleDateString())
+    
     const today = new Date()
     const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000)
-    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
 
     // Query real data from database with fallback to mock data
     let spendData = { total: 0, today: 0, yesterday: 0 }
@@ -20,12 +29,13 @@ export async function GET(req: NextRequest) {
           COALESCE(SUM(CASE WHEN DATE(created_at) = CURRENT_DATE THEN cost ELSE 0 END), 0) as today,
           COALESCE(SUM(CASE WHEN DATE(created_at) = CURRENT_DATE - INTERVAL '1 day' THEN cost ELSE 0 END), 0) as yesterday
         FROM (
-          SELECT cost, created_at FROM cv_parsing_usage
+          SELECT cost, created_at FROM cv_parsing_usage WHERE created_at >= $1 AND created_at <= $2
           UNION ALL
-          SELECT cost, created_at FROM question_generation_usage
+          SELECT cost, created_at FROM question_generation_usage WHERE created_at >= $1 AND created_at <= $2
           UNION ALL
-          SELECT cost, created_at FROM video_interview_usage
-        ) usage`
+          SELECT cost, created_at FROM video_interview_usage WHERE created_at >= $1 AND created_at <= $2
+        ) usage`,
+        [startDate, endDate]
       )
       const rawData = totalSpendRes[0] || { total: 0, today: 0, yesterday: 0 }
       spendData = {
@@ -86,7 +96,7 @@ export async function GET(req: NextRequest) {
       activeJobs: jobsCount,
     }
 
-    // Get 30-day spend trend
+    // Get spend trend for date range
     let spendTrend: any[] = []
     try {
       const spendTrendRes = await DatabaseService.query(
@@ -94,15 +104,15 @@ export async function GET(req: NextRequest) {
           DATE(created_at) as date,
           COALESCE(SUM(cost), 0)::float as spend
         FROM (
-          SELECT cost, created_at FROM cv_parsing_usage WHERE created_at >= $1
+          SELECT cost, created_at FROM cv_parsing_usage WHERE created_at >= $1 AND created_at <= $2
           UNION ALL
-          SELECT cost, created_at FROM question_generation_usage WHERE created_at >= $1
+          SELECT cost, created_at FROM question_generation_usage WHERE created_at >= $1 AND created_at <= $2
           UNION ALL
-          SELECT cost, created_at FROM video_interview_usage WHERE created_at >= $1
+          SELECT cost, created_at FROM video_interview_usage WHERE created_at >= $1 AND created_at <= $2
         ) usage
         GROUP BY DATE(created_at)
         ORDER BY date ASC`,
-        [thirtyDaysAgo]
+        [startDate, endDate]
       )
       spendTrend = (spendTrendRes || []).map((row: any) => ({
         date: new Date(row.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
@@ -112,7 +122,7 @@ export async function GET(req: NextRequest) {
       console.warn("Failed to fetch spend trend:", err)
     }
 
-    // Get 30-day interview trend
+    // Get interview trend for date range
     let interviewTrend: any[] = []
     try {
       const interviewTrendRes = await DatabaseService.query(
@@ -120,10 +130,10 @@ export async function GET(req: NextRequest) {
           DATE(completed_at) as date,
           COUNT(*)::int as count
         FROM interviews
-        WHERE completed_at >= $1
+        WHERE completed_at >= $1 AND completed_at <= $2
         GROUP BY DATE(completed_at)
         ORDER BY date ASC`,
-        [thirtyDaysAgo]
+        [startDate, endDate]
       )
       interviewTrend = (interviewTrendRes || []).map((row: any) => ({
         date: new Date(row.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),

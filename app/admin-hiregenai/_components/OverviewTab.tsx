@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { TrendingUp, TrendingDown, AlertCircle, CheckCircle2, Users, Briefcase, DollarSign, Clock } from "lucide-react"
+import DateRangeFilter from "@/components/filters/DateRangeFilter"
 
 export default function OverviewTab() {
   const [kpis, setKpis] = useState<any>(null)
@@ -12,15 +13,29 @@ export default function OverviewTab() {
   const [interviewTrend, setInterviewTrend] = useState<any[]>([])
   const [alerts, setAlerts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Date range filters
+  const [startDate, setStartDate] = useState<Date>(() => {
+    const date = new Date()
+    date.setDate(date.getDate() - 30)
+    return date
+  })
+  const [endDate, setEndDate] = useState<Date>(new Date())
 
   useEffect(() => {
     loadOverviewData()
-  }, [])
+  }, [startDate, endDate])
 
   const loadOverviewData = async () => {
     try {
       setLoading(true)
-      const res = await fetch("/api/admin/overview")
+      const params = new URLSearchParams({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString()
+      })
+      
+      console.log('📊 [Admin Overview] Fetching data for:', startDate.toLocaleDateString(), 'to', endDate.toLocaleDateString())
+      const res = await fetch(`/api/admin/overview?${params.toString()}`)
       if (!res.ok) throw new Error("Failed to load overview")
       const data = await res.json()
       
@@ -48,6 +63,15 @@ export default function OverviewTab() {
 
   return (
     <div className="space-y-6">
+      {/* Date Range Filter */}
+      <DateRangeFilter
+        onApply={(start, end) => {
+          setStartDate(start)
+          setEndDate(end)
+        }}
+        loading={loading}
+      />
+
       {/* Revenue & Profitability KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Revenue */}
