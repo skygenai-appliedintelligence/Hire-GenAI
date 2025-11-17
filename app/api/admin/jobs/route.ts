@@ -72,35 +72,62 @@ export async function GET(req: NextRequest) {
           // Get interview count
           const interviewRes = await DatabaseService.query(
             `SELECT COUNT(*)::text as count FROM interviews i 
-             JOIN applications a ON i.application_id = a.id 
+             JOIN application_rounds ar ON ar.id = i.application_round_id
+             JOIN applications a ON a.id = ar.application_id
              WHERE a.job_id = $1::uuid`,
             [job.id]
           )
 
-          // Get costs
-          const costRes = await DatabaseService.query(
+          // Get CV parsing costs
+          const cvRes = await DatabaseService.query(
             `SELECT 
-              COALESCE(SUM(CASE WHEN type = 'cv_parsing' THEN cost ELSE 0 END), 0)::text as cvCost,
-              COALESCE(SUM(CASE WHEN type = 'question_generation' THEN cost ELSE 0 END), 0)::text as questionsCost,
-              COALESCE(SUM(CASE WHEN type = 'video_interview' THEN cost ELSE 0 END), 0)::text as videoCost,
-              COALESCE(SUM(cost), 0)::text as totalCost
-            FROM (
-              SELECT 'cv_parsing' as type, cost FROM cv_parsing_usage WHERE job_id = $1::uuid
-              UNION ALL
-              SELECT 'question_generation', cost FROM question_generation_usage WHERE job_id = $1::uuid
-              UNION ALL
-              SELECT 'video_interview', cost FROM video_interview_usage WHERE job_id = $1::uuid
-            ) usage`,
+              COUNT(*) as count,
+              COALESCE(SUM(cost), 0)::text as total
+            FROM cv_parsing_usage 
+            WHERE job_id = $1::uuid`,
             [job.id]
           )
+          const cvCount = parseInt(cvRes[0]?.count || "0")
+          const cvCost = parseFloat(cvRes[0]?.total || "0")
+
+          // Get question generation costs
+          const questionRes = await DatabaseService.query(
+            `SELECT 
+              COUNT(*) as count,
+              COALESCE(SUM(cost), 0)::text as total
+            FROM question_generation_usage 
+            WHERE job_id = $1::uuid`,
+            [job.id]
+          )
+          const questionCount = parseInt(questionRes[0]?.count || "0")
+          const questionsCost = parseFloat(questionRes[0]?.total || "0")
+
+          // Get video interview costs
+          const videoRes = await DatabaseService.query(
+            `SELECT 
+              COUNT(*) as count,
+              COALESCE(SUM(duration_minutes), 0) as total_minutes,
+              COALESCE(SUM(cost), 0)::text as total
+            FROM video_interview_usage 
+            WHERE job_id = $1::uuid`,
+            [job.id]
+          )
+          const videoCount = parseInt(videoRes[0]?.count || "0")
+          const videoMinutes = parseFloat(videoRes[0]?.total_minutes || "0")
+          const videoCost = parseFloat(videoRes[0]?.total || "0")
+
+          // Calculate total cost
+          const totalCost = cvCost + questionsCost + videoCost
+
+          console.log(`📊 Job ${job.title}: CVs=${cvCount} ($${cvCost.toFixed(2)}), Questions=${questionCount} ($${questionsCost.toFixed(2)}), Videos=${videoCount} (${videoMinutes.toFixed(1)}min, $${videoCost.toFixed(2)}), Total=$${totalCost.toFixed(2)}`)
 
           return {
             ...job,
             interviewCount: parseInt(interviewRes[0]?.count || "0"),
-            cvCost: parseFloat(costRes[0]?.cvCost || "0"),
-            questionsCost: parseFloat(costRes[0]?.questionsCost || "0"),
-            videoCost: parseFloat(costRes[0]?.videoCost || "0"),
-            totalCost: parseFloat(costRes[0]?.totalCost || "0"),
+            cvCost,
+            questionsCost,
+            videoCost,
+            totalCost,
           }
         } catch (err) {
           console.warn("⚠️ Error getting costs for job", job.id, ":", err)
