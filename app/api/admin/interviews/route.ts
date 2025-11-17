@@ -23,10 +23,11 @@ export async function GET(req: NextRequest) {
         i.evaluation_score as evaluationScore,
         i.started_at as startedAt
       FROM interviews i
-      LEFT JOIN applications a ON i.application_id = a.id
-      LEFT JOIN jobs j ON a.job_id = j.id
-      LEFT JOIN companies c ON j.company_id = c.id
-      LEFT JOIN video_interview_usage vu ON i.id = vu.interview_id
+      LEFT JOIN application_rounds ar ON ar.id = i.application_round_id
+      LEFT JOIN applications a ON a.id = ar.application_id
+      LEFT JOIN jobs j ON j.id = a.job_id
+      LEFT JOIN companies c ON c.id = j.company_id
+      LEFT JOIN video_interview_usage vu ON vu.interview_id = i.id
       WHERE i.created_at >= $1
     `
 

@@ -3103,6 +3103,106 @@ export class DatabaseService {
     console.log('💰 Final Cost (no profit margin): $' + finalCost.toFixed(4))
     console.log('📈 Base Cost: $' + usageResult.baseCost.toFixed(4))
     console.log('🏷️  Source: ' + usageResult.source)
+
+    // ========================================
+    // WALLET DEDUCTION & LEDGER ENTRY
+    // ========================================
+    try {
+      console.log('\n💳 [WALLET] Starting wallet deduction...')
+      
+      // Get current billing info
+      const billing = await this.getCompanyBilling(data.companyId)
+      if (!billing) {
+        console.log('⚠️  [WALLET] Billing not initialized, skipping wallet deduction')
+      } else {
+        const balanceBefore = parseFloat(billing.wallet_balance)
+        console.log('💰 [WALLET] Current Balance: $' + balanceBefore.toFixed(2))
+        console.log('💸 [WALLET] Amount to Deduct: $' + finalCost.toFixed(2))
+
+        // Check if wallet has sufficient balance
+        if (balanceBefore < finalCost) {
+          console.log('⚠️  [WALLET] Insufficient balance!')
+          
+          // Check if auto-recharge is enabled
+          if (billing.auto_recharge_enabled) {
+            console.log('🔄 [WALLET] Auto-recharge enabled, attempting recharge...')
+            try {
+              await this.autoRecharge(data.companyId)
+              console.log('✅ [WALLET] Auto-recharge successful!')
+            } catch (rechargeError: any) {
+              console.log('❌ [WALLET] Auto-recharge failed:', rechargeError.message)
+              throw new Error('Insufficient wallet balance and auto-recharge failed')
+            }
+          } else {
+            console.log('❌ [WALLET] Auto-recharge disabled, cannot proceed')
+            throw new Error(`Insufficient wallet balance. Current: $${balanceBefore.toFixed(2)}, Required: $${finalCost.toFixed(2)}`)
+          }
+        }
+
+        // Deduct from wallet
+        const deductQuery = `
+          UPDATE company_billing
+          SET 
+            wallet_balance = wallet_balance - $2,
+            current_month_spent = current_month_spent + $2,
+            total_spent = total_spent + $2,
+            updated_at = NOW()
+          WHERE company_id = $1::uuid AND wallet_balance >= $2
+          RETURNING wallet_balance as new_balance
+        `
+        const deductResult = await this.query(deductQuery, [data.companyId, finalCost]) as any[]
+        
+        if (deductResult.length === 0) {
+          throw new Error('Wallet deduction failed - insufficient balance')
+        }
+
+        const balanceAfter = parseFloat(deductResult[0].new_balance)
+        console.log('✅ [WALLET] Deduction successful!')
+        console.log('💰 [WALLET] New Balance: $' + balanceAfter.toFixed(2))
+
+        // Create ledger entry for audit trail
+        const ledgerQuery = `
+          INSERT INTO usage_ledger (
+            company_id, job_id, entry_type, description,
+            quantity, unit_price, amount,
+            balance_before, balance_after,
+            reference_id, metadata, created_at
+          ) VALUES (
+            $1::uuid, $2::uuid, $3::ledger_entry_type, $4,
+            $5, $6, $7,
+            $8, $9,
+            $10::uuid, $11::jsonb, NOW()
+          )
+          RETURNING *
+        `
+        
+        await this.query(ledgerQuery, [
+          data.companyId,
+          data.jobId,
+          'CV_PARSE',
+          `CV parsing - ${data.candidateId ? 'Candidate' : 'File'} processed`,
+          1, // quantity (1 CV)
+          finalCost, // unit price
+          finalCost, // amount
+          balanceBefore,
+          balanceAfter,
+          result[0].id, // reference to cv_parsing_usage record
+          JSON.stringify({
+            file_size_kb: data.fileSizeKb,
+            parse_successful: data.parseSuccessful !== false,
+            pricing_source: usageResult.source
+          })
+        ])
+
+        console.log('📝 [LEDGER] Entry created successfully')
+      }
+    } catch (walletError: any) {
+      console.log('❌ [WALLET] Error during wallet operation:', walletError.message)
+      // Don't throw - allow CV parsing to succeed even if wallet deduction fails
+      // This prevents blocking the user's workflow
+      console.log('⚠️  [WALLET] CV parsing succeeded but wallet was not charged')
+    }
+
     console.log('🎉 [CV PARSING] Billing calculation completed successfully!')
     console.log('='.repeat(70) + '\n')
     return result[0]
@@ -3171,6 +3271,111 @@ export class DatabaseService {
     console.log('💰 Final Cost: $' + finalCost.toFixed(4) + ' (no profit margin applied)')
     console.log('💵 Rate: $' + pricePer10Questions.toFixed(2) + ' per 10 questions')
     console.log('❓ Questions: ' + data.questionCount)
+
+    // ========================================
+    // WALLET DEDUCTION & LEDGER ENTRY
+    // ========================================
+    // Only deduct from wallet if this is a real job (not draft)
+    if (data.jobId && !isDraft) {
+      try {
+        console.log('\n💳 [WALLET] Starting wallet deduction...')
+        
+        // Get current billing info
+        const billing = await this.getCompanyBilling(data.companyId)
+        if (!billing) {
+          console.log('⚠️  [WALLET] Billing not initialized, skipping wallet deduction')
+        } else {
+          const balanceBefore = parseFloat(billing.wallet_balance)
+          console.log('💰 [WALLET] Current Balance: $' + balanceBefore.toFixed(2))
+          console.log('💸 [WALLET] Amount to Deduct: $' + finalCost.toFixed(2))
+
+          // Check if wallet has sufficient balance
+          if (balanceBefore < finalCost) {
+            console.log('⚠️  [WALLET] Insufficient balance!')
+            
+            // Check if auto-recharge is enabled
+            if (billing.auto_recharge_enabled) {
+              console.log('🔄 [WALLET] Auto-recharge enabled, attempting recharge...')
+              try {
+                await this.autoRecharge(data.companyId)
+                console.log('✅ [WALLET] Auto-recharge successful!')
+              } catch (rechargeError: any) {
+                console.log('❌ [WALLET] Auto-recharge failed:', rechargeError.message)
+                throw new Error('Insufficient wallet balance and auto-recharge failed')
+              }
+            } else {
+              console.log('❌ [WALLET] Auto-recharge disabled, cannot proceed')
+              throw new Error(`Insufficient wallet balance. Current: $${balanceBefore.toFixed(2)}, Required: $${finalCost.toFixed(2)}`)
+            }
+          }
+
+          // Deduct from wallet
+          const deductQuery = `
+            UPDATE company_billing
+            SET 
+              wallet_balance = wallet_balance - $2,
+              current_month_spent = current_month_spent + $2,
+              total_spent = total_spent + $2,
+              updated_at = NOW()
+            WHERE company_id = $1::uuid AND wallet_balance >= $2
+            RETURNING wallet_balance as new_balance
+          `
+          const deductResult = await this.query(deductQuery, [data.companyId, finalCost]) as any[]
+          
+          if (deductResult.length === 0) {
+            throw new Error('Wallet deduction failed - insufficient balance')
+          }
+
+          const balanceAfter = parseFloat(deductResult[0].new_balance)
+          console.log('✅ [WALLET] Deduction successful!')
+          console.log('💰 [WALLET] New Balance: $' + balanceAfter.toFixed(2))
+
+          // Create ledger entry for audit trail
+          const ledgerQuery = `
+            INSERT INTO usage_ledger (
+              company_id, job_id, entry_type, description,
+              quantity, unit_price, amount,
+              balance_before, balance_after,
+              reference_id, metadata, created_at
+            ) VALUES (
+              $1::uuid, $2::uuid, $3::ledger_entry_type, $4,
+              $5, $6, $7,
+              $8, $9,
+              $10::uuid, $11::jsonb, NOW()
+            )
+            RETURNING *
+          `
+          
+          await this.query(ledgerQuery, [
+            data.companyId,
+            data.jobId,
+            'JD_QUESTIONS',
+            `Question generation - ${data.questionCount} questions for job`,
+            data.questionCount, // quantity
+            pricePer10Questions / 10, // unit price per question
+            finalCost, // amount
+            balanceBefore,
+            balanceAfter,
+            result[0].id, // reference to question_generation_usage record
+            JSON.stringify({
+              prompt_tokens: data.promptTokens,
+              completion_tokens: data.completionTokens,
+              total_tokens: totalTokens,
+              model_used: data.modelUsed || 'gpt-4o'
+            })
+          ])
+
+          console.log('📝 [LEDGER] Entry created successfully')
+        }
+      } catch (walletError: any) {
+        console.log('❌ [WALLET] Error during wallet operation:', walletError.message)
+        // Don't throw - allow question generation to succeed even if wallet deduction fails
+        console.log('⚠️  [WALLET] Question generation succeeded but wallet was not charged')
+      }
+    } else if (isDraft) {
+      console.log('📝 [WALLET] Skipping wallet deduction for draft job (will charge when job is saved)')
+    }
+
     console.log('🎉 [QUESTION GENERATION] Billing tracking completed successfully!')
     console.log('='.repeat(70) + '\n')
     return result[0]
@@ -3290,6 +3495,109 @@ export class DatabaseService {
     console.log('📈 Base Cost: $' + usageResult.baseCost.toFixed(4))
     console.log('⏱️  Cost per Minute: $' + costPerMinute.toFixed(4))
     console.log('🏷️  Source: ' + usageResult.source)
+
+    // ========================================
+    // WALLET DEDUCTION & LEDGER ENTRY
+    // ========================================
+    try {
+      console.log('\n💳 [WALLET] Starting wallet deduction...')
+      
+      // Get current billing info
+      const billing = await this.getCompanyBilling(data.companyId)
+      if (!billing) {
+        console.log('⚠️  [WALLET] Billing not initialized, skipping wallet deduction')
+      } else {
+        const balanceBefore = parseFloat(billing.wallet_balance)
+        console.log('💰 [WALLET] Current Balance: $' + balanceBefore.toFixed(2))
+        console.log('💸 [WALLET] Amount to Deduct: $' + finalCost.toFixed(2))
+
+        // Check if wallet has sufficient balance
+        if (balanceBefore < finalCost) {
+          console.log('⚠️  [WALLET] Insufficient balance!')
+          
+          // Check if auto-recharge is enabled
+          if (billing.auto_recharge_enabled) {
+            console.log('🔄 [WALLET] Auto-recharge enabled, attempting recharge...')
+            try {
+              await this.autoRecharge(data.companyId)
+              console.log('✅ [WALLET] Auto-recharge successful!')
+            } catch (rechargeError: any) {
+              console.log('❌ [WALLET] Auto-recharge failed:', rechargeError.message)
+              throw new Error('Insufficient wallet balance and auto-recharge failed')
+            }
+          } else {
+            console.log('❌ [WALLET] Auto-recharge disabled, cannot proceed')
+            throw new Error(`Insufficient wallet balance. Current: $${balanceBefore.toFixed(2)}, Required: $${finalCost.toFixed(2)}`)
+          }
+        }
+
+        // Deduct from wallet
+        const deductQuery = `
+          UPDATE company_billing
+          SET 
+            wallet_balance = wallet_balance - $2,
+            current_month_spent = current_month_spent + $2,
+            total_spent = total_spent + $2,
+            updated_at = NOW()
+          WHERE company_id = $1::uuid AND wallet_balance >= $2
+          RETURNING wallet_balance as new_balance
+        `
+        const deductResult = await this.query(deductQuery, [data.companyId, finalCost]) as any[]
+        
+        if (deductResult.length === 0) {
+          throw new Error('Wallet deduction failed - insufficient balance')
+        }
+
+        const balanceAfter = parseFloat(deductResult[0].new_balance)
+        console.log('✅ [WALLET] Deduction successful!')
+        console.log('💰 [WALLET] New Balance: $' + balanceAfter.toFixed(2))
+
+        // Create ledger entry for audit trail
+        const ledgerQuery = `
+          INSERT INTO usage_ledger (
+            company_id, job_id, entry_type, description,
+            quantity, unit_price, amount,
+            balance_before, balance_after,
+            reference_id, metadata, created_at
+          ) VALUES (
+            $1::uuid, $2::uuid, $3::ledger_entry_type, $4,
+            $5, $6, $7,
+            $8, $9,
+            $10::uuid, $11::jsonb, NOW()
+          )
+          RETURNING *
+        `
+        
+        await this.query(ledgerQuery, [
+          data.companyId,
+          data.jobId,
+          'VIDEO_INTERVIEW',
+          `Video interview - ${data.durationMinutes.toFixed(1)} minutes`,
+          data.durationMinutes, // quantity (minutes)
+          costPerMinute, // unit price per minute
+          finalCost, // amount
+          balanceBefore,
+          balanceAfter,
+          result[0].id, // reference to video_interview_usage record
+          JSON.stringify({
+            interview_id: data.interviewId,
+            candidate_id: data.candidateId,
+            duration_minutes: data.durationMinutes,
+            completed_questions: data.completedQuestions || 0,
+            total_questions: data.totalQuestions || 0,
+            video_quality: data.videoQuality || 'HD',
+            pricing_source: usageResult.source
+          })
+        ])
+
+        console.log('📝 [LEDGER] Entry created successfully')
+      }
+    } catch (walletError: any) {
+      console.log('❌ [WALLET] Error during wallet operation:', walletError.message)
+      // Don't throw - allow video interview to succeed even if wallet deduction fails
+      console.log('⚠️  [WALLET] Video interview succeeded but wallet was not charged')
+    }
+
     console.log('🎉 [VIDEO INTERVIEW] Billing calculation completed successfully!')
     console.log('='.repeat(70) + '\n')
     return result[0]

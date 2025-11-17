@@ -61,14 +61,14 @@ export async function GET(req: NextRequest) {
     const result = await Promise.all(
       companies.map(async (c: any) => {
         try {
-          // Get monthly spend
+          // Get monthly spend (current month from 1st to today)
           const monthRes = await DatabaseService.query(
             `SELECT COALESCE(SUM(cost), 0) as total FROM (
-              SELECT cost FROM cv_parsing_usage WHERE company_id = $1::uuid AND DATE(created_at) >= DATE_TRUNC('month', CURRENT_DATE)
+              SELECT cost FROM cv_parsing_usage WHERE company_id = $1::uuid AND created_at >= DATE_TRUNC('month', CURRENT_DATE)::timestamptz
               UNION ALL
-              SELECT cost FROM question_generation_usage WHERE company_id = $1::uuid AND DATE(created_at) >= DATE_TRUNC('month', CURRENT_DATE)
+              SELECT cost FROM question_generation_usage WHERE company_id = $1::uuid AND created_at >= DATE_TRUNC('month', CURRENT_DATE)::timestamptz
               UNION ALL
-              SELECT cost FROM video_interview_usage WHERE company_id = $1::uuid AND DATE(created_at) >= DATE_TRUNC('month', CURRENT_DATE)
+              SELECT cost FROM video_interview_usage WHERE company_id = $1::uuid AND created_at >= DATE_TRUNC('month', CURRENT_DATE)::timestamptz
             ) m`,
             [c.id]
           )
@@ -88,8 +88,9 @@ export async function GET(req: NextRequest) {
           // Get interview count
           const interviewRes = await DatabaseService.query(
             `SELECT COUNT(*)::text as count FROM interviews i 
-             JOIN applications a ON i.application_id = a.id 
-             JOIN jobs j ON a.job_id = j.id 
+             JOIN application_rounds ar ON ar.id = i.application_round_id
+             JOIN applications a ON a.id = ar.application_id
+             JOIN jobs j ON j.id = a.job_id 
              WHERE j.company_id = $1::uuid`,
             [c.id]
           )
