@@ -497,10 +497,9 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
           }
         }
         
+        // Note: transcript deltas are already handled by handleTranscriptionDelta()
+        // Only handle output_text deltas here (non-audio text responses)
         if (msg.type === 'response.output_text.delta' && typeof msg.delta === 'string') {
-          agentTextBufferRef.current += msg.delta
-        }
-        if ((msg.type === 'response.audio_transcript.delta' || msg.type === 'response.output_audio_transcript.delta') && typeof msg.delta === 'string') {
           agentTextBufferRef.current += msg.delta
         }
       } catch (e) {
