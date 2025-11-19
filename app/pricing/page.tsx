@@ -4,103 +4,56 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
 import { LoginModal } from "@/components/auth/login-modal"
 import Link from "next/link"
 import { Check, X, ArrowRight, Star } from "lucide-react"
 
 export default function PricingPage() {
-  const [isAnnual, setIsAnnual] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
 
   const plans = [
     {
-      name: "Starter",
-      description: "Perfect for small teams getting started with AI recruitment",
-      monthlyPrice: 49,
-      annualPrice: 39,
+      name: "Free Trial",
+      description: "Try HireGenAI with core features. No credit card required",
+      monthlyPrice: 0,
+      annualPrice: 0,
       features: [
-        "Up to 5 active jobs",
-        "100 candidate profiles/month",
-        "Basic AI screening",
-        "Email support",
-        "Standard integrations",
-        "Basic analytics",
-        "Mobile app access",
+        "1 Job Description",
+        "1 CV Parsing",
+        "1 AI Interview",
+        "Usage rates: CV Parsing $0.50 per CV",
+        "Usage rates: AI Interview $0.50 per minute",
+        "Usage rates: Question Generation $0.10 per 10 questions",
       ],
-      limitations: ["No voice AI interviews", "No advanced analytics", "No custom workflows", "No priority support"],
+      limitations: [
+        "Limited access only",
+        "Watermarked reports",
+      ],
       popular: false,
       cta: "Start Free Trial",
     },
     {
-      name: "Professional",
-      description: "Ideal for growing companies with advanced recruitment needs",
-      monthlyPrice: 149,
-      annualPrice: 119,
+      name: "$100 Pro",
+      description: "Full platform access for growing teams",
+      monthlyPrice: 100,
+      annualPrice: 100,
       features: [
-        "Up to 25 active jobs",
+        "Multiple job postings",
         "500 candidate profiles/month",
-        "Advanced AI screening",
-        "Voice AI interviews (50/month)",
-        "Priority email & chat support",
-        "All integrations",
-        "Advanced analytics & reporting",
-        "Custom workflows",
-        "Team collaboration tools",
-        "API access",
-      ],
-      limitations: ["Limited voice AI interviews", "No dedicated account manager"],
-      popular: true,
-      cta: "Start Free Trial",
-    },
-    {
-      name: "Enterprise",
-      description: "For large organizations requiring unlimited scale and customization",
-      monthlyPrice: 399,
-      annualPrice: 319,
-      features: [
-        "Unlimited active jobs",
-        "Unlimited candidate profiles",
-        "Advanced AI screening & matching",
-        "Unlimited voice AI interviews",
-        "24/7 priority support",
-        "All integrations + custom",
-        "Advanced analytics & BI tools",
-        "Custom workflows & automation",
-        "White-label options",
-        "Dedicated account manager",
-        "Custom AI model training",
-        "SSO & advanced security",
-        "Onboarding & training",
+        "Advanced AI screening & ranking",
+        "Voice/Video AI interviews",
+        "Detailed analytics & reports",
+        "Usage rates: CV Parsing $0.50 per CV",
+        "Usage rates: AI Interview $0.50 per minute",
+        "Usage rates: Question Generation $0.10 per 10 questions",
       ],
       limitations: [],
-      popular: false,
-      cta: "Contact Sales",
+      popular: true,
+      cta: "Choose Pro",
     },
   ]
 
-  const addOns = [
-    {
-      name: "Additional Voice AI Interviews",
-      description: "Extra voice AI interview credits beyond your plan limit",
-      price: "$2 per interview",
-    },
-    {
-      name: "Custom Integration",
-      description: "Connect with your existing HR tools and systems",
-      price: "$500 setup + $50/month",
-    },
-    {
-      name: "Advanced Training",
-      description: "Personalized onboarding and team training sessions",
-      price: "$1,500 one-time",
-    },
-    {
-      name: "Dedicated Success Manager",
-      description: "Personal account manager for strategic guidance",
-      price: "$500/month",
-    },
-  ]
+  // add-ons removed
 
   return (
     <div className="min-h-screen bg-white">
@@ -172,20 +125,14 @@ export default function PricingPage() {
             Choose the perfect plan for your hiring needs. All plans include our core AI features with no hidden fees.
           </p>
 
-          {/* Billing Toggle */}
-          <div className="flex items-center justify-center space-x-4 mb-12">
-            <span className={`text-sm font-medium ${!isAnnual ? "text-slate-800" : "text-slate-500"}`}>Monthly</span>
-            <Switch checked={isAnnual} onCheckedChange={setIsAnnual} className="data-[state=checked]:bg-emerald-500" />
-            <span className={`text-sm font-medium ${isAnnual ? "text-slate-800" : "text-slate-500"}`}>Annual</span>
-            <Badge className="bg-emerald-100 text-emerald-800 ml-2">Save 20%</Badge>
-          </div>
+          {/* Billing Toggle removed */}
         </div>
       </section>
 
       {/* Pricing Cards */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {plans.map((plan, index) => (
               <Card
                 key={index}
@@ -200,18 +147,15 @@ export default function PricingPage() {
                   </div>
                 )}
                 <CardHeader className="text-center pb-8">
-                  <CardTitle className="text-2xl font-bold text-slate-800">{plan.name}</CardTitle>
+                  {plan.name !== "$100 Pro" && (
+                    <CardTitle className="text-2xl font-bold text-slate-800">{plan.name}</CardTitle>
+                  )}
                   <CardDescription className="text-slate-600 mt-2">{plan.description}</CardDescription>
                   <div className="mt-6">
                     <div className="flex items-center justify-center">
-                      <span className="text-5xl font-bold text-slate-800">
-                        ${isAnnual ? plan.annualPrice : plan.monthlyPrice}
-                      </span>
+                      <span className="text-5xl font-bold text-slate-800">${plan.monthlyPrice}</span>
                       <span className="text-slate-600 ml-2">/month</span>
                     </div>
-                    {isAnnual && (
-                      <div className="text-sm text-slate-500 mt-1">Billed annually (${plan.annualPrice * 12}/year)</div>
-                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -243,135 +187,9 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Add-ons Section */}
-      <section className="py-20 bg-slate-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-slate-800 mb-4">Add-ons & Extensions</h2>
-            <p className="text-slate-600">Enhance your plan with additional features and services</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {addOns.map((addon, index) => (
-              <Card key={index} className="sr-card">
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="font-semibold text-slate-800">{addon.name}</h3>
-                    <Badge variant="outline" className="text-emerald-600 border-emerald-200">
-                      {addon.price}
-                    </Badge>
-                  </div>
-                  <p className="text-slate-600 text-sm">{addon.description}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Add-ons Section removed */}
 
-      {/* Features Comparison */}
-      <section className="py-20 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-slate-800 mb-4">Feature Comparison</h2>
-            <p className="text-slate-600">See what's included in each plan</p>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-4 px-6 font-semibold text-slate-800">Features</th>
-                  <th className="text-center py-4 px-6 font-semibold text-slate-800">Starter</th>
-                  <th className="text-center py-4 px-6 font-semibold text-slate-800">Professional</th>
-                  <th className="text-center py-4 px-6 font-semibold text-slate-800">Enterprise</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                <tr>
-                  <td className="py-4 px-6 font-medium text-slate-700">Active Jobs</td>
-                  <td className="py-4 px-6 text-center text-slate-600">5</td>
-                  <td className="py-4 px-6 text-center text-slate-600">25</td>
-                  <td className="py-4 px-6 text-center text-slate-600">Unlimited</td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium text-slate-700">Candidate Profiles/Month</td>
-                  <td className="py-4 px-6 text-center text-slate-600">100</td>
-                  <td className="py-4 px-6 text-center text-slate-600">500</td>
-                  <td className="py-4 px-6 text-center text-slate-600">Unlimited</td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium text-slate-700">AI Screening</td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-emerald-500 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-emerald-500 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-emerald-500 mx-auto" />
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium text-slate-700">Voice AI Interviews</td>
-                  <td className="py-4 px-6 text-center">
-                    <X className="w-5 h-5 text-slate-400 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center text-slate-600">50/month</td>
-                  <td className="py-4 px-6 text-center text-slate-600">Unlimited</td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium text-slate-700">Advanced Analytics</td>
-                  <td className="py-4 px-6 text-center">
-                    <X className="w-5 h-5 text-slate-400 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-emerald-500 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-emerald-500 mx-auto" />
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium text-slate-700">Custom Workflows</td>
-                  <td className="py-4 px-6 text-center">
-                    <X className="w-5 h-5 text-slate-400 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-emerald-500 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-emerald-500 mx-auto" />
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium text-slate-700">API Access</td>
-                  <td className="py-4 px-6 text-center">
-                    <X className="w-5 h-5 text-slate-400 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-emerald-500 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-emerald-500 mx-auto" />
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-6 font-medium text-slate-700">Dedicated Support</td>
-                  <td className="py-4 px-6 text-center">
-                    <X className="w-5 h-5 text-slate-400 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <X className="w-5 h-5 text-slate-400 mx-auto" />
-                  </td>
-                  <td className="py-4 px-6 text-center">
-                    <Check className="w-5 h-5 text-emerald-500 mx-auto" />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
+      {/* Features Comparison removed */}
 
       {/* FAQ Section */}
       <section className="py-20 bg-slate-50">
