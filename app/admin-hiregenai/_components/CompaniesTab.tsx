@@ -6,21 +6,35 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
+import DateRangeFilter from "@/components/filters/DateRangeFilter"
 
 export default function CompaniesTab() {
   const [companies, setCompanies] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  
+  // Date range filters
+  const [startDate, setStartDate] = useState<Date>(() => {
+    const date = new Date()
+    date.setDate(date.getDate() - 30)
+    return date
+  })
+  const [endDate, setEndDate] = useState<Date>(new Date())
 
   useEffect(() => {
     loadCompanies()
-  }, [])
+  }, [startDate, endDate])
 
   const loadCompanies = async () => {
     try {
       setLoading(true)
-      console.log("🔍 Fetching companies...")
-      const res = await fetch("/api/admin/companies")
+      const params = new URLSearchParams({
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString()
+      })
+      
+      console.log("🔍 Fetching companies for date range:", startDate.toLocaleDateString(), "to", endDate.toLocaleDateString())
+      const res = await fetch(`/api/admin/companies?${params.toString()}`)
       if (!res.ok) {
         const errorData = await res.json()
         throw new Error(errorData.error || "Failed to load companies")
@@ -60,6 +74,15 @@ export default function CompaniesTab() {
 
   return (
     <div className="space-y-6">
+      {/* Date Range Filter */}
+      <DateRangeFilter
+        onApply={(start, end) => {
+          setStartDate(start)
+          setEndDate(end)
+        }}
+        loading={loading}
+      />
+      
       <Card className="bg-slate-900 border-slate-800">
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">

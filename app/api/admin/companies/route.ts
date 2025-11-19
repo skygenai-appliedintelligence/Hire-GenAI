@@ -18,6 +18,15 @@ function convertBigInt(obj: any): any {
 
 export async function GET(req: NextRequest) {
   try {
+    // Get date range from query params
+    const searchParams = req.nextUrl.searchParams
+    const startDateParam = searchParams.get('startDate')
+    const endDateParam = searchParams.get('endDate')
+    
+    const endDate = endDateParam ? new Date(endDateParam) : new Date()
+    const startDate = startDateParam ? new Date(startDateParam) : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000)
+    
+    console.log('📊 [Admin Companies] Date range:', startDate.toLocaleDateString(), 'to', endDate.toLocaleDateString())
     console.log("🔍 Companies API called")
 
     // First check if companies table has data
@@ -61,16 +70,16 @@ export async function GET(req: NextRequest) {
     const result = await Promise.all(
       companies.map(async (c: any) => {
         try {
-          // Get monthly spend (current month from 1st to today)
+          // Get spend for selected date range
           const monthRes = await DatabaseService.query(
             `SELECT COALESCE(SUM(cost), 0) as total FROM (
-              SELECT cost FROM cv_parsing_usage WHERE company_id = $1::uuid AND created_at >= DATE_TRUNC('month', CURRENT_DATE)::timestamptz
+              SELECT cost FROM cv_parsing_usage WHERE company_id = $1::uuid AND created_at >= $2 AND created_at <= $3
               UNION ALL
-              SELECT cost FROM question_generation_usage WHERE company_id = $1::uuid AND created_at >= DATE_TRUNC('month', CURRENT_DATE)::timestamptz
+              SELECT cost FROM question_generation_usage WHERE company_id = $1::uuid AND created_at >= $2 AND created_at <= $3
               UNION ALL
-              SELECT cost FROM video_interview_usage WHERE company_id = $1::uuid AND created_at >= DATE_TRUNC('month', CURRENT_DATE)::timestamptz
+              SELECT cost FROM video_interview_usage WHERE company_id = $1::uuid AND created_at >= $2 AND created_at <= $3
             ) m`,
-            [c.id]
+            [c.id, startDate, endDate]
           )
 
           // Get total spend
