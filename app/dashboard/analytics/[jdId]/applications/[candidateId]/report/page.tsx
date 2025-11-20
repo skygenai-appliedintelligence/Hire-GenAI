@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, User, FileText, MessageSquare, Download, Mail, Phone, Calendar, ExternalLink, Star, Briefcase, ChevronDown } from "lucide-react"
+import { ArrowLeft, User, FileText, MessageSquare, Download, Mail, Phone, Calendar, ExternalLink, Star, Briefcase, ChevronDown, CheckCircle2, TrendingUp } from "lucide-react"
 
 type CandidateData = {
   id: string
@@ -78,6 +78,49 @@ type TranscriptData = {
       score?: number
     }>
   }>
+}
+
+// Helper Functions
+const getScoreBadgeColor = (score: number, maxScore: number = 100) => {
+  const percentage = (score / maxScore) * 100
+  if (percentage >= 80) return "bg-green-100 text-green-800 border-green-300"
+  if (percentage >= 60) return "bg-yellow-100 text-yellow-800 border-yellow-300"
+  return "bg-red-100 text-red-800 border-red-300"
+}
+
+const getScoreBarColor = (score: number, maxScore: number = 100) => {
+  const percentage = (score / maxScore) * 100
+  if (percentage >= 80) return "bg-gradient-to-r from-green-500 to-green-600"
+  if (percentage >= 60) return "bg-gradient-to-r from-yellow-500 to-yellow-600"
+  return "bg-gradient-to-r from-red-500 to-red-600"
+}
+
+const getCategoryIcon = (category: string) => {
+  const icons: Record<string, string> = {
+    "Technical Skills": "💻",
+    "Technical": "💻",
+    "Communication": "💬",
+    "Experience": "📊",
+    "Problem Solving": "🧩",
+    "Cultural Fit": "🤝",
+    "Culture": "🤝"
+  }
+  return icons[category] || "📌"
+}
+
+const extractWeight = (scoreObj: any, defaultWeight: number = 25): number => {
+  if (typeof scoreObj === 'object' && scoreObj !== null) {
+    return scoreObj.weight || defaultWeight
+  }
+  return defaultWeight
+}
+
+const extractScore = (scoreObj: any): number => {
+  if (typeof scoreObj === 'number') return scoreObj
+  if (typeof scoreObj === 'object' && scoreObj !== null) {
+    return scoreObj.score || 0
+  }
+  return 0
 }
 
 export default function CandidateReportPage() {
@@ -965,13 +1008,214 @@ export default function CandidateReportPage() {
                           {overallScoreDisplay}
                         </div>
                         <div className="text-xs text-gray-500">
-                          Interview scores coming soon
+                          Weighted average from all categories
                         </div>
                       </div>
                       <div>
                         {getDecisionBadge(evaluationData!.decision)}
                       </div>
                     </div>
+
+                    {/* Weighted Score Breakdown Card */}
+                    <Card className="border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-white">
+                      <CardHeader>
+                        <CardTitle className="text-lg text-purple-900 flex items-center gap-2">
+                          <TrendingUp className="h-5 w-5" />
+                          Weighted Score Breakdown
+                        </CardTitle>
+                        <CardDescription>Category-wise performance with dynamic weightage</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          {/* Technical Skills */}
+                          <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <h4 className="font-semibold text-blue-900 flex items-center gap-2">
+                                  💻 Technical Skills
+                                </h4>
+                                <p className="text-xs text-blue-700 mt-1">Core technical competencies</p>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-2xl font-bold text-blue-900">
+                                  {extractScore((evaluationData!.scores as any).technical)}/100
+                                </div>
+                                <Badge className="bg-blue-600 text-white mt-1">
+                                  Weight: {extractWeight((evaluationData!.scores as any).technical, 40)}%
+                                </Badge>
+                              </div>
+                            </div>
+                            
+                            {/* Progress Bar */}
+                            <div className="w-full bg-blue-200 rounded-full h-3 mb-2">
+                              <div
+                                className="h-3 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-500"
+                                style={{ width: `${extractScore((evaluationData!.scores as any).technical)}%` }}
+                              />
+                            </div>
+                            
+                            {/* Contribution to Final Score */}
+                            <div className="flex justify-between text-xs text-blue-800 mt-2">
+                              <span>Contribution to Final Score:</span>
+                              <span className="font-semibold">
+                                {((extractScore((evaluationData!.scores as any).technical) * extractWeight((evaluationData!.scores as any).technical, 40)) / 100).toFixed(1)} points
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Communication Skills */}
+                          <div className="p-4 bg-green-50 rounded-lg border-2 border-green-200">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <h4 className="font-semibold text-green-900 flex items-center gap-2">
+                                  💬 Communication Skills
+                                </h4>
+                                <p className="text-xs text-green-700 mt-1">Verbal and written communication</p>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-2xl font-bold text-green-900">
+                                  {extractScore((evaluationData!.scores as any).communication)}/100
+                                </div>
+                                <Badge className="bg-green-600 text-white mt-1">
+                                  Weight: {extractWeight((evaluationData!.scores as any).communication, 20)}%
+                                </Badge>
+                              </div>
+                            </div>
+                            
+                            <div className="w-full bg-green-200 rounded-full h-3 mb-2">
+                              <div
+                                className="h-3 rounded-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500"
+                                style={{ width: `${extractScore((evaluationData!.scores as any).communication)}%` }}
+                              />
+                            </div>
+                            
+                            <div className="flex justify-between text-xs text-green-800 mt-2">
+                              <span>Contribution to Final Score:</span>
+                              <span className="font-semibold">
+                                {((extractScore((evaluationData!.scores as any).communication) * extractWeight((evaluationData!.scores as any).communication, 20)) / 100).toFixed(1)} points
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Problem Solving / Experience */}
+                          <div className="p-4 bg-orange-50 rounded-lg border-2 border-orange-200">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <h4 className="font-semibold text-orange-900 flex items-center gap-2">
+                                  📊 Experience & Problem Solving
+                                </h4>
+                                <p className="text-xs text-orange-700 mt-1">Work experience and analytical skills</p>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-2xl font-bold text-orange-900">
+                                  {extractScore((evaluationData!.scores as any).experience)}/100
+                                </div>
+                                <Badge className="bg-orange-600 text-white mt-1">
+                                  Weight: {extractWeight((evaluationData!.scores as any).experience, 25)}%
+                                </Badge>
+                              </div>
+                            </div>
+                            
+                            <div className="w-full bg-orange-200 rounded-full h-3 mb-2">
+                              <div
+                                className="h-3 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 transition-all duration-500"
+                                style={{ width: `${extractScore((evaluationData!.scores as any).experience)}%` }}
+                              />
+                            </div>
+                            
+                            <div className="flex justify-between text-xs text-orange-800 mt-2">
+                              <span>Contribution to Final Score:</span>
+                              <span className="font-semibold">
+                                {((extractScore((evaluationData!.scores as any).experience) * extractWeight((evaluationData!.scores as any).experience, 25)) / 100).toFixed(1)} points
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Cultural Fit */}
+                          <div className="p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <h4 className="font-semibold text-purple-900 flex items-center gap-2">
+                                  🤝 Cultural Fit
+                                </h4>
+                                <p className="text-xs text-purple-700 mt-1">Team alignment and values</p>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-2xl font-bold text-purple-900">
+                                  {extractScore((evaluationData!.scores as any).cultural_fit)}/100
+                                </div>
+                                <Badge className="bg-purple-600 text-white mt-1">
+                                  Weight: {extractWeight((evaluationData!.scores as any).cultural_fit, 15)}%
+                                </Badge>
+                              </div>
+                            </div>
+                            
+                            <div className="w-full bg-purple-200 rounded-full h-3 mb-2">
+                              <div
+                                className="h-3 rounded-full bg-gradient-to-r from-purple-500 to-purple-600 transition-all duration-500"
+                                style={{ width: `${extractScore((evaluationData!.scores as any).cultural_fit)}%` }}
+                              />
+                            </div>
+                            
+                            <div className="flex justify-between text-xs text-purple-800 mt-2">
+                              <span>Contribution to Final Score:</span>
+                              <span className="font-semibold">
+                                {((extractScore((evaluationData!.scores as any).cultural_fit) * extractWeight((evaluationData!.scores as any).cultural_fit, 15)) / 100).toFixed(1)} points
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Final Calculation Summary */}
+                        <div className="mt-6 p-4 bg-gradient-to-r from-emerald-50 to-emerald-100 rounded-lg border-2 border-emerald-300">
+                          <h4 className="font-semibold text-emerald-900 mb-3 flex items-center gap-2">
+                            🧮 Final Score Calculation
+                          </h4>
+                          <div className="space-y-2 text-sm">
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-700">Technical ({extractWeight((evaluationData!.scores as any).technical, 40)}%)</span>
+                              <span className="font-mono text-gray-900">
+                                {extractScore((evaluationData!.scores as any).technical)} × 0.{extractWeight((evaluationData!.scores as any).technical, 40)} = 
+                                <strong className="ml-1 text-emerald-700">
+                                  {((extractScore((evaluationData!.scores as any).technical) * extractWeight((evaluationData!.scores as any).technical, 40)) / 100).toFixed(1)}
+                                </strong>
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-700">Communication ({extractWeight((evaluationData!.scores as any).communication, 20)}%)</span>
+                              <span className="font-mono text-gray-900">
+                                {extractScore((evaluationData!.scores as any).communication)} × 0.{extractWeight((evaluationData!.scores as any).communication, 20)} = 
+                                <strong className="ml-1 text-emerald-700">
+                                  {((extractScore((evaluationData!.scores as any).communication) * extractWeight((evaluationData!.scores as any).communication, 20)) / 100).toFixed(1)}
+                                </strong>
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-700">Experience ({extractWeight((evaluationData!.scores as any).experience, 25)}%)</span>
+                              <span className="font-mono text-gray-900">
+                                {extractScore((evaluationData!.scores as any).experience)} × 0.{extractWeight((evaluationData!.scores as any).experience, 25)} = 
+                                <strong className="ml-1 text-emerald-700">
+                                  {((extractScore((evaluationData!.scores as any).experience) * extractWeight((evaluationData!.scores as any).experience, 25)) / 100).toFixed(1)}
+                                </strong>
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-700">Cultural Fit ({extractWeight((evaluationData!.scores as any).cultural_fit, 15)}%)</span>
+                              <span className="font-mono text-gray-900">
+                                {extractScore((evaluationData!.scores as any).cultural_fit)} × 0.{extractWeight((evaluationData!.scores as any).cultural_fit, 15)} = 
+                                <strong className="ml-1 text-emerald-700">
+                                  {((extractScore((evaluationData!.scores as any).cultural_fit) * extractWeight((evaluationData!.scores as any).cultural_fit, 15)) / 100).toFixed(1)}
+                                </strong>
+                              </span>
+                            </div>
+                            <div className="border-t-2 border-emerald-300 pt-2 mt-2 flex justify-between items-center font-bold text-base">
+                              <span className="text-emerald-900">Final Weighted Score:</span>
+                              <span className="text-2xl text-emerald-700">{evaluationData!.overallScore}/100</span>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
 
                     <div className="space-y-4">
                       <h3 className="font-semibold text-gray-900">Detailed Scores</h3>
@@ -1061,33 +1305,114 @@ export default function CandidateReportPage() {
                       )}
                     </div>
 
-                    {evaluationData!.strengths.length > 0 && (
-                      <div>
-                        <h3 className="font-semibold text-gray-900 mb-2">Strengths</h3>
-                        <ul className="space-y-1">
-                          {evaluationData!.strengths.map((strength, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-sm">
-                              <span className="text-green-600 mt-0.5">✓</span>
-                              <span>{strength}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                    {/* Enhanced Strengths & Weaknesses with Evidence */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Strengths Card */}
+                      {evaluationData!.strengths.length > 0 && (
+                        <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-white">
+                          <CardHeader>
+                            <CardTitle className="text-green-900 flex items-center gap-2">
+                              <CheckCircle2 className="h-5 w-5" />
+                              Key Strengths
+                            </CardTitle>
+                            <CardDescription className="text-green-700">Areas where candidate excels</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-4">
+                              {evaluationData!.strengths.map((strength, idx) => {
+                                // Handle both string and object formats
+                                const strengthObj = typeof strength === 'string' 
+                                  ? { point: strength } 
+                                  : strength as any
+                                
+                                return (
+                                  <div key={idx} className="p-3 bg-white rounded-lg border border-green-200 hover:border-green-400 transition-colors">
+                                    <div className="flex items-start gap-2 mb-2">
+                                      <span className="text-green-600 mt-0.5 text-lg">✓</span>
+                                      <p className="font-medium text-gray-900 flex-1">{strengthObj.point}</p>
+                                    </div>
+                                    {strengthObj.category && (
+                                      <Badge variant="outline" className="text-xs mb-2 bg-green-50">
+                                        {getCategoryIcon(strengthObj.category)} {strengthObj.category}
+                                      </Badge>
+                                    )}
+                                    {strengthObj.evidence && Array.isArray(strengthObj.evidence) && strengthObj.evidence.length > 0 && (
+                                      <div className="mt-2 pl-6">
+                                        <div className="text-xs font-medium text-gray-500 mb-1">Evidence:</div>
+                                        <ul className="space-y-1">
+                                          {strengthObj.evidence.map((ev: string, evIdx: number) => (
+                                            <li key={evIdx} className="text-xs text-gray-700 flex items-start gap-1">
+                                              <span className="text-green-500 mt-0.5">•</span>
+                                              <span className="flex-1">{ev}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
 
-                    {evaluationData!.weaknesses.length > 0 && (
-                      <div>
-                        <h3 className="font-semibold text-gray-900 mb-2">Areas for Improvement</h3>
-                        <ul className="space-y-1">
-                          {evaluationData!.weaknesses.map((weakness, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-sm">
-                              <span className="text-red-600 mt-0.5">✗</span>
-                              <span>{weakness}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                      {/* Weaknesses Card */}
+                      {evaluationData!.weaknesses.length > 0 && (
+                        <Card className="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-white">
+                          <CardHeader>
+                            <CardTitle className="text-orange-900 flex items-center gap-2">
+                              <TrendingUp className="h-5 w-5" />
+                              Areas for Improvement
+                            </CardTitle>
+                            <CardDescription className="text-orange-700">Growth opportunities</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-4">
+                              {evaluationData!.weaknesses.map((weakness, idx) => {
+                                // Handle both string and object formats
+                                const weaknessObj = typeof weakness === 'string' 
+                                  ? { point: weakness } 
+                                  : weakness as any
+                                
+                                return (
+                                  <div key={idx} className="p-3 bg-white rounded-lg border border-orange-200 hover:border-orange-400 transition-colors">
+                                    <div className="flex items-start gap-2 mb-2">
+                                      <span className="text-orange-600 mt-0.5 text-lg">⚠</span>
+                                      <p className="font-medium text-gray-900 flex-1">{weaknessObj.point}</p>
+                                    </div>
+                                    {weaknessObj.category && (
+                                      <Badge variant="outline" className="text-xs mb-2 bg-orange-50">
+                                        {getCategoryIcon(weaknessObj.category)} {weaknessObj.category}
+                                      </Badge>
+                                    )}
+                                    {weaknessObj.evidence && Array.isArray(weaknessObj.evidence) && weaknessObj.evidence.length > 0 && (
+                                      <div className="mt-2 pl-6">
+                                        <div className="text-xs font-medium text-gray-500 mb-1">Evidence:</div>
+                                        <ul className="space-y-1">
+                                          {weaknessObj.evidence.map((ev: string, evIdx: number) => (
+                                            <li key={evIdx} className="text-xs text-gray-700 flex items-start gap-1">
+                                              <span className="text-orange-500 mt-0.5">•</span>
+                                              <span className="flex-1">{ev}</span>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {weaknessObj.improvement_suggestion && (
+                                      <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                                        <div className="text-xs font-medium text-blue-900 mb-1">💡 Suggestion:</div>
+                                        <p className="text-xs text-blue-800">{weaknessObj.improvement_suggestion}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
 
                     {evaluationData!.reviewerComments && (
                       <div>
