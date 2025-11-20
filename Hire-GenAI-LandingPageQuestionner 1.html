@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Recruiter | Get Your Free Recruitment Efficiency Score</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4361EE;
+            --primary-dark: #3A56D4;
+            --secondary: #7209B7;
+            --accent: #4CC9F0;
+            --light: #F8F9FA;
+            --dark: #212529;
+            --gray: #6C757D;
+            --success: #4BB543;
+            --warning: #FFC107;
+            --danger: #DC3545;
+            --border-radius: 12px;
+            --box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            --transition: all 0.3s ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        body {
+            color: var(--dark);
+            line-height: 1.6;
+            background-color: #f9fafc;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        /* Header & Navigation */
+        header {
+            padding: 20px 0;
+            position: fixed;
+            width: 100%;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+        }
+        
+        .logo span {
+            color: var(--secondary);
+        }
+        
+        .logo i {
+            margin-right: 10px;
+            font-size: 28px;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 30px;
+        }
+        
+        .nav-links a {
+            text-decoration: none;
+            color: var(--dark);
+            font-weight: 500;
+            transition: var(--transition);
+        }
+        
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+        
+        .cta-button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .cta-button:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(67, 97, 238, 0.3);
+        }
+        
+        /* Hero Section with Lead Gen */
+        .hero {
+            padding: 160px 0 100px;
+            background: linear-gradient(135deg, #f5f7ff 0%, #f0f4ff 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 40px;
+        }
+        
+        .hero-text {
+            flex: 1;
+        }
+        
+        .hero-badge {
+            display: inline-block;
+            background: rgba(67, 97, 238, 0.1);
+            color: var(--primary);
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 48px;
+            line-height: 1.2;
+            margin-bottom: 20px;
+            color: var(--dark);
+        }
+        
+        .hero-subtitle {
+            font-size: 20px;
+            color: var(--gray);
+            margin-bottom: 30px;
+            max-width: 500px;
+        }
+        
+        .benefits {
+            margin-top: 30px;
+        }
+        
+        .benefit-item {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+        }
+        
+        .benefit-icon {
+            width: 24px;
+            height: 24px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            flex-shrink: 0;
+            font-size: 12px;
+        }
+        
+        /* Value Proposition Section */
+        .value-proposition {
+            padding: 80px 0;
+            background: white;
+        }
+        
+        .value-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+        
+        .value-card {
+            text-align: center;
+            padding: 30px;
+        }
+        
+        .value-icon {
+            width: 80px;
+            height: 80px;
+            background: rgba(67, 97, 238, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            color: var(--primary);
+            font-size: 32px;
+        }
+        
+        .value-card h3 {
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        
+        .value-card p {
+            color: var(--gray);
+        }
+        
+        /* Credibility Section */
+        .credibility {
+            padding: 80px 0;
+            background: #f8f9fa;
+        }
+        
+        .credibility-content {
+            display: flex;
+            align-items: center;
+            gap: 40px;
+        }
+        
+        .credibility-text {
+            flex: 1;
+        }
+        
+        .credibility-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-top: 30px;
+        }
+        
+        .stat {
+            text-align: center;
+            padding: 20px;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: var(--gray);
+            font-size: 14px;
+        }
+        
+        .credibility-image {
+            flex: 1;
+            text-align: center;
+        }
+        
+        .credibility-image img {
+            max-width: 100%;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+        }
+        
+        /* Questionnaire Container */
+        .questionnaire-container {
+            flex: 1;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            padding: 40px;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .questionnaire-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .questionnaire-header h2 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .questionnaire-header p {
+            color: var(--gray);
+        }
+        
+        .progress-bar {
+            height: 6px;
+            background: #e9ecef;
+            border-radius: 3px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+        
+        .progress {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        
+        .question {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        .question.active {
+            display: block;
+        }
+        
+        .question-title {
+            font-size: 20px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .option {
+            padding: 16px 20px;
+            border: 2px solid #e9ecef;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+        }
+        
+        .option:hover {
+            border-color: var(--primary);
+            background: rgba(67, 97, 238, 0.03);
+        }
+        
+        .option.selected {
+            border-color: var(--primary);
+            background: rgba(67, 97, 238, 0.08);
+        }
+        
+        .option-circle {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #dee2e6;
+            margin-right: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        
+        .option.selected .option-circle {
+            border-color: var(--primary);
+            background: var(--primary);
+        }
+        
+        .option.selected .option-circle::after {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: white;
+        }
+        
+        .question-nav {
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .nav-button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .prev-button {
+            background: #f8f9fa;
+            color: var(--gray);
+        }
+        
+        .prev-button:hover {
+            background: #e9ecef;
+        }
+        
+        .next-button {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .next-button:hover {
+            background: var(--primary-dark);
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: var(--transition);
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+        }
+        
+        /* Results Section */
+        .results-section {
+            display: none;
+            padding: 100px 0;
+            background: white;
+        }
+        
+        .results-container {
+            max-width: 900px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        
+        .score-circle {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            margin: 0 auto 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: conic-gradient(var(--primary) 0% var(--score-percent), #f0f4ff var(--score-percent) 100%);
+        }
+        
+        .score-circle::before {
+            content: '';
+            position: absolute;
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            background: white;
+        }
+        
+        .score-value {
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--primary);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .score-label {
+            font-size: 16px;
+            color: var(--gray);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .results-title {
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+        
+        .results-description {
+            font-size: 18px;
+            color: var(--gray);
+            max-width: 600px;
+            margin: 0 auto 40px;
+        }
+        
+        .recommendations {
+            background: #f8f9fa;
+            border-radius: var(--border-radius);
+            padding: 30px;
+            text-align: left;
+            margin-bottom: 40px;
+        }
+        
+        .recommendations h3 {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .recommendation-list {
+            list-style: none;
+        }
+        
+        .recommendation-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            align-items: flex-start;
+        }
+        
+        .recommendation-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .recommendation-icon {
+            color: var(--primary);
+            margin-right: 15px;
+            font-weight: bold;
+        }
+        
+        .lead-form {
+            background: #f8f9fa;
+            border-radius: var(--border-radius);
+            padding: 30px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        .lead-form h3 {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .submit-button {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .submit-button:hover {
+            background: var(--primary-dark);
+        }
+        
+        /* Detailed Report Section */
+        .report-section {
+            display: none;
+            padding: 80px 0;
+            background: linear-gradient(135deg, #f5f7ff 0%, #f0f4ff 100%);
+        }
+        
+        .report-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            overflow: hidden;
+        }
+        
+        .report-header {
+            background: var(--primary);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .report-header h2 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .report-header p {
+            opacity: 0.9;
+        }
+        
+        .report-content {
+            padding: 40px;
+        }
+        
+        .report-section-title {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: var(--primary);
+            border-bottom: 2px solid #f0f4ff;
+            padding-bottom: 10px;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .metric-card {
+            background: #f8f9fa;
+            border-radius: var(--border-radius);
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 5px;
+        }
+        
+        .metric-label {
+            color: var(--gray);
+            font-size: 14px;
+        }
+        
+        .improvement-areas {
+            margin-bottom: 30px;
+        }
+        
+        .area-card {
+            background: white;
+            border-left: 4px solid var(--primary);
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+        }
+        
+        .area-card h4 {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .area-card h4 i {
+            color: var(--primary);
+            margin-right: 10px;
+        }
+        
+        .trial-cta {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+            border-radius: var(--border-radius);
+            margin-top: 40px;
+        }
+        
+        .trial-cta h3 {
+            font-size: 28px;
+            margin-bottom: 15px;
+        }
+        
+        .trial-features {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+        
+        .trial-feature {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 150px;
+        }
+        
+        .trial-feature i {
+            font-size: 32px;
+            margin-bottom: 10px;
+            color: var(--accent);
+        }
+        
+        .trial-button {
+            background: white;
+            color: var(--primary);
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .trial-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        
+        /* Success Message */
+        .success-message {
+            display: none;
+            text-align: center;
+            padding: 100px 0;
+            background: white;
+        }
+        
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--success);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
+            font-size: 36px;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero-content {
+                flex-direction: column;
+            }
+            
+            h1 {
+                font-size: 36px;
+            }
+            
+            .questionnaire-container {
+                width: 100%;
+                padding: 30px 20px;
+            }
+            
+            .nav-links {
+                display: none;
+            }
+            
+            .trial-features {
+                flex-direction: column;
+                align-items: center;
+                gap: 20px;
+            }
+            
+            .credibility-content {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container nav-container">
+            <a href="#" class="logo"><i class="fas fa-robot"></i>AI<span>Recruiter</span></a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#solutions">How It Works</a>
+                <a href="#pricing">Pricing</a>
+                <a href="#about">About</a>
+            </div>
+            <button class="cta-button">Get Started</button>
+        </div>
+    </header>
+
+    <!-- Hero Section with Questionnaire -->
+    <section class="hero">
+        <div class="container hero-content">
+            <div class="hero-text">
+                <!-- Frustration Hook -->
+                <div class="hero-badge">AI-Powered Recruitment</div>
+                <h1>Feeling Frustrated That You're Not Finding Quality Candidates Even Though You're Spending Hours Screening?</h1>
+                <p class="hero-subtitle">Answer 10 questions to find out why you're experiencing this frustration and get your personalized report.</p>
+                
+                <div class="benefits">
+                    <div class="benefit-item">
+                        <div class="benefit-icon"><i class="fas fa-check"></i></div>
+                        <div>
+                            <strong>Get your personalized score</strong>
+                            <p>See how your recruitment process compares to industry standards</p>
+                        </div>
+                    </div>
+                    <div class="benefit-item">
+                        <div class="benefit-icon"><i class="fas fa-check"></i></div>
+                        <div>
+                            <strong>Receive custom recommendations</strong>
+                            <p>Get actionable insights to improve your hiring efficiency</p>
+                        </div>
+                    </div>
+                    <div class="benefit-item">
+                        <div class="benefit-icon"><i class="fas fa-check"></i></div>
+                        <div>
+                            <strong>Learn time-saving strategies</strong>
+                            <p>Discover how to automate screening and save hours each week</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="questionnaire-container">
+                <div class="questionnaire-header">
+                    <h2>Recruitment Efficiency Assessment</h2>
+                    <p>Answer 10 questions to get your personalized report</p>
+                </div>
+                
+                <div class="progress-bar">
+                    <div class="progress" id="progress-bar"></div>
+                </div>
+                
+                <form id="efficiency-quiz">
+                    <!-- Contact Information -->
+                    <div class="question active" id="question-contact">
+                        <h3 class="question-title">Let's get started with your contact information</h3>
+                        <div class="form-group">
+                            <label for="name">Full Name</label>
+                            <input type="text" id="name" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Work Email</label>
+                            <input type="email" id="email" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="company">Company Name</label>
+                            <input type="text" id="company" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="phone">Phone Number (Optional)</label>
+                            <input type="tel" id="phone" class="form-control">
+                        </div>
+                        <div class="question-nav">
+                            <button type="button" class="nav-button prev-button" disabled>Previous</button>
+                            <button type="button" class="nav-button next-button">Start Assessment</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Question 1 - Volume -->
+                    <div class="question" id="question-1">
+                        <h3 class="question-title">How many applications do you typically receive per open position?</h3>
+                        <div class="options">
+                            <div class="option" data-value="1">
+                                <div class="option-circle"></div>
+                                <span>Less than 10</span>
+                            </div>
+                            <div class="option" data-value="2">
+                                <div class="option-circle"></div>
+                                <span>10 - 30</span>
+                            </div>
+                            <div class="option" data-value="3">
+                                <div class="option-circle"></div>
+                                <span>30 - 100</span>
+                            </div>
+                            <div class="option" data-value="4">
+                                <div class="option-circle"></div>
+                                <span>More than 100</span>
+                            </div>
+                        </div>
+                        <div class="question-nav">
+                            <button type="button" class="nav-button prev-button">Previous</button>
+                            <button type="button" class="nav-button next-button">Next</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Question 2 - Screening Time -->
+                    <div class="question" id="question-2">
+                        <h3 class="question-title">How much time does your team spend screening CVs for a typical role?</h3>
+                        <div class="options">
+                            <div class="option" data-value="1">
+                                <div class="option-circle"></div>
+                                <span>Less than 2 hours</span>
+                            </div>
+                            <div class="option" data-value="2">
+                                <div class="option-circle"></div>
+                                <span>2 - 5 hours</span>
+                            </div>
+                            <div class="option" data-value="3">
+                                <div class="option-circle"></div>
+                                <span>5 - 10 hours</span>
+                            </div>
+                            <div class="option" data-value="4">
+                                <div class="option-circle"></div>
+                                <span>More than 10 hours</span>
+                            </div>
+                        </div>
+                        <div class="question-nav">
+                            <button type="button" class="nav-button prev-button">Previous</button>
+                            <button type="button" class="nav-button next-button">Next</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Question 3 - Time-to-Hire -->
+                    <div class="question" id="question-3">
+                        <h3 class="question-title">What's your average time-to-hire from application to offer?</h3>
+                        <div class="options">
+                            <div class="option" data-value="1">
+                                <div class="option-circle"></div>
+                                <span>Less than 1 week</span>
+                            </div>
+                            <div class="option" data-value="2">
+                                <div class="option-circle"></div>
+                                <span>1 - 2 weeks</span>
+                            </div>
+                            <div class="option" data-value="3">
+                                <div class="option-circle"></div>
+                                <span>2 - 4 weeks</span>
+                            </div>
+                            <div class="option" data-value="4">
+                                <div class="option-circle"></div>
+                                <span>More than 4 weeks</span>
+                            </div>
+                        </div>
+                        <div class="question-nav">
+                            <button type="button" class="nav-button prev-button">Previous</button>
+                            <button type="button" class="nav-button next-button">Next</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Question 4 - Screening Methods -->
+                    <div class="question" id="question-4">
+                        <h3 class="question-title">How do you currently screen candidates before the first interview?</h3>
+                        <div class="options">
+                            <div class="option" data-value="1">
+                                <div class="option-circle"></div>
+                                <span>Manual CV review only</span>
+                            </div>
+                            <div class="option" data-value="2">
+                                <div class="option-circle"></div>
+                                <span>Phone screening calls</span>
+                            </div>
+                            <div class="option" data-value="3">
+                                <div class="option-circle"></div>
+                                <span>Automated skills assessments</span>
+                            </div>
+                            <div class="option" data-value="4">
+                                <div class="option-circle"></div>
+                                <span>AI-powered screening tools</span>
+                            </div>
+                        </div>
+                        <div class="question-nav">
+                            <button type="button" class="nav-button prev-button">Previous</button>
+                            <button type="button" class="nav-button next-button">Next</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Question 5 - Quality of Candidates -->
+                    <div class="question" id="question-5">
+                        <h3 class="question-title">What percentage of candidates you interview meet your quality standards?</h3>
+                        <div class="options">
+                            <div class="option" data-value="1">
+                                <div class="option-circle"></div>
+                                <span>Less than 25%</span>
+                            </div>
+                            <div class="option" data-value="2">
+                                <div class="option-circle"></div>
+                                <span>25% - 50%</span>
+                            </div>
+                            <div class="option" data-value="3">
+                                <div class="option-circle"></div>
+                                <span>50% - 75%</span>
+                            </div>
+                            <div class="option" data-value="4">
+                                <div class="option-circle"></div>
+                                <span>More than 75%</span>
+                            </div>
+                        </div>
+                        <div class="question-nav">
+                            <button type="button" class="nav-button prev-button">Previous</button>
+                            <button type="button" class="nav-button next-button">Next</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Question 6 - Cost Per Hire -->
+                    <div class="question" id="question-6">
+                        <h3 class="question-title">How would you describe your cost per hire?</h3>
+                        <div class="options">
+                            <div class="option" data-value="1">
+                                <div class="option-circle"></div>
+                                <span>Very low - minimal recruitment costs</span>
+                            </div>
+                            <div class="option" data-value="2">
+                                <div class="option-circle"></div>
+                                <span>Reasonable - appropriate for our industry</span>
+                            </div>
+                            <div class="option" data-value="3">
+                                <div class="option-circle"></div>
+                                <span>High - significant investment in recruitment</span>
+                            </div>
+                            <div class="option" data-value="4">
+                                <div class="option-circle"></div>
+                                <span>Very high - excessive recruitment spending</span>
+                            </div>
+                        </div>
+                        <div class="question-nav">
+                            <button type="button" class="nav-button prev-button">Previous</button>
+                            <button type="button" class="nav-button next-button">Next</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Question 7 - Candidate Experience -->
+                    <div class="question" id="question-7">
+                        <h3 class="question-title">How would you rate your candidate experience during the application process?</h3>
+                        <div class="options">
+                            <div class="option" data-value="1">
+                                <div class="option-circle"></div>
+                                <span>Poor - many candidates drop out</span>
+                            </div>
+                            <div class="option" data-value="2">
+                                <div class="option-circle"></div>
+                                <span>Average - some room for improvement</span>
+                            </div>
+                            <div class="option" data-value="3">
+                                <div class="option-circle"></div>
+                                <span>Good - candidates generally satisfied</span>
+                            </div>
+                            <div class="option" data-value="4">
+                                <div class="option-circle"></div>
+                                <span>Excellent - candidates consistently praise our process</span>
+                            </div>
+                        </div>
+                        <div class="question-nav">
+                            <button type="button" class="nav-button prev-button">Previous</button>
+                            <button type="button" class="nav-button next-button">Next</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Question 8 - Team Size -->
+                    <div class="question" id="question-8">
+                        <h3 class="question-title">How many people are involved in your recruitment process per hire?</h3>
+                        <div class="options">
+                            <div class="option" data-value="1">
+                                <div class="option-circle"></div>
+                                <span>1-2 people</span>
+                            </div>
+                            <div class="option" data-value="2">
+                                <div class="option-circle"></div>
+                                <span>3-4 people</span>
+                            </div>
+                            <div class="option" data-value="3">
+                                <div class="option-circle"></div>
+                                <span>5-6 people</span>
+                            </div>
+                            <div class="option" data-value="4">
+                                <div class="option-circle"></div>
+                                <span>More than 6 people</span>
+                            </div>
+                        </div>
+                        <div class="question-nav">
+                            <button type="button" class="nav-button prev-button">Previous</button>
+                            <button type="button" class="nav-button next-button">Next</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Question 9 - Technology Usage -->
+                    <div class="question" id="question-9">
+                        <h3 class="question-title">What recruitment technology do you currently use?</h3>
+                        <div class="options">
+                            <div class="option" data-value="1">
+                                <div class="option-circle"></div>
+                                <span>Basic ATS only</span>
+                            </div>
+                            <div class="option" data-value="2">
+                                <div class="option-circle"></div>
+                                <span>ATS with some automation features</span>
+                            </div>
+                            <div class="option" data-value="3">
+                                <div class="option-circle"></div>
+                                <span>Multiple integrated recruitment tools</span>
+                            </div>
+                            <div class="option" data-value="4">
+                                <div class="option-circle"></div>
+                                <span>Advanced AI-powered recruitment platform</span>
+                            </div>
+                        </div>
+                        <div class="question-nav">
+                            <button type="button" class="nav-button prev-button">Previous</button>
+                            <button type="button" class="nav-button next-button">Next</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Question 10 - Priority Level -->
+                    <div class="question" id="question-10">
+                        <h3 class="question-title">How important is improving your recruitment efficiency right now?</h3>
+                        <div class="options">
+                            <div class="option" data-value="1">
+                                <div class="option-circle"></div>
+                                <span>Not a priority</span>
+                            </div>
+                            <div class="option" data-value="2">
+                                <div class="option-circle"></div>
+                                <span>Somewhat important</span>
+                            </div>
+                            <div class="option" data-value="3">
+                                <div class="option-circle"></div>
+                                <span>Very important</span>
+                            </div>
+                            <div class="option" data-value="4">
+                                <div class="option-circle"></div>
+                                <span>Critical priority</span>
+                            </div>
+                        </div>
+                        <div class="question-nav">
+                            <button type="button" class="nav-button prev-button">Previous</button>
+                            <button type="button" class="nav-button next-button" id="see-results">See My Results</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Value Proposition Section -->
+    <section class="value-proposition">
+        <div class="container">
+            <div class="section-header">
+                <h2 style="text-align: center; margin-bottom: 50px;">Measure and Improve Your Recruitment Process</h2>
+            </div>
+            <div class="value-grid">
+                <div class="value-card">
+                    <div class="value-icon">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <h3>Candidate Screening</h3>
+                    <p>Discover how to automate your CV screening process to identify top talent faster and more accurately.</p>
+                </div>
+                <div class="value-card">
+                    <div class="value-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h3>Time Efficiency</h3>
+                    <p>Learn strategies to reduce your time-to-hire by automating repetitive tasks and focusing on high-value activities.</p>
+                </div>
+                <div class="value-card">
+                    <div class="value-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3>Quality of Hire</h3>
+                    <p>Improve your candidate matching with data-driven insights and AI-powered qualification.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Credibility Section -->
+    <section class="credibility">
+        <div class="container">
+            <div class="credibility-content">
+                <div class="credibility-text">
+                    <h2>Backed by Data and Expertise</h2>
+                    <p>AI-Recruiter was developed based on analysis of over 50,000 hiring processes across multiple industries. Our research shows that 85% of companies struggle with inefficient screening processes, costing them an average of 40 hours per hire.</p>
+                    
+                    <p>Founded by recruitment experts with 20+ years of experience in talent acquisition and HR technology, our platform incorporates the latest AI advancements to transform how companies find and hire talent.</p>
+                    
+                    <div class="credibility-stats">
+                        <div class="stat">
+                            <div class="stat-value">50K+</div>
+                            <div class="stat-label">Hiring Processes Analyzed</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">85%</div>
+                            <div class="stat-label">Companies with Inefficient Screening</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">40 hrs</div>
+                            <div class="stat-label">Average Time Wasted Per Hire</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">20+</div>
+                            <div class="stat-label">Years of Recruitment Expertise</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="credibility-image">
+                    <!-- Placeholder for credibility image -->
+                    <div style="background: #e9ecef; height: 300px; border-radius: var(--border-radius); display: flex; align-items: center; justify-content: center; color: var(--gray);">
+                        <i class="fas fa-chart-bar" style="font-size: 64px;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dynamic Results Section -->
+    <section class="results-section" id="results-section">
+        <div class="container results-container">
+            <div class="score-circle" id="score-circle">
+                <div class="score-value" id="score-value">0</div>
+                <div class="score-label">Efficiency Score</div>
+            </div>
+            
+            <h2 class="results-title" id="results-title">Your Recruitment Efficiency Score</h2>
+            <p class="results-description" id="results-description">Based on your answers, here's how your recruitment process stacks up and where you can improve.</p>
+            
+            <div class="recommendations">
+                <h3>Your Personalized Recommendations</h3>
+                <ul class="recommendation-list" id="recommendation-list">
+                    <!-- Dynamic recommendations will be inserted here -->
+                </ul>
+            </div>
+            
+            <div class="lead-form">
+                <h3>Get Your Full Detailed Report</h3>
+                <p>Enter your email to receive your complete recruitment efficiency analysis with customized action plan.</p>
+                <form id="lead-capture-form">
+                    <button type="submit" class="submit-button">Get My Full Report</button>
+                    <p style="text-align: center; margin-top: 15px; font-size: 14px; color: var(--gray);">It's completely free and you get immediate recommendations</p>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Detailed Report Section -->
+    <section class="report-section" id="report-section">
+        <div class="container report-container">
+            <div class="report-header">
+                <h2>Your Recruitment Efficiency Report</h2>
+                <p>Personalized analysis and actionable recommendations</p>
+            </div>
+            
+            <div class="report-content">
+                <div class="report-overview">
+                    <h3 class="report-section-title">Executive Summary</h3>
+                    <p>Based on your assessment, your recruitment process has significant opportunities for improvement through AI automation. The analysis below highlights key areas where AI-Recruiter can help you save time, reduce costs, and hire better candidates faster.</p>
+                    
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-value" id="report-score">0</div>
+                            <div class="metric-label">Efficiency Score</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="time-saving">0</div>
+                            <div class="metric-label">Hours Saved Per Hire</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="improvement-potential">0%</div>
+                            <div class="metric-label">Improvement Potential</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="time-to-hire">0</div>
+                            <div class="metric-label">Days Reduction in Time-to-Hire</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="improvement-areas">
+                    <h3 class="report-section-title">Key Improvement Areas</h3>
+                    
+                    <div class="area-card">
+                        <h4><i class="fas fa-search"></i> Automated CV Screening</h4>
+                        <p>Your current screening process is manual and time-consuming. AI-Recruiter can automatically analyze and rank all incoming applications based on job requirements, reducing screening time by up to 80%.</p>
+                    </div>
+                    
+                    <div class="area-card">
+                        <h4><i class="fas fa-comments"></i> Candidate Pre-Qualification</h4>
+                        <p>You're spending valuable recruiter time on initial candidate qualification. Our AI chatbot can engage candidates, ask job-specific questions, and pre-qualify applicants before human interaction.</p>
+                    </div>
+                    
+                    <div class="area-card">
+                        <h4><i class="fas fa-chart-line"></i> Data-Driven Decision Making</h4>
+                        <p>Your hiring decisions could benefit from more objective data. AI-Recruiter provides standardized scoring and analytics to help you make more informed hiring decisions based on actual candidate qualifications.</p>
+                    </div>
+                </div>
+                
+                <div class="implementation-plan">
+                    <h3 class="report-section-title">Recommended Implementation Plan</h3>
+                    
+                    <div class="area-card">
+                        <h4><i class="fas fa-rocket"></i> Phase 1: Automated Screening (Week 1-2)</h4>
+                        <p>Implement AI-powered CV analysis to instantly rank candidates based on your specific job requirements.</p>
+                    </div>
+                    
+                    <div class="area-card">
+                        <h4><i class="fas fa-robot"></i> Phase 2: Candidate Engagement (Week 3-4)</h4>
+                        <p>Set up automated candidate qualification through AI-driven chat interviews to pre-screen applicants.</p>
+                    </div>
+                    
+                    <div class="area-card">
+                        <h4><i class="fas fa-tachometer-alt"></i> Phase 3: Analytics & Optimization (Week 5+)</h4>
+                        <p>Leverage recruitment analytics to continuously improve your hiring process and identify bottlenecks.</p>
+                    </div>
+                </div>
+                
+                <div class="trial-cta">
+                    <h3>Ready to Transform Your Recruitment?</h3>
+                    <p>Start your 14-day free trial and experience the power of AI-driven recruitment</p>
+                    
+                    <div class="trial-features">
+                        <div class="trial-feature">
+                            <i class="fas fa-bolt"></i>
+                            <span>Setup in 15 minutes</span>
+                        </div>
+                        <div class="trial-feature">
+                            <i class="fas fa-user-check"></i>
+                            <span>Screen 100 candidates</span>
+                        </div>
+                        <div class="trial-feature">
+                            <i class="fas fa-chart-pie"></i>
+                            <span>Full analytics access</span>
+                        </div>
+                        <div class="trial-feature">
+                            <i class="fas fa-headset"></i>
+                            <span>Priority support</span>
+                        </div>
+                    </div>
+                    
+                    <button class="trial-button" id="start-trial">Start My 14-Day Free Trial</button>
+                    <p style="margin-top: 15px; font-size: 14px; opacity: 0.9;">No credit card required • Cancel anytime</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Success Message -->
+    <section class="success-message" id="success-message">
+        <div class="container">
+            <div class="success-icon"><i class="fas fa-check"></i></div>
+            <h2>Your Trial Account is Ready!</h2>
+            <p class="results-description">We've sent your login details to your email. You can now access the full AI-Recruiter platform and start automating your recruitment process.</p>
+            <button class="cta-button">Access My Account</button>
+        </div>
+    </section>
+
+    <script>
+        // Quiz Logic
+        document.addEventListener('DOMContentLoaded', function() {
+            const questions = document.querySelectorAll('.question');
+            const progressBar = document.getElementById('progress-bar');
+            const nextButtons = document.querySelectorAll('.next-button');
+            const prevButtons = document.querySelectorAll('.prev-button');
+            const seeResultsButton = document.getElementById('see-results');
+            const options = document.querySelectorAll('.option');
+            const resultsSection = document.getElementById('results-section');
+            const reportSection = document.getElementById('report-section');
+            const successMessage = document.getElementById('success-message');
+            const leadForm = document.getElementById('lead-capture-form');
+            const startTrialButton = document.getElementById('start-trial');
+            
+            let currentQuestion = 0;
+            let answers = {};
+            
+            // Initialize progress bar
+            updateProgressBar();
+            
+            // Next button functionality
+            nextButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    if (currentQuestion < questions.length - 1) {
+                        questions[currentQuestion].classList.remove('active');
+                        currentQuestion++;
+                        questions[currentQuestion].classList.add('active');
+                        updateProgressBar();
+                    }
+                });
+            });
+            
+            // Previous button functionality
+            prevButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    if (currentQuestion > 0) {
+                        questions[currentQuestion].classList.remove('active');
+                        currentQuestion--;
+                        questions[currentQuestion].classList.add('active');
+                        updateProgressBar();
+                    }
+                });
+            });
+            
+            // Option selection
+            options.forEach(option => {
+                option.addEventListener('click', function() {
+                    const question = this.closest('.question');
+                    const questionId = question.id;
+                    const value = this.getAttribute('data-value');
+                    
+                    // Remove selected class from all options in this question
+                    question.querySelectorAll('.option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    
+                    // Add selected class to clicked option
+                    this.classList.add('selected');
+                    
+                    // Store answer
+                    answers[questionId] = value;
+                });
+            });
+            
+            // See results button
+            seeResultsButton.addEventListener('click', function() {
+                calculateResults();
+                document.querySelector('.hero').style.display = 'none';
+                document.querySelector('.value-proposition').style.display = 'none';
+                document.querySelector('.credibility').style.display = 'none';
+                resultsSection.style.display = 'block';
+                reportSection.style.display = 'none';
+                successMessage.style.display = 'none';
+            });
+            
+            // Lead form submission
+            leadForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                resultsSection.style.display = 'none';
+                reportSection.style.display = 'block';
+                successMessage.style.display = 'none';
+                
+                // Update report with user's name
+                const userName = document.getElementById('name').value;
+                document.querySelector('.report-header h2').textContent = `${userName}'s Recruitment Efficiency Report`;
+                
+                // Here you would typically send the data to your backend
+                const formData = {
+                    name: document.getElementById('name').value,
+                    email: document.getElementById('email').value,
+                    company: document.getElementById('company').value,
+                    phone: document.getElementById('phone').value,
+                    score: document.getElementById('score-value').textContent,
+                    answers: answers
+                };
+                
+                console.log('Lead captured:', formData);
+                // Send to your CRM or email marketing platform
+            });
+            
+            // Start trial button
+            startTrialButton.addEventListener('click', function() {
+                reportSection.style.display = 'none';
+                successMessage.style.display = 'block';
+                
+                // Here you would typically create a trial account
+                const userEmail = document.getElementById('email').value;
+                console.log('Creating trial account for:', userEmail);
+                // Integration with your backend to create trial account
+            });
+            
+            function updateProgressBar() {
+                const progress = ((currentQuestion + 1) / questions.length) * 100;
+                progressBar.style.width = `${progress}%`;
+            }
+            
+            function calculateResults() {
+                // Calculate score based on answers (simplified logic)
+                let totalScore = 0;
+                let answerCount = 0;
+                
+                for (const question in answers) {
+                    if (question !== 'question-contact') {
+                        totalScore += parseInt(answers[question]);
+                        answerCount++;
+                    }
+                }
+                
+                // Average score converted to 0-100 scale
+                const averageScore = totalScore / answerCount;
+                const efficiencyScore = Math.round((averageScore / 4) * 100);
+                
+                // Update score display
+                document.getElementById('score-value').textContent = efficiencyScore;
+                document.getElementById('score-circle').style.setProperty('--score-percent', `${efficiencyScore}%`);
+                
+                // Update report metrics
+                document.getElementById('report-score').textContent = efficiencyScore;
+                document.getElementById('time-saving').textContent = Math.round(efficiencyScore / 100 * 40);
+                document.getElementById('improvement-potential').textContent = `${Math.round((100 - efficiencyScore) / 100 * 80)}%`;
+                document.getElementById('time-to-hire').textContent = Math.round(efficiencyScore / 100 * 21);
+                
+                // Update results text based on score
+                const resultsTitle = document.getElementById('results-title');
+                const resultsDescription = document.getElementById('results-description');
+                const recommendationsList = document.getElementById('recommendation-list');
+                
+                if (efficiencyScore >= 80) {
+                    resultsTitle.textContent = "Excellent Recruitment Efficiency!";
+                    resultsDescription.textContent = "Your recruitment process is highly efficient, but there are still opportunities to optimize further with AI automation.";
+                } else if (efficiencyScore >= 60) {
+                    resultsTitle.textContent = "Good Recruitment Foundation";
+                    resultsDescription.textContent = "Your recruitment process is solid, but AI automation could help you save significant time and improve candidate quality.";
+                } else if (efficiencyScore >= 40) {
+                    resultsTitle.textContent = "Moderate Efficiency - Room for Improvement";
+                    resultsDescription.textContent = "There are clear opportunities to streamline your recruitment process and reduce time-to-hire with AI-powered tools.";
+                } else {
+                    resultsTitle.textContent = "High-Impact Improvement Opportunities";
+                    resultsDescription.textContent = "Your recruitment process has significant inefficiencies that AI can help solve, potentially saving dozens of hours per hire.";
+                }
+                
+                // Generate dynamic recommendations based on specific answers
+                recommendationsList.innerHTML = '';
+                
+                let recommendations = [];
+                
+                // Check specific answers to provide targeted recommendations
+                if (answers['question-2'] && parseInt(answers['question-2']) >= 3) {
+                    recommendations.push("Implement AI-powered CV screening to reduce manual review time by up to 80%");
+                }
+                
+                if (answers['question-3'] && parseInt(answers['question-3']) >= 3) {
+                    recommendations.push("Use automated candidate engagement to reduce time-to-hire by weeks");
+                }
+                
+                if (answers['question-5'] && parseInt(answers['question-5']) <= 2) {
+                    recommendations.push("Improve candidate quality with AI-powered matching and skills assessment");
+                }
+                
+                if (answers['question-7'] && parseInt(answers['question-7']) <= 2) {
+                    recommendations.push("Enhance candidate experience with automated communication and feedback");
+                }
+                
+                if (answers['question-9'] && parseInt(answers['question-9']) <= 2) {
+                    recommendations.push("Upgrade your recruitment technology stack with AI-powered tools");
+                }
+                
+                // Add default recommendations if we don't have enough specific ones
+                const defaultRecommendations = [
+                    "Create standardized scoring rubrics to ensure consistent candidate evaluation",
+                    "Leverage analytics to identify bottlenecks in your hiring process",
+                    "Automate interview scheduling to reduce administrative overhead",
+                    "Implement skills-based assessments to objectively evaluate candidates"
+                ];
+                
+                while (recommendations.length < 5) {
+                    const randomRec = defaultRecommendations[Math.floor(Math.random() * defaultRecommendations.length)];
+                    if (!recommendations.includes(randomRec)) {
+                        recommendations.push(randomRec);
+                    }
+                }
+                
+                recommendations.forEach(rec => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span class="recommendation-icon">✓</span> ${rec}`;
+                    recommendationsList.appendChild(li);
+                });
+            }
+        });
+    </script>
+</body>
+</html>
