@@ -711,3 +711,20 @@ model admin_sessions {
   @@index([session_token_hash])
   @@index([expires_at])
 }
+
+/// Recruitment efficiency assessment form submissions
+model recruitment_assessments {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String
+  email             String   @db.Citext
+  company           String
+  phone             String?
+  answers           Json     @default("{}")
+  efficiency_score  Int?
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  ip_address        String?  @db.Inet
+  user_agent        String?
+
+  @@index([email])
+  @@index([created_at])
+}
