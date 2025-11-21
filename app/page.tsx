@@ -20,6 +20,7 @@ import {
   BarChart3,
   MessageSquare,
 } from "lucide-react"
+import { RecruitmentQuestionnaire } from "@/components/recruitment-questionnaire"
 
 export default function HomePage() {
   const { user, loading } = useAuth()
@@ -156,41 +157,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Trusted By Section */}
-      <section className="py-16 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-8">
-              TRUSTED BY THESE INDUSTRY LEADERS AROUND THE GLOBE
-            </p>
-            <div className="relative overflow-hidden opacity-60">
-              <style jsx>{`
-                @keyframes scroll-infinite { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
-                .animate-scroll { animation: scroll-infinite 40s linear infinite; will-change: transform; }
-                @media (prefers-reduced-motion: reduce) { .animate-scroll { animation: none; } }
-              `}</style>
-              <div className="flex animate-scroll">
-                <div className="flex items-center gap-12 md:gap-16 px-4 md:px-6 min-w-max">
-                  <div className="text-2xl font-bold text-slate-400">TechCorp</div>
-                  <div className="text-2xl font-bold text-slate-400">InnovateCo</div>
-                  <div className="text-2xl font-bold text-slate-400">GlobalTech</div>
-                  <div className="text-2xl font-bold text-slate-400">FutureSoft</div>
-                  <div className="text-2xl font-bold text-slate-400">NextGen</div>
-                  <div className="text-2xl font-bold text-slate-400">SmartHire</div>
-                </div>
-                <div className="flex items-center gap-12 md:gap-16 px-4 md:px-6 min-w-max">
-                  <div className="text-2xl font-bold text-slate-400">TechCorp</div>
-                  <div className="text-2xl font-bold text-slate-400">InnovateCo</div>
-                  <div className="text-2xl font-bold text-slate-400">GlobalTech</div>
-                  <div className="text-2xl font-bold text-slate-400">FutureSoft</div>
-                  <div className="text-2xl font-bold text-slate-400">NextGen</div>
-                  <div className="text-2xl font-bold text-slate-400">SmartHire</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Recruitment Questionnaire Section */}
+      <RecruitmentQuestionnaire />
 
       {/* Features Section */}
       <section id="product" className="py-20 bg-slate-50">
