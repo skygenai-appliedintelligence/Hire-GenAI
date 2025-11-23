@@ -18,13 +18,105 @@ interface CVEvaluationResult {
     reason_summary: string
   }
   breakdown: {
-    role_title_alignment: { score: number; weight: 15; evidence: string[] }
-    hard_skills: { score: number; weight: 35; matched: string[]; missing: string[]; evidence: string[] }
-    experience_depth: { score: number; weight: 20; years_estimate: number | null; evidence: string[] }
-    domain_relevance: { score: number; weight: 10; evidence: string[] }
-    education_certs: { score: number; weight: 10; matched: string[]; missing: string[]; evidence: string[] }
-    nice_to_have: { score: number; weight: 5; matched: string[]; missing: string[]; evidence: string[] }
-    communication_redflags: { score: number; weight: 5; red_flags: string[]; evidence: string[] }
+    // 1. Skill Set Match (30%)
+    skill_set_match: { 
+      score: number
+      weight: 30
+      matched_skills: string[]
+      missing_skills: string[]
+      match_percentage: number
+      evidence: string[] 
+    }
+    // 2. Missed Skills Analysis (10%)
+    missed_skills_analysis: { 
+      score: number
+      weight: 10
+      critical_missing: string[]
+      important_missing: string[]
+      nice_to_have_missing: string[]
+      evidence: string[] 
+    }
+    // 3. Skills in Recent Projects (15%)
+    skills_in_recent_projects: { 
+      score: number
+      weight: 15
+      recent_skills_used: string[]
+      projects_analyzed: number
+      evidence: string[] 
+    }
+    // 4. Experience Range Match (15%)
+    experience_range_match: { 
+      score: number
+      weight: 15
+      years_actual: number | null
+      years_required: string
+      match_level: string
+      evidence: string[] 
+    }
+    // 5. Location Match (5%)
+    location_match: { 
+      score: number
+      weight: 5
+      candidate_location: string | null
+      job_location: string | null
+      remote_possible: boolean
+      evidence: string[] 
+    }
+    // 6. Written Communication (5%)
+    written_communication: { 
+      score: number
+      weight: 5
+      grammar_score: number
+      structure_score: number
+      formatting_score: number
+      issues: string[]
+      evidence: string[] 
+    }
+    // 7. Education Qualification (10%)
+    education_qualification: { 
+      score: number
+      weight: 10
+      candidate_degree: string | null
+      required_degree: string | null
+      field_match: boolean
+      institution_rank: string
+      evidence: string[] 
+    }
+    // 8. Certifications (5%)
+    certifications_match: { 
+      score: number
+      weight: 5
+      matched_certs: string[]
+      missing_certs: string[]
+      expired_certs: string[]
+      evidence: string[] 
+    }
+    // 9. Language Skills (2%)
+    language_skills: { 
+      score: number
+      weight: 2
+      matched_languages: Array<{ language: string; proficiency: string }>
+      missing_languages: string[]
+      evidence: string[] 
+    }
+    // 10. Nationality (1%) - Optional
+    nationality_match: { 
+      score: number
+      weight: 1
+      candidate_nationality: string | null
+      required_nationality: string | null
+      match: boolean
+      evidence: string[] 
+    }
+    // 11. Profile Quality (2%)
+    profile_quality: { 
+      score: number
+      weight: 2
+      education_rank: string
+      employer_rank: string
+      industry_relevance: string
+      evidence: string[] 
+    }
   }
   extracted: {
     name: string | null
@@ -40,7 +132,21 @@ interface CVEvaluationResult {
       institution: string | null
       year: string | null
     }>
-    certifications: string[]
+    certifications: Array<{
+      name: string
+      issued_date: string | null
+      expiry_date: string | null
+    }>
+    languages: Array<{
+      language: string
+      proficiency: string
+    }>
+    nationality: string | null
+    recent_projects: Array<{
+      title: string
+      duration: string
+      technologies: string[]
+    }>
     notable_projects: string[]
   }
   gaps_and_notes: string[]
@@ -92,17 +198,22 @@ export class CVEvaluator {
       return {
         overall: { score_percent: 15, qualified: false, reason_summary: reason },
         breakdown: {
-          role_title_alignment: { score: 10, weight: 15, evidence: [] },
-          hard_skills: { score: 10, weight: 35, matched: [], missing: requiredSkills, evidence: [] },
-          experience_depth: { score: 20, weight: 20, years_estimate: null, evidence: [] },
-          domain_relevance: { score: 5, weight: 10, evidence: [] },
-          education_certs: { score: 20, weight: 10, matched: [], missing: [], evidence: [] },
-          nice_to_have: { score: 10, weight: 5, matched: [], missing: [], evidence: [] },
-          communication_redflags: { score: 70, weight: 5, red_flags: [], evidence: [] },
+          skill_set_match: { score: 10, weight: 30, matched_skills: [], missing_skills: requiredSkills, match_percentage: 0, evidence: [] },
+          missed_skills_analysis: { score: 10, weight: 10, critical_missing: requiredSkills, important_missing: [], nice_to_have_missing: [], evidence: [] },
+          skills_in_recent_projects: { score: 10, weight: 15, recent_skills_used: [], projects_analyzed: 0, evidence: [] },
+          experience_range_match: { score: 20, weight: 15, years_actual: null, years_required: "Unknown", match_level: "No match", evidence: [] },
+          location_match: { score: 50, weight: 5, candidate_location: null, job_location: null, remote_possible: false, evidence: [] },
+          written_communication: { score: 70, weight: 5, grammar_score: 70, structure_score: 70, formatting_score: 70, issues: [], evidence: [] },
+          education_qualification: { score: 20, weight: 10, candidate_degree: null, required_degree: null, field_match: false, institution_rank: "Unknown", evidence: [] },
+          certifications_match: { score: 10, weight: 5, matched_certs: [], missing_certs: [], expired_certs: [], evidence: [] },
+          language_skills: { score: 50, weight: 2, matched_languages: [], missing_languages: [], evidence: [] },
+          nationality_match: { score: 100, weight: 1, candidate_nationality: null, required_nationality: null, match: true, evidence: [] },
+          profile_quality: { score: 20, weight: 2, education_rank: "Unknown", employer_rank: "Unknown", industry_relevance: "No match", evidence: [] }
         },
         extracted: {
           name: null, email: null, phone: null, location: null,
-          total_experience_years_estimate: null, titles: [], skills: [], education: [], certifications: [], notable_projects: []
+          total_experience_years_estimate: null, titles: [], skills: [], education: [], 
+          certifications: [], languages: [], nationality: null, recent_projects: [], notable_projects: []
         },
         gaps_and_notes: ['Domain mismatch: RPA JD vs non-RPA resume']
       }
@@ -114,17 +225,22 @@ export class CVEvaluator {
       return {
         overall: { score_percent: 20, qualified: false, reason_summary: reason },
         breakdown: {
-          role_title_alignment: { score: 20, weight: 15, evidence: [] },
-          hard_skills: { score: 10, weight: 35, matched: [], missing: requiredSkills, evidence: [] },
-          experience_depth: { score: 25, weight: 20, years_estimate: null, evidence: [] },
-          domain_relevance: { score: 20, weight: 10, evidence: [] },
-          education_certs: { score: 30, weight: 10, matched: [], missing: [], evidence: [] },
-          nice_to_have: { score: 10, weight: 5, matched: [], missing: [], evidence: [] },
-          communication_redflags: { score: 80, weight: 5, red_flags: [], evidence: [] },
+          skill_set_match: { score: 10, weight: 30, matched_skills: [], missing_skills: requiredSkills, match_percentage: 0, evidence: [] },
+          missed_skills_analysis: { score: 15, weight: 10, critical_missing: requiredSkills, important_missing: [], nice_to_have_missing: [], evidence: [] },
+          skills_in_recent_projects: { score: 15, weight: 15, recent_skills_used: [], projects_analyzed: 0, evidence: [] },
+          experience_range_match: { score: 25, weight: 15, years_actual: null, years_required: "Unknown", match_level: "Unknown", evidence: [] },
+          location_match: { score: 50, weight: 5, candidate_location: null, job_location: null, remote_possible: false, evidence: [] },
+          written_communication: { score: 80, weight: 5, grammar_score: 80, structure_score: 80, formatting_score: 80, issues: [], evidence: [] },
+          education_qualification: { score: 30, weight: 10, candidate_degree: null, required_degree: null, field_match: false, institution_rank: "Unknown", evidence: [] },
+          certifications_match: { score: 20, weight: 5, matched_certs: [], missing_certs: [], expired_certs: [], evidence: [] },
+          language_skills: { score: 50, weight: 2, matched_languages: [], missing_languages: [], evidence: [] },
+          nationality_match: { score: 100, weight: 1, candidate_nationality: null, required_nationality: null, match: true, evidence: [] },
+          profile_quality: { score: 30, weight: 2, education_rank: "Unknown", employer_rank: "Unknown", industry_relevance: "Unknown", evidence: [] }
         },
         extracted: {
           name: null, email: null, phone: null, location: null,
-          total_experience_years_estimate: null, titles: [], skills: [], education: [], certifications: [], notable_projects: []
+          total_experience_years_estimate: null, titles: [], skills: [], education: [], 
+          certifications: [], languages: [], nationality: null, recent_projects: [], notable_projects: []
         },
         gaps_and_notes: ['No JD skill overlap found']
       }
@@ -145,15 +261,20 @@ RESUME_TEXT:
 ${resumeText}
 RESUME_END>>>
 
-[SCORING RUBRIC]
+[SCORING RUBRIC - 12 CRITERIA]
 Weighting must sum to 100. Score each 0–100, then compute weighted_sum = Σ(score_i * weight_i/100).
-- Role/Title alignment (weight 15)
-- Core hard skills & tools (weight 35)
-- Relevant experience depth (years, seniority) (weight 20)
-- Domain/industry relevance (weight 10)
-- Education/certs (weight 10)
-- Nice-to-have skills (weight 5)
-- Communication/readability & red flags (weight 5)
+
+1. Skill Set Match (weight 30): Match JD required skills with CV skills. Calculate percentage.
+2. Missed Skills Analysis (weight 10): Identify critical, important, and nice-to-have missing skills.
+3. Skills in Recent Projects (weight 15): Check if JD skills were used in recent 3-5 years.
+4. Experience Range Match (weight 15): Compare actual years with JD requirement (X-Y years).
+5. Location Match (weight 5): Compare candidate location with job location. Check remote options.
+6. Written Communication (weight 5): Assess CV grammar, structure, formatting quality.
+7. Education Qualification (weight 10): Match degree level and field with JD requirements.
+8. Certifications (weight 5): Match required certifications. Check validity dates.
+9. Language Skills (weight 2): Match required languages with proficiency levels.
+10. Nationality (weight 1): Optional - match if specified in JD.
+11. Profile Quality (weight 2): Rank education institution and previous employers.
 
 FAIR SCORING GUIDELINES:
 - Hard skills: Prioritize JD-listed skills. Give partial credit for related technologies (e.g., React vs. Vue, AWS vs. GCP), but weigh direct matches higher.
@@ -166,18 +287,22 @@ FAIR SCORING GUIDELINES:
 [OUTPUT SCHEMA — RETURN ONLY JSON]
 {
   "overall": {
-    "score_percent": number,               // 0-100
-    "qualified": boolean,                  // true if score_percent >= pass_threshold_percent
-    "reason_summary": string               // 1-3 sentences
+    "score_percent": number,
+    "qualified": boolean,
+    "reason_summary": string
   },
   "breakdown": {
-    "role_title_alignment": { "score": number, "weight": 15, "evidence": string[] },
-    "hard_skills":            { "score": number, "weight": 35, "matched": string[], "missing": string[], "evidence": string[] },
-    "experience_depth":       { "score": number, "weight": 20, "years_estimate": number|null, "evidence": string[] },
-    "domain_relevance":       { "score": number, "weight": 10, "evidence": string[] },
-    "education_certs":        { "score": number, "weight": 10, "matched": string[], "missing": string[], "evidence": string[] },
-    "nice_to_have":           { "score": number, "weight": 5,  "matched": string[], "missing": string[], "evidence": string[] },
-    "communication_redflags": { "score": number, "weight": 5,  "red_flags": string[], "evidence": string[] }
+    "skill_set_match": { "score": number, "weight": 30, "matched_skills": string[], "missing_skills": string[], "match_percentage": number, "evidence": string[] },
+    "missed_skills_analysis": { "score": number, "weight": 10, "critical_missing": string[], "important_missing": string[], "nice_to_have_missing": string[], "evidence": string[] },
+    "skills_in_recent_projects": { "score": number, "weight": 15, "recent_skills_used": string[], "projects_analyzed": number, "evidence": string[] },
+    "experience_range_match": { "score": number, "weight": 15, "years_actual": number|null, "years_required": string, "match_level": string, "evidence": string[] },
+    "location_match": { "score": number, "weight": 5, "candidate_location": string|null, "job_location": string|null, "remote_possible": boolean, "evidence": string[] },
+    "written_communication": { "score": number, "weight": 5, "grammar_score": number, "structure_score": number, "formatting_score": number, "issues": string[], "evidence": string[] },
+    "education_qualification": { "score": number, "weight": 10, "candidate_degree": string|null, "required_degree": string|null, "field_match": boolean, "institution_rank": string, "evidence": string[] },
+    "certifications_match": { "score": number, "weight": 5, "matched_certs": string[], "missing_certs": string[], "expired_certs": string[], "evidence": string[] },
+    "language_skills": { "score": number, "weight": 2, "matched_languages": [{ "language": string, "proficiency": string }], "missing_languages": string[], "evidence": string[] },
+    "nationality_match": { "score": number, "weight": 1, "candidate_nationality": string|null, "required_nationality": string|null, "match": boolean, "evidence": string[] },
+    "profile_quality": { "score": number, "weight": 2, "education_rank": string, "employer_rank": string, "industry_relevance": string, "evidence": string[] }
   },
   "extracted": {
     "name": string|null,
@@ -188,10 +313,13 @@ FAIR SCORING GUIDELINES:
     "titles": string[],
     "skills": string[],
     "education": [{ "degree": string|null, "field": string|null, "institution": string|null, "year": string|null }],
-    "certifications": string[],
+    "certifications": [{ "name": string, "issued_date": string|null, "expiry_date": string|null }],
+    "languages": [{ "language": string, "proficiency": string }],
+    "nationality": string|null,
+    "recent_projects": [{ "title": string, "duration": string, "technologies": string[] }],
     "notable_projects": string[]
   },
-  "gaps_and_notes": string[]               // unclear dates, missing claims, OCR noise, etc.
+  "gaps_and_notes": string[]
 }`
 
     try {
@@ -258,22 +386,32 @@ FAIR SCORING GUIDELINES:
       // Return mock evaluation with proper structure
       const mockResult: CVEvaluationResult = {
         overall: {
-          score_percent: Math.floor(Math.random() * 40) + 30, // 30-70 range
+          score_percent: Math.floor(Math.random() * 40) + 30,
           qualified: false,
           reason_summary: "Mock evaluation - OpenAI API unavailable. Please add a valid OPENAI_API_KEY with proper permissions."
         },
         breakdown: {
-          role_title_alignment: { score: Math.floor(Math.random() * 30) + 35, weight: 15, evidence: ["Mock evaluation data"] },
-          hard_skills: { score: Math.floor(Math.random() * 30) + 35, weight: 35, matched: ["Basic skills"], missing: ["Advanced skills"], evidence: ["Mock evaluation data"] },
-          experience_depth: { score: Math.floor(Math.random() * 30) + 35, weight: 20, years_estimate: 3, evidence: ["Mock evaluation data"] },
-          domain_relevance: { score: Math.floor(Math.random() * 30) + 35, weight: 10, evidence: ["Mock evaluation data"] },
-          education_certs: { score: Math.floor(Math.random() * 30) + 35, weight: 10, matched: ["Basic education"], missing: [], evidence: ["Mock evaluation data"] },
-          nice_to_have: { score: Math.floor(Math.random() * 30) + 35, weight: 5, matched: [], missing: [], evidence: ["Mock evaluation data"] },
-          communication_redflags: { score: Math.floor(Math.random() * 30) + 35, weight: 5, red_flags: [], evidence: ["Mock evaluation data"] },
+          skill_set_match: { score: 65, weight: 30, matched_skills: ["JavaScript", "React"], missing_skills: ["Python", "AWS"], match_percentage: 50, evidence: ["Mock data"] },
+          missed_skills_analysis: { score: 60, weight: 10, critical_missing: ["AWS"], important_missing: ["Python"], nice_to_have_missing: ["Docker"], evidence: ["Mock data"] },
+          skills_in_recent_projects: { score: 70, weight: 15, recent_skills_used: ["JavaScript", "React"], projects_analyzed: 2, evidence: ["Mock data"] },
+          experience_range_match: { score: 75, weight: 15, years_actual: 3, years_required: "3-5 years", match_level: "Within range", evidence: ["Mock data"] },
+          location_match: { score: 80, weight: 5, candidate_location: "Mumbai", job_location: "Mumbai", remote_possible: false, evidence: ["Mock data"] },
+          written_communication: { score: 85, weight: 5, grammar_score: 85, structure_score: 90, formatting_score: 80, issues: [], evidence: ["Mock data"] },
+          education_qualification: { score: 70, weight: 10, candidate_degree: "Bachelor's", required_degree: "Bachelor's", field_match: true, institution_rank: "Tier 2", evidence: ["Mock data"] },
+          certifications_match: { score: 50, weight: 5, matched_certs: [], missing_certs: ["AWS Certified"], expired_certs: [], evidence: ["Mock data"] },
+          language_skills: { score: 90, weight: 2, matched_languages: [{ language: "English", proficiency: "Fluent" }], missing_languages: [], evidence: ["Mock data"] },
+          nationality_match: { score: 100, weight: 1, candidate_nationality: "Indian", required_nationality: null, match: true, evidence: ["Mock data"] },
+          profile_quality: { score: 75, weight: 2, education_rank: "Tier 2", employer_rank: "Mid-size", industry_relevance: "Relevant", evidence: ["Mock data"] }
         },
         extracted: {
-          name: null, email: null, phone: null, location: null,
-          total_experience_years_estimate: null, titles: [], skills: [], education: [], certifications: [], notable_projects: []
+          name: null, email: null, phone: null, location: "Mumbai",
+          total_experience_years_estimate: 3, titles: [], skills: ["JavaScript", "React"], 
+          education: [], 
+          certifications: [],
+          languages: [{ language: "English", proficiency: "Fluent" }],
+          nationality: "Indian",
+          recent_projects: [],
+          notable_projects: []
         },
         gaps_and_notes: ["Mock evaluation - add OPENAI_API_KEY for real AI analysis"]
       }

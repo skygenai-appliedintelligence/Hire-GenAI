@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, User, FileText, MessageSquare, Download, Mail, Phone, Calendar, ExternalLink, Star, Briefcase, ChevronDown, CheckCircle2, TrendingUp } from "lucide-react"
+import { CVEvaluationReport } from "@/components/cv-evaluation-report"
 
 type CandidateData = {
   id: string
@@ -177,6 +178,7 @@ export default function CandidateReportPage() {
         console.log('📝 Transcript data:', json.transcript)
         console.log('🔍 Evaluation data received:', JSON.stringify(json.evaluation, null, 2))
         console.log('🔍 SectionPointers received:', JSON.stringify(json.sectionPointers, null, 2))
+        console.log('🎯 QualificationDetails received:', JSON.stringify(json.qualificationDetails, null, 2))
         
         setCandidate(json.candidate || null)
         setEvaluation(json.evaluation || null)
@@ -391,7 +393,200 @@ export default function CandidateReportPage() {
       {/* Content Area */}
       <div className="px-4 md:px-6 py-6 bg-gradient-to-b from-gray-50/60 via-white to-gray-50/40">
         {/* Candidate Tab Content */}
-        {activeTab === "candidate" && (
+        {activeTab === "candidate" && qualificationDetails && (
+          <div className="mt-6">
+            <CVEvaluationReport 
+              data={{
+                candidateName: qualificationDetails.extracted?.name || candidateData.name,
+                role: jobTitle || 'N/A',
+                experience: qualificationDetails.extracted?.total_experience_years_estimate 
+                  ? `${qualificationDetails.extracted.total_experience_years_estimate} yrs` 
+                  : 'N/A',
+                overallScore: resumeScore,
+                qualified: resumeScore >= 60,
+                keyMetrics: {
+                  skillsMatch: qualificationDetails.breakdown?.skill_set_match?.score || 75,
+                  domainKnowledge: qualificationDetails.breakdown?.profile_quality?.score || 70,
+                  communication: qualificationDetails.breakdown?.written_communication?.score || 90,
+                  problemSolving: qualificationDetails.breakdown?.skills_in_recent_projects?.score || 80,
+                },
+                strengths: [
+                  ...(qualificationDetails.breakdown?.skill_set_match?.matched_skills?.slice(0, 3).map((skill: string) => 
+                    `Strong proficiency in ${skill}`
+                  ) || []),
+                  ...(qualificationDetails.breakdown?.skill_set_match?.score >= 70 
+                    ? ['Excellent skill set match with job requirements'] 
+                    : []),
+                  ...(qualificationDetails.breakdown?.experience_range_match?.years_actual >= 3 
+                    ? [`Solid experience of ${qualificationDetails.breakdown.experience_range_match.years_actual} years`] 
+                    : qualificationDetails.extracted?.total_experience_years_estimate >= 3
+                    ? [`Solid experience of ${qualificationDetails.extracted.total_experience_years_estimate} years`]
+                    : []),
+                  ...(qualificationDetails.breakdown?.written_communication?.score >= 85
+                    ? ['Professional CV with excellent communication']
+                    : []),
+                ],
+                gaps: [
+                  ...(qualificationDetails.breakdown?.skill_set_match?.missing_skills?.slice(0, 3).map((skill: string) => 
+                    `Missing experience with ${skill}`
+                  ) || []),
+                  ...(qualificationDetails.breakdown?.missed_skills_analysis?.critical_missing?.slice(0, 2).map((skill: string) =>
+                    `Critical skill gap: ${skill}`
+                  ) || []),
+                  ...(qualificationDetails.gaps_and_notes?.slice(0, 2) || []),
+                ],
+                matchedSkills: (qualificationDetails.breakdown?.skill_set_match?.matched_skills || []).map((skill: string) => ({
+                  name: skill,
+                  score: qualificationDetails.breakdown?.skill_set_match?.score || 85,
+                })),
+                missingSkills: qualificationDetails.breakdown?.skill_set_match?.missing_skills || [],
+                recommendation: resumeScore >= 60 
+                  ? '✅ Qualified - The candidate demonstrates strong relevant experience and meets the requirements. Recommended to proceed to next round.'
+                  : '❌ Not Qualified - The candidate does not meet the minimum requirements for this role.',
+                candidateProfile: {
+                  university: 'non-targeted' as const,
+                  employer: 'targeted' as const,
+                  experience: qualificationDetails.extracted?.total_experience_years_estimate || 4,
+                  hasRelevantExperience: true,
+                },
+                extractedInfo: {
+                  name: qualificationDetails.extracted?.name || candidateData.name,
+                  email: qualificationDetails.extracted?.email || candidateData.email,
+                  phone: qualificationDetails.extracted?.phone || candidateData.phone,
+                  totalExperience: qualificationDetails.extracted?.total_experience_years_estimate 
+                    ? `${qualificationDetails.extracted.total_experience_years_estimate} years` 
+                    : 'N/A',
+                  skills: qualificationDetails.extracted?.skills || [],
+                  notes: qualificationDetails.gaps_and_notes || [],
+                },
+                evaluationBreakdown: [
+                  {
+                    category: '1. Skill Set Match (30%)',
+                    score: qualificationDetails.breakdown?.skill_set_match?.score || 75,
+                    weight: qualificationDetails.breakdown?.skill_set_match?.weight || 30,
+                    details: [
+                      `✓ Matched Skills: ${(qualificationDetails.breakdown?.skill_set_match?.matched_skills || []).slice(0, 4).join(', ') || 'None'}`,
+                      `✗ Missing Skills: ${(qualificationDetails.breakdown?.skill_set_match?.missing_skills || []).slice(0, 4).join(', ') || 'None'}`,
+                      `Match Percentage: ${qualificationDetails.breakdown?.skill_set_match?.match_percentage || 0}%`,
+                      ...(qualificationDetails.breakdown?.skill_set_match?.evidence && qualificationDetails.breakdown.skill_set_match.evidence.length > 0 ? qualificationDetails.breakdown.skill_set_match.evidence : []),
+                    ].filter(d => d && !d.includes('undefined')),
+                  },
+                  {
+                    category: '2. Missed Skills Analysis (10%)',
+                    score: qualificationDetails.breakdown?.missed_skills_analysis?.score || 60,
+                    weight: qualificationDetails.breakdown?.missed_skills_analysis?.weight || 10,
+                    details: [
+                      `Critical Missing: ${(qualificationDetails.breakdown?.missed_skills_analysis?.critical_missing || []).join(', ') || 'None'}`,
+                      `Important Missing: ${(qualificationDetails.breakdown?.missed_skills_analysis?.important_missing || []).join(', ') || 'None'}`,
+                      `Nice-to-Have Missing: ${(qualificationDetails.breakdown?.missed_skills_analysis?.nice_to_have_missing || []).join(', ') || 'None'}`,
+                      ...(qualificationDetails.breakdown?.missed_skills_analysis?.evidence && qualificationDetails.breakdown.missed_skills_analysis.evidence.length > 0 ? qualificationDetails.breakdown.missed_skills_analysis.evidence : []),
+                    ].filter(d => d && !d.includes('undefined')),
+                  },
+                  {
+                    category: '3. Skills in Recent Projects (15%)',
+                    score: qualificationDetails.breakdown?.skills_in_recent_projects?.score || 80,
+                    weight: qualificationDetails.breakdown?.skills_in_recent_projects?.weight || 15,
+                    details: [
+                      `Recent Skills Used: ${(qualificationDetails.breakdown?.skills_in_recent_projects?.recent_skills_used || []).join(', ') || 'Not specified'}`,
+                      `Projects Analyzed: ${qualificationDetails.breakdown?.skills_in_recent_projects?.projects_analyzed || 0}`,
+                      ...(qualificationDetails.breakdown?.skills_in_recent_projects?.evidence && qualificationDetails.breakdown.skills_in_recent_projects.evidence.length > 0 ? qualificationDetails.breakdown.skills_in_recent_projects.evidence : []),
+                    ].filter(d => d && !d.includes('undefined')),
+                  },
+                  {
+                    category: '4. Experience Range Match (15%)',
+                    score: qualificationDetails.breakdown?.experience_range_match?.score || 85,
+                    weight: qualificationDetails.breakdown?.experience_range_match?.weight || 15,
+                    details: [
+                      `Actual Experience: ${qualificationDetails.breakdown?.experience_range_match?.years_actual !== null && qualificationDetails.breakdown?.experience_range_match?.years_actual !== undefined ? qualificationDetails.breakdown.experience_range_match.years_actual : qualificationDetails.extracted?.total_experience_years_estimate || 'N/A'} years`,
+                      `Required: ${qualificationDetails.breakdown?.experience_range_match?.years_required || 'Not specified'}`,
+                      `Match Level: ${qualificationDetails.breakdown?.experience_range_match?.match_level || 'Not specified'}`,
+                      ...(qualificationDetails.breakdown?.experience_range_match?.evidence && qualificationDetails.breakdown.experience_range_match.evidence.length > 0 ? qualificationDetails.breakdown.experience_range_match.evidence : []),
+                    ].filter(d => d && !d.includes('undefined')),
+                  },
+                  {
+                    category: '5. Location Match (5%)',
+                    score: qualificationDetails.breakdown?.location_match?.score || 50,
+                    weight: qualificationDetails.breakdown?.location_match?.weight || 5,
+                    details: [
+                      `Candidate Location: ${qualificationDetails.breakdown?.location_match?.candidate_location || qualificationDetails.extracted?.location || 'Not specified'}`,
+                      `Job Location: ${qualificationDetails.breakdown?.location_match?.job_location || 'Not specified'}`,
+                      `Remote Possible: ${qualificationDetails.breakdown?.location_match?.remote_possible ? 'Yes' : 'No'}`,
+                      ...(qualificationDetails.breakdown?.location_match?.evidence && qualificationDetails.breakdown.location_match.evidence.length > 0 ? qualificationDetails.breakdown.location_match.evidence : []),
+                    ].filter(d => d && !d.includes('undefined')),
+                  },
+                  {
+                    category: '6. Written Communication (5%)',
+                    score: qualificationDetails.breakdown?.written_communication?.score || 90,
+                    weight: qualificationDetails.breakdown?.written_communication?.weight || 5,
+                    details: [
+                      `Grammar Score: ${qualificationDetails.breakdown?.written_communication?.grammar_score || 0}/100`,
+                      `Structure Score: ${qualificationDetails.breakdown?.written_communication?.structure_score || 0}/100`,
+                      `Formatting Score: ${qualificationDetails.breakdown?.written_communication?.formatting_score || 0}/100`,
+                      `Issues: ${(qualificationDetails.breakdown?.written_communication?.issues || []).join(', ') || 'None'}`,
+                      ...(qualificationDetails.breakdown?.written_communication?.evidence && qualificationDetails.breakdown.written_communication.evidence.length > 0 ? qualificationDetails.breakdown.written_communication.evidence : []),
+                    ].filter(d => d && !d.includes('undefined')),
+                  },
+                  {
+                    category: '7. Education Qualification (10%)',
+                    score: qualificationDetails.breakdown?.education_qualification?.score || 80,
+                    weight: qualificationDetails.breakdown?.education_qualification?.weight || 10,
+                    details: [
+                      `Candidate Degree: ${qualificationDetails.breakdown?.education_qualification?.candidate_degree || 'Not specified'}`,
+                      `Required Degree: ${qualificationDetails.breakdown?.education_qualification?.required_degree || 'Not specified'}`,
+                      `Field Match: ${qualificationDetails.breakdown?.education_qualification?.field_match ? 'Yes' : 'No'}`,
+                      `Institution Rank: ${qualificationDetails.breakdown?.education_qualification?.institution_rank || 'Not specified'}`,
+                      ...(qualificationDetails.breakdown?.education_qualification?.evidence && qualificationDetails.breakdown.education_qualification.evidence.length > 0 ? qualificationDetails.breakdown.education_qualification.evidence : []),
+                    ].filter(d => d && !d.includes('undefined')),
+                  },
+                  {
+                    category: '8. Certifications (5%)',
+                    score: qualificationDetails.breakdown?.certifications_match?.score || 70,
+                    weight: qualificationDetails.breakdown?.certifications_match?.weight || 5,
+                    details: [
+                      `Matched: ${(qualificationDetails.breakdown?.certifications_match?.matched_certs || []).join(', ') || 'None'}`,
+                      `Missing: ${(qualificationDetails.breakdown?.certifications_match?.missing_certs || []).join(', ') || 'None'}`,
+                      `Expired: ${(qualificationDetails.breakdown?.certifications_match?.expired_certs || []).join(', ') || 'None'}`,
+                      ...(qualificationDetails.breakdown?.certifications_match?.evidence && qualificationDetails.breakdown.certifications_match.evidence.length > 0 ? qualificationDetails.breakdown.certifications_match.evidence : []),
+                    ].filter(d => d && !d.includes('undefined')),
+                  },
+                  {
+                    category: '9. Language Skills (2%)',
+                    score: qualificationDetails.breakdown?.language_skills?.score || 95,
+                    weight: qualificationDetails.breakdown?.language_skills?.weight || 2,
+                    details: [
+                      `Matched: ${(qualificationDetails.breakdown?.language_skills?.matched_languages || []).map((l: any) => `${l.language} (${l.proficiency})`).join(', ') || 'None'}`,
+                      `Missing: ${(qualificationDetails.breakdown?.language_skills?.missing_languages || []).join(', ') || 'None'}`,
+                      ...(qualificationDetails.breakdown?.language_skills?.evidence && qualificationDetails.breakdown.language_skills.evidence.length > 0 ? qualificationDetails.breakdown.language_skills.evidence : []),
+                    ].filter(d => d && !d.includes('undefined')),
+                  },
+                  {
+                    category: '10. Nationality (1%)',
+                    score: qualificationDetails.breakdown?.nationality_match?.score || 100,
+                    weight: qualificationDetails.breakdown?.nationality_match?.weight || 1,
+                    details: [
+                      `Candidate: ${qualificationDetails.breakdown?.nationality_match?.candidate_nationality || qualificationDetails.extracted?.nationality || 'Not specified'}`,
+                      `Required: ${qualificationDetails.breakdown?.nationality_match?.required_nationality || 'No restriction'}`,
+                      `Match: ${qualificationDetails.breakdown?.nationality_match?.match ? 'Yes' : 'No'}`,
+                      ...(qualificationDetails.breakdown?.nationality_match?.evidence && qualificationDetails.breakdown.nationality_match.evidence.length > 0 ? qualificationDetails.breakdown.nationality_match.evidence : []),
+                    ].filter(d => d && !d.includes('undefined')),
+                  },
+                  {
+                    category: '11. Profile Quality (2%)',
+                    score: qualificationDetails.breakdown?.profile_quality?.score || 75,
+                    weight: qualificationDetails.breakdown?.profile_quality?.weight || 2,
+                    details: [
+                      `Education Rank: ${qualificationDetails.breakdown?.profile_quality?.education_rank || 'Not specified'}`,
+                      `Employer Rank: ${qualificationDetails.breakdown?.profile_quality?.employer_rank || 'Not specified'}`,
+                      `Industry Relevance: ${qualificationDetails.breakdown?.profile_quality?.industry_relevance || 'Not specified'}`,
+                      ...(qualificationDetails.breakdown?.profile_quality?.evidence && qualificationDetails.breakdown.profile_quality.evidence.length > 0 ? qualificationDetails.breakdown.profile_quality.evidence : []),
+                    ].filter(d => d && !d.includes('undefined')),
+                  },
+                ],
+              }}
+            />
+          </div>
+        )}
+        {activeTab === "candidate" && !qualificationDetails && (
           <div className="mt-6 space-y-6">
             {/* Header Profile Card */}
             <Card className="border-2 border-purple-200 bg-white shadow-lg">
