@@ -70,6 +70,8 @@ interface EvaluationData {
   role: string
   experience: string
   overallScore: number
+  interviewScore: number
+  resumeUrl: string
   qualified: boolean
   keyMetrics: {
     skillsMatch: number
@@ -101,9 +103,10 @@ interface EvaluationData {
 
 interface Props {
   data: EvaluationData
+  isGeneratingPDF?: boolean
 }
 
-export function CVEvaluationReport({ data }: Props) {
+export function CVEvaluationReport({ data, isGeneratingPDF = false }: Props) {
   const [faqOpen, setFaqOpen] = useState(false)
   const [profileClassificationOpen, setProfileClassificationOpen] = useState(true)
   
@@ -249,7 +252,7 @@ export function CVEvaluationReport({ data }: Props) {
                 variant="outline" 
                 size="sm"
                 className="flex items-center space-x-2"
-                onClick={() => window.print()}
+                onClick={() => window.open(data.resumeUrl, '_blank')}
               >
                 <Download className="w-4 h-4" />
                 <span>Download Resume</span>
@@ -304,11 +307,18 @@ export function CVEvaluationReport({ data }: Props) {
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 uppercase font-medium tracking-wide mb-1">Overall Score</p>
-                  <div className="flex items-center">
-                    <BarChart4 className="w-4 h-4 text-slate-400 mr-2" />
-                    <p className="font-bold text-lg">{data.overallScore}<span className="text-slate-400 text-xs">/100</span></p>
-                  </div>
+                  <p className="text-xs text-slate-500 uppercase font-medium tracking-wide mb-1">Interview Score</p>
+                  {data.interviewScore > 0 ? (
+                    <div className="flex items-center">
+                      <BarChart4 className="w-4 h-4 text-slate-400 mr-2" />
+                      <p className="font-bold text-lg">{data.interviewScore}<span className="text-slate-400 text-xs">/100</span></p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center">
+                      <BarChart4 className="w-4 h-4 text-slate-400 mr-2" />
+                      <p className="font-bold text-lg text-slate-400">—</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -459,92 +469,6 @@ export function CVEvaluationReport({ data }: Props) {
         </Collapsible>
       </Card>
 
-      {/* Key Metrics and Skills Analysis */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <Card className="shadow-md border border-slate-200 md:col-span-2 overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 py-4 px-6">
-            <CardTitle className="text-lg font-semibold flex items-center">
-              <BarChart4 className="w-5 h-5 text-emerald-600 mr-3" />
-              Key Competency Metrics
-            </CardTitle>
-            <CardDescription className="text-slate-600 mt-1 ml-8">
-              Performance in critical evaluation areas compared to industry benchmarks
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              {Object.entries(data.keyMetrics).map(([key, value]) => {
-                const getScoreColor = (score: number) => {
-                  if (score >= 80) return 'text-emerald-600 bg-emerald-50';
-                  if (score >= 70) return 'text-blue-600 bg-blue-50';
-                  if (score >= 60) return 'text-amber-600 bg-amber-50';
-                  return 'text-red-600 bg-red-50';
-                };
-                
-                return (
-                <div key={key} className="relative">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-sm font-medium">
-                      {key.replace(/([A-Z])/g, " $1").trim()}
-                    </h4>
-                    <span className={`text-sm font-bold rounded-full w-10 h-10 flex items-center justify-center ${getScoreColor(value)}`}>
-                      {value}
-                    </span>
-                  </div>
-                  <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full ${value >= 80 ? 'bg-emerald-500' : value >= 70 ? 'bg-blue-500' : value >= 60 ? 'bg-amber-500' : 'bg-red-500'}`}
-                      style={{ width: `${value}%` }}
-                    ></div>
-                  </div>
-                  <div className="mt-1 flex justify-between text-xs text-slate-500">
-                    <span>0</span>
-                    <span>Industry Avg. (65)</span>
-                    <span>100</span>
-                  </div>
-                </div>
-                );
-              })}
-            </div>
-            
-            <div className="h-[280px] mt-4">
-              <Radar data={radarData} options={radarOptions} />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="shadow-md border border-slate-200 overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 py-4 px-6">
-            <CardTitle className="text-lg font-semibold flex items-center">
-              <CheckCircle className="w-5 h-5 text-emerald-600 mr-3" />
-              Overall Assessment
-            </CardTitle>
-            <CardDescription className="text-slate-600 mt-1 ml-8">
-              Weighted score evaluation
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent className="p-6 flex flex-col items-center justify-center">
-            <div className="w-44 h-44 relative mb-6">
-              <Doughnut data={scoreData} options={scoreOptions} />
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="text-4xl font-bold">{data.overallScore}</div>
-                <div className="text-xs text-slate-500">out of 100</div>
-              </div>
-            </div>
-            
-            <div className="w-full">
-              <Badge 
-                variant={data.qualified ? "default" : "destructive"}
-                className={`w-full py-2 flex justify-center text-base ${data.qualified ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100/90' : 'bg-red-100 text-red-800 hover:bg-red-100/90'}`}
-              >
-                {data.qualified ? "Qualified" : "Not Qualified"}
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Skills & Gap Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -561,27 +485,15 @@ export function CVEvaluationReport({ data }: Props) {
           </CardHeader>
           
           <CardContent className="p-0">
-            <Tabs defaultValue="strengths" className="w-full">
-              <div className="border-b border-slate-200">
-                <TabsList className="w-full grid grid-cols-2 rounded-none bg-transparent p-0">
-                  <TabsTrigger 
-                    value="strengths" 
-                    className="data-[state=active]:bg-white rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 text-slate-600 data-[state=active]:text-emerald-700 py-3 font-medium"
-                  >
+            {isGeneratingPDF ? (
+              // PDF mode: Show all content
+              <div className="space-y-0">
+                <div className="border-b border-slate-200 bg-slate-50 px-6 py-2">
+                  <div className="flex items-center font-medium text-emerald-700">
                     <CheckCircle2 className="w-4 h-4 mr-2" />
                     Strengths
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="gaps" 
-                    className="data-[state=active]:bg-white rounded-none border-b-2 border-transparent data-[state=active]:border-amber-500 text-slate-600 data-[state=active]:text-amber-700 py-3 font-medium"
-                  >
-                    <AlertTriangle className="w-4 h-4 mr-2" />
-                    Gaps
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-              
-              <TabsContent value="strengths" className="m-0 pt-4">
+                  </div>
+                </div>
                 <ul className="divide-y divide-slate-100">
                   {data.strengths.map((strength, index) => (
                     <li key={index} className="py-3 px-6 flex items-start hover:bg-slate-50">
@@ -594,9 +506,12 @@ export function CVEvaluationReport({ data }: Props) {
                     </li>
                   ))}
                 </ul>
-              </TabsContent>
-              
-              <TabsContent value="gaps" className="m-0 pt-4">
+                <div className="border-b border-slate-200 bg-slate-50 px-6 py-2 mt-4">
+                  <div className="flex items-center font-medium text-amber-700">
+                    <AlertTriangle className="w-4 h-4 mr-2" />
+                    Gaps
+                  </div>
+                </div>
                 <ul className="divide-y divide-slate-100">
                   {data.gaps.map((gap, index) => (
                     <li key={index} className="py-3 px-6 flex items-start hover:bg-slate-50">
@@ -609,8 +524,60 @@ export function CVEvaluationReport({ data }: Props) {
                     </li>
                   ))}
                 </ul>
-              </TabsContent>
-            </Tabs>
+              </div>
+            ) : (
+              // Normal mode: Tabbed interface
+              <Tabs defaultValue="strengths" className="w-full">
+                <div className="border-b border-slate-200">
+                  <TabsList className="w-full grid grid-cols-2 rounded-none bg-transparent p-0">
+                    <TabsTrigger 
+                      value="strengths" 
+                      className="data-[state=active]:bg-white rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 text-slate-600 data-[state=active]:text-emerald-700 py-3 font-medium"
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      Strengths
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="gaps" 
+                      className="data-[state=active]:bg-white rounded-none border-b-2 border-transparent data-[state=active]:border-amber-500 text-slate-600 data-[state=active]:text-amber-700 py-3 font-medium"
+                    >
+                      <AlertTriangle className="w-4 h-4 mr-2" />
+                      Gaps
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+                
+                <TabsContent value="strengths" className="m-0 pt-4">
+                  <ul className="divide-y divide-slate-100">
+                    {data.strengths.map((strength, index) => (
+                      <li key={index} className="py-3 px-6 flex items-start hover:bg-slate-50">
+                        <div className="mr-3 mt-0.5">
+                          <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
+                            <CheckCircle className="w-3 h-3 text-emerald-600" />
+                          </div>
+                        </div>
+                        <span className="text-slate-700">{strength}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </TabsContent>
+                
+                <TabsContent value="gaps" className="m-0 pt-4">
+                  <ul className="divide-y divide-slate-100">
+                    {data.gaps.map((gap, index) => (
+                      <li key={index} className="py-3 px-6 flex items-start hover:bg-slate-50">
+                        <div className="mr-3 mt-0.5">
+                          <div className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center">
+                            <XCircle className="w-3 h-3 text-amber-600" />
+                          </div>
+                        </div>
+                        <span className="text-slate-700">{gap}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </TabsContent>
+              </Tabs>
+            )}
           </CardContent>
         </Card>
         
@@ -627,28 +594,16 @@ export function CVEvaluationReport({ data }: Props) {
           </CardHeader>
           
           <CardContent className="p-0">
-            <Tabs defaultValue="matched" className="w-full">
-              <div className="border-b border-slate-200">
-                <TabsList className="w-full grid grid-cols-2 rounded-none bg-transparent p-0">
-                  <TabsTrigger 
-                    value="matched" 
-                    className="data-[state=active]:bg-white rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 text-slate-600 data-[state=active]:text-blue-700 py-3 font-medium"
-                  >
+            {isGeneratingPDF ? (
+              // PDF mode: Show all content
+              <div className="space-y-0">
+                <div className="border-b border-slate-200 bg-slate-50 px-6 py-2">
+                  <div className="flex items-center font-medium text-blue-700">
                     <CheckCircle2 className="w-4 h-4 mr-2" />
                     Matched Skills
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="missing" 
-                    className="data-[state=active]:bg-white rounded-none border-b-2 border-transparent data-[state=active]:border-slate-500 text-slate-600 data-[state=active]:text-slate-700 py-3 font-medium"
-                  >
-                    <XCircle className="w-4 h-4 mr-2" />
-                    Missing Skills
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-              
-              <TabsContent value="matched" className="m-0 pt-4 pb-4">
-                <div className="px-6">
+                  </div>
+                </div>
+                <div className="px-6 pt-4 pb-4">
                   {data.matchedSkills.map((skill, index) => (
                     <div key={index} className="mb-4 last:mb-0">
                       <div className="flex justify-between mb-1.5">
@@ -666,21 +621,82 @@ export function CVEvaluationReport({ data }: Props) {
                     </div>
                   ))}
                 </div>
-              </TabsContent>
-              
-              <TabsContent value="missing" className="m-0 p-4">
-                <div className="grid grid-cols-2 gap-2">
-                  {data.missingSkills.map((skill, index) => (
-                    <div key={index} className="flex items-center p-2 bg-slate-50 rounded border border-slate-200">
-                      <div className="mr-2">
-                        <XCircle className="w-4 h-4 text-slate-400" />
-                      </div>
-                      <span className="text-sm text-slate-700">{skill}</span>
-                    </div>
-                  ))}
+                <div className="border-b border-slate-200 bg-slate-50 px-6 py-2 mt-4">
+                  <div className="flex items-center font-medium text-slate-700">
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Missing Skills
+                  </div>
                 </div>
-              </TabsContent>
-            </Tabs>
+                <div className="p-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    {data.missingSkills.map((skill, index) => (
+                      <div key={index} className="flex items-center p-2 bg-slate-50 rounded border border-slate-200">
+                        <div className="mr-2">
+                          <XCircle className="w-4 h-4 text-slate-400" />
+                        </div>
+                        <span className="text-sm text-slate-700">{skill}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Normal mode: Tabbed interface
+              <Tabs defaultValue="matched" className="w-full">
+                <div className="border-b border-slate-200">
+                  <TabsList className="w-full grid grid-cols-2 rounded-none bg-transparent p-0">
+                    <TabsTrigger 
+                      value="matched" 
+                      className="data-[state=active]:bg-white rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 text-slate-600 data-[state=active]:text-blue-700 py-3 font-medium"
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      Matched Skills
+                    </TabsTrigger>
+                    <TabsTrigger 
+                      value="missing" 
+                      className="data-[state=active]:bg-white rounded-none border-b-2 border-transparent data-[state=active]:border-slate-500 text-slate-600 data-[state=active]:text-slate-700 py-3 font-medium"
+                    >
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Missing Skills
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+                
+                <TabsContent value="matched" className="m-0 pt-4 pb-4">
+                  <div className="px-6">
+                    {data.matchedSkills.map((skill, index) => (
+                      <div key={index} className="mb-4 last:mb-0">
+                        <div className="flex justify-between mb-1.5">
+                          <span className="text-sm font-medium">{skill.name}</span>
+                          <span className="text-xs font-semibold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">
+                            {skill.score}%
+                          </span>
+                        </div>
+                        <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-blue-600 rounded-full" 
+                            style={{ width: `${skill.score}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="missing" className="m-0 p-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    {data.missingSkills.map((skill, index) => (
+                      <div key={index} className="flex items-center p-2 bg-slate-50 rounded border border-slate-200">
+                        <div className="mr-2">
+                          <XCircle className="w-4 h-4 text-slate-400" />
+                        </div>
+                        <span className="text-sm text-slate-700">{skill}</span>
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -698,11 +714,7 @@ export function CVEvaluationReport({ data }: Props) {
         </CardHeader>
         
         <CardContent className="p-6">
-          <div className="mb-6" style={{ height: '400px' }}>
-            <Bar data={breakdownData} options={breakdownOptions} />
-          </div>
-          
-          <div className="space-y-6 mt-8">
+          <div className="space-y-5">
             {data.evaluationBreakdown.map((category, index) => {
               const getScoreColor = (score: number) => {
                 if (score >= 80) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
@@ -711,37 +723,101 @@ export function CVEvaluationReport({ data }: Props) {
                 return 'bg-red-100 text-red-800 border-red-200';
               };
               
+              const getScoreBgColor = (score: number) => {
+                if (score >= 80) return 'bg-emerald-50 hover:bg-emerald-100/50';
+                if (score >= 70) return 'bg-blue-50 hover:bg-blue-100/50';
+                if (score >= 60) return 'bg-amber-50 hover:bg-amber-100/50';
+                return 'bg-red-50 hover:bg-red-100/50';
+              };
+              
               return (
-                <div key={index} className="border border-slate-200 rounded-lg overflow-hidden">
-                  <div className="flex justify-between items-center p-4 bg-slate-50 border-b border-slate-200">
-                    <div className="flex items-center">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${category.score >= 80 ? 'bg-emerald-100' : category.score >= 70 ? 'bg-blue-100' : category.score >= 60 ? 'bg-amber-100' : 'bg-red-100'}`}>
-                        <span className="font-bold text-sm">{index + 1}</span>
+                <div key={index} className={`border-2 border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 ${getScoreBgColor(category.score)}`}>
+                  {/* Category Header */}
+                  <div className="flex justify-between items-center px-6 py-5 bg-gradient-to-r from-slate-50 to-white border-b-2 border-slate-200">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg shadow-md ${
+                        category.score >= 80 ? 'bg-emerald-100 text-emerald-700' : 
+                        category.score >= 70 ? 'bg-blue-100 text-blue-700' : 
+                        category.score >= 60 ? 'bg-amber-100 text-amber-700' : 
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {index + 1}
                       </div>
                       <div>
-                        <h4 className="font-semibold">{category.category}</h4>
-                        <span className="text-xs text-slate-500">Weight: {category.weight}%</span>
+                        <h4 className="font-bold text-lg text-slate-900 leading-tight">{category.category}</h4>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-sm font-semibold text-slate-600">Weight: <span className="text-slate-800">{category.weight}%</span></span>
+                        </div>
                       </div>
                     </div>
-                    <Badge 
-                      variant="outline"
-                      className={`px-3 py-1 ${getScoreColor(category.score)}`}
-                    >
-                      {category.score}/100
-                    </Badge>
+                    <div className="text-right">
+                      <Badge 
+                        variant="outline"
+                        className={`px-5 py-2 text-base font-bold ${getScoreColor(category.score)}`}
+                      >
+                        {category.score}/100
+                      </Badge>
+                    </div>
                   </div>
                   
-                  <div className="p-4">
-                    <ul className="space-y-2">
-                      {category.details.map((detail, idx) => (
-                        <li key={idx} className="flex items-start text-sm text-slate-700">
-                          <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center mr-3 mt-0.5 flex-shrink-0">
-                            <span className="text-xs text-slate-600">{idx + 1}</span>
+                  {/* Category Details - Clear Sections or Grid */}
+                  <div className="px-6 py-6 bg-white/80">
+                    {/* Grid Format (for Education Qualification) */}
+                    {(category as any).isGrid && (category as any).gridData ? (
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        {(category as any).gridData.map((item: any, idx: number) => (
+                          <div key={idx} className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                            <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">
+                              {item.label}
+                            </div>
+                            <p className="text-sm font-medium text-slate-800 leading-relaxed">
+                              {item.value}
+                            </p>
                           </div>
-                          {detail}
-                        </li>
-                      ))}
-                    </ul>
+                        ))}
+                      </div>
+                    ) : null}
+                    
+                    {/* Details List Format */}
+                    <div className={`space-y-4 ${(category as any).isGrid && (category as any).gridData ? 'mt-4 pt-4 border-t border-slate-200' : ''}`}>
+                      {category.details.map((detail, idx) => {
+                      // Parse detail to determine section type and color
+                      const isCritical = detail.includes('🔴') || detail.includes('Critical');
+                      const isImportant = detail.includes('🟠') || detail.includes('Important');
+                      const isNiceToHave = detail.includes('🟡') || detail.includes('Nice-to-Have');
+                      const isMatched = detail.includes('✓') || detail.includes('Matched');
+                      const isMissing = detail.includes('✗') || detail.includes('Missing') || detail.includes('Required');
+                      const isPercentage = detail.includes('%') || detail.includes('Percentage');
+                      
+                      let sectionColor = 'bg-slate-50 border-slate-200';
+                      let textColor = 'text-slate-800';
+                      
+                      if (isCritical) {
+                        sectionColor = 'bg-red-50 border-red-200';
+                        textColor = 'text-red-900';
+                      } else if (isImportant) {
+                        sectionColor = 'bg-orange-50 border-orange-200';
+                        textColor = 'text-orange-900';
+                      } else if (isNiceToHave) {
+                        sectionColor = 'bg-amber-50 border-amber-200';
+                        textColor = 'text-amber-900';
+                      } else if (isMatched && !isMissing) {
+                        sectionColor = 'bg-emerald-50 border-emerald-200';
+                        textColor = 'text-emerald-900';
+                      } else if (isPercentage) {
+                        sectionColor = 'bg-blue-50 border-blue-200';
+                        textColor = 'text-blue-900';
+                      }
+                      
+                      return (
+                        <div key={idx} className={`border rounded-lg p-4 ${sectionColor}`}>
+                          <p className={`text-sm leading-relaxed font-medium ${textColor}`}>
+                            {detail.replace(/^[✓✗]/, '').trim()}
+                          </p>
+                        </div>
+                      );
+                    })}
+                    </div>
                   </div>
                 </div>
               );

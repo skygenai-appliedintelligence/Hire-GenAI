@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, User, FileText, MessageSquare, Download, Mail, Phone, Calendar, ExternalLink, Star, Briefcase, ChevronDown, CheckCircle2, TrendingUp } from "lucide-react"
 import { CVEvaluationReport } from "@/components/cv-evaluation-report"
+// Dynamic import for html2pdf to avoid TypeScript issues
+const html2pdf = () => import('html2pdf.js')
 
 type CandidateData = {
   id: string
@@ -81,6 +83,18 @@ type TranscriptData = {
   }>
 }
 
+type EvaluationBreakdownItem = {
+  category: string
+  score: number
+  weight: number
+  details: string[]
+  isGrid?: boolean
+  gridData?: Array<{
+    label: string
+    value: string
+  }>
+}
+
 // Helper Functions
 const getScoreBadgeColor = (score: number, maxScore: number = 100) => {
   const percentage = (score / maxScore) * 100
@@ -130,6 +144,7 @@ export default function CandidateReportPage() {
   const searchParams = useSearchParams()
   const jdId = (params?.jdId as string) || ""
   const candidateId = (params?.candidateId as string) || ""
+  const reportRef = useRef<HTMLDivElement>(null)
 
   const [candidate, setCandidate] = useState<CandidateData | null>(null)
   const [evaluation, setEvaluation] = useState<EvaluationData | null>(null)
@@ -144,6 +159,40 @@ export default function CandidateReportPage() {
   const [dbQualified, setDbQualified] = useState<boolean | null>(null)
   const [qualificationDetails, setQualificationDetails] = useState<any>(null)
   const [sectionPointers, setSectionPointers] = useState<SectionPointers | null>(null)
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
+
+  // Download report as PDF
+  const downloadReport = async () => {
+    if (!reportRef.current) return
+
+    try {
+      // Enable PDF mode to show all tabs
+      setIsGeneratingPDF(true)
+      
+      // Wait for state update and DOM to render
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      const html2pdfModule = await html2pdf()
+      const element = reportRef.current
+      const opt = {
+        margin: 10,
+        filename: `${candidate?.name || 'Report'}_Evaluation_Report.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      }
+
+      await html2pdfModule.default().set(opt).from(element).save()
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      // Fallback: show alert if PDF generation fails
+      alert('PDF generation failed. Please try again.')
+    } finally {
+      // Disable PDF mode
+      setIsGeneratingPDF(false)
+    }
+  }
 
   // Read tab from URL on mount
   useEffect(() => {
@@ -270,12 +319,85 @@ export default function CandidateReportPage() {
   const evaluationData = evaluation
   const transcriptData = transcript
 
+  // Calculate weighted score from breakdown - matches backend logic exactly
+  const calculateWeightedScore = (breakdown: any): number => {
+    if (!breakdown) {
+      console.log('[Score Calc] No breakdown data available')
+      return 0
+    }
+    
+    const categories = [
+      { key: 'skill_set_match', weight: 30 },
+      { key: 'missed_skills_analysis', weight: 10 },
+      { key: 'skills_in_recent_projects', weight: 15 },
+      { key: 'experience_range_match', weight: 15 },
+      { key: 'location_match', weight: 5 },
+      { key: 'written_communication', weight: 5 },
+      { key: 'education_qualification', weight: 10 },
+      { key: 'certifications_match', weight: 5 },
+      { key: 'language_skills', weight: 2 },
+      { key: 'nationality_match', weight: 1 },
+      { key: 'profile_quality', weight: 2 },
+    ]
+    
+    console.log('[Score Calc] Starting weighted score calculation...')
+    let totalScore = 0
+    let totalWeight = 0
+    
+    categories.forEach(cat => {
+      const categoryData = breakdown[cat.key]
+      if (categoryData && typeof categoryData.score === 'number') {
+        const contribution = (categoryData.score * cat.weight) / 100
+        totalScore += contribution
+        totalWeight += cat.weight
+        console.log(`[Score Calc] ${cat.key}: score=${categoryData.score}, weight=${cat.weight}%, contribution=${contribution.toFixed(2)}`)
+      } else {
+        console.log(`[Score Calc] ${cat.key}: MISSING or invalid`)
+      }
+    })
+    
+    const finalScore = Math.round(totalScore)
+    console.log(`[Score Calc] ✅ Total weighted score: ${totalScore.toFixed(2)} → Rounded: ${finalScore}`)
+    console.log(`[Score Calc] Total weight used: ${totalWeight}%`)
+    
+    return finalScore
+  }
+
   // Prefer evaluation score; fall back to DB score only if evaluation missing
   const overallScore = ((evaluation?.overallScore ?? null) !== null)
     ? (evaluation!.overallScore as number)
     : (typeof dbScore === 'number' ? dbScore : null)
-  // Resume/Qualification score must come from DB qualification_score
-  const resumeScore = typeof dbScore === 'number' ? dbScore : (qualificationDetails?.overall?.score_percent || 0)
+  
+  // Resume/Qualification score priority:
+  // 1. Use DB score first (always show resume score from database)
+  // 2. Use AI-calculated score from qualificationDetails.overall.score_percent (authoritative)
+  // 3. Calculate from breakdown
+  // 4. Finally use 0
+  const resumeScore = (() => {
+    // First priority: DB score (resume score from database)
+    if (typeof dbScore === 'number') {
+      console.log('[Score Calc] Using DB score for resume:', dbScore)
+      return dbScore
+    }
+    
+    // Second priority: AI-calculated score from overall
+    if (qualificationDetails?.overall?.score_percent != null) {
+      const aiScore = Math.round(qualificationDetails.overall.score_percent)
+      console.log('[Score Calc] Using AI-calculated score from overall:', aiScore)
+      return aiScore
+    }
+    
+    // Third priority: Calculate from breakdown
+    if (qualificationDetails?.breakdown) {
+      const calculatedScore = calculateWeightedScore(qualificationDetails.breakdown)
+      console.log('[Score Calc] Using calculated score from breakdown:', calculatedScore)
+      return calculatedScore
+    }
+    
+    // Last resort
+    console.log('[Score Calc] No score available, using 0')
+    return 0
+  })()
   // Display overall score from evaluation: always show out of 100
   const overallScoreDisplay = (() => {
     if (overallScore === null || overallScore === undefined || isNaN(overallScore as any)) return "--"
@@ -327,10 +449,19 @@ export default function CandidateReportPage() {
             <span className="text-gray-700">{candidateId.substring(0, 16)}</span>
           </div>
 
-          {/* Title */}
-          <h1 className="text-3xl md:text-4xl font-bold text-purple-600 mb-6">
-            Interview with {candidateData.name} {jobTitle && `for ${jobTitle}`}
-          </h1>
+          {/* Title and Download Report Button */}
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-3xl md:text-4xl font-bold text-purple-600">
+              Interview with {candidateData.name} {jobTitle && `for ${jobTitle}`}
+            </h1>
+            <Button 
+              onClick={downloadReport}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Download Report
+            </Button>
+          </div>
 
           {/* Tabs Navigation */}
           <div className="flex items-center gap-8 border-b border-gray-200 -mb-px">
@@ -391,7 +522,7 @@ export default function CandidateReportPage() {
       </div>
 
       {/* Content Area */}
-      <div className="px-4 md:px-6 py-6 bg-gradient-to-b from-gray-50/60 via-white to-gray-50/40">
+      <div className="px-4 md:px-6 py-6 bg-gradient-to-b from-gray-50/60 via-white to-gray-50/40" ref={reportRef}>
         {/* Candidate Tab Content */}
         {activeTab === "candidate" && qualificationDetails && (
           <div className="mt-6">
@@ -403,6 +534,8 @@ export default function CandidateReportPage() {
                   ? `${qualificationDetails.extracted.total_experience_years_estimate} yrs` 
                   : 'N/A',
                 overallScore: resumeScore,
+                interviewScore: evaluation?.overallScore ? (evaluation.overallScore as number) : 0,
+                resumeUrl: candidateData.resumeUrl,
                 qualified: resumeScore >= 60,
                 keyMetrics: {
                   skillsMatch: qualificationDetails.breakdown?.skill_set_match?.score || 75,
@@ -459,130 +592,253 @@ export default function CandidateReportPage() {
                   skills: qualificationDetails.extracted?.skills || [],
                   notes: qualificationDetails.gaps_and_notes || [],
                 },
-                evaluationBreakdown: [
+                evaluationBreakdown: ([] as EvaluationBreakdownItem[]).concat([
                   {
-                    category: '1. Skill Set Match (30%)',
+                    category: 'Skill Set Match',
                     score: qualificationDetails.breakdown?.skill_set_match?.score || 75,
                     weight: qualificationDetails.breakdown?.skill_set_match?.weight || 30,
+                    isGrid: true,
+                    gridData: [
+                      {
+                        label: '✓ Matched Skills',
+                        value: (qualificationDetails.breakdown?.skill_set_match?.matched_skills || []).slice(0, 4).join(', ') || 'None'
+                      },
+                      {
+                        label: '✗ Missing Skills',
+                        value: (qualificationDetails.breakdown?.skill_set_match?.missing_skills || []).slice(0, 4).join(', ') || 'None'
+                      },
+                      {
+                        label: 'Match Percentage',
+                        value: `${qualificationDetails.breakdown?.skill_set_match?.match_percentage || 0}%`
+                      },
+                      {
+                        label: 'Total Skills Required',
+                        value: `${(qualificationDetails.breakdown?.skill_set_match?.matched_skills || []).length + (qualificationDetails.breakdown?.skill_set_match?.missing_skills || []).length} skills`
+                      }
+                    ],
                     details: [
-                      `✓ Matched Skills: ${(qualificationDetails.breakdown?.skill_set_match?.matched_skills || []).slice(0, 4).join(', ') || 'None'}`,
-                      `✗ Missing Skills: ${(qualificationDetails.breakdown?.skill_set_match?.missing_skills || []).slice(0, 4).join(', ') || 'None'}`,
-                      `Match Percentage: ${qualificationDetails.breakdown?.skill_set_match?.match_percentage || 0}%`,
                       ...(qualificationDetails.breakdown?.skill_set_match?.evidence && qualificationDetails.breakdown.skill_set_match.evidence.length > 0 ? qualificationDetails.breakdown.skill_set_match.evidence : []),
                     ].filter(d => d && !d.includes('undefined')),
                   },
                   {
-                    category: '2. Missed Skills Analysis (10%)',
-                    score: qualificationDetails.breakdown?.missed_skills_analysis?.score || 60,
-                    weight: qualificationDetails.breakdown?.missed_skills_analysis?.weight || 10,
-                    details: [
-                      `Critical Missing: ${(qualificationDetails.breakdown?.missed_skills_analysis?.critical_missing || []).join(', ') || 'None'}`,
-                      `Important Missing: ${(qualificationDetails.breakdown?.missed_skills_analysis?.important_missing || []).join(', ') || 'None'}`,
-                      `Nice-to-Have Missing: ${(qualificationDetails.breakdown?.missed_skills_analysis?.nice_to_have_missing || []).join(', ') || 'None'}`,
-                      ...(qualificationDetails.breakdown?.missed_skills_analysis?.evidence && qualificationDetails.breakdown.missed_skills_analysis.evidence.length > 0 ? qualificationDetails.breakdown.missed_skills_analysis.evidence : []),
-                    ].filter(d => d && !d.includes('undefined')),
-                  },
-                  {
-                    category: '3. Skills in Recent Projects (15%)',
+                    category: 'Skills in Recent Projects',
                     score: qualificationDetails.breakdown?.skills_in_recent_projects?.score || 80,
                     weight: qualificationDetails.breakdown?.skills_in_recent_projects?.weight || 15,
+                    isGrid: true,
+                    gridData: [
+                      {
+                        label: 'Recent Skills Used',
+                        value: (qualificationDetails.breakdown?.skills_in_recent_projects?.recent_skills_used || []).join(', ') || 'Not specified'
+                      },
+                      {
+                        label: 'Projects Analyzed',
+                        value: `${qualificationDetails.breakdown?.skills_in_recent_projects?.projects_analyzed || 0} projects`
+                      },
+                      {
+                        label: 'Skill Relevance',
+                        value: 'High' // Can be enhanced based on data
+                      },
+                      {
+                        label: 'Experience Depth',
+                        value: 'Verified' // Can be enhanced based on data
+                      }
+                    ],
                     details: [
-                      `Recent Skills Used: ${(qualificationDetails.breakdown?.skills_in_recent_projects?.recent_skills_used || []).join(', ') || 'Not specified'}`,
-                      `Projects Analyzed: ${qualificationDetails.breakdown?.skills_in_recent_projects?.projects_analyzed || 0}`,
                       ...(qualificationDetails.breakdown?.skills_in_recent_projects?.evidence && qualificationDetails.breakdown.skills_in_recent_projects.evidence.length > 0 ? qualificationDetails.breakdown.skills_in_recent_projects.evidence : []),
                     ].filter(d => d && !d.includes('undefined')),
                   },
                   {
-                    category: '4. Experience Range Match (15%)',
+                    category: 'Experience Range Match',
                     score: qualificationDetails.breakdown?.experience_range_match?.score || 85,
                     weight: qualificationDetails.breakdown?.experience_range_match?.weight || 15,
+                    isGrid: true,
+                    gridData: [
+                      {
+                        label: 'Actual Experience',
+                        value: `${qualificationDetails.breakdown?.experience_range_match?.years_actual !== null && qualificationDetails.breakdown?.experience_range_match?.years_actual !== undefined ? qualificationDetails.breakdown.experience_range_match.years_actual : qualificationDetails.extracted?.total_experience_years_estimate || 'N/A'} years`
+                      },
+                      {
+                        label: 'Required Experience',
+                        value: `${qualificationDetails.breakdown?.experience_range_match?.years_required || 'Not specified'} years`
+                      },
+                      {
+                        label: 'Match Level',
+                        value: qualificationDetails.breakdown?.experience_range_match?.match_level || 'Not specified'
+                      },
+                      {
+                        label: 'Experience Status',
+                        value: (qualificationDetails.breakdown?.experience_range_match?.years_actual || 0) >= (parseInt(qualificationDetails.breakdown?.experience_range_match?.years_required || '0') || 0) ? '✓ Meets Requirement' : '✗ Below Requirement'
+                      }
+                    ],
                     details: [
-                      `Actual Experience: ${qualificationDetails.breakdown?.experience_range_match?.years_actual !== null && qualificationDetails.breakdown?.experience_range_match?.years_actual !== undefined ? qualificationDetails.breakdown.experience_range_match.years_actual : qualificationDetails.extracted?.total_experience_years_estimate || 'N/A'} years`,
-                      `Required: ${qualificationDetails.breakdown?.experience_range_match?.years_required || 'Not specified'}`,
-                      `Match Level: ${qualificationDetails.breakdown?.experience_range_match?.match_level || 'Not specified'}`,
                       ...(qualificationDetails.breakdown?.experience_range_match?.evidence && qualificationDetails.breakdown.experience_range_match.evidence.length > 0 ? qualificationDetails.breakdown.experience_range_match.evidence : []),
                     ].filter(d => d && !d.includes('undefined')),
                   },
                   {
-                    category: '5. Location Match (5%)',
+                    category: 'Location Match',
                     score: qualificationDetails.breakdown?.location_match?.score || 50,
                     weight: qualificationDetails.breakdown?.location_match?.weight || 5,
+                    isGrid: true,
+                    gridData: [
+                      {
+                        label: 'Candidate Location',
+                        value: qualificationDetails.breakdown?.location_match?.candidate_location || qualificationDetails.extracted?.location || 'Not specified'
+                      },
+                      {
+                        label: 'Job Location',
+                        value: qualificationDetails.breakdown?.location_match?.job_location || 'Not specified'
+                      },
+                      {
+                        label: 'Remote Possible',
+                        value: qualificationDetails.breakdown?.location_match?.remote_possible ? '✓ Yes' : '✗ No'
+                      },
+                      {
+                        label: 'Location Status',
+                        value: qualificationDetails.breakdown?.location_match?.candidate_location === qualificationDetails.breakdown?.location_match?.job_location ? '✓ Match' : '⚠ Different'
+                      }
+                    ],
                     details: [
-                      `Candidate Location: ${qualificationDetails.breakdown?.location_match?.candidate_location || qualificationDetails.extracted?.location || 'Not specified'}`,
-                      `Job Location: ${qualificationDetails.breakdown?.location_match?.job_location || 'Not specified'}`,
-                      `Remote Possible: ${qualificationDetails.breakdown?.location_match?.remote_possible ? 'Yes' : 'No'}`,
                       ...(qualificationDetails.breakdown?.location_match?.evidence && qualificationDetails.breakdown.location_match.evidence.length > 0 ? qualificationDetails.breakdown.location_match.evidence : []),
                     ].filter(d => d && !d.includes('undefined')),
                   },
                   {
-                    category: '6. Written Communication (5%)',
+                    category: 'Written Communication',
                     score: qualificationDetails.breakdown?.written_communication?.score || 90,
                     weight: qualificationDetails.breakdown?.written_communication?.weight || 5,
+                    isGrid: true,
+                    gridData: [
+                      {
+                        label: 'Grammar Score',
+                        value: `${qualificationDetails.breakdown?.written_communication?.grammar_score || 0}/100`
+                      },
+                      {
+                        label: 'Structure Score',
+                        value: `${qualificationDetails.breakdown?.written_communication?.structure_score || 0}/100`
+                      },
+                      {
+                        label: 'Formatting Score',
+                        value: `${qualificationDetails.breakdown?.written_communication?.formatting_score || 0}/100`
+                      },
+                      {
+                        label: 'Issues Found',
+                        value: (qualificationDetails.breakdown?.written_communication?.issues || []).length > 0 ? (qualificationDetails.breakdown?.written_communication?.issues || []).join(', ') : '✓ None'
+                      }
+                    ],
                     details: [
-                      `Grammar Score: ${qualificationDetails.breakdown?.written_communication?.grammar_score || 0}/100`,
-                      `Structure Score: ${qualificationDetails.breakdown?.written_communication?.structure_score || 0}/100`,
-                      `Formatting Score: ${qualificationDetails.breakdown?.written_communication?.formatting_score || 0}/100`,
-                      `Issues: ${(qualificationDetails.breakdown?.written_communication?.issues || []).join(', ') || 'None'}`,
                       ...(qualificationDetails.breakdown?.written_communication?.evidence && qualificationDetails.breakdown.written_communication.evidence.length > 0 ? qualificationDetails.breakdown.written_communication.evidence : []),
                     ].filter(d => d && !d.includes('undefined')),
                   },
                   {
-                    category: '7. Education Qualification (10%)',
+                    category: 'Education Qualification',
                     score: qualificationDetails.breakdown?.education_qualification?.score || 80,
                     weight: qualificationDetails.breakdown?.education_qualification?.weight || 10,
+                    isGrid: true,
+                    gridData: [
+                      {
+                        label: 'Candidate Degree',
+                        value: qualificationDetails.breakdown?.education_qualification?.candidate_degree || 'Not specified'
+                      },
+                      {
+                        label: 'Required Degree',
+                        value: qualificationDetails.breakdown?.education_qualification?.required_degree || 'Not specified'
+                      },
+                      {
+                        label: 'Field Match',
+                        value: qualificationDetails.breakdown?.education_qualification?.field_match ? '✓ Yes' : '✗ No'
+                      },
+                      {
+                        label: 'Institution Rank',
+                        value: qualificationDetails.breakdown?.education_qualification?.institution_rank || 'Not specified'
+                      }
+                    ],
                     details: [
-                      `Candidate Degree: ${qualificationDetails.breakdown?.education_qualification?.candidate_degree || 'Not specified'}`,
-                      `Required Degree: ${qualificationDetails.breakdown?.education_qualification?.required_degree || 'Not specified'}`,
-                      `Field Match: ${qualificationDetails.breakdown?.education_qualification?.field_match ? 'Yes' : 'No'}`,
-                      `Institution Rank: ${qualificationDetails.breakdown?.education_qualification?.institution_rank || 'Not specified'}`,
                       ...(qualificationDetails.breakdown?.education_qualification?.evidence && qualificationDetails.breakdown.education_qualification.evidence.length > 0 ? qualificationDetails.breakdown.education_qualification.evidence : []),
                     ].filter(d => d && !d.includes('undefined')),
                   },
                   {
-                    category: '8. Certifications (5%)',
+                    category: 'Certifications',
                     score: qualificationDetails.breakdown?.certifications_match?.score || 70,
                     weight: qualificationDetails.breakdown?.certifications_match?.weight || 5,
+                    isGrid: true,
+                    gridData: [
+                      {
+                        label: '✓ Matched Certs',
+                        value: (qualificationDetails.breakdown?.certifications_match?.matched_certs || []).join(', ') || 'None'
+                      },
+                      {
+                        label: '✗ Missing Certs',
+                        value: (qualificationDetails.breakdown?.certifications_match?.missing_certs || []).join(', ') || 'None'
+                      },
+                      {
+                        label: '⏰ Expired Certs',
+                        value: (qualificationDetails.breakdown?.certifications_match?.expired_certs || []).join(', ') || 'None'
+                      },
+                      {
+                        label: 'Cert Status',
+                        value: (qualificationDetails.breakdown?.certifications_match?.matched_certs || []).length > 0 ? '✓ Has Required' : '✗ Missing'
+                      }
+                    ],
                     details: [
-                      `Matched: ${(qualificationDetails.breakdown?.certifications_match?.matched_certs || []).join(', ') || 'None'}`,
-                      `Missing: ${(qualificationDetails.breakdown?.certifications_match?.missing_certs || []).join(', ') || 'None'}`,
-                      `Expired: ${(qualificationDetails.breakdown?.certifications_match?.expired_certs || []).join(', ') || 'None'}`,
                       ...(qualificationDetails.breakdown?.certifications_match?.evidence && qualificationDetails.breakdown.certifications_match.evidence.length > 0 ? qualificationDetails.breakdown.certifications_match.evidence : []),
                     ].filter(d => d && !d.includes('undefined')),
                   },
                   {
-                    category: '9. Language Skills (2%)',
+                    category: 'Language Skills',
                     score: qualificationDetails.breakdown?.language_skills?.score || 95,
                     weight: qualificationDetails.breakdown?.language_skills?.weight || 2,
+                    isGrid: true,
+                    gridData: [
+                      {
+                        label: '✓ Matched Languages',
+                        value: (qualificationDetails.breakdown?.language_skills?.matched_languages || []).map((l: any) => `${l.language} (${l.proficiency})`).join(', ') || 'None'
+                      },
+                      {
+                        label: '✗ Missing Languages',
+                        value: (qualificationDetails.breakdown?.language_skills?.missing_languages || []).join(', ') || 'None'
+                      },
+                      {
+                        label: 'Primary Language',
+                        value: (qualificationDetails.breakdown?.language_skills?.matched_languages || [])[0]?.language || 'Not specified'
+                      },
+                      {
+                        label: 'Language Status',
+                        value: (qualificationDetails.breakdown?.language_skills?.matched_languages || []).length > 0 ? '✓ Qualified' : '✗ Not Qualified'
+                      }
+                    ],
                     details: [
-                      `Matched: ${(qualificationDetails.breakdown?.language_skills?.matched_languages || []).map((l: any) => `${l.language} (${l.proficiency})`).join(', ') || 'None'}`,
-                      `Missing: ${(qualificationDetails.breakdown?.language_skills?.missing_languages || []).join(', ') || 'None'}`,
                       ...(qualificationDetails.breakdown?.language_skills?.evidence && qualificationDetails.breakdown.language_skills.evidence.length > 0 ? qualificationDetails.breakdown.language_skills.evidence : []),
                     ].filter(d => d && !d.includes('undefined')),
                   },
                   {
-                    category: '10. Nationality (1%)',
-                    score: qualificationDetails.breakdown?.nationality_match?.score || 100,
-                    weight: qualificationDetails.breakdown?.nationality_match?.weight || 1,
-                    details: [
-                      `Candidate: ${qualificationDetails.breakdown?.nationality_match?.candidate_nationality || qualificationDetails.extracted?.nationality || 'Not specified'}`,
-                      `Required: ${qualificationDetails.breakdown?.nationality_match?.required_nationality || 'No restriction'}`,
-                      `Match: ${qualificationDetails.breakdown?.nationality_match?.match ? 'Yes' : 'No'}`,
-                      ...(qualificationDetails.breakdown?.nationality_match?.evidence && qualificationDetails.breakdown.nationality_match.evidence.length > 0 ? qualificationDetails.breakdown.nationality_match.evidence : []),
-                    ].filter(d => d && !d.includes('undefined')),
-                  },
-                  {
-                    category: '11. Profile Quality (2%)',
+                    category: 'Profile Quality',
                     score: qualificationDetails.breakdown?.profile_quality?.score || 75,
                     weight: qualificationDetails.breakdown?.profile_quality?.weight || 2,
+                    isGrid: true,
+                    gridData: [
+                      {
+                        label: 'Education Rank',
+                        value: qualificationDetails.breakdown?.profile_quality?.education_rank || 'Not specified'
+                      },
+                      {
+                        label: 'Employer Rank',
+                        value: qualificationDetails.breakdown?.profile_quality?.employer_rank || 'Not specified'
+                      },
+                      {
+                        label: 'Industry Relevance',
+                        value: qualificationDetails.breakdown?.profile_quality?.industry_relevance || 'Not specified'
+                      },
+                      {
+                        label: 'Overall Quality',
+                        value: qualificationDetails.breakdown?.profile_quality?.score >= 80 ? '✓ Excellent' : qualificationDetails.breakdown?.profile_quality?.score >= 60 ? '⚠ Good' : '✗ Fair'
+                      }
+                    ],
                     details: [
-                      `Education Rank: ${qualificationDetails.breakdown?.profile_quality?.education_rank || 'Not specified'}`,
-                      `Employer Rank: ${qualificationDetails.breakdown?.profile_quality?.employer_rank || 'Not specified'}`,
-                      `Industry Relevance: ${qualificationDetails.breakdown?.profile_quality?.industry_relevance || 'Not specified'}`,
                       ...(qualificationDetails.breakdown?.profile_quality?.evidence && qualificationDetails.breakdown.profile_quality.evidence.length > 0 ? qualificationDetails.breakdown.profile_quality.evidence : []),
                     ].filter(d => d && !d.includes('undefined')),
                   },
-                ],
+                ]),
               }}
+              isGeneratingPDF={isGeneratingPDF}
             />
           </div>
         )}
@@ -623,13 +879,16 @@ export default function CandidateReportPage() {
                         <div className="text-base font-semibold text-gray-900">{resumeScore}/100</div>
                       </div>
                     </div>
-                    <div className="flex items-start gap-2">
-                      <Star className="h-4 w-4 text-orange-500 fill-orange-500 mt-0.5" />
-                      <div>
-                        <div className="text-xs text-gray-700">Overall Score</div>
-                        <div className="text-base font-semibold text-gray-900">{overallScoreDisplay}</div>
+                    {/* Only show Interview Score when interview evaluation exists */}
+                    {evaluation?.overallScore && (
+                      <div className="flex items-start gap-2">
+                        <Star className="h-4 w-4 text-orange-500 fill-orange-500 mt-0.5" />
+                        <div>
+                          <div className="text-xs text-gray-700">Interview Score</div>
+                          <div className="text-base font-semibold text-gray-900">{overallScoreDisplay}</div>
+                        </div>
                       </div>
-                    </div>
+                    )}
                     <Button size="sm" asChild className="bg-purple-600 hover:bg-purple-700 text-white w-48 justify-center mt-1">
                       <a href={candidateData.resumeUrl} target="_blank" rel="noopener noreferrer">
                         <Download className="h-4 w-4 mr-2" /> Download Resume
@@ -1090,6 +1349,12 @@ export default function CandidateReportPage() {
                         <div className="text-gray-500">Qualification Score</div>
                         <div className="font-semibold text-gray-900">{resumeScore}</div>
                       </div>
+                      {evaluation?.overallScore && (
+                        <div>
+                          <div className="text-gray-500">Interview Score</div>
+                          <div className="font-semibold text-gray-900">{overallScoreDisplay}</div>
+                        </div>
+                      )}
                       <div>
                         <div className="text-gray-500">Applications</div>
                         <div className="font-semibold text-gray-900">{applicationsCount ?? '—'}</div>
