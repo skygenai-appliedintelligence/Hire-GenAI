@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, CheckCircle2, X, Briefcase } from "lucide-react"
+import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, CheckCircle2, X, Briefcase, AlertCircle } from "lucide-react"
+import html2canvas from "html2canvas"
 
 export default function InterviewPage() {
   const params = useParams()
@@ -27,11 +28,16 @@ export default function InterviewPage() {
   const [interviewStartTime, setInterviewStartTime] = useState<number | null>(null)
   const [interviewDuration, setInterviewDuration] = useState(30) // minutes
   const [showInstructions, setShowInstructions] = useState(true)
+  const [showSnapshotModal, setShowSnapshotModal] = useState(false)
+  const [snapshotTimer, setSnapshotTimer] = useState(0)
+  const [snapshotTaken, setSnapshotTaken] = useState(false)
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const dcRef = useRef<RTCDataChannel | null>(null)
   const agentTextBufferRef = useRef<string>("")
   const userTextBufferRef = useRef<string>("")
   const avatarFirstPlayRef = useRef<boolean>(true)
+  const snapshotCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const questionCountRef = useRef<number>(0)
   
   const logTs = (label: string, text?: string) => {
     const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -40,6 +46,75 @@ export default function InterviewPage() {
     } else {
       console.log(`[${ts}] ${label}`)
     }
+  }
+
+  // Capture full-screen screenshot
+  const captureScreenshot = async () => {
+    try {
+      logTs('📸 [SNAPSHOT] Capturing full-screen screenshot...')
+      
+      const userVideo = userVideoRef.current
+      const avatarVideo = avatarVideoRef.current
+      
+      try {
+        // Capture screenshot without hiding videos (ignoreElements will skip them)
+        const canvas = await html2canvas(document.documentElement, {
+          allowTaint: false,
+          useCORS: true,
+          backgroundColor: '#000000',
+          scale: 1,
+          logging: false,
+          ignoreElements: (element) => {
+            // Ignore video and canvas elements that might be tainted
+            return element.tagName === 'VIDEO' || element.tagName === 'CANVAS'
+          }
+        })
+        
+        const imageData = canvas.toDataURL('image/jpeg', 0.8)
+        
+        // Save to database
+        const response = await fetch('/api/interviews/save-snapshot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            applicationId,
+            snapshotData: imageData
+          })
+        })
+        
+        if (response.ok) {
+          logTs('✅ [SNAPSHOT] Screenshot saved successfully')
+          setSnapshotTaken(true)
+        } else {
+          const errorData = await response.json().catch(() => ({}))
+          logTs(`❌ [SNAPSHOT] Failed to save screenshot - Status: ${response.status}`)
+          console.error('API Error:', errorData)
+        }
+      } catch (error) {
+        console.error('❌ [SNAPSHOT] Error capturing screenshot:', error)
+      }
+    } catch (error) {
+      console.error('❌ [SNAPSHOT] Error in captureScreenshot:', error)
+    }
+  }
+
+  // Handle snapshot confirmation
+  const handleSnapshotConfirm = () => {
+    setShowSnapshotModal(false)
+    setSnapshotTimer(5)
+    
+    // Start countdown timer
+    const timerInterval = setInterval(() => {
+      setSnapshotTimer(prev => {
+        if (prev <= 1) {
+          clearInterval(timerInterval)
+          // Capture screenshot after timer ends
+          captureScreenshot()
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
   }
 
   // Extract message text from content array
@@ -476,6 +551,18 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
           case "response.audio_transcript.done": {
             console.log('[handleTranscriptionCompleted]', msg);
             handleTranscriptionCompleted(msg);
+            
+            // Increment question counter after agent speaks
+            questionCountRef.current++
+            
+            // Check if this is the second question being asked (after first question answered)
+            // We trigger AFTER the agent finishes speaking the second question
+            if (questionCountRef.current === 2 && !snapshotTaken) {
+              logTs(`🎥 [SNAPSHOT] Second question detected (count: ${questionCountRef.current}) - triggering snapshot capture`)
+              setTimeout(() => {
+                setShowSnapshotModal(true)
+              }, 1000)
+            }
             break;
           }
           case "response.audio_transcript.delta": {
@@ -882,41 +969,125 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
     </div>
   )
 
+  // Snapshot Verification Modal
+  const SnapshotModal = () => (
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center transition-all duration-300 ${showSnapshotModal ? 'bg-black/30' : 'pointer-events-none'}`}>
+      <div className={`bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-500/30 rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all duration-300 ${showSnapshotModal ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
+        {/* Header */}
+        <div className="border-b border-amber-500/20 px-5 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
+              <AlertCircle className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Security Verification</h2>
+              <p className="text-xs text-slate-400">Verification snapshot required</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="px-5 py-6 space-y-4">
+          <div className="bg-amber-600/10 border border-amber-500/30 rounded-lg p-4">
+            <p className="text-sm text-amber-100 leading-relaxed">
+              For security purposes, we are capturing a verification snapshot before asking the next question. Please be attentive and look into the camera.
+            </p>
+          </div>
+
+          {snapshotTimer > 0 && (
+            <div className="flex items-center justify-center">
+              <div className="text-center">
+                <p className="text-slate-300 text-sm mb-2">Snapshot will be taken in:</p>
+                <div className="text-4xl font-bold text-amber-400 animate-pulse">
+                  {snapshotTimer}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-amber-500/20 px-5 py-4 flex gap-2 justify-end">
+          <Button 
+            onClick={handleSnapshotConfirm}
+            disabled={snapshotTimer > 0}
+            className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-semibold shadow-lg text-sm px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {snapshotTimer > 0 ? `Starting in ${snapshotTimer}s...` : 'OK, I\'m Ready'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <>
       {/* Instruction Modal */}
       <InstructionModal />
+      
+      {/* Snapshot Modal */}
+      <SnapshotModal />
 
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Header */}
-      <header className="border-b border-emerald-500/20 bg-slate-900/50 backdrop-blur-md sticky top-0 z-40">
-        <div className="mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg">
-              <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      {/* Header with Controls */}
+      <header className="border-b border-emerald-500/30 bg-gradient-to-r from-slate-900/80 via-slate-800/80 to-slate-900/80 backdrop-blur-lg sticky top-0 z-40 shadow-lg animate-in fade-in duration-500">
+        <div className="mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-6">
+          
+          {/* Left: Logo + Title + Job Details (MERGED) */}
+          <div className="flex items-center gap-4 animate-in fade-in slide-in-from-left-4 duration-500">
+            <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg hover:shadow-emerald-500/50 transition-shadow duration-300 flex-shrink-0">
+              <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-white">AI Interview Session</h1>
-              <p className="text-xs text-slate-400">Real-time Assessment</p>
+              </div>
+            <div className="flex flex-col gap-0.5">
+              <h1 className="text-base font-bold text-white leading-tight">AI Interview</h1>
+              <p className="text-sm font-semibold text-emerald-300">{jobDetails?.jobTitle || 'Position'}</p>
+              <p className="text-xs text-slate-400">{jobDetails?.company || 'Company'}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:block text-right">
-              <div className="text-[10px] uppercase tracking-wide text-slate-400">Job Role</div>
-              <div className="text-sm font-semibold text-emerald-300 max-w-[300px] truncate">{jobDetails?.jobTitle || 'Position'}</div>
-              <div className="text-[11px] text-slate-400 truncate">{jobDetails?.company || 'Company'}</div>
-            </div>
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-600/10 backdrop-blur px-3 py-2 flex items-center gap-2 shadow-sm">
-              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white shadow">
-                <Briefcase className="h-4 w-4" />
-              </div>
-              <div className="sm:hidden">
-                <div className="text-[10px] uppercase tracking-wide text-emerald-200">Job Role</div>
-                <div className="text-xs font-semibold text-emerald-100 max-w-[140px] truncate">{jobDetails?.jobTitle || 'Position'}</div>
-              </div>
-            </div>
+
+          {/* Right: Controls (square buttons, no outer box) */}
+          <div className="ml-auto flex items-center gap-3 animate-in fade-in scale-in duration-500">
+            {/* Mic Button */}
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              className={`rounded-lg transition-all duration-300 hover:scale-110 ${
+                micOn 
+                  ? 'bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 hover:text-emerald-200' 
+                  : 'bg-red-600/20 hover:bg-red-600/40 text-red-400 hover:text-red-200'
+              }`}
+              onClick={toggleMic} 
+              title={micOn ? 'Mute microphone' : 'Unmute microphone'}
+            >
+              {micOn ? <Mic className="h-7 w-7" /> : <MicOff className="h-7 w-7" />}
+            </Button>
+
+            {/* Camera Button */}
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              className={`rounded-lg transition-all duration-300 hover:scale-110 ${
+                camOn 
+                  ? 'bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 hover:text-emerald-200' 
+                  : 'bg-red-600/20 hover:bg-red-600/40 text-red-400 hover:text-red-200'
+              }`}
+              onClick={toggleCam} 
+              title={camOn ? 'Turn off camera' : 'Turn on camera'}
+            >
+              {camOn ? <VideoIcon className="h-7 w-7" /> : <VideoOff className="h-7 w-7" />}
+            </Button>
+
+            {/* End Interview Button */}
+            <Button 
+              size="icon" 
+              className="rounded-lg bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg hover:shadow-red-500/50 transition-all duration-300 hover:scale-110" 
+              onClick={endInterview} 
+              title="End interview session"
+            >
+              <PhoneOff className="h-7 w-7" />
+            </Button>
           </div>
         </div>
       </header>
@@ -978,51 +1149,6 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
               </div>
             </div>
 
-            {/* Controls bar - Bottom center */}
-            <div className="absolute left-1/2 -translate-x-1/2 bottom-6 flex items-center gap-3 bg-slate-900/95 backdrop-blur-xl rounded-full shadow-2xl px-6 py-3 border border-emerald-500/20 z-50 group-hover:border-emerald-500/40 transition-all duration-300">
-              {/* Mic Button */}
-              <Button 
-                size="icon" 
-                variant="ghost" 
-                className={`rounded-full transition-all duration-300 ${
-                  micOn 
-                    ? 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 hover:text-emerald-300' 
-                    : 'bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300'
-                }`}
-                onClick={toggleMic} 
-                title={micOn ? 'Mute microphone' : 'Unmute microphone'}
-              >
-                {micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-              </Button>
-
-              {/* Camera Button */}
-              <Button 
-                size="icon" 
-                variant="ghost" 
-                className={`rounded-full transition-all duration-300 ${
-                  camOn 
-                    ? 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 hover:text-emerald-300' 
-                    : 'bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300'
-                }`}
-                onClick={toggleCam} 
-                title={camOn ? 'Turn off camera' : 'Turn on camera'}
-              >
-                {camOn ? <VideoIcon className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-              </Button>
-
-              {/* Divider */}
-              <div className="h-6 w-px bg-slate-700/50"></div>
-
-              {/* End Interview Button */}
-              <Button 
-                size="icon" 
-                className="rounded-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 relative z-50" 
-                onClick={endInterview} 
-                title="End interview session"
-              >
-                <PhoneOff className="h-5 w-5" />
-              </Button>
-            </div>
 
             {/* Timer/Status - Top right */}
             <div className="absolute top-6 right-6 flex flex-col items-end gap-2 z-40">

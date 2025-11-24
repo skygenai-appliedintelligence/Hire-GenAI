@@ -374,11 +374,6 @@ export default function HomePage() {
                     <div className="text-slate-700 font-medium">Candidates Screened</div>
                     <div className="text-xs text-slate-500 mt-1">With AI precision</div>
                   </div>
-                  <div className="text-center min-w-[220px] md:min-w-[260px] px-4">
-                    <div className="text-4xl md:text-5xl font-bold sr-text-gradient mb-1 md:mb-2">500+</div>
-                    <div className="text-slate-700 font-medium">Companies</div>
-                    <div className="text-xs text-slate-500 mt-1">Trust our platform</div>
-                  </div>
                 </div>
                 {/* Duplicate set for seamless loop */}
                 <div className="flex items-center gap-8 md:gap-10 px-4 md:px-6 min-w-max">
@@ -406,11 +401,6 @@ export default function HomePage() {
                     <div className="text-4xl md:text-5xl font-bold sr-text-gradient mb-1 md:mb-2">50K+</div>
                     <div className="text-slate-700 font-medium">Candidates Screened</div>
                     <div className="text-xs text-slate-500 mt-1">With AI precision</div>
-                  </div>
-                  <div className="text-center min-w-[220px] md:min-w-[260px] px-4">
-                    <div className="text-4xl md:text-5xl font-bold sr-text-gradient mb-1 md:mb-2">500+</div>
-                    <div className="text-slate-700 font-medium">Companies</div>
-                    <div className="text-xs text-slate-500 mt-1">Trust our platform</div>
                   </div>
                 </div>
               </div>

@@ -6,7 +6,13 @@ import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Video, CircleDot, Heart } from "lucide-react"
+import { Video, CircleDot, Heart, ChevronDown, AlertCircle } from "lucide-react"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 
 export default function InterviewStartPage() {
   const params = useParams()
@@ -18,6 +24,8 @@ export default function InterviewStartPage() {
   const [company, setCompany] = useState<string>(search?.get("company") || "")
   const [location, setLocation] = useState<string>(search?.get("loc") || "")
   const [loading, setLoading] = useState(true)
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false)
+  const [showDisclaimerWarning, setShowDisclaimerWarning] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -82,6 +90,58 @@ export default function InterviewStartPage() {
           </div>
         </div>
 
+        {/* Disclaimer Accordion - ABOVE Button */}
+        <div className="mt-8">
+          <Accordion type="single" collapsible className="w-full border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+            <AccordionItem value="disclaimer" className="border-none">
+              <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 text-left font-semibold text-gray-900 transition-colors">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-amber-600" />
+                  Interview Disclaimer
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 py-3 bg-gray-50 border-t border-gray-200 animate-in fade-in slide-in-from-top-2 duration-300">
+                <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700">
+                  <li>The interview will be recorded for evaluation purposes.</li>
+                  <li>Your responses may be reviewed by recruiters at your company.</li>
+                  <li>Do not share passwords or highly sensitive personal data.</li>
+                  <li>You may exit the interview at any time by clicking the end button.</li>
+                  <li>Your camera must remain on throughout the entire interview session.</li>
+                  <li>Ensure your background is clean and professional.</li>
+                  <li>The interview session will be saved and cannot be resumed later.</li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
+
+        {/* Disclaimer Checkbox */}
+        <div className="mt-4 space-y-2">
+          <label className="flex items-start space-x-3 cursor-pointer p-3 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-all duration-200 hover:shadow-sm">
+            <input
+              type="checkbox"
+              checked={disclaimerAccepted}
+              onChange={(e) => {
+                setDisclaimerAccepted(e.target.checked)
+                if (e.target.checked) setShowDisclaimerWarning(false)
+              }}
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer"
+            />
+            <span className="text-sm text-gray-700">
+              I have read and agree to the interview disclaimer above.
+            </span>
+          </label>
+
+          {showDisclaimerWarning && !disclaimerAccepted && (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg animate-in fade-in slide-in-from-top-2 duration-300">
+              <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800">
+                Please tick the disclaimer before starting the interview.
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Instructions + CTA */}
         <div className="grid md:grid-cols-2 gap-8 items-start mt-8">
           <div className="space-y-2 text-left">
@@ -94,11 +154,29 @@ export default function InterviewStartPage() {
             </ul>
           </div>
           <div className="flex md:justify-end">
-            <Link href={`/interview/${applicationId}`}>
-              <Button size="lg" className="bg-black text-white hover:bg-gray-900 gap-2">
-                <Video className="h-5 w-5" /> Start Video Interview
+            <div className="w-full md:w-auto">
+              <Button 
+                size="lg" 
+                className={`w-full md:w-auto gap-2 transition-all duration-300 ${
+                  disclaimerAccepted 
+                    ? 'bg-black text-white hover:bg-gray-900 shadow-lg hover:shadow-xl hover:scale-105' 
+                    : 'bg-gray-400 text-gray-600 cursor-not-allowed opacity-60'
+                }`}
+                disabled={!disclaimerAccepted}
+                onClick={() => {
+                  if (!disclaimerAccepted) {
+                    setShowDisclaimerWarning(true)
+                    return
+                  }
+                }}
+              >
+                <Link href={`/interview/${applicationId}`} className={disclaimerAccepted ? '' : 'pointer-events-none'}>
+                  <span className="flex items-center gap-2">
+                    <Video className="h-5 w-5" /> Start Video Interview
+                  </span>
+                </Link>
               </Button>
-            </Link>
+            </div>
           </div>
         </div>
 
