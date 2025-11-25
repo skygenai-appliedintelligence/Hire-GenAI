@@ -3059,13 +3059,19 @@ export class DatabaseService {
     console.log('📄 File Size:', data.fileSizeKb || 0, 'KB')
     console.log('='.repeat(70))
 
-    // Use centralized OpenAI Usage Tracker (no profit margin)
-    const { OpenAIUsageTracker } = await import('./openai-usage-tracker')
-    const usageResult = await OpenAIUsageTracker.trackCVParsing()
+    // Use fixed pricing (no OpenAI API call)
+    const CV_PARSING_COST = 0.50 // Fixed cost per CV parsing
+    const usageResult = {
+      baseCost: CV_PARSING_COST,
+      source: 'fixed-pricing' as const,
+      tokens: 0
+    }
     
-    // Use only base cost without profit margin
+    // Use fixed cost
     const finalCost = usageResult.baseCost
     const profitMarginPercent = 0 // No profit margin
+    
+    console.log('💰 [CV PARSING] Using fixed pricing: $' + CV_PARSING_COST.toFixed(2))
     
     const query = `
       INSERT INTO cv_parsing_usage (
@@ -3447,14 +3453,22 @@ export class DatabaseService {
     console.log('🎬 Video Quality:', data.videoQuality || 'HD')
     console.log('='.repeat(70))
 
-    // Use centralized OpenAI Usage Tracker (no profit margin)
-    const { OpenAIUsageTracker } = await import('./openai-usage-tracker')
-    const usageResult = await OpenAIUsageTracker.trackVideoInterview(data.durationMinutes)
+    // Use fixed pricing per minute (no OpenAI API call)
+    const COST_PER_MINUTE = 0.10 // Fixed cost per minute of interview
+    const totalCost = COST_PER_MINUTE * (data.durationMinutes || 1)
+    const usageResult = {
+      baseCost: totalCost,
+      source: 'fixed-pricing' as const,
+      tokens: 0
+    }
     
-    // Use only base cost without profit margin
+    // Use fixed cost
     const finalCost = usageResult.baseCost
-    const costPerMinute = usageResult.baseCost / (data.durationMinutes || 1)
+    const costPerMinute = COST_PER_MINUTE
     const profitMarginPercent = 0 // No profit margin
+    
+    console.log('💰 [VIDEO INTERVIEW] Using fixed pricing: $' + COST_PER_MINUTE.toFixed(2) + '/min')
+    console.log('💵 [VIDEO INTERVIEW] Total cost: $' + totalCost.toFixed(2))
     
     const query = `
       INSERT INTO video_interview_usage (

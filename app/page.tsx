@@ -19,6 +19,12 @@ import {
   Clock,
   BarChart3,
   MessageSquare,
+  Facebook,
+  Instagram,
+  Youtube,
+  Linkedin,
+  Lock,
+  Star,
 } from "lucide-react"
 import { RecruitmentQuestionnaire } from "@/components/recruitment-questionnaire"
 
@@ -65,24 +71,12 @@ export default function HomePage() {
                 >
                   Product
                 </a>
-                <a
-                  href="#solutions"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Solutions
-                </a>
                 <Link
                   href="/pricing"
                   className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
                 >
                   Pricing
                 </Link>
-                <a
-                  href="#resources"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Resources
-                </a>
                 <a
                   href="#company"
                   className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
@@ -158,7 +152,9 @@ export default function HomePage() {
       </section>
 
       {/* Recruitment Questionnaire Section */}
-      <RecruitmentQuestionnaire />
+      <section id="assessment">
+        <RecruitmentQuestionnaire />
+      </section>
 
       {/* Features Section */}
       <section id="product" className="py-20 bg-slate-50">
@@ -428,7 +424,7 @@ export default function HomePage() {
               variant="outline"
               className="border-white text-white hover:bg-white hover:text-emerald-600 font-semibold px-8 py-4 text-lg rounded-full bg-transparent"
             >
-              Schedule a demo
+              Try demo
             </Button>
           </div>
         </div>
@@ -437,62 +433,93 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="bg-slate-900 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
-            <div className="md:col-span-2">
-              <h3 className="text-2xl font-bold mb-4">
+          {/* Main Footer Content */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-12">
+            {/* Left Section - Brand Block */}
+            <div className="md:col-span-3">
+              <h3 className="text-2xl font-bold mb-2">
                 <span className="text-white">Hire</span>
                 <span className="text-emerald-400">GenAI</span>
               </h3>
-              <p className="text-slate-400 mb-6 max-w-md">
-                The future of recruitment is here. Automate your hiring process with AI and transform how you discover,
-                evaluate, and hire top talent.
+              <p className="text-sm text-slate-400 mb-4">By SKYGENAI</p>
+              <p className="text-slate-400 mb-6 text-sm leading-relaxed">
+                HireGenAI pre-screens and interviews candidates, helping you shortlist talent 20x faster and more efficiently.
               </p>
+              <p className="text-slate-400 mb-6 text-sm font-medium">
+                Email: <a href="mailto:support@hire-genai.com" className="text-emerald-400 hover:text-emerald-300 transition-colors">support@hire-genai.com</a>
+              </p>
+              {/* Social Icons */}
               <div className="flex space-x-4">
-                <Globe className="w-5 h-5 text-slate-400" />
-                <MessageSquare className="w-5 h-5 text-slate-400" />
+                <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
+                  <Facebook className="w-5 h-5" />
+                </a>
+                <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
+                  <Instagram className="w-5 h-5" />
+                </a>
+                <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
+                  <Youtube className="w-5 h-5" />
+                </a>
+                <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
+                  <Linkedin className="w-5 h-5" />
+                </a>
               </div>
             </div>
-            <div>
-              <h4 className="font-semibold mb-4 text-white">Product</h4>
-              <ul className="space-y-3 text-slate-400">
+
+            {/* Product Section */}
+            <div className="md:col-span-2">
+              <h4 className="font-semibold mb-4 text-white text-sm uppercase tracking-wide">Product</h4>
+              <ul className="space-y-3 text-slate-400 text-sm">
                 <li>
                   <a href="#" className="hover:text-emerald-400 transition-colors">
-                    Features
+                    HireGenAI
                   </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
-                    Integrations
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
-                    API
-                  </a>
+                  <Link href="/demo-en" className="hover:text-emerald-400 transition-colors">
+                    Try the Demo
+                  </Link>
                 </li>
                 <li>
                   <Link href="/pricing" className="hover:text-emerald-400 transition-colors">
                     Pricing
                   </Link>
                 </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4 text-white">Company</h4>
-              <ul className="space-y-3 text-slate-400">
                 <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
-                    About
-                  </a>
+                  <button 
+                    onClick={() => {
+                      const element = document.getElementById('assessment');
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="text-slate-400 hover:text-emerald-400 transition-colors text-left w-full"
+                  >
+                    Assessment
+                  </button>
                 </li>
                 <li>
                   <a href="#" className="hover:text-emerald-400 transition-colors">
-                    Careers
+                    FAQs
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Company Section */}
+            <div className="md:col-span-2">
+              <h4 className="font-semibold mb-4 text-white text-sm uppercase tracking-wide">Company</h4>
+              <ul className="space-y-3 text-slate-400 text-sm">
+                <li>
+                  <a href="#" className="hover:text-emerald-400 transition-colors">
+                    About us
                   </a>
                 </li>
                 <li>
                   <a href="#" className="hover:text-emerald-400 transition-colors">
                     Contact
+                  </a>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-emerald-400 transition-colors">
+                    Book a Meeting
                   </a>
                 </li>
                 <li>
@@ -502,33 +529,57 @@ export default function HomePage() {
                 </li>
               </ul>
             </div>
-            <div>
-              <h4 className="font-semibold mb-4 text-white">Support</h4>
-              <ul className="space-y-3 text-slate-400">
+
+            {/* Legal Section */}
+            <div className="md:col-span-2">
+              <h4 className="font-semibold mb-4 text-white text-sm uppercase tracking-wide">Legal</h4>
+              <ul className="space-y-3 text-slate-400 text-sm">
                 <li>
                   <a href="#" className="hover:text-emerald-400 transition-colors">
-                    Help Center
+                    Privacy Policy
                   </a>
                 </li>
                 <li>
                   <a href="#" className="hover:text-emerald-400 transition-colors">
-                    Documentation
+                    Terms and Conditions
                   </a>
                 </li>
                 <li>
                   <a href="#" className="hover:text-emerald-400 transition-colors">
-                    Status
-                  </a>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
-                    Privacy
+                    Imprint
                   </a>
                 </li>
               </ul>
             </div>
+
+            {/* Right Section - Badges Block */}
+            <div className="md:col-span-3">
+              <div className="space-y-4">
+                {/* Trustpilot Badge */}
+                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                  <p className="text-xs text-slate-400 mb-2 font-semibold">Trustpilot</p>
+                  <div className="flex items-center gap-2 mb-2">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                    ))}
+                  </div>
+                  <p className="text-sm font-semibold text-white">TrustScore 4.5</p>
+                </div>
+
+                {/* GDPR Compliant Badge */}
+                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Lock className="w-4 h-4 text-emerald-400" />
+                    <p className="text-sm font-semibold text-white">GDPR COMPLIANT</p>
+                  </div>
+                  <p className="text-xs text-slate-400">Your data is secure and compliant</p>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="border-t border-slate-800 mt-12 pt-8 text-center text-slate-400">
+
+          {/* Footer Bottom */}
+          <div className="border-t border-slate-800 pt-8 text-center text-slate-400 text-sm">
             <p>&copy; 2024 HireGenAI. All rights reserved.</p>
           </div>
         </div>

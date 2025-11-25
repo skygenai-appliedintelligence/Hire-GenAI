@@ -35,13 +35,11 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="flex">
-        <Sidebar />
-        <div className="flex-1 min-w-0">
-          <Header />
-          <main className="p-6">{children}</main>
-        </div>
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar />
+      <div className="flex-1 min-w-0 flex flex-col">
+        <Header />
+        <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
     </div>
   )
