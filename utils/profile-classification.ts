@@ -1,5 +1,11 @@
+export interface EducationEntry {
+  institution: string
+  degree: string
+}
+
 export interface CandidateProfile {
   university: 'targeted' | 'non-targeted'
+  educationList?: EducationEntry[]  // All education entries (institution + degree)
   employer: 'targeted' | 'non-targeted'
   experience: number
   hasRelevantExperience: boolean
@@ -23,7 +29,7 @@ export interface ProfileGroup {
 export const PROFILE_GROUPS: ProfileGroup[] = [
   {
     id: 'profile-0',
-    name: 'Profile 0 (Least Ideal)',
+    name: 'Least Ideal',
     description: 'Non targeted university AND Non targeted employer',
     priority: 'low',
     color: 'text-red-700',
@@ -37,7 +43,7 @@ export const PROFILE_GROUPS: ProfileGroup[] = [
   },
   {
     id: 'profile-1',
-    name: 'Profile 1',
+    name: 'Average',
     description: 'Targeted university BUT Non targeted employer',
     priority: 'medium',
     color: 'text-orange-700',
@@ -51,7 +57,7 @@ export const PROFILE_GROUPS: ProfileGroup[] = [
   },
   {
     id: 'profile-2',
-    name: 'Profile 2',
+    name: 'Good Match',
     description: 'Non targeted university BUT targeted employer (with at least 3 yrs of exp.)',
     priority: 'high',
     color: 'text-blue-700',
@@ -65,7 +71,7 @@ export const PROFILE_GROUPS: ProfileGroup[] = [
   },
   {
     id: 'profile-3',
-    name: 'Profile 3 (Most Ideal)',
+    name: 'Most Ideal',
     description: 'Targeted university AND targeted employer (with at least 3 yrs of exp.)',
     priority: 'highest',
     color: 'text-emerald-700',
