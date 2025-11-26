@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, CheckCircle2, X, Briefcase, AlertCircle } from "lucide-react"
-import html2canvas from "html2canvas"
 
 export default function InterviewPage() {
   const params = useParams()
@@ -28,15 +27,11 @@ export default function InterviewPage() {
   const [interviewStartTime, setInterviewStartTime] = useState<number | null>(null)
   const [interviewDuration, setInterviewDuration] = useState(30) // minutes
   const [showInstructions, setShowInstructions] = useState(true)
-  const [showSnapshotModal, setShowSnapshotModal] = useState(false)
-  const [snapshotTimer, setSnapshotTimer] = useState(0)
-  const [snapshotTaken, setSnapshotTaken] = useState(false)
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const dcRef = useRef<RTCDataChannel | null>(null)
   const agentTextBufferRef = useRef<string>("")
   const userTextBufferRef = useRef<string>("")
   const avatarFirstPlayRef = useRef<boolean>(true)
-  const snapshotCanvasRef = useRef<HTMLCanvasElement | null>(null)
   const questionCountRef = useRef<number>(0)
   
   const logTs = (label: string, text?: string) => {
@@ -48,74 +43,6 @@ export default function InterviewPage() {
     }
   }
 
-  // Capture full-screen screenshot
-  const captureScreenshot = async () => {
-    try {
-      logTs('📸 [SNAPSHOT] Capturing full-screen screenshot...')
-      
-      const userVideo = userVideoRef.current
-      const avatarVideo = avatarVideoRef.current
-      
-      try {
-        // Capture screenshot without hiding videos (ignoreElements will skip them)
-        const canvas = await html2canvas(document.documentElement, {
-          allowTaint: false,
-          useCORS: true,
-          backgroundColor: '#000000',
-          scale: 1,
-          logging: false,
-          ignoreElements: (element) => {
-            // Ignore video and canvas elements that might be tainted
-            return element.tagName === 'VIDEO' || element.tagName === 'CANVAS'
-          }
-        })
-        
-        const imageData = canvas.toDataURL('image/jpeg', 0.8)
-        
-        // Save to database
-        const response = await fetch('/api/interviews/save-snapshot', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            applicationId,
-            snapshotData: imageData
-          })
-        })
-        
-        if (response.ok) {
-          logTs('✅ [SNAPSHOT] Screenshot saved successfully')
-          setSnapshotTaken(true)
-        } else {
-          const errorData = await response.json().catch(() => ({}))
-          logTs(`❌ [SNAPSHOT] Failed to save screenshot - Status: ${response.status}`)
-          console.error('API Error:', errorData)
-        }
-      } catch (error) {
-        console.error('❌ [SNAPSHOT] Error capturing screenshot:', error)
-      }
-    } catch (error) {
-      console.error('❌ [SNAPSHOT] Error in captureScreenshot:', error)
-    }
-  }
-
-  // Handle snapshot confirmation
-  const handleSnapshotConfirm = () => {
-    setShowSnapshotModal(false)
-    setSnapshotTimer(5)
-    
-    // Start countdown timer
-    const timerInterval = setInterval(() => {
-      setSnapshotTimer(prev => {
-        if (prev <= 1) {
-          clearInterval(timerInterval)
-          // Capture screenshot after timer ends
-          captureScreenshot()
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-  }
 
   // Extract message text from content array
   const extractMessageText = (content: any[] = []): string => {
@@ -405,6 +332,10 @@ export default function InterviewPage() {
       agentAudioRef.current.srcObject = remoteStream
       agentAudioRef.current.autoplay = true
       agentAudioRef.current.muted = false
+      // Add buffering settings for smooth playback
+      agentAudioRef.current.preload = 'auto'
+      agentAudioRef.current.playbackRate = 1.0
+      console.log('🔊 Agent audio track attached with buffering enabled')
     }
     pc.ontrack = (event) => {
       try {
@@ -514,9 +445,9 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
             },
             turn_detection: {
               type: 'server_vad',
-              threshold: 0.5,
-              prefix_padding_ms: 300,
-              silence_duration_ms: 500
+              threshold: 0.6, // Lower threshold for better sensitivity
+              prefix_padding_ms: 300, // Add padding to prevent cutting off beginnings
+              silence_duration_ms: 1200 // Increased from 500ms to prevent premature interruptions
             }
           }
         }
@@ -554,15 +485,6 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
             
             // Increment question counter after agent speaks
             questionCountRef.current++
-            
-            // Check if this is the second question being asked (after first question answered)
-            // We trigger AFTER the agent finishes speaking the second question
-            if (questionCountRef.current === 2 && !snapshotTaken) {
-              logTs(`🎥 [SNAPSHOT] Second question detected (count: ${questionCountRef.current}) - triggering snapshot capture`)
-              setTimeout(() => {
-                setShowSnapshotModal(true)
-              }, 1000)
-            }
             break;
           }
           case "response.audio_transcript.delta": {
@@ -689,7 +611,7 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
         source.connect(analyser)
 
         const data = new Uint8Array(analyser.frequencyBinCount)
-        const threshold = 8 // lower = more sensitive
+        const threshold = 5 // Lower threshold = more sensitive to speech
 
         const tick = () => {
           if (!analyser) return
@@ -707,10 +629,10 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
             speakingFrames = 0
           }
 
-          // Debounce to avoid flicker
-          if (speakingFrames > 2) {
+          // More conservative debounce to prevent interruptions
+          if (speakingFrames > 3) { // Increased from 2 to 3
             avatarVideo.play().catch(() => {})
-          } else if (silentFrames > 8) {
+          } else if (silentFrames > 15) { // Increased from 8 to 15
             avatarVideo.pause()
           }
 
@@ -802,7 +724,20 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
         
         if (evaluationResponse) {
           const evaluationResult = await evaluationResponse.json()
-          console.log('✅ Evaluation completed:', evaluationResult)
+          
+          if (!evaluationResponse.ok) {
+            // Handle incomplete interview error
+            if (evaluationResponse.status === 400 && evaluationResult.error === 'Incomplete interview') {
+              console.warn('⚠️ Interview incomplete:', evaluationResult.message)
+              console.warn('📊 Details:', evaluationResult.details)
+              console.warn('Interview will be saved but not evaluated. User needs to complete more questions.')
+              // Interview is saved but not evaluated - user will need to complete a new interview
+            } else {
+              console.error('❌ Evaluation failed:', evaluationResult)
+            }
+          } else {
+            console.log('✅ Evaluation completed:', evaluationResult)
+          }
         }
       }
       
@@ -969,64 +904,11 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
     </div>
   )
 
-  // Snapshot Verification Modal
-  const SnapshotModal = () => (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center transition-all duration-300 ${showSnapshotModal ? 'bg-black/30' : 'pointer-events-none'}`}>
-      <div className={`bg-gradient-to-br from-slate-900 to-slate-800 border border-amber-500/30 rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all duration-300 ${showSnapshotModal ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
-        {/* Header */}
-        <div className="border-b border-amber-500/20 px-5 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
-              <AlertCircle className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-white">Security Verification</h2>
-              <p className="text-xs text-slate-400">Verification snapshot required</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="px-5 py-6 space-y-4">
-          <div className="bg-amber-600/10 border border-amber-500/30 rounded-lg p-4">
-            <p className="text-sm text-amber-100 leading-relaxed">
-              For security purposes, we are capturing a verification snapshot before asking the next question. Please be attentive and look into the camera.
-            </p>
-          </div>
-
-          {snapshotTimer > 0 && (
-            <div className="flex items-center justify-center">
-              <div className="text-center">
-                <p className="text-slate-300 text-sm mb-2">Snapshot will be taken in:</p>
-                <div className="text-4xl font-bold text-amber-400 animate-pulse">
-                  {snapshotTimer}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="border-t border-amber-500/20 px-5 py-4 flex gap-2 justify-end">
-          <Button 
-            onClick={handleSnapshotConfirm}
-            disabled={snapshotTimer > 0}
-            className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-semibold shadow-lg text-sm px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {snapshotTimer > 0 ? `Starting in ${snapshotTimer}s...` : 'OK, I\'m Ready'}
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-
+  
   return (
     <>
       {/* Instruction Modal */}
       <InstructionModal />
-      
-      {/* Snapshot Modal */}
-      <SnapshotModal />
 
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header with Controls */}

@@ -760,64 +760,23 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false }: Props) {
                     </div>
                   </div>
                   
-                  {/* Category Details - Clear Sections or Grid */}
+                  {/* Category Details - Grid Only */}
                   <div className="px-6 py-6 bg-white/80">
-                    {/* Grid Format (for Education Qualification) */}
+                    {/* Grid Format (2x2 for all grid categories) */}
                     {(category as any).isGrid && (category as any).gridData ? (
-                      <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="grid grid-cols-2 gap-4">
                         {(category as any).gridData.map((item: any, idx: number) => (
-                          <div key={idx} className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                            <div className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">
+                          <div key={idx} className="bg-white border border-slate-200 rounded-lg p-4">
+                            <div className="text-sm font-medium text-slate-600 mb-2">
                               {item.label}
                             </div>
-                            <p className="text-sm font-medium text-slate-800 leading-relaxed">
+                            <p className="text-sm text-slate-800">
                               {item.value}
                             </p>
                           </div>
                         ))}
                       </div>
                     ) : null}
-                    
-                    {/* Details List Format */}
-                    <div className={`space-y-4 ${(category as any).isGrid && (category as any).gridData ? 'mt-4 pt-4 border-t border-slate-200' : ''}`}>
-                      {category.details.map((detail, idx) => {
-                      // Parse detail to determine section type and color
-                      const isCritical = detail.includes('🔴') || detail.includes('Critical');
-                      const isImportant = detail.includes('🟠') || detail.includes('Important');
-                      const isNiceToHave = detail.includes('🟡') || detail.includes('Nice-to-Have');
-                      const isMatched = detail.includes('✓') || detail.includes('Matched');
-                      const isMissing = detail.includes('✗') || detail.includes('Missing') || detail.includes('Required');
-                      const isPercentage = detail.includes('%') || detail.includes('Percentage');
-                      
-                      let sectionColor = 'bg-slate-50 border-slate-200';
-                      let textColor = 'text-slate-800';
-                      
-                      if (isCritical) {
-                        sectionColor = 'bg-red-50 border-red-200';
-                        textColor = 'text-red-900';
-                      } else if (isImportant) {
-                        sectionColor = 'bg-orange-50 border-orange-200';
-                        textColor = 'text-orange-900';
-                      } else if (isNiceToHave) {
-                        sectionColor = 'bg-amber-50 border-amber-200';
-                        textColor = 'text-amber-900';
-                      } else if (isMatched && !isMissing) {
-                        sectionColor = 'bg-emerald-50 border-emerald-200';
-                        textColor = 'text-emerald-900';
-                      } else if (isPercentage) {
-                        sectionColor = 'bg-blue-50 border-blue-200';
-                        textColor = 'text-blue-900';
-                      }
-                      
-                      return (
-                        <div key={idx} className={`border rounded-lg p-4 ${sectionColor}`}>
-                          <p className={`text-sm leading-relaxed font-medium ${textColor}`}>
-                            {detail.replace(/^[✓✗]/, '').trim()}
-                          </p>
-                        </div>
-                      );
-                    })}
-                    </div>
                   </div>
                 </div>
               );

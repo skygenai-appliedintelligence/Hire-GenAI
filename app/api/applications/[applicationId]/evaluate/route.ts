@@ -4,6 +4,10 @@ import { DatabaseService } from '@/lib/database'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+// School exam style evaluation constants
+const TOTAL_MARKS = 100
+const TOTAL_QUESTIONS = 10
+
 export async function POST(req: Request, ctx: { params: Promise<{ applicationId: string }> } | { params: { applicationId: string } }) {
   try {
     const p = 'then' in (ctx as any).params ? await (ctx as any).params : (ctx as any).params
@@ -28,6 +32,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ applicationId:
       return NextResponse.json({ ok: false, error: 'Missing transcript' }, { status: 400 })
     }
 
+    // Log transcript info (no validation - evaluate regardless of question count)
+    console.log('📊 Transcript received, proceeding with evaluation...')
     console.log('🔍 Starting evaluation for application:', applicationId)
 
     // Get application and job details for evaluation context
@@ -77,230 +83,191 @@ export async function POST(req: Request, ctx: { params: Promise<{ applicationId:
     const criteriaList = Array.from(allCriteria)
     console.log('📊 Evaluation criteria:', criteriaList)
 
-    // Enhanced evaluation system with weighted categories and question-wise scoring
-    const evaluationCategories = {
-      "Technical Skills": { weight: 0.40, maxQuestions: 5 },
-      "Communication": { weight: 0.20, maxQuestions: 3 },
-      "Problem Solving": { weight: 0.25, maxQuestions: 4 },
-      "Cultural Fit": { weight: 0.15, maxQuestions: 2 }
+    // Enhanced evaluation system with question-specific weightages
+    // Total marks = 100, distributed across 10 questions based on criteria importance
+    // Like school exams: Q1 may have 15 marks, Q2 may have 8 marks, etc.
+    // Note: TOTAL_MARKS and TOTAL_QUESTIONS are defined at file top
+    
+    // Category weights for distributing marks
+    const categoryWeights = {
+      "Technical Skills": 0.40,      // 40 marks total
+      "Communication": 0.20,         // 20 marks total
+      "Problem Solving": 0.25,       // 25 marks total
+      "Cultural Fit": 0.15           // 15 marks total
     }
 
-    const totalMarks = 100
-    const marksPerQuestion = 10
-
     // Call OpenAI API for evaluation
-    const evaluationPrompt = `You are an expert HR evaluator. Analyze this interview transcript and provide detailed question-wise scores with weighted categories.
+    const evaluationPrompt = `You are an expert HR evaluator. Analyze this interview transcript and provide detailed question-wise scores.
+
+**IMPORTANT: This is like a school exam where each question has different marks based on importance.**
 
 **Job Details:**
 - Position: ${application.job_title}
 - Company: ${application.company_name}
 - Candidate: ${application.first_name} ${application.last_name}
 
-**Evaluation Framework:**
-Total Marks: ${totalMarks} (Each question scored out of ${marksPerQuestion} marks)
+**EVALUATION FRAMEWORK (Like School Exam):**
+- Total Marks: ${TOTAL_MARKS}
+- Total Questions: ${TOTAL_QUESTIONS}
+- Each question has DIFFERENT marks based on its importance (like Q1=15 marks, Q2=8 marks, etc.)
 
-**Weighted Categories:**
-${Object.entries(evaluationCategories).map(([category, config]) => 
-  `- **${category}**: ${(config.weight * 100)}% weight, ${config.maxQuestions} questions max`
-).join('\n')}
+**MARKS DISTRIBUTION BY CATEGORY:**
+- Technical Skills: 40 marks total (most important for this role)
+- Problem Solving: 25 marks total
+- Communication: 20 marks total  
+- Cultural Fit: 15 marks total
 
-**Original Criteria from Job:**
+**Original Evaluation Criteria from Job:**
 ${criteriaList.map(c => `- ${c}`).join('\n')}
 
 **Interview Transcript:**
 ${transcript}
 
-**Instructions:**
-1. Identify specific questions asked in each category from the transcript
-2. Score each question out of ${marksPerQuestion} marks based on candidate's response quality
-3. Calculate category scores using weighted average
-4. Provide detailed feedback for each question and category
-5. Calculate final weighted overall score out of ${totalMarks}
+**CRITICAL INSTRUCTIONS - READ CAREFULLY:**
+
+1. **IDENTIFY ALL 10 QUESTIONS** from the interview (whether asked or not)
+
+2. **YOU MUST CATEGORIZE EACH QUESTION** - Analyze the question content and decide its category:
+   - **Technical Skills**: Questions about coding, programming languages, frameworks, tools, databases, architecture, APIs, algorithms, data structures, system design, technical concepts specific to the job role
+   - **Problem Solving**: Questions about debugging, troubleshooting, handling challenges, analytical thinking, decision making, approach to solving complex issues
+   - **Communication**: Questions about explaining concepts, presenting ideas, storytelling about projects, describing experiences, how they communicate with team/stakeholders
+   - **Cultural Fit**: Questions about teamwork, collaboration, handling conflicts, work style, values, motivation, career goals, company culture alignment
+
+3. **ASSIGN MARKS TO EACH QUESTION** based on its category and importance:
+   - Technical/Core skill questions: 8-15 marks each (total ~40 marks)
+   - Problem solving questions: 8-12 marks each (total ~25 marks)
+   - Communication questions: 5-10 marks each (total ~20 marks)
+   - Cultural fit questions: 5-8 marks each (total ~15 marks)
+   - Total of all question marks MUST equal exactly ${TOTAL_MARKS}
+
+4. **SCORING RULES (Like School Exam):**
+   - If question has 15 marks and candidate answered perfectly: Give 15/15
+   - If question has 15 marks and candidate gave partial answer: Give 8-12/15
+   - If question has 15 marks and candidate gave vague answer ("Hmm", "Yeah"): Give 0-3/15
+   - If question was NOT ASKED or NOT ANSWERED: Give 0 marks (but question still counts!)
+   
+5. **FINAL SCORE CALCULATION:**
+   - Add up all marks obtained by candidate
+   - Divide by total marks (${TOTAL_MARKS})
+   - Example: If candidate got 45 marks out of 100 = 45%
+   - Even if only 2 questions were answered, calculate against FULL ${TOTAL_MARKS}
 
 **Response Format (JSON):**
 {
-  "question_analysis": {
-    "Technical Skills": {
-      "questions": [
-        {
-          "question": "Actual question asked",
-          "candidate_response": "Key points from response",
-          "score": 8,
-          "max_score": ${marksPerQuestion},
-          "feedback": "Detailed feedback on this specific answer"
-        }
-      ],
-      "category_score": 0,
-      "category_max": 0,
-      "weight": ${evaluationCategories["Technical Skills"].weight}
+  "questions": [
+    {
+      "question_number": 1,
+      "question_text": "Actual question from transcript",
+      "category": "Technical Skills",
+      "max_marks": 15,
+      "marks_obtained": 12,
+      "answered": true,
+      "candidate_response": "Summary of what candidate said",
+      "feedback": "Why this score was given"
     },
-    "Communication": {
-      "questions": [
-        {
-          "question": "Actual question asked",
-          "candidate_response": "Key points from response", 
-          "score": 7,
-          "max_score": ${marksPerQuestion},
-          "feedback": "Detailed feedback on this specific answer"
-        }
-      ],
-      "category_score": 0,
-      "category_max": 0,
-      "weight": ${evaluationCategories["Communication"].weight}
-    },
-    "Problem Solving": {
-      "questions": [
-        {
-          "question": "Actual question asked",
-          "candidate_response": "Key points from response",
-          "score": 6,
-          "max_score": ${marksPerQuestion},
-          "feedback": "Detailed feedback on this specific answer"
-        }
-      ],
-      "category_score": 0,
-      "category_max": 0,
-      "weight": ${evaluationCategories["Problem Solving"].weight}
-    },
-    "Cultural Fit": {
-      "questions": [
-        {
-          "question": "Actual question asked",
-          "candidate_response": "Key points from response",
-          "score": 9,
-          "max_score": ${marksPerQuestion},
-          "feedback": "Detailed feedback on this specific answer"
-        }
-      ],
-      "category_score": 0,
-      "category_max": 0,
-      "weight": ${evaluationCategories["Cultural Fit"].weight}
+    {
+      "question_number": 2,
+      "question_text": "Question that was asked",
+      "category": "Communication",
+      "max_marks": 8,
+      "marks_obtained": 0,
+      "answered": false,
+      "candidate_response": "Not answered / Vague response",
+      "feedback": "Question not properly answered"
     }
-  },
-  "weighted_calculation": {
-    "technical_weighted": 0,
-    "communication_weighted": 0,
-    "problem_solving_weighted": 0,
-    "cultural_fit_weighted": 0,
-    "total_weighted_score": 0
+  ],
+  "marks_summary": {
+    "total_max_marks": ${TOTAL_MARKS},
+    "total_obtained": 0,
+    "percentage": 0,
+    "questions_asked": 0,
+    "questions_answered": 0,
+    "by_category": {
+      "Technical Skills": { "max": 40, "obtained": 0 },
+      "Communication": { "max": 20, "obtained": 0 },
+      "Problem Solving": { "max": 25, "obtained": 0 },
+      "Cultural Fit": { "max": 15, "obtained": 0 }
+    }
   },
   "overall_score": 0,
   "recommendation": "Hire|Maybe|No Hire",
-  "summary": "Overall assessment summary with scoring breakdown",
-  "strengths": ["strength 1", "strength 2"],
-  "areas_for_improvement": ["area 1", "area 2"],
-  "scoring_details": "Explanation of how the final score was calculated"
+  "summary": "Overall assessment",
+  "strengths": ["strength 1"],
+  "areas_for_improvement": ["area 1"],
+  "scoring_explanation": "Detailed explanation of how marks were assigned"
 }
 
-**Important Notes:**
-- Score each individual question out of ${marksPerQuestion} marks
-- Calculate category scores as sum of question scores in that category
-- Apply weights: Technical (40%), Communication (20%), Problem Solving (25%), Cultural Fit (15%)
-- Final score = (Technical×0.4 + Communication×0.2 + Problem Solving×0.25 + Cultural Fit×0.15)
-- If fewer questions exist in a category, adjust scoring proportionally
-- Provide specific examples from transcript in feedback`
+**IMPORTANT RULES:**
+1. All ${TOTAL_QUESTIONS} questions MUST be listed (even if not asked)
+2. Sum of all max_marks MUST equal exactly ${TOTAL_MARKS}
+3. **YOU decide the category for each question** based on its content:
+   - "What frameworks do you know?" → Technical Skills
+   - "How did you debug that issue?" → Problem Solving
+   - "Tell me about your project" → Communication
+   - "How do you work in a team?" → Cultural Fit
+4. **YOU decide the marks** for each question based on its importance (8-15 for technical, 5-8 for cultural fit, etc.)
+5. If candidate only answered 2/10 questions, they can only score marks for those 2 questions
+6. Final percentage = (total_obtained / ${TOTAL_MARKS}) × 100
+7. Reference actual transcript content in feedback`
 
     // Check if OpenAI API key is configured
     if (!process.env.OPENAI_API_KEY) {
       console.warn('⚠️ OPENAI_API_KEY not configured, using mock evaluation')
-      // Use enhanced mock evaluation data with question-wise scoring
+      // Use school-exam style scoring: each question has different marks based on importance
       const mockEvaluation = {
-        question_analysis: {
-          "Technical Skills": {
-            questions: [
-              {
-                question: "Can you explain your experience with React and state management?",
-                candidate_response: "Discussed Redux and Context API usage in previous projects",
-                score: 8,
-                max_score: 10,
-                feedback: "Good understanding of state management concepts, provided relevant examples"
-              },
-              {
-                question: "How would you optimize a slow-loading web application?",
-                candidate_response: "Mentioned code splitting, lazy loading, and performance monitoring",
-                score: 7,
-                max_score: 10,
-                feedback: "Solid knowledge of optimization techniques, could elaborate more on implementation"
-              }
-            ],
-            category_score: 15,
-            category_max: 20,
-            weight: 0.40
-          },
-          "Communication": {
-            questions: [
-              {
-                question: "Tell me about a challenging project you worked on",
-                candidate_response: "Clearly explained project scope, challenges, and solutions",
-                score: 8,
-                max_score: 10,
-                feedback: "Excellent storytelling and clear communication of complex technical concepts"
-              }
-            ],
-            category_score: 8,
-            category_max: 10,
-            weight: 0.20
-          },
-          "Problem Solving": {
-            questions: [
-              {
-                question: "How would you approach debugging a production issue?",
-                candidate_response: "Systematic approach: logs, monitoring, reproduction, fix, testing",
-                score: 7,
-                max_score: 10,
-                feedback: "Good systematic approach, demonstrated logical thinking process"
-              }
-            ],
-            category_score: 7,
-            category_max: 10,
-            weight: 0.25
-          },
-          "Cultural Fit": {
-            questions: [
-              {
-                question: "How do you handle working in a team environment?",
-                candidate_response: "Emphasized collaboration, communication, and shared responsibility",
-                score: 9,
-                max_score: 10,
-                feedback: "Strong team player mentality, aligns well with company values"
-              }
-            ],
-            category_score: 9,
-            category_max: 10,
-            weight: 0.15
+        questions: [
+          // Technical Skills - 40 marks total (4 questions)
+          { question_number: 1, question_text: "Can you explain your experience with React and state management?", category: "Technical Skills", max_marks: 15, marks_obtained: 12, answered: true, candidate_response: "Discussed Redux and Context API usage in previous projects", feedback: "Good understanding of state management. Lost 3 marks for not mentioning newer solutions." },
+          { question_number: 2, question_text: "How would you optimize a slow-loading web application?", category: "Technical Skills", max_marks: 12, marks_obtained: 9, answered: true, candidate_response: "Mentioned code splitting, lazy loading, and performance monitoring", feedback: "Solid knowledge of optimization techniques." },
+          { question_number: 3, question_text: "What is your experience with serverless architecture?", category: "Technical Skills", max_marks: 8, marks_obtained: 0, answered: false, candidate_response: "Vague response: 'Hmm'", feedback: "No substantive answer provided. 0 marks." },
+          { question_number: 4, question_text: "Explain the difference between SQL and NoSQL databases", category: "Technical Skills", max_marks: 5, marks_obtained: 0, answered: false, candidate_response: "Not asked", feedback: "Question not asked during interview." },
+          // Problem Solving - 25 marks total (2 questions)
+          { question_number: 5, question_text: "How would you approach debugging a production issue?", category: "Problem Solving", max_marks: 15, marks_obtained: 11, answered: true, candidate_response: "Systematic approach: logs, monitoring, reproduction, fix, testing", feedback: "Good systematic approach. Could improve on rollback strategies." },
+          { question_number: 6, question_text: "Describe a time when you solved a complex technical problem", category: "Problem Solving", max_marks: 10, marks_obtained: 0, answered: false, candidate_response: "Not asked", feedback: "Question not asked during interview." },
+          // Communication - 20 marks total (2 questions)
+          { question_number: 7, question_text: "Tell me about a challenging project you worked on", category: "Communication", max_marks: 12, marks_obtained: 10, answered: true, candidate_response: "Clearly explained project scope, challenges, and solutions", feedback: "Excellent storytelling and clear communication." },
+          { question_number: 8, question_text: "How do you explain technical concepts to non-technical stakeholders?", category: "Communication", max_marks: 8, marks_obtained: 0, answered: false, candidate_response: "Not asked", feedback: "Question not asked during interview." },
+          // Cultural Fit - 15 marks total (2 questions)
+          { question_number: 9, question_text: "How do you handle working in a team environment?", category: "Cultural Fit", max_marks: 8, marks_obtained: 7, answered: true, candidate_response: "Emphasized collaboration and shared responsibility", feedback: "Strong team player mentality." },
+          { question_number: 10, question_text: "Tell me about a time you had a conflict with a team member", category: "Cultural Fit", max_marks: 7, marks_obtained: 0, answered: false, candidate_response: "Not asked", feedback: "Question not asked during interview." }
+        ],
+        marks_summary: {
+          total_max_marks: 100,
+          total_obtained: 49, // 12+9+0+0+11+0+10+0+7+0 = 49
+          percentage: 49,
+          questions_asked: 6,
+          questions_answered: 5,
+          by_category: {
+            "Technical Skills": { max: 40, obtained: 21 },
+            "Problem Solving": { max: 25, obtained: 11 },
+            "Communication": { max: 20, obtained: 10 },
+            "Cultural Fit": { max: 15, obtained: 7 }
           }
         },
-        weighted_calculation: {
-          technical_weighted: (15/20) * 0.40 * 100, // 30
-          communication_weighted: (8/10) * 0.20 * 100, // 16
-          problem_solving_weighted: (7/10) * 0.25 * 100, // 17.5
-          cultural_fit_weighted: (9/10) * 0.15 * 100, // 13.5
-          total_weighted_score: 77
-        },
-        overall_score: 77,
-        recommendation: 'Hire',
-        summary: 'Strong candidate with good technical skills and excellent cultural fit. Demonstrates solid problem-solving abilities and clear communication.',
-        strengths: ['Strong technical foundation', 'Excellent communication skills', 'Good cultural alignment', 'Systematic problem-solving approach'],
-        areas_for_improvement: ['Could deepen technical expertise in advanced topics', 'More specific examples in optimization techniques'],
-        scoring_details: 'Technical Skills: 15/20 (75%) × 40% = 30 points, Communication: 8/10 (80%) × 20% = 16 points, Problem Solving: 7/10 (70%) × 25% = 17.5 points, Cultural Fit: 9/10 (90%) × 15% = 13.5 points. Total: 77/100'
+        overall_score: 49,
+        recommendation: 'Maybe',
+        summary: 'Candidate scored 49/100. Only 5 out of 10 questions were properly answered. Technical skills decent (21/40) but many questions unanswered.',
+        strengths: ['Good React/state management knowledge', 'Clear communication skills', 'Systematic debugging approach'],
+        areas_for_improvement: ['Many questions unanswered', 'Needs to elaborate more on technical topics'],
+        scoring_explanation: 'Score calculated like school exam: Q1(12/15) + Q2(9/12) + Q3(0/8) + Q4(0/5) + Q5(11/15) + Q6(0/10) + Q7(10/12) + Q8(0/8) + Q9(7/8) + Q10(0/7) = 49/100 = 49%'
       }
       
       // Skip to storing mock evaluation
       const evaluation = mockEvaluation
       
-      // Jump to storage section (we'll refactor this into a function)
+      // Convert new format to storage format
       const evaluationData = {
         application_id: applicationId,
-        scores: evaluation.question_analysis || {},
-        overall_score: evaluation.overall_score || 5,
+        scores: evaluation.questions || [],
+        overall_score: evaluation.overall_score || 0,
         recommendation: evaluation.recommendation || 'Maybe',
         summary: evaluation.summary || '',
         strengths: evaluation.strengths || [],
         areas_for_improvement: evaluation.areas_for_improvement || [],
         evaluated_at: new Date().toISOString(),
         evaluation_criteria: criteriaList,
-        weighted_calculation: evaluation.weighted_calculation || {},
-        scoring_details: evaluation.scoring_details || ''
+        marks_summary: evaluation.marks_summary || {},
+        scoring_explanation: evaluation.scoring_explanation || ''
       }
 
       // Find interview and store evaluation
@@ -343,9 +310,24 @@ ${transcript}
         }
         
         const recOutcome = 'on_hold'
+        
+        // Group questions by category for display
+        const questionsByCategory: Record<string, any[]> = {}
+        evaluation.questions.forEach((q: any) => {
+          if (!questionsByCategory[q.category]) {
+            questionsByCategory[q.category] = []
+          }
+          questionsByCategory[q.category].push(q)
+        })
+        
         const rubricNotes = `
 ## Summary
 ${evaluation.summary}
+
+## Marks Summary
+- **Total Marks:** ${evaluation.marks_summary.total_obtained}/${evaluation.marks_summary.total_max_marks} (${evaluation.marks_summary.percentage}%)
+- **Questions Asked:** ${evaluation.marks_summary.questions_asked}/${TOTAL_QUESTIONS}
+- **Questions Answered:** ${evaluation.marks_summary.questions_answered}/${TOTAL_QUESTIONS}
 
 ## Strengths
 ${evaluation.strengths.map((s: string) => `- ${s}`).join('\n')}
@@ -353,22 +335,28 @@ ${evaluation.strengths.map((s: string) => `- ${s}`).join('\n')}
 ## Areas for Improvement
 ${evaluation.areas_for_improvement.map((a: string) => `- ${a}`).join('\n')}
 
-## Detailed Scores by Category
-${Object.entries(evaluation.question_analysis || {}).map(([category, categoryData]: [string, any]) => {
-  const questions = categoryData.questions || [];
-  const categoryScore = questions.reduce((sum: number, q: any) => sum + (q.score || 0), 0);
-  const categoryMax = questions.reduce((sum: number, q: any) => sum + (q.max_score || 10), 0);
-  const percentage = categoryMax > 0 ? Math.round((categoryScore / categoryMax) * 100) : 0;
-  
-  return `### ${category} (${categoryScore}/${categoryMax} - ${percentage}%)
-${questions.map((q: any) => `- **Q:** ${q.question}\n  **A:** ${q.candidate_response}\n  **Score:** ${q.score}/${q.max_score} - ${q.feedback}`).join('\n\n')}`;
-}).join('\n\n')}
+## Detailed Scores by Question (School Exam Style)
+${evaluation.questions.map((q: any) => 
+  `### Q${q.question_number}: ${q.question_text}
+- **Category:** ${q.category}
+- **Marks:** ${q.marks_obtained}/${q.max_marks} ${q.answered ? '✓' : '✗ (Not answered)'}
+- **Response:** ${q.candidate_response}
+- **Feedback:** ${q.feedback}`
+).join('\n\n')}
+
+## Category Breakdown
+${Object.entries(evaluation.marks_summary.by_category).map(([cat, data]: [string, any]) => 
+  `- **${cat}:** ${data.obtained}/${data.max} marks`
+).join('\n')}
+
+## Scoring Explanation
+${evaluation.scoring_explanation}
         `.trim()
         
         const evaluationResult = await DatabaseService.query(evaluationQuery, [
           interviewId,
           evaluation.overall_score,
-          JSON.stringify(evaluation.question_analysis || {}),
+          JSON.stringify({ questions: evaluation.questions, marks_summary: evaluation.marks_summary }),
           recOutcome,
           rubricNotes,
           mockStatus
@@ -445,87 +433,49 @@ ${questions.map((q: any) => `- **Q:** ${q.question}\n  **A:** ${q.candidate_resp
       
     } catch (e) {
       console.error('Failed to parse evaluation JSON:', e)
-      // Fallback evaluation structure in new format
+      // Fallback evaluation structure in new school-exam format
       evaluation = {
-        question_analysis: {
-          "Technical Skills": {
-            questions: [{
-              question: "General technical assessment",
-              candidate_response: "Unable to parse detailed response",
-              score: 5,
-              max_score: 10,
-              feedback: "Evaluation parsing failed, using fallback score"
-            }],
-            category_score: 5,
-            category_max: 10,
-            weight: 0.40
-          },
-          "Communication": {
-            questions: [{
-              question: "General communication assessment", 
-              candidate_response: "Unable to parse detailed response",
-              score: 5,
-              max_score: 10,
-              feedback: "Evaluation parsing failed, using fallback score"
-            }],
-            category_score: 5,
-            category_max: 10,
-            weight: 0.20
-          },
-          "Problem Solving": {
-            questions: [{
-              question: "General problem solving assessment",
-              candidate_response: "Unable to parse detailed response", 
-              score: 5,
-              max_score: 10,
-              feedback: "Evaluation parsing failed, using fallback score"
-            }],
-            category_score: 5,
-            category_max: 10,
-            weight: 0.25
-          },
-          "Cultural Fit": {
-            questions: [{
-              question: "General cultural fit assessment",
-              candidate_response: "Unable to parse detailed response",
-              score: 5, 
-              max_score: 10,
-              feedback: "Evaluation parsing failed, using fallback score"
-            }],
-            category_score: 5,
-            category_max: 10,
-            weight: 0.15
+        questions: [
+          { question_number: 1, question_text: "General assessment", category: "Technical Skills", max_marks: 40, marks_obtained: 20, answered: true, candidate_response: "Unable to parse", feedback: "Fallback score" },
+          { question_number: 2, question_text: "General assessment", category: "Problem Solving", max_marks: 25, marks_obtained: 12, answered: true, candidate_response: "Unable to parse", feedback: "Fallback score" },
+          { question_number: 3, question_text: "General assessment", category: "Communication", max_marks: 20, marks_obtained: 10, answered: true, candidate_response: "Unable to parse", feedback: "Fallback score" },
+          { question_number: 4, question_text: "General assessment", category: "Cultural Fit", max_marks: 15, marks_obtained: 8, answered: true, candidate_response: "Unable to parse", feedback: "Fallback score" }
+        ],
+        marks_summary: {
+          total_max_marks: 100,
+          total_obtained: 50,
+          percentage: 50,
+          questions_asked: 4,
+          questions_answered: 4,
+          by_category: {
+            "Technical Skills": { max: 40, obtained: 20 },
+            "Problem Solving": { max: 25, obtained: 12 },
+            "Communication": { max: 20, obtained: 10 },
+            "Cultural Fit": { max: 15, obtained: 8 }
           }
-        },
-        weighted_calculation: {
-          technical_weighted: 20,
-          communication_weighted: 10,
-          problem_solving_weighted: 12.5,
-          cultural_fit_weighted: 7.5,
-          total_weighted_score: 50
         },
         overall_score: 50,
         recommendation: 'Maybe',
         summary: 'Evaluation completed but failed to parse detailed scores.',
         strengths: ['Participated in interview'],
         areas_for_improvement: ['Detailed evaluation unavailable'],
-        scoring_details: 'Fallback scoring used due to parsing error'
+        scoring_explanation: 'Fallback scoring used due to parsing error'
       }
     }
 
     // Store evaluation in database
     const evaluationData = {
       application_id: applicationId,
-      scores: evaluation.question_analysis || {},
-      overall_score: evaluation.overall_score || 5,
+      scores: evaluation.questions || [],
+      overall_score: evaluation.overall_score || 0,
       recommendation: evaluation.recommendation || 'Maybe',
       summary: evaluation.summary || '',
       strengths: evaluation.strengths || [],
       areas_for_improvement: evaluation.areas_for_improvement || [],
       evaluated_at: new Date().toISOString(),
       evaluation_criteria: criteriaList,
-      weighted_calculation: evaluation.weighted_calculation || {},
-      scoring_details: evaluation.scoring_details || ''
+      marks_summary: evaluation.marks_summary || {},
+      scoring_explanation: evaluation.scoring_explanation || ''
     }
 
     // Find the interview for this application
@@ -601,10 +551,16 @@ ${questions.map((q: any) => `- **Q:** ${q.question}\n  **A:** ${q.candidate_resp
           break
       }
       
-      // Create rubric notes from summary, strengths, and areas for improvement
+      // Create rubric notes from summary, strengths, and areas for improvement (new school-exam format)
+      const marksSummary = evaluation.marks_summary || { total_max_marks: 100, total_obtained: 0, percentage: 0, questions_asked: 0, questions_answered: 0, by_category: {} }
       const rubricNotes = `
 ## Summary
 ${evaluation.summary || 'No summary provided'}
+
+## Marks Summary
+- **Total Marks:** ${marksSummary.total_obtained}/${marksSummary.total_max_marks} (${marksSummary.percentage}%)
+- **Questions Asked:** ${marksSummary.questions_asked}/10
+- **Questions Answered:** ${marksSummary.questions_answered}/10
 
 ## Strengths
 ${(evaluation.strengths || []).map((s: string) => `- ${s}`).join('\n')}
@@ -612,25 +568,28 @@ ${(evaluation.strengths || []).map((s: string) => `- ${s}`).join('\n')}
 ## Areas for Improvement
 ${(evaluation.areas_for_improvement || []).map((a: string) => `- ${a}`).join('\n')}
 
-## Detailed Scores by Category
-${Object.entries(evaluation.question_analysis || {}).map(([category, categoryData]: [string, any]) => {
-  const questions = categoryData.questions || [];
-  const categoryScore = questions.reduce((sum: number, q: any) => sum + (q.score || 0), 0);
-  const categoryMax = questions.reduce((sum: number, q: any) => sum + (q.max_score || 10), 0);
-  const percentage = categoryMax > 0 ? Math.round((categoryScore / categoryMax) * 100) : 0;
-  
-  return `### ${category} (${categoryScore}/${categoryMax} - ${percentage}%)
-${questions.map((q: any) => `- **Q:** ${q.question}\n  **A:** ${q.candidate_response}\n  **Score:** ${q.score}/${q.max_score} - ${q.feedback}`).join('\n\n')}`;
-}).join('\n\n')}
+## Detailed Scores by Question (School Exam Style)
+${(evaluation.questions || []).map((q: any) => 
+  `### Q${q.question_number}: ${q.question_text}
+- **Category:** ${q.category}
+- **Marks:** ${q.marks_obtained}/${q.max_marks} ${q.answered ? '✓' : '✗ (Not answered)'}
+- **Response:** ${q.candidate_response}
+- **Feedback:** ${q.feedback}`
+).join('\n\n')}
 
-## Scoring Details
-${evaluation.scoring_details || 'No detailed scoring breakdown available'}
+## Category Breakdown
+${Object.entries(marksSummary.by_category || {}).map(([cat, data]: [string, any]) => 
+  `- **${cat}:** ${data.obtained}/${data.max} marks`
+).join('\n')}
+
+## Scoring Explanation
+${evaluation.scoring_explanation || 'No detailed scoring breakdown available'}
       `.trim()
       
       const evaluationResult = await DatabaseService.query(evaluationQuery, [
         interviewId,
-        evaluation.overall_score || 5,
-        JSON.stringify(evaluation.question_analysis || {}),
+        evaluation.overall_score || 0,
+        JSON.stringify({ questions: evaluation.questions || [], marks_summary: marksSummary }),
         recOutcome,
         rubricNotes,
         status
@@ -682,94 +641,95 @@ ${evaluation.scoring_details || 'No detailed scoring breakdown available'}
   }
 }
 
-// Helper function to calculate weighted scores from question analysis
-function calculateWeightedScore(questionAnalysis: any): number {
-  const categories = {
-    "Technical Skills": 0.40,
-    "Communication": 0.20,
-    "Problem Solving": 0.25,
-    "Cultural Fit": 0.15
-  }
-
-  let totalWeightedScore = 0
-  let totalWeight = 0
-
-  Object.entries(categories).forEach(([categoryName, weight]) => {
-    const categoryData = questionAnalysis[categoryName]
-    if (categoryData && categoryData.questions && categoryData.questions.length > 0) {
-      const questions = categoryData.questions
-      const categoryScore = questions.reduce((sum: number, q: any) => sum + (q.score || 0), 0)
-      const categoryMax = questions.reduce((sum: number, q: any) => sum + (q.max_score || 10), 0)
-      
-      if (categoryMax > 0) {
-        const categoryPercentage = (categoryScore / categoryMax) * 100
-        totalWeightedScore += categoryPercentage * weight
-        totalWeight += weight
-      }
-    }
-  })
-
-  // Normalize if not all categories are present
-  return totalWeight > 0 ? Math.round(totalWeightedScore / totalWeight) : 0
+// Helper function to calculate score from questions array (school-exam style)
+// Simply adds up all marks_obtained and divides by total_max_marks
+function calculateSchoolExamScore(questions: any[]): { total_obtained: number, total_max: number, percentage: number } {
+  const total_obtained = questions.reduce((sum: number, q: any) => sum + (q.marks_obtained || 0), 0)
+  const total_max = questions.reduce((sum: number, q: any) => sum + (q.max_marks || 0), 0)
+  const percentage = total_max > 0 ? Math.round((total_obtained / total_max) * 100) : 0
+  return { total_obtained, total_max, percentage }
 }
 
-// Helper function to ensure evaluation response has the correct format
+// Helper function to ensure evaluation response has the correct format (school-exam style)
 function normalizeEvaluationResponse(evaluation: any): any {
-  // If it's already in the new format, return as is
-  if (evaluation.question_analysis) {
+  // If it's already in the new school-exam format with questions array, return as is
+  if (evaluation.questions && Array.isArray(evaluation.questions)) {
+    // Ensure marks_summary exists
+    if (!evaluation.marks_summary) {
+      const { total_obtained, total_max, percentage } = calculateSchoolExamScore(evaluation.questions)
+      const byCategory: Record<string, { max: number, obtained: number }> = {}
+      
+      evaluation.questions.forEach((q: any) => {
+        if (!byCategory[q.category]) {
+          byCategory[q.category] = { max: 0, obtained: 0 }
+        }
+        byCategory[q.category].max += q.max_marks || 0
+        byCategory[q.category].obtained += q.marks_obtained || 0
+      })
+      
+      evaluation.marks_summary = {
+        total_max_marks: total_max,
+        total_obtained: total_obtained,
+        percentage: percentage,
+        questions_asked: evaluation.questions.filter((q: any) => q.answered).length,
+        questions_answered: evaluation.questions.filter((q: any) => q.answered && q.marks_obtained > 0).length,
+        by_category: byCategory
+      }
+      
+      // Ensure overall_score matches percentage
+      evaluation.overall_score = percentage
+    }
     return evaluation
   }
 
-  // If it's in the old format, convert it
-  if (evaluation.scores) {
-    const questionAnalysis: any = {
-      "Technical Skills": { questions: [], category_score: 0, category_max: 0, weight: 0.40 },
-      "Communication": { questions: [], category_score: 0, category_max: 0, weight: 0.20 },
-      "Problem Solving": { questions: [], category_score: 0, category_max: 0, weight: 0.25 },
-      "Cultural Fit": { questions: [], category_score: 0, category_max: 0, weight: 0.15 }
-    }
-
-    // Convert old scores to new format (best effort)
-    Object.entries(evaluation.scores).forEach(([criterion, data]: [string, any]) => {
-      const question = {
-        question: `Assessment of ${criterion}`,
-        candidate_response: "Based on overall interview performance",
-        score: Math.round((data.score || 0) / 10), // Convert from 100 scale to 10 scale
-        max_score: 10,
-        feedback: data.feedback || "No specific feedback provided"
-      }
-
-      // Try to categorize the criterion
-      const lowerCriterion = criterion.toLowerCase()
-      if (lowerCriterion.includes('technical') || lowerCriterion.includes('coding') || lowerCriterion.includes('programming')) {
-        questionAnalysis["Technical Skills"].questions.push(question)
-      } else if (lowerCriterion.includes('communication') || lowerCriterion.includes('presentation')) {
-        questionAnalysis["Communication"].questions.push(question)
-      } else if (lowerCriterion.includes('problem') || lowerCriterion.includes('analytical')) {
-        questionAnalysis["Problem Solving"].questions.push(question)
-      } else {
-        questionAnalysis["Cultural Fit"].questions.push(question)
-      }
+  // If it's in the old question_analysis format, convert to new school-exam format
+  if (evaluation.question_analysis) {
+    const questions: any[] = []
+    let questionNumber = 1
+    
+    Object.entries(evaluation.question_analysis).forEach(([category, categoryData]: [string, any]) => {
+      const categoryQuestions = categoryData.questions || []
+      categoryQuestions.forEach((q: any) => {
+        questions.push({
+          question_number: questionNumber++,
+          question_text: q.question || 'Unknown question',
+          category: category,
+          max_marks: (q.max_score || 10) * (q.weightage || 1.0), // Convert to marks
+          marks_obtained: (q.score || 0) * (q.weightage || 1.0),
+          answered: q.answered !== false,
+          candidate_response: q.candidate_response || '',
+          feedback: q.feedback || ''
+        })
+      })
     })
-
-    // Calculate category scores
-    Object.keys(questionAnalysis).forEach(category => {
-      const questions = questionAnalysis[category].questions
-      questionAnalysis[category].category_score = questions.reduce((sum: number, q: any) => sum + q.score, 0)
-      questionAnalysis[category].category_max = questions.reduce((sum: number, q: any) => sum + q.max_score, 0)
+    
+    const { total_obtained, total_max, percentage } = calculateSchoolExamScore(questions)
+    const byCategory: Record<string, { max: number, obtained: number }> = {}
+    
+    questions.forEach((q: any) => {
+      if (!byCategory[q.category]) {
+        byCategory[q.category] = { max: 0, obtained: 0 }
+      }
+      byCategory[q.category].max += q.max_marks || 0
+      byCategory[q.category].obtained += q.marks_obtained || 0
     })
-
+    
     return {
-      ...evaluation,
-      question_analysis: questionAnalysis,
-      weighted_calculation: {
-        technical_weighted: 0,
-        communication_weighted: 0,
-        problem_solving_weighted: 0,
-        cultural_fit_weighted: 0,
-        total_weighted_score: calculateWeightedScore(questionAnalysis)
+      questions: questions,
+      marks_summary: {
+        total_max_marks: total_max,
+        total_obtained: total_obtained,
+        percentage: percentage,
+        questions_asked: questions.filter((q: any) => q.answered).length,
+        questions_answered: questions.filter((q: any) => q.answered && q.marks_obtained > 0).length,
+        by_category: byCategory
       },
-      scoring_details: "Converted from legacy format to new weighted scoring system"
+      overall_score: percentage,
+      recommendation: evaluation.recommendation || 'Maybe',
+      summary: evaluation.summary || '',
+      strengths: evaluation.strengths || [],
+      areas_for_improvement: evaluation.areas_for_improvement || [],
+      scoring_explanation: evaluation.scoring_details || 'Converted from legacy format'
     }
   }
 
