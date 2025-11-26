@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { DatabaseService } from '@/lib/database'
+import { decrypt } from '@/lib/encryption'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -54,6 +55,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ applicationId:
 
     const application = applicationRows[0]
     const jobId = application.job_id
+
+    // Get company ID for fetching service account key
+    const companyQuery = `SELECT company_id FROM jobs WHERE id = $1::uuid`
+    const companyRows = await DatabaseService.query(companyQuery, [jobId]) as any[]
+    const companyId = companyRows[0]?.company_id
 
     // Get evaluation criteria from job rounds
     const roundsQuery = `
@@ -210,9 +216,84 @@ ${transcript}
 6. Final percentage = (total_obtained / ${TOTAL_MARKS}) × 100
 7. Reference actual transcript content in feedback`
 
+    // Fetch company's OpenAI service account key from database (like CV parsing and video interviews)
+    let openaiApiKey: string | undefined = undefined
+    let openaiProjectId: string | undefined = undefined
+    
+    if (companyId) {
+      try {
+        const companyData = await DatabaseService.query(
+          `SELECT openai_service_account_key, openai_project_id FROM companies WHERE id = $1::uuid LIMIT 1`,
+          [companyId]
+        ) as any[]
+        
+        if (companyData && companyData.length > 0 && companyData[0].openai_service_account_key) {
+          try {
+            // Decrypt the encrypted key using ENCRYPTION_KEY from .env
+            const encryptedKey = companyData[0].openai_service_account_key
+            console.log('🔑 [INTERVIEW EVAL] Encrypted key format:', encryptedKey.substring(0, 50) + '...')
+            
+            const decryptedKey = decrypt(encryptedKey)
+            const trimmedKey = decryptedKey.trim()
+            
+            // Check if it's a JSON object (starts with {)
+            if (trimmedKey.startsWith('{')) {
+              try {
+                const keyObj = JSON.parse(trimmedKey)
+                console.log('🔑 [INTERVIEW EVAL] JSON keys available:', Object.keys(keyObj))
+                
+                // Extract the actual API key from the JSON object
+                openaiApiKey = keyObj.value || keyObj.apiKey || keyObj.api_key || keyObj.key || (typeof keyObj === 'string' ? keyObj : null)
+                
+                if (!openaiApiKey && keyObj.id) {
+                  openaiApiKey = keyObj.id
+                }
+                
+                console.log('🔑 [INTERVIEW EVAL] Extracted API key from JSON object')
+              } catch (jsonErr) {
+                openaiApiKey = trimmedKey
+                console.log('🔑 [INTERVIEW EVAL] Could not parse JSON, using raw decrypted value')
+              }
+            } else {
+              openaiApiKey = trimmedKey
+              console.log('🔑 [INTERVIEW EVAL] Using plain string API key')
+            }
+            
+            // Get project ID if available
+            if (companyData[0].openai_project_id) {
+              try {
+                openaiProjectId = decrypt(companyData[0].openai_project_id)
+                console.log('🔑 [INTERVIEW EVAL] Using company project ID:', openaiProjectId?.substring(0, 20) + '...')
+              } catch (e) {
+                openaiProjectId = companyData[0].openai_project_id
+              }
+            }
+            
+            console.log('✅ [INTERVIEW EVAL] Using company service account key from database')
+            if (openaiApiKey) {
+              console.log('🔑 [INTERVIEW EVAL] API key length:', openaiApiKey.length)
+              console.log('🔑 [INTERVIEW EVAL] Key starts with:', openaiApiKey.substring(0, 10))
+            }
+          } catch (decryptErr) {
+            console.warn('⚠️ [INTERVIEW EVAL] Failed to decrypt company service account key:', decryptErr)
+          }
+        }
+      } catch (fetchErr) {
+        console.warn('⚠️ [INTERVIEW EVAL] Failed to fetch company service account key:', fetchErr)
+      }
+    }
+
+    // Fallback to environment variable if no company key
+    if (!openaiApiKey) {
+      openaiApiKey = process.env.OPENAI_API_KEY || process.env.OPENAI_EVAL_KEY
+      if (openaiApiKey) {
+        console.log('🔑 [INTERVIEW EVAL] Using environment OPENAI_API_KEY for evaluation')
+      }
+    }
+
     // Check if OpenAI API key is configured
-    if (!process.env.OPENAI_API_KEY) {
-      console.warn('⚠️ OPENAI_API_KEY not configured, using mock evaluation')
+    if (!openaiApiKey) {
+      console.warn('⚠️ [INTERVIEW EVAL] No OpenAI API key configured (no company key, no env key), using mock evaluation')
       // Use school-exam style scoring: each question has different marks based on importance
       const mockEvaluation = {
         questions: [
@@ -378,13 +459,22 @@ ${evaluation.scoring_explanation}
       })
     }
 
-    console.log('🤖 Calling OpenAI API for evaluation...')
+    console.log('🤖 [INTERVIEW EVAL] Calling OpenAI API for evaluation...')
+    console.log('🔑 [INTERVIEW EVAL] Using API key:', openaiApiKey.substring(0, 15) + '...')
+    
+    // Build headers with project ID if available (for proper attribution)
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${openaiApiKey}`,
+      'Content-Type': 'application/json',
+    }
+    if (openaiProjectId) {
+      headers['OpenAI-Project'] = openaiProjectId
+      console.log('🔑 [INTERVIEW EVAL] Using OpenAI-Project header:', openaiProjectId)
+    }
+    
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         model: 'gpt-4o',
         messages: [
