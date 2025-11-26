@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, CheckCircle2, X, Briefcase } from "lucide-react"
+import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, CheckCircle2, X, Briefcase, AlertCircle } from "lucide-react"
 
 export default function InterviewPage() {
   const params = useParams()
@@ -32,6 +32,7 @@ export default function InterviewPage() {
   const agentTextBufferRef = useRef<string>("")
   const userTextBufferRef = useRef<string>("")
   const avatarFirstPlayRef = useRef<boolean>(true)
+  const questionCountRef = useRef<number>(0)
   
   const logTs = (label: string, text?: string) => {
     const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -41,6 +42,7 @@ export default function InterviewPage() {
       console.log(`[${ts}] ${label}`)
     }
   }
+
 
   // Extract message text from content array
   const extractMessageText = (content: any[] = []): string => {
@@ -330,6 +332,10 @@ export default function InterviewPage() {
       agentAudioRef.current.srcObject = remoteStream
       agentAudioRef.current.autoplay = true
       agentAudioRef.current.muted = false
+      // Add buffering settings for smooth playback
+      agentAudioRef.current.preload = 'auto'
+      agentAudioRef.current.playbackRate = 1.0
+      console.log('🔊 Agent audio track attached with buffering enabled')
     }
     pc.ontrack = (event) => {
       try {
@@ -439,9 +445,9 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
             },
             turn_detection: {
               type: 'server_vad',
-              threshold: 0.5,
-              prefix_padding_ms: 300,
-              silence_duration_ms: 500
+              threshold: 0.6, // Lower threshold for better sensitivity
+              prefix_padding_ms: 300, // Add padding to prevent cutting off beginnings
+              silence_duration_ms: 1200 // Increased from 500ms to prevent premature interruptions
             }
           }
         }
@@ -476,6 +482,9 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
           case "response.audio_transcript.done": {
             console.log('[handleTranscriptionCompleted]', msg);
             handleTranscriptionCompleted(msg);
+            
+            // Increment question counter after agent speaks
+            questionCountRef.current++
             break;
           }
           case "response.audio_transcript.delta": {
@@ -602,7 +611,7 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
         source.connect(analyser)
 
         const data = new Uint8Array(analyser.frequencyBinCount)
-        const threshold = 8 // lower = more sensitive
+        const threshold = 5 // Lower threshold = more sensitive to speech
 
         const tick = () => {
           if (!analyser) return
@@ -620,10 +629,10 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
             speakingFrames = 0
           }
 
-          // Debounce to avoid flicker
-          if (speakingFrames > 2) {
+          // More conservative debounce to prevent interruptions
+          if (speakingFrames > 3) { // Increased from 2 to 3
             avatarVideo.play().catch(() => {})
-          } else if (silentFrames > 8) {
+          } else if (silentFrames > 15) { // Increased from 8 to 15
             avatarVideo.pause()
           }
 
@@ -715,7 +724,20 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
         
         if (evaluationResponse) {
           const evaluationResult = await evaluationResponse.json()
-          console.log('✅ Evaluation completed:', evaluationResult)
+          
+          if (!evaluationResponse.ok) {
+            // Handle incomplete interview error
+            if (evaluationResponse.status === 400 && evaluationResult.error === 'Incomplete interview') {
+              console.warn('⚠️ Interview incomplete:', evaluationResult.message)
+              console.warn('📊 Details:', evaluationResult.details)
+              console.warn('Interview will be saved but not evaluated. User needs to complete more questions.')
+              // Interview is saved but not evaluated - user will need to complete a new interview
+            } else {
+              console.error('❌ Evaluation failed:', evaluationResult)
+            }
+          } else {
+            console.log('✅ Evaluation completed:', evaluationResult)
+          }
         }
       }
       
@@ -882,41 +904,72 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
     </div>
   )
 
+  
   return (
     <>
       {/* Instruction Modal */}
       <InstructionModal />
 
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Header */}
-      <header className="border-b border-emerald-500/20 bg-slate-900/50 backdrop-blur-md sticky top-0 z-40">
-        <div className="mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg">
-              <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      {/* Header with Controls */}
+      <header className="border-b border-emerald-500/30 bg-gradient-to-r from-slate-900/80 via-slate-800/80 to-slate-900/80 backdrop-blur-lg sticky top-0 z-40 shadow-lg animate-in fade-in duration-500">
+        <div className="mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-6">
+          
+          {/* Left: Logo + Title + Job Details (MERGED) */}
+          <div className="flex items-center gap-4 animate-in fade-in slide-in-from-left-4 duration-500">
+            <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg hover:shadow-emerald-500/50 transition-shadow duration-300 flex-shrink-0">
+              <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-white">AI Interview Session</h1>
-              <p className="text-xs text-slate-400">Real-time Assessment</p>
+              </div>
+            <div className="flex flex-col gap-0.5">
+              <h1 className="text-base font-bold text-white leading-tight">AI Interview</h1>
+              <p className="text-sm font-semibold text-emerald-300">{jobDetails?.jobTitle || 'Position'}</p>
+              <p className="text-xs text-slate-400">{jobDetails?.company || 'Company'}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:block text-right">
-              <div className="text-[10px] uppercase tracking-wide text-slate-400">Job Role</div>
-              <div className="text-sm font-semibold text-emerald-300 max-w-[300px] truncate">{jobDetails?.jobTitle || 'Position'}</div>
-              <div className="text-[11px] text-slate-400 truncate">{jobDetails?.company || 'Company'}</div>
-            </div>
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-600/10 backdrop-blur px-3 py-2 flex items-center gap-2 shadow-sm">
-              <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white shadow">
-                <Briefcase className="h-4 w-4" />
-              </div>
-              <div className="sm:hidden">
-                <div className="text-[10px] uppercase tracking-wide text-emerald-200">Job Role</div>
-                <div className="text-xs font-semibold text-emerald-100 max-w-[140px] truncate">{jobDetails?.jobTitle || 'Position'}</div>
-              </div>
-            </div>
+
+          {/* Right: Controls (square buttons, no outer box) */}
+          <div className="ml-auto flex items-center gap-3 animate-in fade-in scale-in duration-500">
+            {/* Mic Button */}
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              className={`rounded-lg transition-all duration-300 hover:scale-110 ${
+                micOn 
+                  ? 'bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 hover:text-emerald-200' 
+                  : 'bg-red-600/20 hover:bg-red-600/40 text-red-400 hover:text-red-200'
+              }`}
+              onClick={toggleMic} 
+              title={micOn ? 'Mute microphone' : 'Unmute microphone'}
+            >
+              {micOn ? <Mic className="h-7 w-7" /> : <MicOff className="h-7 w-7" />}
+            </Button>
+
+            {/* Camera Button */}
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              className={`rounded-lg transition-all duration-300 hover:scale-110 ${
+                camOn 
+                  ? 'bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 hover:text-emerald-200' 
+                  : 'bg-red-600/20 hover:bg-red-600/40 text-red-400 hover:text-red-200'
+              }`}
+              onClick={toggleCam} 
+              title={camOn ? 'Turn off camera' : 'Turn on camera'}
+            >
+              {camOn ? <VideoIcon className="h-7 w-7" /> : <VideoOff className="h-7 w-7" />}
+            </Button>
+
+            {/* End Interview Button */}
+            <Button 
+              size="icon" 
+              className="rounded-lg bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg hover:shadow-red-500/50 transition-all duration-300 hover:scale-110" 
+              onClick={endInterview} 
+              title="End interview session"
+            >
+              <PhoneOff className="h-7 w-7" />
+            </Button>
           </div>
         </div>
       </header>
@@ -978,51 +1031,6 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
               </div>
             </div>
 
-            {/* Controls bar - Bottom center */}
-            <div className="absolute left-1/2 -translate-x-1/2 bottom-6 flex items-center gap-3 bg-slate-900/95 backdrop-blur-xl rounded-full shadow-2xl px-6 py-3 border border-emerald-500/20 z-50 group-hover:border-emerald-500/40 transition-all duration-300">
-              {/* Mic Button */}
-              <Button 
-                size="icon" 
-                variant="ghost" 
-                className={`rounded-full transition-all duration-300 ${
-                  micOn 
-                    ? 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 hover:text-emerald-300' 
-                    : 'bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300'
-                }`}
-                onClick={toggleMic} 
-                title={micOn ? 'Mute microphone' : 'Unmute microphone'}
-              >
-                {micOn ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-              </Button>
-
-              {/* Camera Button */}
-              <Button 
-                size="icon" 
-                variant="ghost" 
-                className={`rounded-full transition-all duration-300 ${
-                  camOn 
-                    ? 'bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 hover:text-emerald-300' 
-                    : 'bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300'
-                }`}
-                onClick={toggleCam} 
-                title={camOn ? 'Turn off camera' : 'Turn on camera'}
-              >
-                {camOn ? <VideoIcon className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-              </Button>
-
-              {/* Divider */}
-              <div className="h-6 w-px bg-slate-700/50"></div>
-
-              {/* End Interview Button */}
-              <Button 
-                size="icon" 
-                className="rounded-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 relative z-50" 
-                onClick={endInterview} 
-                title="End interview session"
-              >
-                <PhoneOff className="h-5 w-5" />
-              </Button>
-            </div>
 
             {/* Timer/Status - Top right */}
             <div className="absolute top-6 right-6 flex flex-col items-end gap-2 z-40">
