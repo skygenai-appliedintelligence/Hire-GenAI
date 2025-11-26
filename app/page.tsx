@@ -27,6 +27,7 @@ import {
   Star,
 } from "lucide-react"
 import { RecruitmentQuestionnaire } from "@/components/recruitment-questionnaire"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 
 export default function HomePage() {
   const { user, loading } = useAuth()
@@ -324,84 +325,59 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
 
-          {/* Unified Stats Section with Continuous Scroll */}
-          <div className="mt-16 overflow-hidden">
-            <div className="relative">
-              <style jsx>{`
-                @keyframes scroll-infinite {
-                  0% { transform: translateX(0); }
-                  100% { transform: translateX(-100%); }
-                }
-                .animate-scroll { 
-                  animation: scroll-infinite 40s linear infinite;
-                  will-change: transform;
-                }
-                @media (prefers-reduced-motion: reduce) {
-                  .animate-scroll { animation: none; }
-                }
-                .animate-scroll:hover { animation-play-state: paused; }
-              `}</style>
-              <div className="flex animate-scroll">
-                {/* First set of stats */}
-                <div className="flex items-center gap-8 md:gap-10 px-4 md:px-6 min-w-max">
-                  <div className="text-center min-w-[220px] md:min-w-[260px] px-4">
-                    <div className="text-4xl md:text-5xl font-bold sr-text-gradient mb-1 md:mb-2">40%</div>
-                    <div className="text-slate-700 font-medium">Candidates Filtered</div>
-                    <div className="text-xs text-slate-500 mt-1">Unqualified removed</div>
-                  </div>
-                  <div className="text-center min-w-[220px] md:min-w-[260px] px-4">
-                    <div className="text-4xl md:text-5xl font-bold sr-text-gradient mb-1 md:mb-2">60%</div>
-                    <div className="text-slate-700 font-medium">Qualified Shortlist</div>
-                    <div className="text-xs text-slate-500 mt-1">Pre-vetted candidates</div>
-                  </div>
-                  <div className="text-center min-w-[220px] md:min-w-[260px] px-4">
-                    <div className="text-4xl md:text-5xl font-bold sr-text-gradient mb-1 md:mb-2">95%</div>
-                    <div className="text-slate-700 font-medium">Parsing Accuracy</div>
-                    <div className="text-xs text-slate-500 mt-1">Skills identification</div>
-                  </div>
-                  <div className="text-center min-w-[220px] md:min-w-[260px] px-4">
-                    <div className="text-4xl md:text-5xl font-bold sr-text-gradient mb-1 md:mb-2">10K+</div>
-                    <div className="text-slate-700 font-medium">Jobs Posted</div>
-                    <div className="text-xs text-slate-500 mt-1">Across platforms</div>
-                  </div>
-                  <div className="text-center min-w-[220px] md:min-w-[260px] px-4">
-                    <div className="text-4xl md:text-5xl font-bold sr-text-gradient mb-1 md:mb-2">50K+</div>
-                    <div className="text-slate-700 font-medium">Candidates Screened</div>
-                    <div className="text-xs text-slate-500 mt-1">With AI precision</div>
-                  </div>
-                </div>
-                {/* Duplicate set for seamless loop */}
-                <div className="flex items-center gap-8 md:gap-10 px-4 md:px-6 min-w-max">
-                  <div className="text-center min-w-[220px] md:min-w-[260px] px-4">
-                    <div className="text-4xl md:text-5xl font-bold sr-text-gradient mb-1 md:mb-2">40%</div>
-                    <div className="text-slate-700 font-medium">Candidates Filtered</div>
-                    <div className="text-xs text-slate-500 mt-1">Unqualified removed</div>
-                  </div>
-                  <div className="text-center min-w-[220px] md:min-w-[260px] px-4">
-                    <div className="text-4xl md:text-5xl font-bold sr-text-gradient mb-1 md:mb-2">60%</div>
-                    <div className="text-slate-700 font-medium">Qualified Shortlist</div>
-                    <div className="text-xs text-slate-500 mt-1">Pre-vetted candidates</div>
-                  </div>
-                  <div className="text-center min-w-[220px] md:min-w-[260px] px-4">
-                    <div className="text-4xl md:text-5xl font-bold sr-text-gradient mb-1 md:mb-2">95%</div>
-                    <div className="text-slate-700 font-medium">Parsing Accuracy</div>
-                    <div className="text-xs text-slate-500 mt-1">Skills identification</div>
-                  </div>
-                  <div className="text-center min-w-[220px] md:min-w-[260px] px-4">
-                    <div className="text-4xl md:text-5xl font-bold sr-text-gradient mb-1 md:mb-2">10K+</div>
-                    <div className="text-slate-700 font-medium">Jobs Posted</div>
-                    <div className="text-xs text-slate-500 mt-1">Across platforms</div>
-                  </div>
-                  <div className="text-center min-w-[220px] md:min-w-[260px] px-4">
-                    <div className="text-4xl md:text-5xl font-bold sr-text-gradient mb-1 md:mb-2">50K+</div>
-                    <div className="text-slate-700 font-medium">Candidates Screened</div>
-                    <div className="text-xs text-slate-500 mt-1">With AI precision</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+      {/* FAQ Section */}
+      <section id="faq" className="py-16 bg-slate-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl lg:text-4xl font-bold text-slate-800 mb-4">
+              Frequently Asked Questions
+            </h2>
+            <p className="text-lg text-slate-600 max-w-2xl mx-auto">
+              Everything you need to know about our pricing
+            </p>
           </div>
+
+          <Card className="sr-card p-8">
+            <CardContent className="p-0">
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="item-1" className="border-slate-200">
+                  <AccordionTrigger className="text-left px-6 py-4 hover:no-underline">
+                    <span className="font-medium text-slate-800">Can I change my plan anytime?</span>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-6 pb-4 text-slate-600 leading-relaxed">
+                    Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately, and we'll prorate the billing accordingly.
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="item-2" className="border-slate-200">
+                  <AccordionTrigger className="text-left px-6 py-4 hover:no-underline">
+                    <span className="font-medium text-slate-800">Is there a free trial?</span>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-6 pb-4 text-slate-600 leading-relaxed">
+                    Yes, we offer a 14-day free trial for all plans. No credit card required to start your trial.
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="item-3" className="border-slate-200">
+                  <AccordionTrigger className="text-left px-6 py-4 hover:no-underline">
+                    <span className="font-medium text-slate-800">What happens if I exceed my plan limits?</span>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-6 pb-4 text-slate-600 leading-relaxed">
+                    We'll notify you when you're approaching your limits. You can either upgrade your plan or purchase additional credits as needed.
+                  </AccordionContent>
+                </AccordionItem>
+                <AccordionItem value="item-4" className="border-slate-200">
+                  <AccordionTrigger className="text-left px-6 py-4 hover:no-underline">
+                    <span className="font-medium text-slate-800">Do you offer custom enterprise solutions?</span>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-6 pb-4 text-slate-600 leading-relaxed">
+                    Yes, we work with large enterprises to create custom solutions that fit their specific needs. Contact our sales team to discuss your requirements.
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
@@ -459,7 +435,7 @@ export default function HomePage() {
                 <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
                   <Youtube className="w-5 h-5" />
                 </a>
-                <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
+                <a href="https://www.linkedin.com/company/hire-genai" className="text-slate-400 hover:text-emerald-400 transition-colors">
                   <Linkedin className="w-5 h-5" />
                 </a>
               </div>
@@ -469,11 +445,6 @@ export default function HomePage() {
             <div className="md:col-span-2">
               <h4 className="font-semibold mb-4 text-white text-sm uppercase tracking-wide">Product</h4>
               <ul className="space-y-3 text-slate-400 text-sm">
-                <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
-                    HireGenAI
-                  </a>
-                </li>
                 <li>
                   <Link href="/demo-en" className="hover:text-emerald-400 transition-colors">
                     Try the Demo
@@ -496,9 +467,15 @@ export default function HomePage() {
                   </button>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
+                  <button
+                    onClick={() => {
+                      const element = document.getElementById('faq');
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="text-slate-400 hover:text-emerald-400 transition-colors text-left w-full"
+                  >
                     FAQs
-                  </a>
+                  </button>
                 </li>
               </ul>
             </div>
@@ -508,19 +485,19 @@ export default function HomePage() {
               <h4 className="font-semibold mb-4 text-white text-sm uppercase tracking-wide">Company</h4>
               <ul className="space-y-3 text-slate-400 text-sm">
                 <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
+                  <Link href="/about" className="hover:text-emerald-400 transition-colors">
                     About us
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
+                  <Link href="/contact" className="hover:text-emerald-400 transition-colors">
                     Contact
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
+                  <Link href="/book-meeting" className="hover:text-emerald-400 transition-colors">
                     Book a Meeting
-                  </a>
+                  </Link>
                 </li>
                 <li>
                   <Link href="/owner-login" className="hover:text-emerald-400 transition-colors">
@@ -535,14 +512,14 @@ export default function HomePage() {
               <h4 className="font-semibold mb-4 text-white text-sm uppercase tracking-wide">Legal</h4>
               <ul className="space-y-3 text-slate-400 text-sm">
                 <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
+                  <Link href="/privacy" className="hover:text-emerald-400 transition-colors">
                     Privacy Policy
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
+                  <Link href="/terms" className="hover:text-emerald-400 transition-colors">
                     Terms and Conditions
-                  </a>
+                  </Link>
                 </li>
                 <li>
                   <a href="#" className="hover:text-emerald-400 transition-colors">
