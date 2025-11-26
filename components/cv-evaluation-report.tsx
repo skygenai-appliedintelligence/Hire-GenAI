@@ -394,6 +394,18 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false }: Props) {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 pt-2">
+                      {data.candidateProfile.educationList && data.candidateProfile.educationList.length > 0 ? (
+                        <div className="space-y-2 mb-2">
+                          {data.candidateProfile.educationList.map((edu, idx) => (
+                            <p key={idx} className="text-sm text-slate-700 font-medium">
+                              {edu.institution}
+                              {edu.degree && (
+                                <span className="text-slate-500"> - {edu.degree}</span>
+                              )}
+                            </p>
+                          ))}
+                        </div>
+                      ) : null}
                       <Badge variant="outline" className="capitalize mt-1">
                         {data.candidateProfile.university}
                       </Badge>

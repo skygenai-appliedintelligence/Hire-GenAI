@@ -578,6 +578,12 @@ export default function CandidateReportPage() {
                   : '❌ Not Qualified - The candidate does not meet the minimum requirements for this role.',
                 candidateProfile: {
                   university: 'non-targeted' as const,
+                  educationList: (qualificationDetails.extracted?.education || [])
+                    .filter((edu: any) => edu?.institution || edu?.degree)
+                    .map((edu: any) => ({
+                      institution: edu?.institution || '',
+                      degree: edu?.degree || ''
+                    })),
                   employer: 'targeted' as const,
                   experience: qualificationDetails.extracted?.total_experience_years_estimate || 4,
                   hasRelevantExperience: true,
@@ -789,20 +795,30 @@ export default function CandidateReportPage() {
                     isGrid: true,
                     gridData: [
                       {
-                        label: '✓ Matched Languages',
-                        value: (qualificationDetails.breakdown?.language_skills?.matched_languages || []).map((l: any) => `${l.language} (${l.proficiency})`).join(', ') || 'None'
+                        label: 'Known Languages',
+                        value: (() => {
+                          const langs = qualificationDetails.breakdown?.language_skills?.matched_languages || [];
+                          if (langs.length === 0) return 'Not specified';
+                          return langs.map((l: any) => l.language).join(', ');
+                        })()
                       },
                       {
-                        label: '✗ Missing Languages',
-                        value: (qualificationDetails.breakdown?.language_skills?.missing_languages || []).join(', ') || 'None'
+                        label: 'Proficiency Levels',
+                        value: (() => {
+                          const langs = qualificationDetails.breakdown?.language_skills?.matched_languages || [];
+                          if (langs.length === 0) return 'Not specified';
+                          return langs.map((l: any) => l.proficiency || 'N/A').join(', ');
+                        })()
                       },
                       {
-                        label: 'Primary Language',
-                        value: (qualificationDetails.breakdown?.language_skills?.matched_languages || [])[0]?.language || 'Not specified'
+                        label: 'Missing Languages',
+                        value: (qualificationDetails.breakdown?.language_skills?.missing_languages || []).length > 0 
+                          ? (qualificationDetails.breakdown?.language_skills?.missing_languages || []).join(', ') 
+                          : 'None required'
                       },
                       {
-                        label: 'Language Status',
-                        value: (qualificationDetails.breakdown?.language_skills?.matched_languages || []).length > 0 ? '✓ Qualified' : '✗ Not Qualified'
+                        label: 'Status',
+                        value: (qualificationDetails.breakdown?.language_skills?.matched_languages || []).length > 0 ? '✓ Meets Requirements' : '⚠ No languages specified'
                       }
                     ],
                     details: [
