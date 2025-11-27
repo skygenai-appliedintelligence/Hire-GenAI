@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateText } from "ai"
-import { openai } from "@ai-sdk/openai"
 import { AIService } from '@/lib/ai-service'
 import { DatabaseService } from '@/lib/database'
 
@@ -15,14 +13,77 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Fetch company's OpenAI credentials from database (same pattern as session/route.ts)
+    let apiKey: string | null = null
+    let projectId: string | null = null
+
+    if (companyId) {
+      try {
+        console.log('\n' + '='.repeat(60))
+        console.log('🎯 [QUESTION GENERATION] Starting with company credentials...')
+        console.log('📋 Company ID:', companyId)
+
+        const company = await DatabaseService.getCompanyById(companyId)
+        
+        if (company) {
+          console.log('🔍 [QUESTION GENERATION] Company fetched:', company.name)
+          console.log('🔍 [QUESTION GENERATION] Has service key?', !!company.openai_service_account_key)
+          console.log('🔍 [QUESTION GENERATION] Has project ID?', !!company.openai_project_id)
+          
+          if (company.openai_service_account_key && company.openai_project_id) {
+            try {
+              const keyData = typeof company.openai_service_account_key === "string"
+                ? JSON.parse(company.openai_service_account_key)
+                : company.openai_service_account_key
+              
+              apiKey = keyData?.value || keyData
+              projectId = company.openai_project_id
+              
+              if (!apiKey || apiKey.length < 20) {
+                throw new Error('Invalid API key format')
+              }
+              
+              console.log('✅ [QUESTION GENERATION] Using company service account key from database')
+              console.log('🔑 Project ID:', projectId)
+              console.log('🔑 API Key preview:', apiKey?.substring(0, 20) + '...')
+            } catch (parseError: any) {
+              console.error('❌ [QUESTION GENERATION] Failed to parse service key:', parseError.message)
+              apiKey = null
+              projectId = null
+            }
+          } else {
+            console.log('⚠️  [QUESTION GENERATION] Company has no credentials in database')
+          }
+        } else {
+          console.log('❌ [QUESTION GENERATION] Company not found')
+        }
+      } catch (err) {
+        console.error('❌ [QUESTION GENERATION] Failed to fetch company credentials:', err)
+      }
+    }
+
+    // Fallback to environment variable if company key not found
+    if (!apiKey) {
+      apiKey = process.env.OPENAI_API_KEY || null
+      if (apiKey) {
+        console.log('⚠️  [QUESTION GENERATION] Using environment OPENAI_API_KEY (fallback)')
+      }
+    }
+
+    console.log('🏷️  Credential Source:', projectId ? 'company-database' : 'environment-variable')
+    console.log('='.repeat(60) + '\n')
+
     // Delegate to AIService which handles AI generation, normalization/dedup, and mock backfill
+    // Pass the company credentials for per-company OpenAI usage
     const result = await AIService.generateStagedInterviewQuestions(
       jobDescription,
       agentType,
       numberOfQuestions,
       Array.isArray(skills) ? skills : [],
       Array.isArray(existingQuestions) ? existingQuestions : [],
-      agentName
+      agentName,
+      apiKey || undefined,
+      projectId || undefined
     )
 
     // Record billing usage for question generation (supports draft jobs)

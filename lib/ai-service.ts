@@ -1,5 +1,5 @@
 import { generateText } from "ai"
-import { openai } from "@ai-sdk/openai"
+import { openai, createOpenAI } from "@ai-sdk/openai"
 import { config, isAIEnabled } from "./config"
 
 // Check for OpenAI key in both server and client environments
@@ -112,7 +112,9 @@ export class AIService {
     numberOfQuestions: number,
     skills?: string[],
     existingQuestions?: string[],
-    agentName?: string
+    agentName?: string,
+    companyApiKey?: string,
+    companyProjectId?: string
   ): Promise<{ questions: string[], usage?: { promptTokens: number, completionTokens: number } }> {
     // Check if we're in the browser
     if (typeof window !== "undefined") {
@@ -276,11 +278,31 @@ export class AIService {
     }
 
     // Server-side logic
-    if (!hasOpenAIKey()) {
+    // Check for company API key first, then fall back to environment
+    const hasValidKey = companyApiKey || hasOpenAIKey()
+    if (!hasValidKey) {
+      console.log('⚠️  [AI Service] No OpenAI API key available, using mock questions')
       return { 
         questions: this.getJDAndSkillsMock(jobDescription, Array.isArray(skills) ? skills : [], agentType, numberOfQuestions),
         usage: undefined
       }
+    }
+
+    // Create custom OpenAI provider with company credentials if available
+    const openaiProvider = companyApiKey 
+      ? createOpenAI({ 
+          apiKey: companyApiKey,
+          project: companyProjectId || undefined,
+        })
+      : openai
+
+    if (companyApiKey) {
+      console.log('✅ [AI Service] Using company service account key for question generation')
+      if (companyProjectId) {
+        console.log('📊 [AI Service] Project ID:', companyProjectId)
+      }
+    } else {
+      console.log('⚠️  [AI Service] Using environment OPENAI_API_KEY for question generation')
     }
 
     const agentTypePrompts = {
@@ -300,6 +322,15 @@ ${jobDescription}
 INTERVIEW STAGE/AGENT TYPE: ${agentType}
 NUMBER OF QUESTIONS REQUIRED: ${numberOfQuestions}
 
+CRITICAL UNIQUENESS REQUIREMENT:
+**EVERY SINGLE QUESTION MUST BE COMPLETELY UNIQUE AND DIFFERENT FROM ALL OTHERS.**
+- Do NOT generate questions that ask the same thing in different words
+- Do NOT generate questions with the same core intent or topic
+- Each question must cover a DIFFERENT aspect, skill, or scenario
+- Vary the question structure (some "How would you...", some "Describe a time...", some "What is your approach to...", etc.)
+- If asking about multiple skills, ensure each question focuses on a DIFFERENT skill
+- NEVER repeat or rephrase the same concept twice
+
 INSTRUCTIONS:
 - Read the JD carefully and extract the key skills, requirements, and responsibilities.
 - Use the FOCUS SKILLS list as a guidance signal; prefer questions that validate these skills as they appear in the JD context.
@@ -312,32 +343,34 @@ INSTRUCTIONS:
 - Ensure the questions are:
   1. Directly related to the role
   2. Clear, concise, and easy to understand
-  3. Unique (no repetition)
+  3. **100% UNIQUE - no duplicates, no rephrasing, no similar questions**
   4. Suitable for the given interview stage
   5. When FOCUS SKILLS are provided, ensure coverage across them where reasonable (not necessarily one-to-one), and each question should be obviously connected to either a JD requirement or a FOCUS SKILL.
+  6. Each question should test a DIFFERENT competency or aspect of the candidate
 
 ${agentTypePrompts[agentType]}
  ${focus}
 
 OUTPUT FORMAT:
-Generate exactly ${numberOfQuestions} questions in this format:
-Q1: <question>
-Q2: <question>
-Q3: <question>
+Generate exactly ${numberOfQuestions} UNIQUE questions in this format:
+Q1: <question about topic A>
+Q2: <question about topic B - DIFFERENT from Q1>
+Q3: <question about topic C - DIFFERENT from Q1 and Q2>
 ...
-Q${numberOfQuestions}: <question>
+Q${numberOfQuestions}: <question about topic ${numberOfQuestions} - DIFFERENT from all previous>
 
+Before outputting, mentally verify that NO TWO questions are similar in meaning or intent.
 Only provide the questions, no explanations or additional text.
     `
 
     try {
       // Fail fast on quota/latency: no retries and a short timeout
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 10000) // 10s ceiling
+      const timeout = setTimeout(() => controller.abort(), 15000) // 15s ceiling (increased for better reliability)
       const { text, usage } = await generateText({
-        model: openai("gpt-4o"),
+        model: openaiProvider("gpt-4o"),
         prompt,
-        system: "You are an AI Interview Question Generator. Generate relevant, clear, and role-specific interview questions based on the job description and interview stage.",
+        system: "You are an AI Interview Question Generator. Generate relevant, clear, and role-specific interview questions based on the job description and interview stage. CRITICAL: Every question MUST be completely unique - no duplicates, no rephrasing, no similar questions. Each question must test a different competency or aspect.",
         maxRetries: 0,
         abortSignal: controller.signal,
       })
