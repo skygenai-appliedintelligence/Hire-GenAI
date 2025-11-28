@@ -123,6 +123,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
         a.portfolio_url,
         a.available_start_date,
         a.willing_to_relocate,
+        a.languages,
         c.email as candidate_email,
         c.phone as candidate_phone,
         c.first_name as c_first_name,
@@ -152,6 +153,16 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       ? `${row.first_name} ${row.last_name}`
       : row.candidate_email?.split('@')[0] || row.email?.split('@')[0] || 'Unknown'
 
+    // Parse languages from JSON if stored as string
+    let parsedLanguages = []
+    try {
+      if (row.languages) {
+        parsedLanguages = typeof row.languages === 'string' ? JSON.parse(row.languages) : row.languages
+      }
+    } catch (e) {
+      console.warn('Failed to parse languages:', e)
+    }
+
     const candidate = {
       id: row.id,
       name: candidateName,
@@ -167,7 +178,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       linkedinUrl: row.linkedin_url || null,
       portfolioUrl: row.portfolio_url || null,
       availableStartDate: row.available_start_date || null,
-      willingToRelocate: row.willing_to_relocate || false
+      willingToRelocate: row.willing_to_relocate || false,
+      languages: parsedLanguages
     }
 
     // Primary source: evaluation from interviews.metadata->evaluation
@@ -214,20 +226,54 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
           return 0
         }
 
-        evaluation = {
-          overallScore: evalObj.overall_score || 0,
-          decision,
-          scores: {
+        // Extract criteria-based evaluation data (new format)
+        const criteriaBreakdown = evalObj.criteria_breakdown || null
+        const categoriesUsed = evalObj.categories_used || []
+        const categoriesNotUsed = evalObj.categories_not_used || []
+        const finalScoreCalculation = evalObj.final_score_calculation || null
+        const questionDetails = evalObj.scores || evalObj.questions || []
+        
+        // Build scores from criteria_breakdown if available (new format)
+        let computedScores = {
+          technical: 0,
+          communication: 0,
+          experience: 0,
+          cultural_fit: 0
+        }
+        
+        if (criteriaBreakdown) {
+          computedScores = {
+            technical: criteriaBreakdown['Technical Skills']?.average_score || 0,
+            communication: criteriaBreakdown['Communication']?.average_score || 0,
+            experience: criteriaBreakdown['Problem Solving']?.average_score || 0,
+            cultural_fit: criteriaBreakdown['Cultural Fit']?.average_score || 0
+          }
+        } else {
+          // Fallback to old score extraction
+          computedScores = {
             technical: extractScore(scores.technical || scores, 'technical'),
             communication: extractScore(scores.communication || scores, 'communication'),
             experience: extractScore(scores.experience || scores, 'experience'),
             cultural_fit: extractScore(scores.cultural_fit || scores.culture || scores, 'cultural_fit')
-          },
+          }
+        }
+
+        evaluation = {
+          overallScore: evalObj.overall_score || 0,
+          decision,
+          scores: computedScores,
           strengths: Array.isArray(strengths) ? strengths : [],
           weaknesses: Array.isArray(weaknesses) ? weaknesses : [],
           reviewerComments: evalObj.summary || evalObj.reviewer_comments || '',
           reviewedAt: evalObj.evaluated_at || evalObj.reviewed_at || null,
-          reviewedBy: evalObj.reviewed_by || 'AI Evaluator'
+          reviewedBy: evalObj.reviewed_by || 'AI Evaluator',
+          // New criteria-based fields
+          criteriaBreakdown,
+          categoriesUsed,
+          categoriesNotUsed,
+          finalScoreCalculation,
+          questions: questionDetails,
+          scoringExplanation: evalObj.scoring_explanation || ''
         }
         console.log('✅ Evaluation loaded from interviews.metadata:', JSON.stringify(evaluation, null, 2))
       }

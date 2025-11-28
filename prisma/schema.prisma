@@ -61,6 +61,7 @@ model applications {
   last_name            String?
   email                String?
   phone                String?
+  languages            Json?                @default("[]")
   application_rounds   application_rounds[]
   candidates           candidates           @relation(fields: [candidate_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   reports              reports[]

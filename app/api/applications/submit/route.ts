@@ -262,6 +262,10 @@ export async function POST(req: NextRequest) {
         if (candidate.willingToRelocate !== undefined) {
           cols.push('willing_to_relocate'); vals.push(`$${p++}`); params.push(Boolean(candidate.willingToRelocate))
         }
+        // Languages and proficiency levels
+        if (candidate.languages && Array.isArray(candidate.languages) && candidate.languages.length > 0) {
+          cols.push('languages'); vals.push(`$${p++}::jsonb`); params.push(JSON.stringify(candidate.languages))
+        }
 
       if (cols.length === 0) throw new Error('applications table not compatible')
 
