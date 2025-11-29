@@ -476,22 +476,44 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       if (Array.isArray(arr) && arr.length > 0) return String(arr[0])
       return fallback
     }
-    const safeEval = evaluation || { scores: {}, strengths: [], weaknesses: [], reviewerComments: '' }
-    let techScoreRaw = (safeEval.scores as any)?.technical ?? (safeEval.scores as any)?.tech
-    let commScoreRaw = (safeEval.scores as any)?.communication
-    let expScoreRaw = (safeEval.scores as any)?.experience
-    let cultScoreRaw = (safeEval.scores as any)?.cultural_fit ?? (safeEval.scores as any)?.culture
+    const safeEval = evaluation || { scores: {}, strengths: [], weaknesses: [], reviewerComments: '', criteriaBreakdown: null }
     
-    // If all individual scores are 0 but we have an overall score, distribute it
+    // PRIORITY: Use criteria_breakdown if available (new school exam style)
+    // This has accurate scores based on actual answered questions
+    const criteriaBreakdown = safeEval.criteriaBreakdown || (safeEval as any).criteria_breakdown
+    
+    let techScoreRaw = 0
+    let commScoreRaw = 0
+    let expScoreRaw = 0
+    let cultScoreRaw = 0
+    
+    if (criteriaBreakdown) {
+      // Use the accurate scores from criteria breakdown
+      // These are calculated as: (obtained_marks / max_marks) * 100
+      techScoreRaw = criteriaBreakdown['Technical Skills']?.average_score || 0
+      commScoreRaw = criteriaBreakdown['Communication']?.average_score || 0
+      expScoreRaw = criteriaBreakdown['Problem Solving']?.average_score || 0
+      cultScoreRaw = criteriaBreakdown['Cultural Fit']?.average_score || 0
+      console.log('📊 Using criteria_breakdown scores:', { techScoreRaw, commScoreRaw, expScoreRaw, cultScoreRaw })
+    } else {
+      // Fallback to old scores format
+      techScoreRaw = (safeEval.scores as any)?.technical ?? (safeEval.scores as any)?.tech ?? 0
+      commScoreRaw = (safeEval.scores as any)?.communication ?? 0
+      expScoreRaw = (safeEval.scores as any)?.experience ?? 0
+      cultScoreRaw = (safeEval.scores as any)?.cultural_fit ?? (safeEval.scores as any)?.culture ?? 0
+      console.log('📊 Using fallback scores:', { techScoreRaw, commScoreRaw, expScoreRaw, cultScoreRaw })
+    }
+    
+    // If all individual scores are 0 but we have an overall score, use overall score for all
     const hasIndividualScores = techScoreRaw || commScoreRaw || expScoreRaw || cultScoreRaw
     if (!hasIndividualScores && safeEval.overallScore) {
       const baseScore = safeEval.overallScore
-      console.log('📊 No individual scores found, distributing overall score:', baseScore)
-      // Distribute the overall score with some variation based on strengths/weaknesses
-      techScoreRaw = baseScore + (Math.random() * 2 - 1) // ±1 variation
-      commScoreRaw = baseScore + (Math.random() * 2 - 1)
-      expScoreRaw = baseScore + (Math.random() * 2 - 1)
-      cultScoreRaw = baseScore + (Math.random() * 2 - 1)
+      console.log('📊 No individual scores found, using overall score:', baseScore)
+      // Use overall score directly (no random variation - that was wrong)
+      techScoreRaw = baseScore
+      commScoreRaw = baseScore
+      expScoreRaw = baseScore
+      cultScoreRaw = baseScore
     }
     
     const techScore = normalizeTo100(techScoreRaw)

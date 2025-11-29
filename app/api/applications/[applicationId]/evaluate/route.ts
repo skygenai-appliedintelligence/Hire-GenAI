@@ -733,17 +733,67 @@ ${evaluation.scoring_explanation || 'No detailed scoring breakdown available'}
 }
 
 // Helper function to calculate criteria-based weighted score
-// Only considers criteria that have actual questions
-function calculateCriteriaBasedScore(questions: any[]): {
+// SCHOOL EXAM STYLE: Total marks = 100, distributed across TOTAL INTERVIEW QUESTIONS (default 10)
+// Questions not asked = 0 marks, Unanswered questions = 0 marks
+function calculateCriteriaBasedScore(questions: any[], totalInterviewQuestions: number = DEFAULT_TOTAL_QUESTIONS): {
   overall_score: number,
   criteria_breakdown: Record<string, any>,
   categories_used: string[],
   categories_not_used: string[],
   final_score_calculation: any
 } {
-  // Group questions by criteria
+  const questionsAsked = questions.length
+  // CRITICAL: Use TOTAL interview questions (e.g., 10), not just questions asked (e.g., 4)
+  const marksPerQuestion = Math.floor(100 / totalInterviewQuestions) // 10 questions = 10 marks each
+  const remainderMarks = 100 - (marksPerQuestion * totalInterviewQuestions) // distribute remainder to first questions
+  
+  console.log('📊 [SCORING] Total interview questions:', totalInterviewQuestions)
+  console.log('📊 [SCORING] Questions actually asked:', questionsAsked)
+  console.log('📊 [SCORING] Marks per question:', marksPerQuestion)
+  console.log('📊 [SCORING] Questions NOT asked (will get 0 marks):', totalInterviewQuestions - questionsAsked)
+  
+  // First pass: Assign max marks to each question and calculate obtained marks
+  // CRITICAL: Unanswered questions get 0 marks
+  let totalObtained = 0
+  const questionsWithMarks = questions.map((q, index) => {
+    // First few questions get +1 mark to distribute remainder
+    const maxMarks = marksPerQuestion + (index < remainderMarks ? 1 : 0)
+    
+    // CRITICAL FIX: If question is NOT answered, score = 0
+    // Check multiple indicators of unanswered question
+    const isUnanswered = q.answered === false || 
+                         (q.candidate_response && (
+                           q.candidate_response.toLowerCase().includes('no, sorry') ||
+                           q.candidate_response.toLowerCase().includes('please ask the next') ||
+                           q.candidate_response.toLowerCase().includes('skip') ||
+                           q.candidate_response.toLowerCase().includes('i don\'t know') ||
+                           q.candidate_response.toLowerCase().includes('not sure') ||
+                           q.candidate_response.trim().length < 10 // Very short responses
+                         ))
+    
+    // Calculate obtained marks: scale the 0-100 score to the question's max marks
+    // BUT if unanswered, give 0 marks regardless of what OpenAI said
+    let obtainedMarks = 0
+    if (!isUnanswered) {
+      const scorePercent = (q.score || 0) / 100
+      obtainedMarks = Math.round(scorePercent * maxMarks)
+    }
+    
+    totalObtained += obtainedMarks
+    
+    console.log(`📊 [SCORING] Q${index + 1}: ${isUnanswered ? 'UNANSWERED' : 'answered'} - ${obtainedMarks}/${maxMarks} marks`)
+    
+    return {
+      ...q,
+      max_marks: maxMarks,
+      marks_obtained: obtainedMarks,
+      answered: !isUnanswered
+    }
+  })
+  
+  // Group questions by criteria for breakdown
   const byCategory: Record<string, any[]> = {}
-  questions.forEach((q: any) => {
+  questionsWithMarks.forEach((q: any) => {
     const criteria = q.criteria || q.category || 'General'
     if (!byCategory[criteria]) {
       byCategory[criteria] = []
@@ -751,39 +801,43 @@ function calculateCriteriaBasedScore(questions: any[]): {
     byCategory[criteria].push(q)
   })
   
-  // Calculate scores for each criteria that has questions
-  const totalQuestions = questions.length
+  // Calculate breakdown by category
   const criteriaBreakdown: Record<string, any> = {}
   const breakdown: any[] = []
-  let finalScore = 0
   
   Object.entries(byCategory).forEach(([criteria, criteriaQuestions]) => {
     const questionCount = criteriaQuestions.length
-    const weightPercentage = Math.round((questionCount / totalQuestions) * 100)
-    const weight = questionCount / totalQuestions
-    
-    // Calculate average score for this criteria
-    const totalScore = criteriaQuestions.reduce((sum, q) => sum + (q.score || 0), 0)
-    const averageScore = Math.round(totalScore / questionCount)
-    const weightedContribution = Math.round(averageScore * weight)
+    const maxMarks = criteriaQuestions.reduce((sum, q) => sum + (q.max_marks || 0), 0)
+    const obtainedMarks = criteriaQuestions.reduce((sum, q) => sum + (q.marks_obtained || 0), 0)
+    const answeredCount = criteriaQuestions.filter(q => q.answered).length
+    const averagePercent = maxMarks > 0 ? Math.round((obtainedMarks / maxMarks) * 100) : 0
     
     criteriaBreakdown[criteria] = {
       question_count: questionCount,
-      average_score: averageScore,
-      weight_percentage: weightPercentage,
-      weighted_contribution: weightedContribution,
-      summary: `${questionCount} question(s) evaluated with average score of ${averageScore}%`
+      questions_answered: answeredCount,
+      max_marks: maxMarks,
+      obtained_marks: obtainedMarks,
+      average_score: averagePercent,
+      weight_percentage: maxMarks, // In school exam style, weight = max marks
+      summary: `${answeredCount}/${questionCount} questions answered, scored ${obtainedMarks}/${maxMarks} marks`
     }
     
     breakdown.push({
       criteria,
-      score: averageScore,
-      weight: weight,
-      contribution: weightedContribution
+      max_marks: maxMarks,
+      obtained_marks: obtainedMarks,
+      questions_answered: answeredCount,
+      total_questions: questionCount
     })
-    
-    finalScore += weightedContribution
   })
+  
+  // Final score is simply: total obtained out of 100
+  // If only 4 questions asked out of 10, max possible is 40 marks (4 × 10)
+  // The remaining 60 marks (6 questions not asked) are lost
+  const finalScore = totalObtained
+  
+  console.log('📊 [SCORING] Final score:', finalScore, '/ 100')
+  console.log('📊 [SCORING] Questions answered:', questionsWithMarks.filter(q => q.answered).length, '/', questionsAsked, '(asked) out of', totalInterviewQuestions, '(total)')
   
   // Determine used and unused categories
   const allPossibleCategories = ['Technical Skills', 'Communication', 'Problem Solving', 'Cultural Fit']
@@ -796,38 +850,38 @@ function calculateCriteriaBasedScore(questions: any[]): {
     categories_used: categoriesUsed,
     categories_not_used: categoriesNotUsed,
     final_score_calculation: {
-      formula: breakdown.map(b => `(${b.criteria}: ${b.score} × ${Math.round(b.weight * 100)}%)`).join(' + '),
+      formula: breakdown.map(b => `${b.criteria}: ${b.obtained_marks}/${b.max_marks}`).join(' + '),
       breakdown,
-      total: finalScore
+      total: finalScore,
+      questions_with_marks: questionsWithMarks
     }
   }
 }
 
 // Helper function to ensure evaluation response has the correct format (criteria-based)
-function normalizeEvaluationResponse(evaluation: any): any {
+// SCHOOL EXAM STYLE: 100 marks total for 10 questions, unanswered/not asked = 0 marks
+function normalizeEvaluationResponse(evaluation: any, totalInterviewQuestions: number = DEFAULT_TOTAL_QUESTIONS): any {
   // If it's in the new criteria-based format, ensure all fields exist
   if (evaluation.questions && Array.isArray(evaluation.questions)) {
-    // Check if it already has criteria_breakdown (new format)
-    if (evaluation.criteria_breakdown) {
-      // Ensure overall_score is set
-      if (!evaluation.overall_score && evaluation.final_score_calculation) {
-        evaluation.overall_score = evaluation.final_score_calculation.total
-      }
-      return evaluation
-    }
+    const questionsAsked = evaluation.questions.length
+    console.log('📊 [NORMALIZE] Processing', questionsAsked, 'questions out of', totalInterviewQuestions, 'total')
     
-    // Calculate criteria-based scores from questions
-    const calculated = calculateCriteriaBasedScore(evaluation.questions)
+    // ALWAYS recalculate to ensure:
+    // 1. Unanswered questions get 0 marks
+    // 2. Questions not asked get 0 marks (counted in total)
+    const calculated = calculateCriteriaBasedScore(evaluation.questions, totalInterviewQuestions)
     
-    // Build marks_summary for backward compatibility
+    // Build marks_summary for backward compatibility using calculated values
     const byCategory: Record<string, { max: number, obtained: number }> = {}
-    evaluation.questions.forEach((q: any) => {
+    const questionsWithMarks = calculated.final_score_calculation.questions_with_marks || []
+    
+    questionsWithMarks.forEach((q: any) => {
       const criteria = q.criteria || q.category || 'General'
       if (!byCategory[criteria]) {
         byCategory[criteria] = { max: 0, obtained: 0 }
       }
-      byCategory[criteria].max += q.max_score || 100
-      byCategory[criteria].obtained += q.score || 0
+      byCategory[criteria].max += q.max_marks || 0
+      byCategory[criteria].obtained += q.marks_obtained || 0
     })
     
     evaluation.criteria_breakdown = calculated.criteria_breakdown
@@ -836,15 +890,27 @@ function normalizeEvaluationResponse(evaluation: any): any {
     evaluation.final_score_calculation = calculated.final_score_calculation
     evaluation.overall_score = calculated.overall_score
     
-    // Backward compatible marks_summary
+    // Update questions with correct marks
+    evaluation.questions = questionsWithMarks
+    
+    // Backward compatible marks_summary with CORRECT values
+    const answeredCount = questionsWithMarks.filter((q: any) => q.answered).length
+    const questionsNotAsked = totalInterviewQuestions - questionsAsked
     evaluation.marks_summary = {
-      total_max_marks: evaluation.questions.length * 100,
-      total_obtained: evaluation.questions.reduce((sum: number, q: any) => sum + (q.score || 0), 0),
+      total_max_marks: 100, // School exam style: always out of 100
+      total_obtained: calculated.overall_score,
       percentage: calculated.overall_score,
-      questions_asked: evaluation.questions.length,
-      questions_answered: evaluation.questions.filter((q: any) => q.answered).length,
+      total_interview_questions: totalInterviewQuestions,
+      questions_asked: questionsAsked,
+      questions_not_asked: questionsNotAsked,
+      questions_answered: answeredCount,
       by_category: byCategory
     }
+    
+    console.log('📊 [NORMALIZE] Final score:', calculated.overall_score, '/ 100')
+    console.log('📊 [NORMALIZE] Questions asked:', questionsAsked, '/', totalInterviewQuestions)
+    console.log('📊 [NORMALIZE] Questions answered:', answeredCount, '/', questionsAsked)
+    console.log('📊 [NORMALIZE] Questions NOT asked (0 marks):', questionsNotAsked)
     
     return evaluation
   }
@@ -873,7 +939,8 @@ function normalizeEvaluationResponse(evaluation: any): any {
       })
     })
     
-    const calculated = calculateCriteriaBasedScore(questions)
+    // Use total interview questions (10) for scoring
+    const calculated = calculateCriteriaBasedScore(questions, totalInterviewQuestions)
     
     return {
       questions,
