@@ -5,9 +5,17 @@ import { decrypt } from '@/lib/encryption'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// School exam style evaluation constants
+// Dynamic criteria-based evaluation constants
 const TOTAL_MARKS = 100
-const TOTAL_QUESTIONS = 10
+const DEFAULT_TOTAL_QUESTIONS = 10
+
+// All possible evaluation criteria with default weights
+const ALL_CRITERIA = {
+  "Technical Skills": { weight: 0.40, description: "Technical knowledge, coding, frameworks, tools" },
+  "Communication": { weight: 0.25, description: "Clarity, articulation, listening skills" },
+  "Problem Solving": { weight: 0.20, description: "Analytical thinking, debugging, approach" },
+  "Cultural Fit": { weight: 0.15, description: "Teamwork, values, collaboration" }
+}
 
 export async function POST(req: Request, ctx: { params: Promise<{ applicationId: string }> } | { params: { applicationId: string } }) {
   try {
@@ -89,39 +97,24 @@ export async function POST(req: Request, ctx: { params: Promise<{ applicationId:
     const criteriaList = Array.from(allCriteria)
     console.log('📊 Evaluation criteria:', criteriaList)
 
-    // Enhanced evaluation system with question-specific weightages
-    // Total marks = 100, distributed across 10 questions based on criteria importance
-    // Like school exams: Q1 may have 15 marks, Q2 may have 8 marks, etc.
-    // Note: TOTAL_MARKS and TOTAL_QUESTIONS are defined at file top
+    // DYNAMIC CRITERIA-BASED EVALUATION
+    // The system identifies the correct criteria for EACH question
+    // Final score is calculated ONLY from criteria actually used
+    // No unused criteria (like Cultural Fit) if no questions asked for it
     
-    // Category weights for distributing marks
-    const categoryWeights = {
-      "Technical Skills": 0.40,      // 40 marks total
-      "Communication": 0.20,         // 20 marks total
-      "Problem Solving": 0.25,       // 25 marks total
-      "Cultural Fit": 0.15           // 15 marks total
-    }
+    console.log('📊 Starting dynamic criteria-based evaluation...')
 
-    // Call OpenAI API for evaluation
-    const evaluationPrompt = `You are an expert HR evaluator. Analyze this interview transcript and provide detailed question-wise scores.
+    // Call OpenAI API for evaluation with DYNAMIC CRITERIA
+    const evaluationPrompt = `You are an expert HR evaluator. Analyze this interview transcript and provide detailed, criteria-based scoring.
 
-**IMPORTANT: This is like a school exam where each question has different marks based on importance.**
+**CRITICAL EVALUATION PRINCIPLE:**
+You must ONLY evaluate based on criteria that have actual questions in the interview.
+If there are 8 Technical questions and 2 Communication questions, the final score should ONLY consider Technical and Communication - NOT Cultural Fit or any other criteria that had no questions.
 
 **Job Details:**
 - Position: ${application.job_title}
 - Company: ${application.company_name}
 - Candidate: ${application.first_name} ${application.last_name}
-
-**EVALUATION FRAMEWORK (Like School Exam):**
-- Total Marks: ${TOTAL_MARKS}
-- Total Questions: ${TOTAL_QUESTIONS}
-- Each question has DIFFERENT marks based on its importance (like Q1=15 marks, Q2=8 marks, etc.)
-
-**MARKS DISTRIBUTION BY CATEGORY:**
-- Technical Skills: 40 marks total (most important for this role)
-- Problem Solving: 25 marks total
-- Communication: 20 marks total  
-- Cultural Fit: 15 marks total
 
 **Original Evaluation Criteria from Job:**
 ${criteriaList.map(c => `- ${c}`).join('\n')}
@@ -129,92 +122,100 @@ ${criteriaList.map(c => `- ${c}`).join('\n')}
 **Interview Transcript:**
 ${transcript}
 
-**CRITICAL INSTRUCTIONS - READ CAREFULLY:**
+**STEP-BY-STEP EVALUATION PROCESS:**
 
-1. **IDENTIFY ALL 10 QUESTIONS** from the interview (whether asked or not)
+**STEP 1: EXTRACT ALL QUESTIONS**
+Identify EVERY question asked in the transcript (may be more or less than 10).
 
-2. **YOU MUST CATEGORIZE EACH QUESTION** - Analyze the question content and decide its category:
-   - **Technical Skills**: Questions about coding, programming languages, frameworks, tools, databases, architecture, APIs, algorithms, data structures, system design, technical concepts specific to the job role
-   - **Problem Solving**: Questions about debugging, troubleshooting, handling challenges, analytical thinking, decision making, approach to solving complex issues
-   - **Communication**: Questions about explaining concepts, presenting ideas, storytelling about projects, describing experiences, how they communicate with team/stakeholders
-   - **Cultural Fit**: Questions about teamwork, collaboration, handling conflicts, work style, values, motivation, career goals, company culture alignment
+**STEP 2: CATEGORIZE EACH QUESTION**
+For EACH question, determine its criteria based on content:
+- **Technical Skills**: Coding, programming, frameworks, tools, databases, architecture, APIs, algorithms, system design
+- **Communication**: Explaining concepts, presenting ideas, describing experiences, clarity of expression
+- **Problem Solving**: Debugging, troubleshooting, analytical thinking, approach to challenges
+- **Cultural Fit**: Teamwork, collaboration, values, work style, motivation
 
-3. **ASSIGN MARKS TO EACH QUESTION** based on its category and importance:
-   - Technical/Core skill questions: 8-15 marks each (total ~40 marks)
-   - Problem solving questions: 8-12 marks each (total ~25 marks)
-   - Communication questions: 5-10 marks each (total ~20 marks)
-   - Cultural fit questions: 5-8 marks each (total ~15 marks)
-   - Total of all question marks MUST equal exactly ${TOTAL_MARKS}
+**STEP 3: EVALUATE EACH ANSWER**
+For each question-answer pair:
+- Score from 0-100 based on answer quality
+- Document WHY this score was given (specific evidence from transcript)
+- Note if answer was complete, partial, or missing
 
-4. **SCORING RULES (Like School Exam):**
-   - If question has 15 marks and candidate answered perfectly: Give 15/15
-   - If question has 15 marks and candidate gave partial answer: Give 8-12/15
-   - If question has 15 marks and candidate gave vague answer ("Hmm", "Yeah"): Give 0-3/15
-   - If question was NOT ASKED or NOT ANSWERED: Give 0 marks (but question still counts!)
-   
-5. **FINAL SCORE CALCULATION:**
-   - Add up all marks obtained by candidate
-   - Divide by total marks (${TOTAL_MARKS})
-   - Example: If candidate got 45 marks out of 100 = 45%
-   - Even if only 2 questions were answered, calculate against FULL ${TOTAL_MARKS}
+**STEP 4: CALCULATE CATEGORY SCORES**
+For each criteria that has questions:
+- Average the scores of all questions in that criteria
+- This becomes the criteria score (0-100)
+
+**STEP 5: CALCULATE FINAL WEIGHTED SCORE**
+**IMPORTANT:** Only include criteria that actually have questions!
+- If 8 questions are Technical and 2 are Communication: 
+  - Technical weight: 8/10 = 80%
+  - Communication weight: 2/10 = 20%
+  - Cultural Fit weight: 0% (no questions)
+- Final Score = (Technical_Score × 0.80) + (Communication_Score × 0.20)
 
 **Response Format (JSON):**
 {
   "questions": [
     {
       "question_number": 1,
-      "question_text": "Actual question from transcript",
-      "category": "Technical Skills",
-      "max_marks": 15,
-      "marks_obtained": 12,
+      "question_text": "Exact question from transcript",
+      "criteria": "Technical Skills",
+      "criteria_reasoning": "Why this question falls under Technical Skills",
+      "score": 85,
+      "max_score": 100,
       "answered": true,
-      "candidate_response": "Summary of what candidate said",
-      "feedback": "Why this score was given"
-    },
-    {
-      "question_number": 2,
-      "question_text": "Question that was asked",
-      "category": "Communication",
-      "max_marks": 8,
-      "marks_obtained": 0,
-      "answered": false,
-      "candidate_response": "Not answered / Vague response",
-      "feedback": "Question not properly answered"
+      "candidate_response": "Summary of candidate's answer",
+      "evaluation_reasoning": "Detailed explanation of why this score was given, citing specific parts of the answer",
+      "strengths_in_answer": ["Specific strength 1", "Specific strength 2"],
+      "gaps_in_answer": ["What was missing or could be improved"]
     }
   ],
-  "marks_summary": {
-    "total_max_marks": ${TOTAL_MARKS},
-    "total_obtained": 0,
-    "percentage": 0,
-    "questions_asked": 0,
-    "questions_answered": 0,
-    "by_category": {
-      "Technical Skills": { "max": 40, "obtained": 0 },
-      "Communication": { "max": 20, "obtained": 0 },
-      "Problem Solving": { "max": 25, "obtained": 0 },
-      "Cultural Fit": { "max": 15, "obtained": 0 }
+  "criteria_breakdown": {
+    "Technical Skills": {
+      "question_count": 8,
+      "average_score": 75,
+      "weight_percentage": 80,
+      "weighted_contribution": 60,
+      "summary": "Strong technical foundation with good framework knowledge"
+    },
+    "Communication": {
+      "question_count": 2,
+      "average_score": 70,
+      "weight_percentage": 20,
+      "weighted_contribution": 14,
+      "summary": "Clear communication but could elaborate more"
     }
   },
-  "overall_score": 0,
+  "categories_used": ["Technical Skills", "Communication"],
+  "categories_not_used": ["Cultural Fit", "Problem Solving"],
+  "final_score_calculation": {
+    "formula": "(Technical: 75 × 80%) + (Communication: 70 × 20%)",
+    "breakdown": [
+      { "criteria": "Technical Skills", "score": 75, "weight": 0.80, "contribution": 60 },
+      { "criteria": "Communication", "score": 70, "weight": 0.20, "contribution": 14 }
+    ],
+    "total": 74
+  },
+  "overall_score": 74,
   "recommendation": "Hire|Maybe|No Hire",
-  "summary": "Overall assessment",
-  "strengths": ["strength 1"],
-  "areas_for_improvement": ["area 1"],
-  "scoring_explanation": "Detailed explanation of how marks were assigned"
+  "summary": "Overall assessment based ONLY on criteria evaluated",
+  "strengths": [
+    { "point": "Strong technical knowledge", "category": "Technical Skills", "evidence": ["Demonstrated deep React knowledge", "Explained hooks correctly"] }
+  ],
+  "areas_for_improvement": [
+    { "point": "Could elaborate more", "category": "Communication", "evidence": ["Answers were brief"], "improvement_suggestion": "Practice expanding on technical explanations" }
+  ],
+  "scoring_explanation": "Final score of 74% calculated from Technical Skills (80% weight, 75 score) and Communication (20% weight, 70 score). Cultural Fit and Problem Solving were not evaluated as no questions were asked in these categories."
 }
 
-**IMPORTANT RULES:**
-1. All ${TOTAL_QUESTIONS} questions MUST be listed (even if not asked)
-2. Sum of all max_marks MUST equal exactly ${TOTAL_MARKS}
-3. **YOU decide the category for each question** based on its content:
-   - "What frameworks do you know?" → Technical Skills
-   - "How did you debug that issue?" → Problem Solving
-   - "Tell me about your project" → Communication
-   - "How do you work in a team?" → Cultural Fit
-4. **YOU decide the marks** for each question based on its importance (8-15 for technical, 5-8 for cultural fit, etc.)
-5. If candidate only answered 2/10 questions, they can only score marks for those 2 questions
-6. Final percentage = (total_obtained / ${TOTAL_MARKS}) × 100
-7. Reference actual transcript content in feedback`
+**CRITICAL RULES:**
+1. ONLY include criteria in final score that have actual questions
+2. Weight each criteria by (number of questions in that criteria / total questions)
+3. Each question must have detailed reasoning for its score
+4. Reference SPECIFIC parts of candidate's answers as evidence
+5. Do NOT assume or invent categories that had no questions
+6. The sum of all weight_percentages must equal 100%
+7. Be specific in feedback - cite actual words/phrases from transcript`
 
     // Fetch company's OpenAI service account key from database (like CV parsing and video interviews)
     let openaiApiKey: string | undefined = undefined
@@ -407,8 +408,8 @@ ${evaluation.summary}
 
 ## Marks Summary
 - **Total Marks:** ${evaluation.marks_summary.total_obtained}/${evaluation.marks_summary.total_max_marks} (${evaluation.marks_summary.percentage}%)
-- **Questions Asked:** ${evaluation.marks_summary.questions_asked}/${TOTAL_QUESTIONS}
-- **Questions Answered:** ${evaluation.marks_summary.questions_answered}/${TOTAL_QUESTIONS}
+- **Questions Asked:** ${evaluation.marks_summary.questions_asked}/${evaluation.questions?.length || DEFAULT_TOTAL_QUESTIONS}
+- **Questions Answered:** ${evaluation.marks_summary.questions_answered}/${evaluation.questions?.length || DEFAULT_TOTAL_QUESTIONS}
 
 ## Strengths
 ${evaluation.strengths.map((s: string) => `- ${s}`).join('\n')}
@@ -731,48 +732,190 @@ ${evaluation.scoring_explanation || 'No detailed scoring breakdown available'}
   }
 }
 
-// Helper function to calculate score from questions array (school-exam style)
-// Simply adds up all marks_obtained and divides by total_max_marks
-function calculateSchoolExamScore(questions: any[]): { total_obtained: number, total_max: number, percentage: number } {
-  const total_obtained = questions.reduce((sum: number, q: any) => sum + (q.marks_obtained || 0), 0)
-  const total_max = questions.reduce((sum: number, q: any) => sum + (q.max_marks || 0), 0)
-  const percentage = total_max > 0 ? Math.round((total_obtained / total_max) * 100) : 0
-  return { total_obtained, total_max, percentage }
+// Helper function to calculate criteria-based weighted score
+// SCHOOL EXAM STYLE: Total marks = 100, distributed across TOTAL INTERVIEW QUESTIONS (default 10)
+// Questions not asked = 0 marks, Unanswered questions = 0 marks
+function calculateCriteriaBasedScore(questions: any[], totalInterviewQuestions: number = DEFAULT_TOTAL_QUESTIONS): {
+  overall_score: number,
+  criteria_breakdown: Record<string, any>,
+  categories_used: string[],
+  categories_not_used: string[],
+  final_score_calculation: any
+} {
+  const questionsAsked = questions.length
+  // CRITICAL: Use TOTAL interview questions (e.g., 10), not just questions asked (e.g., 4)
+  const marksPerQuestion = Math.floor(100 / totalInterviewQuestions) // 10 questions = 10 marks each
+  const remainderMarks = 100 - (marksPerQuestion * totalInterviewQuestions) // distribute remainder to first questions
+  
+  console.log('📊 [SCORING] Total interview questions:', totalInterviewQuestions)
+  console.log('📊 [SCORING] Questions actually asked:', questionsAsked)
+  console.log('📊 [SCORING] Marks per question:', marksPerQuestion)
+  console.log('📊 [SCORING] Questions NOT asked (will get 0 marks):', totalInterviewQuestions - questionsAsked)
+  
+  // First pass: Assign max marks to each question and calculate obtained marks
+  // CRITICAL: Unanswered questions get 0 marks
+  let totalObtained = 0
+  const questionsWithMarks = questions.map((q, index) => {
+    // First few questions get +1 mark to distribute remainder
+    const maxMarks = marksPerQuestion + (index < remainderMarks ? 1 : 0)
+    
+    // CRITICAL FIX: If question is NOT answered, score = 0
+    // Check multiple indicators of unanswered question
+    const isUnanswered = q.answered === false || 
+                         (q.candidate_response && (
+                           q.candidate_response.toLowerCase().includes('no, sorry') ||
+                           q.candidate_response.toLowerCase().includes('please ask the next') ||
+                           q.candidate_response.toLowerCase().includes('skip') ||
+                           q.candidate_response.toLowerCase().includes('i don\'t know') ||
+                           q.candidate_response.toLowerCase().includes('not sure') ||
+                           q.candidate_response.trim().length < 10 // Very short responses
+                         ))
+    
+    // Calculate obtained marks: scale the 0-100 score to the question's max marks
+    // BUT if unanswered, give 0 marks regardless of what OpenAI said
+    let obtainedMarks = 0
+    if (!isUnanswered) {
+      const scorePercent = (q.score || 0) / 100
+      obtainedMarks = Math.round(scorePercent * maxMarks)
+    }
+    
+    totalObtained += obtainedMarks
+    
+    console.log(`📊 [SCORING] Q${index + 1}: ${isUnanswered ? 'UNANSWERED' : 'answered'} - ${obtainedMarks}/${maxMarks} marks`)
+    
+    return {
+      ...q,
+      max_marks: maxMarks,
+      marks_obtained: obtainedMarks,
+      answered: !isUnanswered
+    }
+  })
+  
+  // Group questions by criteria for breakdown
+  const byCategory: Record<string, any[]> = {}
+  questionsWithMarks.forEach((q: any) => {
+    const criteria = q.criteria || q.category || 'General'
+    if (!byCategory[criteria]) {
+      byCategory[criteria] = []
+    }
+    byCategory[criteria].push(q)
+  })
+  
+  // Calculate breakdown by category
+  const criteriaBreakdown: Record<string, any> = {}
+  const breakdown: any[] = []
+  
+  Object.entries(byCategory).forEach(([criteria, criteriaQuestions]) => {
+    const questionCount = criteriaQuestions.length
+    const maxMarks = criteriaQuestions.reduce((sum, q) => sum + (q.max_marks || 0), 0)
+    const obtainedMarks = criteriaQuestions.reduce((sum, q) => sum + (q.marks_obtained || 0), 0)
+    const answeredCount = criteriaQuestions.filter(q => q.answered).length
+    const averagePercent = maxMarks > 0 ? Math.round((obtainedMarks / maxMarks) * 100) : 0
+    
+    criteriaBreakdown[criteria] = {
+      question_count: questionCount,
+      questions_answered: answeredCount,
+      max_marks: maxMarks,
+      obtained_marks: obtainedMarks,
+      average_score: averagePercent,
+      weight_percentage: maxMarks, // In school exam style, weight = max marks
+      summary: `${answeredCount}/${questionCount} questions answered, scored ${obtainedMarks}/${maxMarks} marks`
+    }
+    
+    breakdown.push({
+      criteria,
+      max_marks: maxMarks,
+      obtained_marks: obtainedMarks,
+      questions_answered: answeredCount,
+      total_questions: questionCount
+    })
+  })
+  
+  // Final score is simply: total obtained out of 100
+  // If only 4 questions asked out of 10, max possible is 40 marks (4 × 10)
+  // The remaining 60 marks (6 questions not asked) are lost
+  const finalScore = totalObtained
+  
+  console.log('📊 [SCORING] Final score:', finalScore, '/ 100')
+  console.log('📊 [SCORING] Questions answered:', questionsWithMarks.filter(q => q.answered).length, '/', questionsAsked, '(asked) out of', totalInterviewQuestions, '(total)')
+  
+  // Determine used and unused categories
+  const allPossibleCategories = ['Technical Skills', 'Communication', 'Problem Solving', 'Cultural Fit']
+  const categoriesUsed = Object.keys(byCategory)
+  const categoriesNotUsed = allPossibleCategories.filter(c => !categoriesUsed.includes(c))
+  
+  return {
+    overall_score: finalScore,
+    criteria_breakdown: criteriaBreakdown,
+    categories_used: categoriesUsed,
+    categories_not_used: categoriesNotUsed,
+    final_score_calculation: {
+      formula: breakdown.map(b => `${b.criteria}: ${b.obtained_marks}/${b.max_marks}`).join(' + '),
+      breakdown,
+      total: finalScore,
+      questions_with_marks: questionsWithMarks
+    }
+  }
 }
 
-// Helper function to ensure evaluation response has the correct format (school-exam style)
-function normalizeEvaluationResponse(evaluation: any): any {
-  // If it's already in the new school-exam format with questions array, return as is
+// Helper function to ensure evaluation response has the correct format (criteria-based)
+// SCHOOL EXAM STYLE: 100 marks total for 10 questions, unanswered/not asked = 0 marks
+function normalizeEvaluationResponse(evaluation: any, totalInterviewQuestions: number = DEFAULT_TOTAL_QUESTIONS): any {
+  // If it's in the new criteria-based format, ensure all fields exist
   if (evaluation.questions && Array.isArray(evaluation.questions)) {
-    // Ensure marks_summary exists
-    if (!evaluation.marks_summary) {
-      const { total_obtained, total_max, percentage } = calculateSchoolExamScore(evaluation.questions)
-      const byCategory: Record<string, { max: number, obtained: number }> = {}
-      
-      evaluation.questions.forEach((q: any) => {
-        if (!byCategory[q.category]) {
-          byCategory[q.category] = { max: 0, obtained: 0 }
-        }
-        byCategory[q.category].max += q.max_marks || 0
-        byCategory[q.category].obtained += q.marks_obtained || 0
-      })
-      
-      evaluation.marks_summary = {
-        total_max_marks: total_max,
-        total_obtained: total_obtained,
-        percentage: percentage,
-        questions_asked: evaluation.questions.filter((q: any) => q.answered).length,
-        questions_answered: evaluation.questions.filter((q: any) => q.answered && q.marks_obtained > 0).length,
-        by_category: byCategory
+    const questionsAsked = evaluation.questions.length
+    console.log('📊 [NORMALIZE] Processing', questionsAsked, 'questions out of', totalInterviewQuestions, 'total')
+    
+    // ALWAYS recalculate to ensure:
+    // 1. Unanswered questions get 0 marks
+    // 2. Questions not asked get 0 marks (counted in total)
+    const calculated = calculateCriteriaBasedScore(evaluation.questions, totalInterviewQuestions)
+    
+    // Build marks_summary for backward compatibility using calculated values
+    const byCategory: Record<string, { max: number, obtained: number }> = {}
+    const questionsWithMarks = calculated.final_score_calculation.questions_with_marks || []
+    
+    questionsWithMarks.forEach((q: any) => {
+      const criteria = q.criteria || q.category || 'General'
+      if (!byCategory[criteria]) {
+        byCategory[criteria] = { max: 0, obtained: 0 }
       }
-      
-      // Ensure overall_score matches percentage
-      evaluation.overall_score = percentage
+      byCategory[criteria].max += q.max_marks || 0
+      byCategory[criteria].obtained += q.marks_obtained || 0
+    })
+    
+    evaluation.criteria_breakdown = calculated.criteria_breakdown
+    evaluation.categories_used = calculated.categories_used
+    evaluation.categories_not_used = calculated.categories_not_used
+    evaluation.final_score_calculation = calculated.final_score_calculation
+    evaluation.overall_score = calculated.overall_score
+    
+    // Update questions with correct marks
+    evaluation.questions = questionsWithMarks
+    
+    // Backward compatible marks_summary with CORRECT values
+    const answeredCount = questionsWithMarks.filter((q: any) => q.answered).length
+    const questionsNotAsked = totalInterviewQuestions - questionsAsked
+    evaluation.marks_summary = {
+      total_max_marks: 100, // School exam style: always out of 100
+      total_obtained: calculated.overall_score,
+      percentage: calculated.overall_score,
+      total_interview_questions: totalInterviewQuestions,
+      questions_asked: questionsAsked,
+      questions_not_asked: questionsNotAsked,
+      questions_answered: answeredCount,
+      by_category: byCategory
     }
+    
+    console.log('📊 [NORMALIZE] Final score:', calculated.overall_score, '/ 100')
+    console.log('📊 [NORMALIZE] Questions asked:', questionsAsked, '/', totalInterviewQuestions)
+    console.log('📊 [NORMALIZE] Questions answered:', answeredCount, '/', questionsAsked)
+    console.log('📊 [NORMALIZE] Questions NOT asked (0 marks):', questionsNotAsked)
+    
     return evaluation
   }
 
-  // If it's in the old question_analysis format, convert to new school-exam format
+  // If it's in the old question_analysis format, convert to new criteria-based format
   if (evaluation.question_analysis) {
     const questions: any[] = []
     let questionNumber = 1
@@ -783,43 +926,34 @@ function normalizeEvaluationResponse(evaluation: any): any {
         questions.push({
           question_number: questionNumber++,
           question_text: q.question || 'Unknown question',
-          category: category,
-          max_marks: (q.max_score || 10) * (q.weightage || 1.0), // Convert to marks
-          marks_obtained: (q.score || 0) * (q.weightage || 1.0),
+          criteria: category,
+          criteria_reasoning: `Question categorized as ${category}`,
+          score: q.score || 0,
+          max_score: 100,
           answered: q.answered !== false,
           candidate_response: q.candidate_response || '',
-          feedback: q.feedback || ''
+          evaluation_reasoning: q.feedback || '',
+          strengths_in_answer: [],
+          gaps_in_answer: []
         })
       })
     })
     
-    const { total_obtained, total_max, percentage } = calculateSchoolExamScore(questions)
-    const byCategory: Record<string, { max: number, obtained: number }> = {}
-    
-    questions.forEach((q: any) => {
-      if (!byCategory[q.category]) {
-        byCategory[q.category] = { max: 0, obtained: 0 }
-      }
-      byCategory[q.category].max += q.max_marks || 0
-      byCategory[q.category].obtained += q.marks_obtained || 0
-    })
+    // Use total interview questions (10) for scoring
+    const calculated = calculateCriteriaBasedScore(questions, totalInterviewQuestions)
     
     return {
-      questions: questions,
-      marks_summary: {
-        total_max_marks: total_max,
-        total_obtained: total_obtained,
-        percentage: percentage,
-        questions_asked: questions.filter((q: any) => q.answered).length,
-        questions_answered: questions.filter((q: any) => q.answered && q.marks_obtained > 0).length,
-        by_category: byCategory
-      },
-      overall_score: percentage,
+      questions,
+      criteria_breakdown: calculated.criteria_breakdown,
+      categories_used: calculated.categories_used,
+      categories_not_used: calculated.categories_not_used,
+      final_score_calculation: calculated.final_score_calculation,
+      overall_score: calculated.overall_score,
       recommendation: evaluation.recommendation || 'Maybe',
       summary: evaluation.summary || '',
       strengths: evaluation.strengths || [],
       areas_for_improvement: evaluation.areas_for_improvement || [],
-      scoring_explanation: evaluation.scoring_details || 'Converted from legacy format'
+      scoring_explanation: `Criteria-based evaluation: ${calculated.final_score_calculation.formula}`
     }
   }
 

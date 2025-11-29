@@ -123,6 +123,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
         a.portfolio_url,
         a.available_start_date,
         a.willing_to_relocate,
+        a.languages,
         c.email as candidate_email,
         c.phone as candidate_phone,
         c.first_name as c_first_name,
@@ -152,6 +153,16 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       ? `${row.first_name} ${row.last_name}`
       : row.candidate_email?.split('@')[0] || row.email?.split('@')[0] || 'Unknown'
 
+    // Parse languages from JSON if stored as string
+    let parsedLanguages = []
+    try {
+      if (row.languages) {
+        parsedLanguages = typeof row.languages === 'string' ? JSON.parse(row.languages) : row.languages
+      }
+    } catch (e) {
+      console.warn('Failed to parse languages:', e)
+    }
+
     const candidate = {
       id: row.id,
       name: candidateName,
@@ -167,7 +178,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       linkedinUrl: row.linkedin_url || null,
       portfolioUrl: row.portfolio_url || null,
       availableStartDate: row.available_start_date || null,
-      willingToRelocate: row.willing_to_relocate || false
+      willingToRelocate: row.willing_to_relocate || false,
+      languages: parsedLanguages
     }
 
     // Primary source: evaluation from interviews.metadata->evaluation
@@ -214,20 +226,54 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
           return 0
         }
 
-        evaluation = {
-          overallScore: evalObj.overall_score || 0,
-          decision,
-          scores: {
+        // Extract criteria-based evaluation data (new format)
+        const criteriaBreakdown = evalObj.criteria_breakdown || null
+        const categoriesUsed = evalObj.categories_used || []
+        const categoriesNotUsed = evalObj.categories_not_used || []
+        const finalScoreCalculation = evalObj.final_score_calculation || null
+        const questionDetails = evalObj.scores || evalObj.questions || []
+        
+        // Build scores from criteria_breakdown if available (new format)
+        let computedScores = {
+          technical: 0,
+          communication: 0,
+          experience: 0,
+          cultural_fit: 0
+        }
+        
+        if (criteriaBreakdown) {
+          computedScores = {
+            technical: criteriaBreakdown['Technical Skills']?.average_score || 0,
+            communication: criteriaBreakdown['Communication']?.average_score || 0,
+            experience: criteriaBreakdown['Problem Solving']?.average_score || 0,
+            cultural_fit: criteriaBreakdown['Cultural Fit']?.average_score || 0
+          }
+        } else {
+          // Fallback to old score extraction
+          computedScores = {
             technical: extractScore(scores.technical || scores, 'technical'),
             communication: extractScore(scores.communication || scores, 'communication'),
             experience: extractScore(scores.experience || scores, 'experience'),
             cultural_fit: extractScore(scores.cultural_fit || scores.culture || scores, 'cultural_fit')
-          },
+          }
+        }
+
+        evaluation = {
+          overallScore: evalObj.overall_score || 0,
+          decision,
+          scores: computedScores,
           strengths: Array.isArray(strengths) ? strengths : [],
           weaknesses: Array.isArray(weaknesses) ? weaknesses : [],
           reviewerComments: evalObj.summary || evalObj.reviewer_comments || '',
           reviewedAt: evalObj.evaluated_at || evalObj.reviewed_at || null,
-          reviewedBy: evalObj.reviewed_by || 'AI Evaluator'
+          reviewedBy: evalObj.reviewed_by || 'AI Evaluator',
+          // New criteria-based fields
+          criteriaBreakdown,
+          categoriesUsed,
+          categoriesNotUsed,
+          finalScoreCalculation,
+          questions: questionDetails,
+          scoringExplanation: evalObj.scoring_explanation || ''
         }
         console.log('✅ Evaluation loaded from interviews.metadata:', JSON.stringify(evaluation, null, 2))
       }
@@ -430,22 +476,44 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       if (Array.isArray(arr) && arr.length > 0) return String(arr[0])
       return fallback
     }
-    const safeEval = evaluation || { scores: {}, strengths: [], weaknesses: [], reviewerComments: '' }
-    let techScoreRaw = (safeEval.scores as any)?.technical ?? (safeEval.scores as any)?.tech
-    let commScoreRaw = (safeEval.scores as any)?.communication
-    let expScoreRaw = (safeEval.scores as any)?.experience
-    let cultScoreRaw = (safeEval.scores as any)?.cultural_fit ?? (safeEval.scores as any)?.culture
+    const safeEval = evaluation || { scores: {}, strengths: [], weaknesses: [], reviewerComments: '', criteriaBreakdown: null }
     
-    // If all individual scores are 0 but we have an overall score, distribute it
+    // PRIORITY: Use criteria_breakdown if available (new school exam style)
+    // This has accurate scores based on actual answered questions
+    const criteriaBreakdown = safeEval.criteriaBreakdown || (safeEval as any).criteria_breakdown
+    
+    let techScoreRaw = 0
+    let commScoreRaw = 0
+    let expScoreRaw = 0
+    let cultScoreRaw = 0
+    
+    if (criteriaBreakdown) {
+      // Use the accurate scores from criteria breakdown
+      // These are calculated as: (obtained_marks / max_marks) * 100
+      techScoreRaw = criteriaBreakdown['Technical Skills']?.average_score || 0
+      commScoreRaw = criteriaBreakdown['Communication']?.average_score || 0
+      expScoreRaw = criteriaBreakdown['Problem Solving']?.average_score || 0
+      cultScoreRaw = criteriaBreakdown['Cultural Fit']?.average_score || 0
+      console.log('📊 Using criteria_breakdown scores:', { techScoreRaw, commScoreRaw, expScoreRaw, cultScoreRaw })
+    } else {
+      // Fallback to old scores format
+      techScoreRaw = (safeEval.scores as any)?.technical ?? (safeEval.scores as any)?.tech ?? 0
+      commScoreRaw = (safeEval.scores as any)?.communication ?? 0
+      expScoreRaw = (safeEval.scores as any)?.experience ?? 0
+      cultScoreRaw = (safeEval.scores as any)?.cultural_fit ?? (safeEval.scores as any)?.culture ?? 0
+      console.log('📊 Using fallback scores:', { techScoreRaw, commScoreRaw, expScoreRaw, cultScoreRaw })
+    }
+    
+    // If all individual scores are 0 but we have an overall score, use overall score for all
     const hasIndividualScores = techScoreRaw || commScoreRaw || expScoreRaw || cultScoreRaw
     if (!hasIndividualScores && safeEval.overallScore) {
       const baseScore = safeEval.overallScore
-      console.log('📊 No individual scores found, distributing overall score:', baseScore)
-      // Distribute the overall score with some variation based on strengths/weaknesses
-      techScoreRaw = baseScore + (Math.random() * 2 - 1) // ±1 variation
-      commScoreRaw = baseScore + (Math.random() * 2 - 1)
-      expScoreRaw = baseScore + (Math.random() * 2 - 1)
-      cultScoreRaw = baseScore + (Math.random() * 2 - 1)
+      console.log('📊 No individual scores found, using overall score:', baseScore)
+      // Use overall score directly (no random variation - that was wrong)
+      techScoreRaw = baseScore
+      commScoreRaw = baseScore
+      expScoreRaw = baseScore
+      cultScoreRaw = baseScore
     }
     
     const techScore = normalizeTo100(techScoreRaw)

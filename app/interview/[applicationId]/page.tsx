@@ -389,7 +389,24 @@ Ask these questions sequentially:`
           questions.forEach((q, index) => {
             instructions += `\n${index + 1}. ${q.text}`
           })
-          instructions += `\n\nAllow time for responses. If candidate goes off-track or takes too long, politely redirect: "Thank you, let's move to the next question so we can cover everything within our time."`
+          instructions += `
+
+**ANSWER VALIDATION PROCESS (Follow this for EVERY question):**
+After each candidate response, you MUST:
+1. **Analyze the answer** - Check if:
+   - The answer is RELEVANT to the question asked
+   - The candidate appears to have COMPLETED their response (not mid-thought)
+   
+2. **Confirm completion** - Ask: "Have you finished your answer?" or "Is there anything else you'd like to add?"
+
+3. **Handle based on response:**
+   - If candidate says YES (finished) AND answer was relevant and complete → Acknowledge briefly ("Thank you for that response") and proceed to the NEXT question
+   - If candidate says NO (not finished) → Say "Please continue, I'm listening" and wait for them to complete
+   - If answer was NOT relevant to the question → Politely redirect: "I appreciate your thoughts, but could you please address the specific question about [topic]? Let me repeat it..."
+   - If answer was too brief or incomplete → Ask for elaboration: "Could you please elaborate on that? I'd like to understand your experience in more detail."
+   - If candidate goes off-track or takes too long → Politely redirect: "Thank you, let's move to the next question so we can cover everything within our time."
+
+**IMPORTANT:** Do NOT move to the next question until you have confirmed the candidate has finished AND the answer is appropriate.`
         } else {
           instructions += `\n1. Tell me about yourself and your relevant experience.
 2. Why are you interested in this ${details?.jobTitle || 'position'}?
@@ -402,7 +419,22 @@ Ask these questions sequentially:`
 9. Describe a technical problem you solved recently.
 10. Do you have any questions about the role or company?
 
-Allow time for responses. If candidate goes off-track or takes too long, politely redirect: "Thank you, let's move to the next question so we can cover everything within our time."`
+**ANSWER VALIDATION PROCESS (Follow this for EVERY question):**
+After each candidate response, you MUST:
+1. **Analyze the answer** - Check if:
+   - The answer is RELEVANT to the question asked
+   - The candidate appears to have COMPLETED their response (not mid-thought)
+   
+2. **Confirm completion** - Ask: "Have you finished your answer?" or "Is there anything else you'd like to add?"
+
+3. **Handle based on response:**
+   - If candidate says YES (finished) AND answer was relevant and complete → Acknowledge briefly ("Thank you for that response") and proceed to the NEXT question
+   - If candidate says NO (not finished) → Say "Please continue, I'm listening" and wait for them to complete
+   - If answer was NOT relevant to the question → Politely redirect: "I appreciate your thoughts, but could you please address the specific question about [topic]? Let me repeat it..."
+   - If answer was too brief or incomplete → Ask for elaboration: "Could you please elaborate on that? I'd like to understand your experience in more detail."
+   - If candidate goes off-track or takes too long → Politely redirect: "Thank you, let's move to the next question so we can cover everything within our time."
+
+**IMPORTANT:** Do NOT move to the next question until you have confirmed the candidate has finished AND the answer is appropriate.`
         }
 
         instructions += `
@@ -429,7 +461,9 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
 1. ALWAYS speak in English only
 2. If candidate uses any other language, politely redirect to English immediately
 3. Be professional, warm, and keep the interview structured and on-time
-4. Maintain the English-only policy throughout the entire interview`
+4. Maintain the English-only policy throughout the entire interview
+5. ALWAYS ask "Have you finished your answer?" after each candidate response before moving to the next question
+6. NEVER proceed to the next question until you have confirmed the candidate has completed their answer AND the answer is relevant`
 
         // Update session with instructions
         const updateMsg = {

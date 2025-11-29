@@ -17,16 +17,17 @@ export const config = {
   // Environment
   env: process.env.NODE_ENV || 'development',
   
-  // Billing Configuration
+  // Billing Configuration - ALL PRICING COMES FROM .env FILE ONLY
+  // NO external pricing, NO OpenAI API costs - ONLY these env values
   billing: {
-    // Profit margin percentage to add on top of OpenAI costs (e.g., 20 = 20% markup)
-    profitMarginPercentage: parseFloat(process.env.PROFIT_MARGIN_PERCENTAGE || '20'),
+    // Cost per CV parsing (default: $0.50)
+    cvParsingCost: parseFloat(process.env.COST_PER_CV_PARSING || '0.50'),
     
-    // Hardcoded pricing (NEVER shown in database or UI)
-    // These values are ONLY used internally for billing calculations
-    cvParsingPrice: parseFloat(process.env.CV_PARSING_PRICE || '0.50'),
-    videoInterviewPricePerMinute: parseFloat(process.env.VIDEO_INTERVIEW_PRICE_PER_MINUTE || '0.50'),
-    questionGenerationPricePer10Questions: parseFloat(process.env.QUESTION_GENERATION_PRICE_PER_10_QUESTIONS || '0.10'),
+    // Cost per 10 questions generated (default: $0.10)
+    questionGenerationCostPer10: parseFloat(process.env.COST_PER_10_QUESTIONS || '0.10'),
+    
+    // Cost per minute of video interview (default: $0.10)
+    videoInterviewCostPerMinute: parseFloat(process.env.COST_PER_VIDEO_MINUTE || '0.10'),
   },
   
   // Feature flags
@@ -121,35 +122,31 @@ export const checkOpenAIPermissions = async (): Promise<{
   }
 }
 
-// Helper function to calculate cost with profit margin
-export const applyProfitMargin = (baseCost: number): { baseCost: number, markup: number, finalCost: number } => {
-  const profitMargin = config.billing.profitMarginPercentage
-  const markup = (baseCost * profitMargin) / 100
-  const finalCost = baseCost + markup
+// ============================================
+// BILLING PRICING - ALL FROM .env FILE ONLY
+// NO OpenAI API costs, NO external sources
+// ============================================
 
+// Get CV parsing cost from .env
+export const getCVParsingCost = (): number => {
+  return config.billing.cvParsingCost
+}
+
+// Get question generation cost per 10 questions from .env
+export const getQuestionGenerationCostPer10 = (): number => {
+  return config.billing.questionGenerationCostPer10
+}
+
+// Get video interview cost per minute from .env
+export const getVideoInterviewCostPerMinute = (): number => {
+  return config.billing.videoInterviewCostPerMinute
+}
+
+// Get all billing prices (for API/UI display)
+export const getBillingPrices = () => {
   return {
-    baseCost: parseFloat(baseCost.toFixed(4)),
-    markup: parseFloat(markup.toFixed(4)),
-    finalCost: parseFloat(finalCost.toFixed(4))
+    cvParsingCost: config.billing.cvParsingCost,
+    questionGenerationCostPer10: config.billing.questionGenerationCostPer10,
+    videoInterviewCostPerMinute: config.billing.videoInterviewCostPerMinute,
   }
-}
-
-// Get profit margin percentage
-export const getProfitMarginPercentage = () => {
-  return config.billing.profitMarginPercentage
-}
-
-// Get hardcoded CV parsing price (INTERNAL USE ONLY - Never expose to UI/DB)
-export const getCVParsingPrice = () => {
-  return config.billing.cvParsingPrice
-}
-
-// Get hardcoded video interview price per minute (INTERNAL USE ONLY - Never expose to UI/DB)
-export const getVideoInterviewPricePerMinute = () => {
-  return config.billing.videoInterviewPricePerMinute
-}
-
-// Get hardcoded question generation price per 10 questions (INTERNAL USE ONLY - Never expose to UI/DB)
-export const getQuestionGenerationPricePer10Questions = () => {
-  return config.billing.questionGenerationPricePer10Questions
 }

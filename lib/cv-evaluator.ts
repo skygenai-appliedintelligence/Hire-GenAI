@@ -132,6 +132,13 @@ interface CVEvaluationResult {
       institution: string | null
       year: string | null
     }>
+    work_experience: Array<{
+      company: string
+      title: string
+      duration: string
+      start_date: string | null
+      end_date: string | null
+    }>
     certifications: Array<{
       name: string
       issued_date: string | null
@@ -213,6 +220,7 @@ export class CVEvaluator {
         extracted: {
           name: null, email: null, phone: null, location: null,
           total_experience_years_estimate: null, titles: [], skills: [], education: [], 
+          work_experience: [],
           certifications: [], languages: [], nationality: null, recent_projects: [], notable_projects: []
         },
         gaps_and_notes: ['Domain mismatch: RPA JD vs non-RPA resume']
@@ -239,7 +247,8 @@ export class CVEvaluator {
         },
         extracted: {
           name: null, email: null, phone: null, location: null,
-          total_experience_years_estimate: null, titles: [], skills: [], education: [], 
+          total_experience_years_estimate: null, titles: [], skills: [], education: [],
+          work_experience: [],
           certifications: [], languages: [], nationality: null, recent_projects: [], notable_projects: []
         },
         gaps_and_notes: ['No JD skill overlap found']
@@ -284,6 +293,14 @@ FAIR SCORING GUIDELINES:
 - Education: Score based on relevance of degree/certifications; mark null if not clearly stated.
 - Red flags: Note serious issues (unreadable resume, clearly contradictory claims). Do not penalize normal job changes.
 
+WORK EXPERIENCE EXTRACTION:
+- Look for sections like "Career Highlights", "Professional Experience", "Employment History", "Work Experience"
+- Extract each position with: company name, job title, start date, end date, and calculate duration
+- Format dates as "YYYY-MM-DD" if possible, or just "YYYY" if only year provided
+- For current positions with no end date, use null for end_date
+- Calculate duration based on date ranges (e.g., "Jan 2022 - Dec 2023" = "1 year 11 months")
+- Exclude non-professional experience like internships, training, or part-time roles unless relevant to the position
+
 [OUTPUT SCHEMA — RETURN ONLY JSON]
 {
   "overall": {
@@ -313,6 +330,15 @@ FAIR SCORING GUIDELINES:
     "titles": string[],
     "skills": string[],
     "education": [{ "degree": string|null, "field": string|null, "institution": string|null, "year": string|null }],
+    "work_experience": [
+      {
+        "company": string,
+        "title": string,
+        "duration": string,
+        "start_date": string|null,
+        "end_date": string|null
+      }
+    ],
     "certifications": [{ "name": string, "issued_date": string|null, "expiry_date": string|null }],
     "languages": [{ "language": string, "proficiency": string }],
     "nationality": string|null,
@@ -407,6 +433,11 @@ FAIR SCORING GUIDELINES:
           name: null, email: null, phone: null, location: "Mumbai",
           total_experience_years_estimate: 3, titles: [], skills: ["JavaScript", "React"], 
           education: [], 
+          work_experience: [
+            { company: "Teamlease Digital Private Limited, India", title: "RPA Support/Developer", duration: "11 months", start_date: "2022-02-21", end_date: "2023-01-20" },
+            { company: "Home Credit India Finance (P) Ltd, India", title: "RPA Developer / Junior Customer Support", duration: "2 years 8 months", start_date: "2018-03-05", end_date: "2021-05-01" },
+            { company: "Adya Computers, Allahabad, Naini, India", title: "Data Entry Operator", duration: "1 year", start_date: "2012-12-03", end_date: "2013-12-30" }
+          ],
           certifications: [],
           languages: [{ language: "English", proficiency: "Fluent" }],
           nationality: "Indian",

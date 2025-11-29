@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { AIInterviewService, type CandidateApplication } from '@/lib/ai-interview-service'
-import { Loader2, Send } from 'lucide-react'
+import { Loader2, Send, Plus, X } from 'lucide-react'
 
 export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOpen?: boolean }) {
   const router = useRouter()
@@ -49,6 +49,41 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
     impactfulProject: '',
     availability: '',
   })
+
+  // Language and proficiency state
+  const [languages, setLanguages] = useState<Array<{ language: string; proficiency: string }>>([{ language: '', proficiency: '' }])
+
+  const languageOptions = [
+    'English', 'Hindi', 'Spanish', 'French', 'German', 'Chinese (Mandarin)', 'Chinese (Cantonese)',
+    'Japanese', 'Korean', 'Arabic', 'Portuguese', 'Russian', 'Italian', 'Dutch', 'Turkish',
+    'Vietnamese', 'Thai', 'Indonesian', 'Malay', 'Bengali', 'Tamil', 'Telugu', 'Marathi',
+    'Gujarati', 'Kannada', 'Malayalam', 'Punjabi', 'Urdu', 'Polish', 'Ukrainian', 'Swedish',
+    'Norwegian', 'Danish', 'Finnish', 'Greek', 'Hebrew', 'Czech', 'Romanian', 'Hungarian'
+  ]
+
+  const proficiencyLevels = [
+    { value: 'native', label: 'Native / Bilingual' },
+    { value: 'fluent', label: 'Fluent' },
+    { value: 'advanced', label: 'Advanced' },
+    { value: 'intermediate', label: 'Intermediate' },
+    { value: 'basic', label: 'Basic' },
+  ]
+
+  const addLanguage = () => {
+    setLanguages([...languages, { language: '', proficiency: '' }])
+  }
+
+  const removeLanguage = (index: number) => {
+    if (languages.length > 1) {
+      setLanguages(languages.filter((_, i) => i !== index))
+    }
+  }
+
+  const updateLanguage = (index: number, field: 'language' | 'proficiency', value: string) => {
+    const updated = [...languages]
+    updated[index][field] = value
+    setLanguages(updated)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -141,6 +176,9 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
 
       // Persist into DB applications table (server-side) so analytics can use real data
       try {
+        // Filter out empty language entries
+        const validLanguages = languages.filter(l => l.language && l.proficiency)
+        
         const submitPayload = {
           jobId: job.id,
           candidate: {
@@ -157,6 +195,7 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
             portfolioUrl: formData.portfolioUrl || null,
             availableStartDate: formData.availableStartDate || null,
             willingToRelocate: formData.relocate || false,
+            languages: validLanguages,
           },
           resume: resumeUploadResult?.fileUrl
             ? {
@@ -497,6 +536,72 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
         <section>
           <h3 className="font-semibold text-slate-900 border-b border-slate-200 pb-3 mb-4">Cover Letter</h3>
           <Textarea id="coverLetter" value={formData.coverLetter} onChange={(e) => setFormData((p) => ({ ...p, coverLetter: e.target.value, whyInterested: e.target.value }))} placeholder="Tell us why you're interested in this role and what makes you a great fit..." rows={5} className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" disabled={loading} />
+        </section>
+
+        {/* Language and Proficiency */}
+        <section>
+          <h3 className="font-semibold text-slate-900 border-b border-slate-200 pb-3 mb-4">Language and Proficiency Levels</h3>
+          <div className="space-y-3">
+            {languages.map((lang, index) => (
+              <div key={index} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+                <div className="space-y-2">
+                  <Label htmlFor={`language-${index}`}>Language</Label>
+                  <Select 
+                    value={lang.language} 
+                    onValueChange={(v) => updateLanguage(index, 'language', v)}
+                    disabled={loading}
+                  >
+                    <SelectTrigger className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400">
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {languageOptions.map((option) => (
+                        <SelectItem key={option} value={option}>{option}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`proficiency-${index}`}>Proficiency Level</Label>
+                  <Select 
+                    value={lang.proficiency} 
+                    onValueChange={(v) => updateLanguage(index, 'proficiency', v)}
+                    disabled={loading}
+                  >
+                    <SelectTrigger className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400">
+                      <SelectValue placeholder="Select proficiency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {proficiencyLevels.map((level) => (
+                        <SelectItem key={level.value} value={level.value}>{level.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => removeLanguage(index)}
+                  disabled={loading || languages.length === 1}
+                  className="border-slate-300 text-slate-500 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors duration-200"
+                  title="Remove language"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={addLanguage}
+              disabled={loading}
+              className="mt-2 border-slate-300 text-emerald-600 hover:text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50 transition-colors duration-200"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Another Language
+            </Button>
+          </div>
         </section>
 
         {/* Additional Information */}

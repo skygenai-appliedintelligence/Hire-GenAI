@@ -2037,14 +2037,19 @@ export class DatabaseService {
 
   // =========================
   // BILLING & USAGE TRACKING
+  // ALL PRICING FROM .env FILE ONLY - NO OpenAI API, NO external sources
   // =========================
 
-  // Get current pricing from env or defaults
+  // Get current pricing from .env file
   static getPricing() {
     return {
-      cvParsePrice: parseFloat(process.env.CV_PARSE_PRICE || '0.05'),
-      questionPricePer1kTokens: parseFloat(process.env.QUESTION_PRICE_PER_1K_TOKENS || '0.002'),
-      videoPricePerMin: parseFloat(process.env.VIDEO_PRICE_PER_MIN || '0.03'),
+      // Cost per CV parsing (COST_PER_CV_PARSING)
+      cvParsePrice: parseFloat(process.env.COST_PER_CV_PARSING || '0.50'),
+      // Cost per 10 questions (COST_PER_10_QUESTIONS)
+      questionPricePer10: parseFloat(process.env.COST_PER_10_QUESTIONS || '0.10'),
+      // Cost per minute of video (COST_PER_VIDEO_MINUTE)
+      videoPricePerMin: parseFloat(process.env.COST_PER_VIDEO_MINUTE || '0.10'),
+      // Recharge amount
       rechargeAmount: parseFloat(process.env.RECHARGE_AMOUNT || '100.00')
     }
   }
@@ -2220,7 +2225,7 @@ export class DatabaseService {
     let description: string
     let unitPrice = 0
 
-    // Calculate cost based on usage type
+    // Calculate cost based on usage type (all pricing from .env)
     switch (usageType) {
       case 'cv_parse':
         unitPrice = pricing.cvParsePrice
@@ -2229,11 +2234,12 @@ export class DatabaseService {
         description = `CV parsing (${quantity} CVs)`
         break
       case 'jd_questions':
-        unitPrice = pricing.questionPricePer1kTokens
-        const tokens = metadata.tokensIn + metadata.tokensOut
-        cost = trial.isFreeUsage ? 0 : (tokens / 1000) * unitPrice
+        // Cost per 10 questions from .env (COST_PER_10_QUESTIONS)
+        const questionCount = metadata.questionCount || quantity
+        unitPrice = pricing.questionPricePer10 / 10 // per question
+        cost = trial.isFreeUsage ? 0 : (questionCount / 10) * pricing.questionPricePer10
         entryType = trial.isFreeUsage ? 'TRIAL_CREDIT' : 'JD_QUESTIONS'
-        description = `JD question generation (${tokens} tokens)`
+        description = `JD question generation (${questionCount} questions)`
         break
       case 'video_minutes':
         unitPrice = pricing.videoPricePerMin
@@ -3016,24 +3022,17 @@ export class DatabaseService {
     }
   }
 
-  // Get current pricing
+  // Get current pricing from .env file ONLY
   static async getCurrentPricing() {
-    if (!this.isDatabaseConfigured()) {
-      throw new Error('Database not configured')
-    }
-
-    const query = `
-      SELECT * FROM pricing_history
-      WHERE effective_until IS NULL OR effective_until > NOW()
-      ORDER BY effective_from DESC
-      LIMIT 1
-    `
-    const result = await this.query(query, []) as any[]
-    return result[0] || {
-      cv_parse_price: 0.50,
-      question_price_per_1k_tokens: 0.002,
-      video_price_per_min: 0.30, // OpenAI Realtime API: $0.06 input + $0.24 output = $0.30/min
-      recharge_amount: 100.00
+    // All pricing comes from .env file - no database, no OpenAI API
+    const { getBillingPrices } = await import('./config')
+    const prices = getBillingPrices()
+    
+    return {
+      cv_parse_price: prices.cvParsingCost,
+      question_price_per_10: prices.questionGenerationCostPer10,
+      video_price_per_min: prices.videoInterviewCostPerMinute,
+      pricing_source: 'env-config'
     }
   }
 
@@ -3059,19 +3058,13 @@ export class DatabaseService {
     console.log('📄 File Size:', data.fileSizeKb || 0, 'KB')
     console.log('='.repeat(70))
 
-    // Use fixed pricing (no OpenAI API call)
-    const CV_PARSING_COST = 0.50 // Fixed cost per CV parsing
-    const usageResult = {
-      baseCost: CV_PARSING_COST,
-      source: 'fixed-pricing' as const,
-      tokens: 0
-    }
+    // Get pricing from .env file ONLY (no OpenAI API, no external sources)
+    const { getCVParsingCost } = await import('./config')
+    const cvCost = getCVParsingCost()
     
-    // Use fixed cost
-    const finalCost = usageResult.baseCost
-    const profitMarginPercent = 0 // No profit margin
+    console.log('💰 [CV PARSING] Using .env pricing: $' + cvCost.toFixed(2) + ' (COST_PER_CV_PARSING)')
     
-    console.log('💰 [CV PARSING] Using fixed pricing: $' + CV_PARSING_COST.toFixed(2))
+    const finalCost = cvCost
     
     const query = `
       INSERT INTO cv_parsing_usage (
@@ -3096,19 +3089,18 @@ export class DatabaseService {
       data.fileId || null,
       data.fileSizeKb || 0,
       data.parseSuccessful !== false,
-      usageResult.baseCost, // Keep for backward compatibility
-      finalCost, // Final cost (no profit margin)
+      cvCost, // unit_price from .env
+      finalCost, // cost (same as unit_price, no markup)
       data.successRate || null,
-      usageResult.baseCost, // Real OpenAI base cost
-      usageResult.source, // 'openai-api' or 'fallback'
-      usageResult.tokens || null, // Tokens used
-      profitMarginPercent // Profit margin percentage
+      cvCost, // openai_base_cost (using env value, no OpenAI API)
+      'env-config', // pricing_source - from .env file
+      null, // tokens_used - not applicable for env pricing
+      0 // profit_margin_percent - no margin
     ]) as any[]
 
     console.log('💾 [CV PARSING] Cost stored in database successfully')
-    console.log('💰 Final Cost (no profit margin): $' + finalCost.toFixed(4))
-    console.log('📈 Base Cost: $' + usageResult.baseCost.toFixed(4))
-    console.log('🏷️  Source: ' + usageResult.source)
+    console.log('💰 Final Cost: $' + finalCost.toFixed(2))
+    console.log('🏷️  Source: .env (COST_PER_CV_PARSING)')
 
     // ========================================
     // WALLET DEDUCTION & LEDGER ENTRY
@@ -3196,7 +3188,7 @@ export class DatabaseService {
           JSON.stringify({
             file_size_kb: data.fileSizeKb,
             parse_successful: data.parseSuccessful !== false,
-            pricing_source: usageResult.source
+            pricing_source: 'env-config'
           })
         ])
 
@@ -3237,17 +3229,16 @@ export class DatabaseService {
     console.log('💼 Job ID:', data.jobId || 'NULL (draft)')
     console.log('🔖 Draft ID:', data.draftJobId || 'N/A')
     console.log('📝 Status:', isDraft ? 'DRAFT (will reconcile when job saved)' : 'PERSISTED')
-    console.log('🤖 Prompt Tokens:', data.promptTokens)
-    console.log('✍️  Completion Tokens:', data.completionTokens)
-    console.log('📝 Total Tokens:', totalTokens)
     console.log('❓ Questions Generated:', data.questionCount)
-    console.log('🧠 Model Used:', data.modelUsed || 'gpt-4o')
     console.log('='.repeat(70))
 
-    // Calculate flat rate pricing: $0.10 for 10 questions (no profit margin)
-    const { getQuestionGenerationPricePer10Questions } = await import('./config')
-    const pricePer10Questions = getQuestionGenerationPricePer10Questions()
-    const finalCost = (data.questionCount / 10) * pricePer10Questions
+    // Get pricing from .env file ONLY (no OpenAI API, no external sources)
+    const { getQuestionGenerationCostPer10 } = await import('./config')
+    const costPer10Questions = getQuestionGenerationCostPer10()
+    const finalCost = (data.questionCount / 10) * costPer10Questions
+    
+    console.log('💰 [QUESTION GENERATION] Using .env pricing: $' + costPer10Questions.toFixed(2) + ' per 10 questions (COST_PER_10_QUESTIONS)')
+    console.log('💵 [QUESTION GENERATION] Total cost: $' + finalCost.toFixed(2) + ' for ' + data.questionCount + ' questions')
 
     const query = `
       INSERT INTO question_generation_usage (
@@ -3275,7 +3266,7 @@ export class DatabaseService {
     console.log('💾 [QUESTION GENERATION] Cost stored in database successfully')
     console.log('🆔 Record ID:', result[0]?.id || 'N/A')
     console.log('💰 Final Cost: $' + finalCost.toFixed(4) + ' (no profit margin applied)')
-    console.log('💵 Rate: $' + pricePer10Questions.toFixed(2) + ' per 10 questions')
+    console.log('💵 Rate: $' + costPer10Questions.toFixed(2) + ' per 10 questions')
     console.log('❓ Questions: ' + data.questionCount)
 
     // ========================================
@@ -3358,7 +3349,7 @@ export class DatabaseService {
             'JD_QUESTIONS',
             `Question generation - ${data.questionCount} questions for job`,
             data.questionCount, // quantity
-            pricePer10Questions / 10, // unit price per question
+            costPer10Questions / 10, // unit price per question
             finalCost, // amount
             balanceBefore,
             balanceAfter,
@@ -3449,26 +3440,15 @@ export class DatabaseService {
     console.log('🎥 Interview ID:', data.interviewId || 'N/A')
     console.log('👤 Candidate ID:', data.candidateId || 'N/A')
     console.log('⏱️  Duration:', data.durationMinutes, 'minutes')
-    console.log('❓ Questions Completed:', data.completedQuestions || 0)
-    console.log('🎬 Video Quality:', data.videoQuality || 'HD')
     console.log('='.repeat(70))
 
-    // Use fixed pricing per minute (no OpenAI API call)
-    const COST_PER_MINUTE = 0.10 // Fixed cost per minute of interview
-    const totalCost = COST_PER_MINUTE * (data.durationMinutes || 1)
-    const usageResult = {
-      baseCost: totalCost,
-      source: 'fixed-pricing' as const,
-      tokens: 0
-    }
+    // Get pricing from .env file ONLY (no OpenAI API, no external sources)
+    const { getVideoInterviewCostPerMinute } = await import('./config')
+    const costPerMinute = getVideoInterviewCostPerMinute()
+    const finalCost = costPerMinute * (data.durationMinutes || 1)
     
-    // Use fixed cost
-    const finalCost = usageResult.baseCost
-    const costPerMinute = COST_PER_MINUTE
-    const profitMarginPercent = 0 // No profit margin
-    
-    console.log('💰 [VIDEO INTERVIEW] Using fixed pricing: $' + COST_PER_MINUTE.toFixed(2) + '/min')
-    console.log('💵 [VIDEO INTERVIEW] Total cost: $' + totalCost.toFixed(2))
+    console.log('💰 [VIDEO INTERVIEW] Using .env pricing: $' + costPerMinute.toFixed(2) + '/min (COST_PER_VIDEO_MINUTE)')
+    console.log('💵 [VIDEO INTERVIEW] Total cost: $' + finalCost.toFixed(2) + ' for ' + data.durationMinutes + ' minutes')
     
     const query = `
       INSERT INTO video_interview_usage (
@@ -3494,21 +3474,20 @@ export class DatabaseService {
       data.candidateId || null,
       data.durationMinutes,
       data.videoQuality || 'HD',
-      costPerMinute, // Keep for backward compatibility
-      finalCost, // Final cost (no profit margin)
+      costPerMinute, // minute_price from .env
+      finalCost, // cost (duration * minute_price)
       data.completedQuestions || 0,
       data.totalQuestions || 0,
-      usageResult.baseCost, // Real OpenAI base cost
-      usageResult.source, // 'openai-api' or 'fallback'
-      usageResult.tokens || null, // Tokens used
-      profitMarginPercent // Profit margin percentage
+      finalCost, // openai_base_cost (using env value, no OpenAI API)
+      'env-config', // pricing_source - from .env file
+      null, // tokens_used - not applicable for env pricing
+      0 // profit_margin_percent - no margin
     ]) as any[]
 
     console.log('💾 [VIDEO INTERVIEW] Cost stored in database successfully')
-    console.log('💰 Final Cost (no profit margin): $' + finalCost.toFixed(4))
-    console.log('📈 Base Cost: $' + usageResult.baseCost.toFixed(4))
-    console.log('⏱️  Cost per Minute: $' + costPerMinute.toFixed(4))
-    console.log('🏷️  Source: ' + usageResult.source)
+    console.log('💰 Final Cost: $' + finalCost.toFixed(2))
+    console.log('⏱️  Cost per Minute: $' + costPerMinute.toFixed(2))
+    console.log('🏷️  Source: .env (COST_PER_VIDEO_MINUTE)')
 
     // ========================================
     // WALLET DEDUCTION & LEDGER ENTRY
@@ -3799,15 +3778,11 @@ export class DatabaseService {
 
     const result = await this.query(query, params) as any[]
 
-    // If OpenAI usage data provided, use real costs; otherwise use DB costs
-    const { applyProfitMargin } = await import('./config')
-    const openAI = filters?.openAIUsage
-
+    // Use costs from database (all costs come from .env pricing, stored at record time)
     return result.map((row: any) => {
-      // Calculate proportional costs from OpenAI usage if available
-      const cvCost = openAI ? applyProfitMargin(openAI.cvParsing.cost).finalCost : parseFloat(row.cv_parsing_cost || 0)
-      const questionsCost = openAI ? applyProfitMargin(openAI.questionGeneration.cost).finalCost : parseFloat(row.question_gen_cost || 0)
-      const videoCost = openAI ? applyProfitMargin(openAI.videoInterview.cost).finalCost : parseFloat(row.video_interview_cost || 0)
+      const cvCost = parseFloat(row.cv_parsing_cost || 0)
+      const questionsCost = parseFloat(row.question_gen_cost || 0)
+      const videoCost = parseFloat(row.video_interview_cost || 0)
 
       return {
         jobId: row.job_id,

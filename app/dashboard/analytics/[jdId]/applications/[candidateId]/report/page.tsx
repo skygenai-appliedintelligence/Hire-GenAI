@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, User, FileText, MessageSquare, Download, Mail, Phone, Calendar, ExternalLink, Star, Briefcase, ChevronDown, CheckCircle2, TrendingUp } from "lucide-react"
+import { ArrowLeft, User, FileText, MessageSquare, Download, Mail, Phone, Calendar, ExternalLink, Star, Briefcase, ChevronDown, CheckCircle2, TrendingUp, Target, Award, BarChart3, HelpCircle, Lightbulb, AlertTriangle, Zap, Brain, Users, MessageCircle, Code, Globe, DollarSign, Link as LinkIcon, XCircle, CheckCircle } from "lucide-react"
 import { CVEvaluationReport } from "@/components/cv-evaluation-report"
 // Dynamic import for html2pdf to avoid TypeScript issues
 const html2pdf = () => import('html2pdf.js')
@@ -27,6 +27,7 @@ type CandidateData = {
   portfolioUrl?: string | null
   availableStartDate?: string | null
   willingToRelocate?: boolean
+  languages?: Array<{ language: string; proficiency: string }>
 }
 
 type EvaluationData = {
@@ -93,6 +94,8 @@ type EvaluationBreakdownItem = {
     label: string
     value: string
   }>
+  fullMatchedSkills?: string[]
+  fullMissingSkills?: string[]
 }
 
 // Helper Functions
@@ -160,6 +163,7 @@ export default function CandidateReportPage() {
   const [qualificationDetails, setQualificationDetails] = useState<any>(null)
   const [sectionPointers, setSectionPointers] = useState<SectionPointers | null>(null)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
+  const [expandedSkillSetMatch, setExpandedSkillSetMatch] = useState(false)
 
   // Download report as PDF
   const downloadReport = async () => {
@@ -527,6 +531,9 @@ export default function CandidateReportPage() {
         {activeTab === "candidate" && qualificationDetails && (
           <div className="mt-6">
             <CVEvaluationReport 
+              expandedSkillSetMatch={expandedSkillSetMatch}
+              onToggleSkillSetMatch={setExpandedSkillSetMatch}
+              candidateLocation={candidate?.location}
               data={{
                 candidateName: qualificationDetails.extracted?.name || candidateData.name,
                 role: jobTitle || 'N/A',
@@ -597,6 +604,7 @@ export default function CandidateReportPage() {
                     : 'N/A',
                   skills: qualificationDetails.extracted?.skills || [],
                   notes: qualificationDetails.gaps_and_notes || [],
+                  workExperience: qualificationDetails.extracted?.work_experience || [],
                 },
                 evaluationBreakdown: ([] as EvaluationBreakdownItem[]).concat([
                   {
@@ -604,24 +612,38 @@ export default function CandidateReportPage() {
                     score: qualificationDetails.breakdown?.skill_set_match?.score || 75,
                     weight: qualificationDetails.breakdown?.skill_set_match?.weight || 30,
                     isGrid: true,
-                    gridData: [
-                      {
-                        label: '✓ Matched Skills',
-                        value: (qualificationDetails.breakdown?.skill_set_match?.matched_skills || []).slice(0, 4).join(', ') || 'None'
-                      },
-                      {
-                        label: '✗ Missing Skills',
-                        value: (qualificationDetails.breakdown?.skill_set_match?.missing_skills || []).slice(0, 4).join(', ') || 'None'
-                      },
-                      {
-                        label: 'Match Percentage',
-                        value: `${qualificationDetails.breakdown?.skill_set_match?.match_percentage || 0}%`
-                      },
-                      {
-                        label: 'Total Skills Required',
-                        value: `${(qualificationDetails.breakdown?.skill_set_match?.matched_skills || []).length + (qualificationDetails.breakdown?.skill_set_match?.missing_skills || []).length} skills`
-                      }
-                    ],
+                    fullMatchedSkills: qualificationDetails.breakdown?.skill_set_match?.matched_skills || [],
+                    fullMissingSkills: qualificationDetails.breakdown?.skill_set_match?.missing_skills || [],
+                    gridData: (() => {
+                      const matchedSkills = qualificationDetails.breakdown?.skill_set_match?.matched_skills || []
+                      const missingSkills = qualificationDetails.breakdown?.skill_set_match?.missing_skills || []
+                      const matchedCount = matchedSkills.length
+                      const missingCount = missingSkills.length
+                      const totalSkills = matchedCount + missingCount
+                      
+                      return [
+                        {
+                          label: `✓ Matched Skills (${matchedCount})`,
+                          value: matchedSkills.length > 0 
+                            ? matchedSkills.slice(0, 6).join(', ')
+                            : 'None'
+                        },
+                        {
+                          label: `✗ Missing Skills (${missingCount})`,
+                          value: missingSkills.length > 0 
+                            ? missingSkills.slice(0, 6).join(', ')
+                            : 'None'
+                        },
+                        {
+                          label: 'Match Percentage',
+                          value: `${qualificationDetails.breakdown?.skill_set_match?.match_percentage || (totalSkills > 0 ? Math.round((matchedCount / totalSkills) * 100) : 0)}%`
+                        },
+                        {
+                          label: 'Skills Summary',
+                          value: `${matchedCount} matched / ${totalSkills} total required`
+                        }
+                      ]
+                    })(),
                     details: [
                       ...(qualificationDetails.breakdown?.skill_set_match?.evidence && qualificationDetails.breakdown.skill_set_match.evidence.length > 0 ? qualificationDetails.breakdown.skill_set_match.evidence : []),
                     ].filter(d => d && !d.includes('undefined')),
@@ -685,24 +707,57 @@ export default function CandidateReportPage() {
                     score: qualificationDetails.breakdown?.location_match?.score || 50,
                     weight: qualificationDetails.breakdown?.location_match?.weight || 5,
                     isGrid: true,
-                    gridData: [
-                      {
-                        label: 'Candidate Location',
-                        value: qualificationDetails.breakdown?.location_match?.candidate_location || qualificationDetails.extracted?.location || 'Not specified'
-                      },
-                      {
-                        label: 'Job Location',
-                        value: qualificationDetails.breakdown?.location_match?.job_location || 'Not specified'
-                      },
-                      {
-                        label: 'Remote Possible',
-                        value: qualificationDetails.breakdown?.location_match?.remote_possible ? '✓ Yes' : '✗ No'
-                      },
-                      {
-                        label: 'Location Status',
-                        value: qualificationDetails.breakdown?.location_match?.candidate_location === qualificationDetails.breakdown?.location_match?.job_location ? '✓ Match' : '⚠ Different'
+                    gridData: (() => {
+                      const candidateLocation = candidate?.location || qualificationDetails.breakdown?.location_match?.candidate_location || qualificationDetails.extracted?.location || 'Not specified'
+                      const jobLocation = qualificationDetails.breakdown?.location_match?.job_location || 'Not specified'
+                      
+                      // Extract city name from location (first part before comma)
+                      const extractCity = (loc: string) => {
+                        if (loc === 'Not specified') return ''
+                        return loc.split(',')[0].trim().toLowerCase()
                       }
-                    ],
+                      
+                      // Fuzzy match: check if cities are similar (handles typos)
+                      const candidateCity = extractCity(candidateLocation)
+                      const jobCity = extractCity(jobLocation)
+                      
+                      const isSimilar = (str1: string, str2: string) => {
+                        if (!str1 || !str2) return false
+                        // Exact match
+                        if (str1 === str2) return true
+                        // Check if one is substring of other (handles typos)
+                        if (str1.includes(str2) || str2.includes(str1)) return true
+                        // Levenshtein distance for typo tolerance (simple version)
+                        const len = Math.max(str1.length, str2.length)
+                        let diff = 0
+                        for (let i = 0; i < len; i++) {
+                          if (str1[i] !== str2[i]) diff++
+                        }
+                        // Allow up to 2 character differences for typos
+                        return diff <= 2
+                      }
+                      
+                      const isMatch = candidateLocation !== 'Not specified' && jobLocation !== 'Not specified' && isSimilar(candidateCity, jobCity)
+                      
+                      return [
+                        {
+                          label: 'Candidate Location',
+                          value: candidateLocation
+                        },
+                        {
+                          label: 'Job Location',
+                          value: jobLocation
+                        },
+                        {
+                          label: 'Remote Possible',
+                          value: qualificationDetails.breakdown?.location_match?.remote_possible ? '✓ Yes' : '✗ No'
+                        },
+                        {
+                          label: 'Location Status',
+                          value: isMatch ? '✓ Match' : '⚠ Different'
+                        }
+                      ]
+                    })(),
                     details: [
                       ...(qualificationDetails.breakdown?.location_match?.evidence && qualificationDetails.breakdown.location_match.evidence.length > 0 ? qualificationDetails.breakdown.location_match.evidence : []),
                     ].filter(d => d && !d.includes('undefined')),
@@ -793,34 +848,45 @@ export default function CandidateReportPage() {
                     score: qualificationDetails.breakdown?.language_skills?.score || 95,
                     weight: qualificationDetails.breakdown?.language_skills?.weight || 2,
                     isGrid: true,
-                    gridData: [
-                      {
-                        label: 'Known Languages',
-                        value: (() => {
-                          const langs = qualificationDetails.breakdown?.language_skills?.matched_languages || [];
-                          if (langs.length === 0) return 'Not specified';
-                          return langs.map((l: any) => l.language).join(', ');
-                        })()
-                      },
-                      {
-                        label: 'Proficiency Levels',
-                        value: (() => {
-                          const langs = qualificationDetails.breakdown?.language_skills?.matched_languages || [];
-                          if (langs.length === 0) return 'Not specified';
-                          return langs.map((l: any) => l.proficiency || 'N/A').join(', ');
-                        })()
-                      },
-                      {
-                        label: 'Missing Languages',
-                        value: (qualificationDetails.breakdown?.language_skills?.missing_languages || []).length > 0 
-                          ? (qualificationDetails.breakdown?.language_skills?.missing_languages || []).join(', ') 
-                          : 'None required'
-                      },
-                      {
-                        label: 'Status',
-                        value: (qualificationDetails.breakdown?.language_skills?.matched_languages || []).length > 0 ? '✓ Meets Requirements' : '⚠ No languages specified'
+                    gridData: (() => {
+                      // Prioritize languages from application form, fallback to resume-extracted languages
+                      const applicationLanguages = candidate?.languages || []
+                      const resumeLanguages = qualificationDetails.breakdown?.language_skills?.matched_languages || []
+                      const langs = applicationLanguages.length > 0 ? applicationLanguages : resumeLanguages
+                      
+                      const proficiencyLabels: Record<string, string> = {
+                        'native': 'Native / Bilingual',
+                        'fluent': 'Fluent',
+                        'advanced': 'Advanced',
+                        'intermediate': 'Intermediate',
+                        'basic': 'Basic'
                       }
-                    ],
+                      
+                      return [
+                        {
+                          label: 'Known Languages',
+                          value: langs.length > 0 
+                            ? langs.map((l: any) => l.language).join(', ')
+                            : 'Not specified'
+                        },
+                        {
+                          label: 'Proficiency Levels',
+                          value: langs.length > 0 
+                            ? langs.map((l: any) => proficiencyLabels[l.proficiency] || l.proficiency || 'N/A').join(', ')
+                            : 'Not specified'
+                        },
+                        {
+                          label: 'Language Details',
+                          value: langs.length > 0 
+                            ? langs.map((l: any) => `${l.language} (${proficiencyLabels[l.proficiency] || l.proficiency || 'N/A'})`).join(', ')
+                            : 'No languages specified'
+                        },
+                        {
+                          label: 'Status',
+                          value: langs.length > 0 ? '✓ Languages Provided' : '⚠ No languages specified'
+                        }
+                      ]
+                    })(),
                     details: [
                       ...(qualificationDetails.breakdown?.language_skills?.evidence && qualificationDetails.breakdown.language_skills.evidence.length > 0 ? qualificationDetails.breakdown.language_skills.evidence : []),
                     ].filter(d => d && !d.includes('undefined')),
@@ -1463,255 +1529,511 @@ export default function CandidateReportPage() {
           </div>
         )}
 
-        {/* Evaluation Tab Content */}
+        {/* Evaluation Tab Content - Redesigned with Criteria-Based Flow */}
         {activeTab === "evaluation" && (
-          <div className="mt-6">
-            <Card className="border-2 border-emerald-200 bg-white shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-emerald-50 to-emerald-100 border-b border-emerald-200">
-                <CardTitle className="text-2xl text-emerald-900 flex items-center gap-2">
-                  <FileText className="h-6 w-6" />
-                  Evaluation
-                </CardTitle>
-                <CardDescription className="text-emerald-700">Assessment scores and feedback</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-6">
-                {evaluation ? (
-                  <>
-                    <div className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-                      <div>
-                        <div className="text-xs text-gray-700">Overall Score</div>
-                        <div className={`text-4xl font-bold text-gray-800`}>
-                          {overallScoreDisplay}
+          <div className="mt-6 space-y-6">
+            {evaluation ? (
+              <>
+                {/* ===== SECTION 1: Overall Score Hero Card ===== */}
+                <Card className="border-0 shadow-xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-emerald-800 text-white overflow-hidden">
+                  <CardContent className="p-8">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                      <div className="flex items-center gap-6">
+                        <div className="relative">
+                          <div className="w-32 h-32 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-4 border-white/30">
+                            <div className="text-center">
+                              <div className="text-4xl font-bold">{overallScoreDisplay.split('/')[0]}</div>
+                              <div className="text-sm opacity-80">out of 100</div>
+                            </div>
+                          </div>
+                          <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-2 shadow-lg">
+                            {(evaluation as any).overallScore >= 65 ? (
+                              <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                            ) : (
+                              <AlertTriangle className="h-6 w-6 text-orange-500" />
+                            )}
+                          </div>
                         </div>
-                        <div className="text-xs text-gray-500">
-                          Weighted average from all categories
+                        <div>
+                          <h2 className="text-2xl font-bold mb-2">Interview Evaluation</h2>
+                          <p className="text-emerald-100 text-sm max-w-md">
+                            Score calculated based on criteria actually evaluated in the interview
+                          </p>
+                          <div className="mt-3">
+                            {getDecisionBadge(evaluationData!.decision)}
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        {getDecisionBadge(evaluationData!.decision)}
+                      <div className="text-center md:text-right">
+                        <div className="text-sm opacity-80 mb-1">Recommendation</div>
+                        <div className="text-xl font-semibold">
+                          {(evaluation as any).overallScore >= 80 ? '🎯 Strong Hire' :
+                           (evaluation as any).overallScore >= 65 ? '✅ Hire' :
+                           (evaluation as any).overallScore >= 50 ? '🤔 Maybe' : '❌ No Hire'}
+                        </div>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
 
-                    <div className="space-y-4">
-                      <h3 className="font-semibold text-gray-900">Detailed Scores</h3>
-                      
-                      {/* Technical Section */}
-                      {(sectionPointers?.technical || evaluationData?.scores?.technical !== undefined) && (
-                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="font-medium text-blue-900">Technical</span>
-                            <span className="font-bold text-blue-800">
-                              {sectionPointers?.technical?.label || `${evaluationData?.scores?.technical || 0}/100`}
-                            </span>
-                          </div>
-                          <div className="w-full bg-blue-200 rounded-full h-2 mb-3">
-                            <div
-                              className="h-2 rounded-full bg-blue-600"
-                              style={{ width: `${sectionPointers?.technical?.score || evaluationData?.scores?.technical || 0}%` }}
-                            />
-                          </div>
-                          <p className="text-sm text-blue-800">
-                            {sectionPointers?.technical?.summary || "Technical skills assessment based on interview performance"}
-                          </p>
-                        </div>
-                      )}
-                      
-                      {/* Communication Section */}
-                      {(sectionPointers?.communication || evaluationData?.scores?.communication !== undefined) && (
-                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="font-medium text-green-900">Communication</span>
-                            <span className="font-bold text-green-800">
-                              {sectionPointers?.communication?.label || `${evaluationData?.scores?.communication || 0}/100`}
-                            </span>
-                          </div>
-                          <div className="w-full bg-green-200 rounded-full h-2 mb-3">
-                            <div
-                              className="h-2 rounded-full bg-green-600"
-                              style={{ width: `${sectionPointers?.communication?.score || evaluationData?.scores?.communication || 0}%` }}
-                            />
-                          </div>
-                          <p className="text-sm text-green-800">
-                            {sectionPointers?.communication?.summary || "Communication skills assessment based on interview performance"}
-                          </p>
-                        </div>
-                      )}
-                      
-                      {/* Experience Section */}
-                      {(sectionPointers?.experience || evaluationData?.scores?.experience !== undefined) && (
-                        <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="font-medium text-orange-900">Experience</span>
-                            <span className="font-bold text-orange-800">
-                              {sectionPointers?.experience?.label || `${evaluationData?.scores?.experience || 0}/100`}
-                            </span>
-                          </div>
-                          <div className="w-full bg-orange-200 rounded-full h-2 mb-3">
-                            <div
-                              className="h-2 rounded-full bg-orange-600"
-                              style={{ width: `${sectionPointers?.experience?.score || evaluationData?.scores?.experience || 0}%` }}
-                            />
-                          </div>
-                          <p className="text-sm text-orange-800">
-                            {sectionPointers?.experience?.summary || "Experience assessment based on interview performance"}
-                          </p>
-                        </div>
-                      )}
-                      
-                      {/* Cultural Section */}
-                      {(sectionPointers?.cultural || evaluationData?.scores?.cultural_fit !== undefined) && (
-                        <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="font-medium text-purple-900">Cultural Fit</span>
-                            <span className="font-bold text-purple-800">
-                              {sectionPointers?.cultural?.label || `${evaluationData?.scores?.cultural_fit || 0}/100`}
-                            </span>
-                          </div>
-                          <div className="w-full bg-purple-200 rounded-full h-2 mb-3">
-                            <div
-                              className="h-2 rounded-full bg-purple-600"
-                              style={{ width: `${sectionPointers?.cultural?.score || evaluationData?.scores?.cultural_fit || 0}%` }}
-                            />
-                          </div>
-                          <p className="text-sm text-purple-800">
-                            {sectionPointers?.cultural?.summary || "Cultural fit assessment based on interview performance"}
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                {/* ===== SECTION 2: Evaluation Flow Explanation - REMOVED AS REQUESTED ===== */}
+                {/* This section was removed per user request */}
 
-                    {/* Enhanced Strengths & Weaknesses with Evidence */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Strengths Card */}
-                      {evaluationData!.strengths.length > 0 && (
-                        <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-white">
-                          <CardHeader>
-                            <CardTitle className="text-green-900 flex items-center gap-2">
-                              <CheckCircle2 className="h-5 w-5" />
-                              Key Strengths
-                            </CardTitle>
-                            <CardDescription className="text-green-700">Areas where candidate excels</CardDescription>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-4">
-                              {evaluationData!.strengths.map((strength, idx) => {
-                                // Handle both string and object formats
-                                const strengthObj = typeof strength === 'string' 
-                                  ? { point: strength } 
-                                  : strength as any
-                                
-                                return (
-                                  <div key={idx} className="p-3 bg-white rounded-lg border border-green-200 hover:border-green-400 transition-colors">
-                                    <div className="flex items-start gap-2 mb-2">
-                                      <span className="text-green-600 mt-0.5 text-lg">✓</span>
-                                      <p className="font-medium text-gray-900 flex-1">{strengthObj.point}</p>
+                {/* ===== SECTION 3: Criteria Breakdown with Weights ===== */}
+                <Card className="border-2 border-gray-200 shadow-lg">
+                  <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+                    <CardTitle className="text-gray-900 flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-emerald-600" />
+                      Criteria-Based Score Breakdown
+                    </CardTitle>
+                    <CardDescription>Only criteria with questions asked are included in the final score</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    {(() => {
+                      // Get criteria breakdown from evaluation
+                      const evalAny = evaluation as any
+                      const criteriaBreakdown = evalAny.criteriaBreakdown || {}
+                      const categoriesUsed = evalAny.categoriesUsed || Object.keys(criteriaBreakdown)
+                      const categoriesNotUsed = evalAny.categoriesNotUsed || []
+                      const questions = evalAny.questions || []
+                      
+                      // Calculate criteria from questions if not available
+                      const criteriaFromQuestions: Record<string, { count: number, totalScore: number, questions: any[] }> = {}
+                      questions.forEach((q: any) => {
+                        const criteria = q.criteria || q.category || 'General'
+                        if (!criteriaFromQuestions[criteria]) {
+                          criteriaFromQuestions[criteria] = { count: 0, totalScore: 0, questions: [] }
+                        }
+                        criteriaFromQuestions[criteria].count++
+                        criteriaFromQuestions[criteria].totalScore += (q.score || q.marks_obtained || 0)
+                        criteriaFromQuestions[criteria].questions.push(q)
+                      })
+                      
+                      const totalQuestions = questions.length || 1
+                      const criteriaList = Object.keys(criteriaBreakdown).length > 0 
+                        ? Object.keys(criteriaBreakdown) 
+                        : Object.keys(criteriaFromQuestions)
+                      
+                      const getCriteriaIcon = (criteria: string) => {
+                        const icons: Record<string, any> = {
+                          'Technical Skills': <Code className="h-5 w-5" />,
+                          'Technical': <Code className="h-5 w-5" />,
+                          'Communication': <MessageCircle className="h-5 w-5" />,
+                          'Problem Solving': <Brain className="h-5 w-5" />,
+                          'Cultural Fit': <Users className="h-5 w-5" />,
+                          'Culture': <Users className="h-5 w-5" />
+                        }
+                        return icons[criteria] || <Target className="h-5 w-5" />
+                      }
+                      
+                      const getCriteriaColor = (criteria: string) => {
+                        const colors: Record<string, { bg: string, border: string, text: string, bar: string }> = {
+                          'Technical Skills': { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', bar: 'bg-blue-500' },
+                          'Technical': { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', bar: 'bg-blue-500' },
+                          'Communication': { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', bar: 'bg-green-500' },
+                          'Problem Solving': { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', bar: 'bg-purple-500' },
+                          'Cultural Fit': { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', bar: 'bg-orange-500' },
+                          'Culture': { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', bar: 'bg-orange-500' }
+                        }
+                        return colors[criteria] || { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700', bar: 'bg-gray-500' }
+                      }
+                      
+                      return (
+                        <div className="space-y-6">
+                          {/* Criteria Cards */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {criteriaList.map((criteria, idx) => {
+                              const breakdown = criteriaBreakdown[criteria] || {}
+                              const fromQuestions = criteriaFromQuestions[criteria] || { count: 0, totalScore: 0 }
+                              const questionCount = breakdown.question_count || fromQuestions.count || 0
+                              const avgScore = breakdown.average_score || (fromQuestions.count > 0 ? Math.round(fromQuestions.totalScore / fromQuestions.count) : 0)
+                              const weightPct = breakdown.weight_percentage || Math.round((questionCount / totalQuestions) * 100)
+                              const contribution = breakdown.weighted_contribution || Math.round(avgScore * (questionCount / totalQuestions))
+                              const colors = getCriteriaColor(criteria)
+                              
+                              return (
+                                <div key={idx} className={`p-5 rounded-xl border-2 ${colors.border} ${colors.bg} transition-all hover:shadow-md`}>
+                                  <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className={`p-2 rounded-lg bg-white shadow-sm ${colors.text}`}>
+                                        {getCriteriaIcon(criteria)}
+                                      </div>
+                                      <div>
+                                        <h4 className={`font-semibold ${colors.text}`}>{criteria}</h4>
+                                        <p className="text-xs text-gray-500">{questionCount} question{questionCount !== 1 ? 's' : ''} evaluated</p>
+                                      </div>
                                     </div>
+                                    <div className="text-right">
+                                      <div className={`text-2xl font-bold ${colors.text}`}>{avgScore}</div>
+                                      <div className="text-xs text-gray-500">avg score</div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Progress Bar */}
+                                  <div className="mb-3">
+                                    <div className="w-full bg-white rounded-full h-3 shadow-inner">
+                                      <div
+                                        className={`h-3 rounded-full ${colors.bar} transition-all duration-500`}
+                                        style={{ width: `${avgScore}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Weight & Contribution */}
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-gray-600">
+                                      <span className="font-medium">Weight:</span> {weightPct}%
+                                    </span>
+                                    <span className={`font-semibold ${colors.text}`}>
+                                      Contributes: +{contribution} pts
+                                    </span>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                          
+                          {/* Categories Not Used */}
+                          {categoriesNotUsed.length > 0 && (
+                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <AlertTriangle className="h-4 w-4 text-gray-400" />
+                                <span className="text-sm font-medium text-gray-600">Criteria Not Evaluated</span>
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                The following criteria were not included in the final score because no questions were asked for them:
+                              </p>
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {categoriesNotUsed.map((cat: string, idx: number) => (
+                                  <Badge key={idx} variant="outline" className="bg-white text-gray-500">
+                                    {cat} (0%)
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Final Score Calculation - REMOVED AS REQUESTED */}
+                          {/* This section was removed per user request */}
+                        </div>
+                      )
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* ===== SECTION 4: Question-by-Question Breakdown ===== */}
+                <Card className="border-2 border-gray-200 shadow-lg">
+                  <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b">
+                    <CardTitle className="text-gray-900 flex items-center gap-2">
+                      <HelpCircle className="h-5 w-5 text-indigo-600" />
+                      Question-by-Question Evaluation
+                    </CardTitle>
+                    <CardDescription>Each question mapped to its criteria with detailed scoring</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    {(() => {
+                      const evalAny = evaluation as any
+                      const questions = evalAny.questions || []
+                      
+                      if (questions.length === 0) {
+                        return (
+                          <div className="text-center py-8 text-gray-500">
+                            <HelpCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                            <p>No detailed question breakdown available</p>
+                          </div>
+                        )
+                      }
+                      
+                      const getCriteriaColor = (criteria: string) => {
+                        const colors: Record<string, { bg: string, border: string, text: string, badge: string }> = {
+                          'Technical Skills': { bg: 'bg-blue-50', border: 'border-l-blue-500', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-800' },
+                          'Technical': { bg: 'bg-blue-50', border: 'border-l-blue-500', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-800' },
+                          'Communication': { bg: 'bg-green-50', border: 'border-l-green-500', text: 'text-green-700', badge: 'bg-green-100 text-green-800' },
+                          'Problem Solving': { bg: 'bg-purple-50', border: 'border-l-purple-500', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-800' },
+                          'Cultural Fit': { bg: 'bg-orange-50', border: 'border-l-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-800' },
+                          'Culture': { bg: 'bg-orange-50', border: 'border-l-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-800' }
+                        }
+                        return colors[criteria] || { bg: 'bg-gray-50', border: 'border-l-gray-500', text: 'text-gray-700', badge: 'bg-gray-100 text-gray-800' }
+                      }
+                      
+                      const getScoreStatus = (score: number, maxScore: number = 100) => {
+                        const pct = (score / maxScore) * 100
+                        if (pct >= 80) return { label: 'Excellent', color: 'text-green-600', bg: 'bg-green-100' }
+                        if (pct >= 60) return { label: 'Good', color: 'text-blue-600', bg: 'bg-blue-100' }
+                        if (pct >= 40) return { label: 'Fair', color: 'text-yellow-600', bg: 'bg-yellow-100' }
+                        return { label: 'Needs Work', color: 'text-red-600', bg: 'bg-red-100' }
+                      }
+                      
+                      return (
+                        <div className="space-y-4">
+                          {questions.map((q: any, idx: number) => {
+                            const criteria = q.criteria || q.category || 'General'
+                            const colors = getCriteriaColor(criteria)
+                            const score = q.score || q.marks_obtained || 0
+                            const maxScore = q.max_score || q.max_marks || 100
+                            const status = getScoreStatus(score, maxScore)
+                            const answered = q.answered !== false
+                            
+                            return (
+                              <div key={idx} className={`rounded-xl border-l-4 ${colors.border} ${colors.bg} p-5 transition-all hover:shadow-md`}>
+                                {/* Question Header */}
+                                <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                                  <div className="flex items-start gap-3 flex-1">
+                                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center font-bold text-gray-600">
+                                      {q.question_number || idx + 1}
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className="font-medium text-gray-900 leading-snug">
+                                        {q.question_text || q.question || 'Question not available'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge className={colors.badge}>
+                                      {criteria}
+                                    </Badge>
+                                    {!answered && (
+                                      <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200">
+                                        Not Answered
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {/* Score Display */}
+                                <div className="flex items-center gap-4 mb-4">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`text-3xl font-bold ${answered ? colors.text : 'text-gray-400'}`}>
+                                      {score}
+                                    </div>
+                                    <div className="text-gray-400">/</div>
+                                    <div className="text-lg text-gray-500">{maxScore}</div>
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="w-full bg-white rounded-full h-2 shadow-inner">
+                                      <div
+                                        className={`h-2 rounded-full transition-all duration-500 ${answered ? (score >= maxScore * 0.8 ? 'bg-green-500' : score >= maxScore * 0.6 ? 'bg-blue-500' : score >= maxScore * 0.4 ? 'bg-yellow-500' : 'bg-red-500') : 'bg-gray-300'}`}
+                                        style={{ width: `${(score / maxScore) * 100}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <Badge className={`${status.bg} ${status.color}`}>
+                                    {status.label}
+                                  </Badge>
+                                </div>
+                                
+                                {/* Candidate Response */}
+                                {(q.candidate_response || q.answer) && (
+                                  <div className="mb-3">
+                                    <div className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                                      <MessageCircle className="h-3 w-3" /> Candidate Response
+                                    </div>
+                                    <div className="bg-white p-3 rounded-lg border border-gray-200 text-sm text-gray-700">
+                                      {q.candidate_response || q.answer || 'No response recorded'}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Evaluation Reasoning */}
+                                {(q.evaluation_reasoning || q.feedback) && (
+                                  <div className="mb-3">
+                                    <div className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                                      <Brain className="h-3 w-3" /> Evaluation Reasoning
+                                    </div>
+                                    <div className="bg-white p-3 rounded-lg border border-gray-200 text-sm text-gray-600">
+                                      {q.evaluation_reasoning || q.feedback}
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Strengths & Gaps in Answer */}
+                                {((q.strengths_in_answer && q.strengths_in_answer.length > 0) || (q.gaps_in_answer && q.gaps_in_answer.length > 0)) && (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {q.strengths_in_answer && q.strengths_in_answer.length > 0 && (
+                                      <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                                        <div className="text-xs font-medium text-green-700 mb-2 flex items-center gap-1">
+                                          <CheckCircle2 className="h-3 w-3" /> Strengths
+                                        </div>
+                                        <ul className="space-y-1">
+                                          {q.strengths_in_answer.map((s: string, sIdx: number) => (
+                                            <li key={sIdx} className="text-xs text-green-800 flex items-start gap-1">
+                                              <span className="text-green-500">✓</span> {s}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {q.gaps_in_answer && q.gaps_in_answer.length > 0 && (
+                                      <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+                                        <div className="text-xs font-medium text-orange-700 mb-2 flex items-center gap-1">
+                                          <AlertTriangle className="h-3 w-3" /> Gaps
+                                        </div>
+                                        <ul className="space-y-1">
+                                          {q.gaps_in_answer.map((g: string, gIdx: number) => (
+                                            <li key={gIdx} className="text-xs text-orange-800 flex items-start gap-1">
+                                              <span className="text-orange-500">•</span> {g}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    })()}
+                  </CardContent>
+                </Card>
+
+                {/* ===== SECTION 5: Strengths & Areas for Improvement ===== */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Strengths Card */}
+                  {evaluationData!.strengths.length > 0 && (
+                    <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-lg">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-green-800 flex items-center gap-2">
+                          <CheckCircle2 className="h-5 w-5" />
+                          Key Strengths
+                        </CardTitle>
+                        <CardDescription className="text-green-600">Areas where candidate excels</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {evaluationData!.strengths.map((strength, idx) => {
+                            const strengthObj = typeof strength === 'string' 
+                              ? { point: strength } 
+                              : strength as any
+                            
+                            return (
+                              <div key={idx} className="p-3 bg-white rounded-lg border border-green-200 hover:border-green-400 transition-all hover:shadow-sm">
+                                <div className="flex items-start gap-2">
+                                  <span className="text-green-500 mt-0.5">✓</span>
+                                  <div className="flex-1">
+                                    <p className="font-medium text-gray-900 text-sm">{strengthObj.point}</p>
                                     {strengthObj.category && (
-                                      <Badge variant="outline" className="text-xs mb-2 bg-green-50">
-                                        {getCategoryIcon(strengthObj.category)} {strengthObj.category}
+                                      <Badge variant="outline" className="text-xs mt-1 bg-green-50 text-green-700">
+                                        {strengthObj.category}
                                       </Badge>
                                     )}
                                     {strengthObj.evidence && Array.isArray(strengthObj.evidence) && strengthObj.evidence.length > 0 && (
-                                      <div className="mt-2 pl-6">
-                                        <div className="text-xs font-medium text-gray-500 mb-1">Evidence:</div>
-                                        <ul className="space-y-1">
-                                          {strengthObj.evidence.map((ev: string, evIdx: number) => (
-                                            <li key={evIdx} className="text-xs text-gray-700 flex items-start gap-1">
-                                              <span className="text-green-500 mt-0.5">•</span>
-                                              <span className="flex-1">{ev}</span>
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </div>
+                                      <ul className="mt-2 space-y-1">
+                                        {strengthObj.evidence.map((ev: string, evIdx: number) => (
+                                          <li key={evIdx} className="text-xs text-gray-600 flex items-start gap-1">
+                                            <span className="text-green-400">•</span> {ev}
+                                          </li>
+                                        ))}
+                                      </ul>
                                     )}
                                   </div>
-                                )
-                              })}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
-                      {/* Weaknesses Card */}
-                      {evaluationData!.weaknesses.length > 0 && (
-                        <Card className="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-white">
-                          <CardHeader>
-                            <CardTitle className="text-orange-900 flex items-center gap-2">
-                              <TrendingUp className="h-5 w-5" />
-                              Areas for Improvement
-                            </CardTitle>
-                            <CardDescription className="text-orange-700">Growth opportunities</CardDescription>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-4">
-                              {evaluationData!.weaknesses.map((weakness, idx) => {
-                                // Handle both string and object formats
-                                const weaknessObj = typeof weakness === 'string' 
-                                  ? { point: weakness } 
-                                  : weakness as any
-                                
-                                return (
-                                  <div key={idx} className="p-3 bg-white rounded-lg border border-orange-200 hover:border-orange-400 transition-colors">
-                                    <div className="flex items-start gap-2 mb-2">
-                                      <span className="text-orange-600 mt-0.5 text-lg">⚠</span>
-                                      <p className="font-medium text-gray-900 flex-1">{weaknessObj.point}</p>
-                                    </div>
+                  {/* Weaknesses Card */}
+                  {evaluationData!.weaknesses.length > 0 && (
+                    <Card className="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 shadow-lg">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-orange-800 flex items-center gap-2">
+                          <TrendingUp className="h-5 w-5" />
+                          Areas for Improvement
+                        </CardTitle>
+                        <CardDescription className="text-orange-600">Growth opportunities</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {evaluationData!.weaknesses.map((weakness, idx) => {
+                            const weaknessObj = typeof weakness === 'string' 
+                              ? { point: weakness } 
+                              : weakness as any
+                            
+                            return (
+                              <div key={idx} className="p-3 bg-white rounded-lg border border-orange-200 hover:border-orange-400 transition-all hover:shadow-sm">
+                                <div className="flex items-start gap-2">
+                                  <span className="text-orange-500 mt-0.5">⚠</span>
+                                  <div className="flex-1">
+                                    <p className="font-medium text-gray-900 text-sm">{weaknessObj.point}</p>
                                     {weaknessObj.category && (
-                                      <Badge variant="outline" className="text-xs mb-2 bg-orange-50">
-                                        {getCategoryIcon(weaknessObj.category)} {weaknessObj.category}
+                                      <Badge variant="outline" className="text-xs mt-1 bg-orange-50 text-orange-700">
+                                        {weaknessObj.category}
                                       </Badge>
                                     )}
                                     {weaknessObj.evidence && Array.isArray(weaknessObj.evidence) && weaknessObj.evidence.length > 0 && (
-                                      <div className="mt-2 pl-6">
-                                        <div className="text-xs font-medium text-gray-500 mb-1">Evidence:</div>
-                                        <ul className="space-y-1">
-                                          {weaknessObj.evidence.map((ev: string, evIdx: number) => (
-                                            <li key={evIdx} className="text-xs text-gray-700 flex items-start gap-1">
-                                              <span className="text-orange-500 mt-0.5">•</span>
-                                              <span className="flex-1">{ev}</span>
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </div>
+                                      <ul className="mt-2 space-y-1">
+                                        {weaknessObj.evidence.map((ev: string, evIdx: number) => (
+                                          <li key={evIdx} className="text-xs text-gray-600 flex items-start gap-1">
+                                            <span className="text-orange-400">•</span> {ev}
+                                          </li>
+                                        ))}
+                                      </ul>
                                     )}
                                     {weaknessObj.improvement_suggestion && (
                                       <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
-                                        <div className="text-xs font-medium text-blue-900 mb-1">💡 Suggestion:</div>
-                                        <p className="text-xs text-blue-800">{weaknessObj.improvement_suggestion}</p>
+                                        <div className="text-xs font-medium text-blue-800 flex items-center gap-1">
+                                          <Lightbulb className="h-3 w-3" /> Suggestion
+                                        </div>
+                                        <p className="text-xs text-blue-700 mt-1">{weaknessObj.improvement_suggestion}</p>
                                       </div>
                                     )}
                                   </div>
-                                )
-                              })}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-
-                    {evaluationData!.reviewerComments && (
-                      <div>
-                        <h3 className="font-semibold text-gray-900 mb-2">Reviewer Comments</h3>
-                        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 text-sm">
-                          {evaluationData!.reviewerComments}
+                                </div>
+                              </div>
+                            )
+                          })}
                         </div>
-                      </div>
-                    )}
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
 
-                    {evaluationData!.reviewedAt && (
-                      <div className="text-xs text-gray-500 pt-4 border-t">
-                        Reviewed on {new Date(evaluationData!.reviewedAt).toLocaleDateString()}
-                        {evaluationData!.reviewedBy && ` by ${evaluationData!.reviewedBy}`}
+                {/* ===== SECTION 6: Summary & Comments ===== */}
+                {evaluationData!.reviewerComments && (
+                  <Card className="border-2 border-gray-200 shadow-lg">
+                    <CardHeader className="bg-gradient-to-r from-gray-50 to-slate-50 border-b">
+                      <CardTitle className="text-gray-900 flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-gray-600" />
+                        Evaluation Summary
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <div className="prose prose-sm max-w-none text-gray-700">
+                        {evaluationData!.reviewerComments}
                       </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    No evaluation data available yet
-                  </div>
+                      {evaluationData!.reviewedAt && (
+                        <div className="mt-4 pt-4 border-t text-xs text-gray-500 flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Evaluated on {new Date(evaluationData!.reviewedAt).toLocaleDateString('en-US', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                          {evaluationData!.reviewedBy && ` by ${evaluationData!.reviewedBy}`}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 )}
-              </CardContent>
-            </Card>
+              </>
+            ) : (
+              <Card className="border-2 border-gray-200">
+                <CardContent className="p-12 text-center">
+                  <FileText className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                  <h3 className="text-lg font-semibold text-gray-700 mb-2">No Evaluation Data Available</h3>
+                  <p className="text-gray-500 max-w-md mx-auto">
+                    The interview evaluation has not been completed yet. Once the candidate completes their interview, the AI will generate a detailed evaluation.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
@@ -1778,6 +2100,272 @@ export default function CandidateReportPage() {
                 ) : (
                   <div className="text-center py-8 text-gray-500">
                     No transcript available yet
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Job Application Tab Content */}
+        {activeTab === "job" && (
+          <div className="mt-6 space-y-6">
+            {/* Application Overview Card */}
+            <Card className="border-2 border-purple-200 bg-white shadow-lg">
+              <CardHeader className="bg-gradient-to-r from-purple-50 to-purple-100 border-b border-purple-200">
+                <CardTitle className="text-2xl text-purple-900 flex items-center gap-2">
+                  <FileText className="h-6 w-6" />
+                  Application Details
+                </CardTitle>
+                <CardDescription className="text-purple-700">
+                  Information submitted by the candidate during the application process
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                {candidate ? (
+                  <div className="space-y-8">
+                    {/* Personal Information Section */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 border-b pb-2">
+                        <User className="h-5 w-5 text-purple-600" />
+                        Personal Information
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 bg-gray-50 rounded-lg border">
+                          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Full Name</div>
+                          <div className="text-gray-900 font-medium">{candidate.name || 'Not provided'}</div>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg border">
+                          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Email Address</div>
+                          <div className="text-gray-900 font-medium">{candidate.email || 'Not provided'}</div>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg border">
+                          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Phone Number</div>
+                          <div className="text-gray-900 font-medium">{candidate.phone || 'Not provided'}</div>
+                        </div>
+                        <div className="p-4 bg-gray-50 rounded-lg border">
+                          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Location</div>
+                          <div className="text-gray-900 font-medium">{candidate.location || 'Not provided'}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Salary & Compensation Section */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 border-b pb-2">
+                        <DollarSign className="h-5 w-5 text-green-600" />
+                        Salary Expectations
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                          <div className="text-xs font-medium text-green-700 uppercase tracking-wide mb-1">Expected Salary</div>
+                          <div className="text-gray-900 font-semibold text-lg">
+                            {candidate.expectedSalary 
+                              ? `${candidate.salaryCurrency || 'USD'} ${Number(candidate.expectedSalary).toLocaleString()}`
+                              : 'Not specified'}
+                          </div>
+                        </div>
+                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                          <div className="text-xs font-medium text-green-700 uppercase tracking-wide mb-1">Currency</div>
+                          <div className="text-gray-900 font-medium">{candidate.salaryCurrency || 'USD'}</div>
+                        </div>
+                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                          <div className="text-xs font-medium text-green-700 uppercase tracking-wide mb-1">Pay Period</div>
+                          <div className="text-gray-900 font-medium capitalize">{candidate.salaryPeriod || 'Monthly'}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Language & Proficiency Section */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 border-b pb-2">
+                        <Globe className="h-5 w-5 text-blue-600" />
+                        Language Proficiency
+                      </h3>
+                      {candidate.languages && candidate.languages.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {candidate.languages.map((lang, idx) => {
+                            const proficiencyLabels: Record<string, string> = {
+                              'native': 'Native / Bilingual',
+                              'fluent': 'Fluent',
+                              'advanced': 'Advanced',
+                              'intermediate': 'Intermediate',
+                              'basic': 'Basic'
+                            }
+                            const proficiencyColors: Record<string, string> = {
+                              'native': 'bg-purple-100 border-purple-300 text-purple-800',
+                              'fluent': 'bg-blue-100 border-blue-300 text-blue-800',
+                              'advanced': 'bg-green-100 border-green-300 text-green-800',
+                              'intermediate': 'bg-yellow-100 border-yellow-300 text-yellow-800',
+                              'basic': 'bg-gray-100 border-gray-300 text-gray-800'
+                            }
+                            return (
+                              <div key={idx} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                <div className="flex items-center justify-between">
+                                  <div className="font-medium text-gray-900">{lang.language}</div>
+                                  <Badge className={`${proficiencyColors[lang.proficiency] || 'bg-gray-100 text-gray-800'}`}>
+                                    {proficiencyLabels[lang.proficiency] || lang.proficiency}
+                                  </Badge>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <div className="p-6 bg-gray-50 rounded-lg border border-gray-200 text-center">
+                          <Globe className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                          <p className="text-gray-500">No languages specified in the application</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Availability & Relocation Section */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 border-b pb-2">
+                        <Calendar className="h-5 w-5 text-orange-600" />
+                        Availability & Relocation
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                          <div className="text-xs font-medium text-orange-700 uppercase tracking-wide mb-1">Available Start Date</div>
+                          <div className="text-gray-900 font-medium">
+                            {candidate.availableStartDate 
+                              ? new Date(candidate.availableStartDate).toLocaleDateString('en-US', { 
+                                  year: 'numeric', 
+                                  month: 'long', 
+                                  day: 'numeric' 
+                                })
+                              : 'Not specified'}
+                          </div>
+                        </div>
+                        <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                          <div className="text-xs font-medium text-orange-700 uppercase tracking-wide mb-1">Willing to Relocate</div>
+                          <div className="flex items-center gap-2">
+                            {candidate.willingToRelocate ? (
+                              <>
+                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <span className="text-green-700 font-medium">Yes, willing to relocate</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-5 w-5 text-red-500" />
+                                <span className="text-red-600 font-medium">Not willing to relocate</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Professional Links Section */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 border-b pb-2">
+                        <LinkIcon className="h-5 w-5 text-indigo-600" />
+                        Professional Links
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                          <div className="text-xs font-medium text-indigo-700 uppercase tracking-wide mb-1">LinkedIn Profile</div>
+                          {candidate.linkedinUrl ? (
+                            <a 
+                              href={candidate.linkedinUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 hover:underline"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              View LinkedIn Profile
+                            </a>
+                          ) : (
+                            <span className="text-gray-500">Not provided</span>
+                          )}
+                        </div>
+                        <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                          <div className="text-xs font-medium text-indigo-700 uppercase tracking-wide mb-1">Portfolio / Website</div>
+                          {candidate.portfolioUrl ? (
+                            <a 
+                              href={candidate.portfolioUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 hover:underline"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              View Portfolio
+                            </a>
+                          ) : (
+                            <span className="text-gray-500">Not provided</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Resume Section */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 border-b pb-2">
+                        <FileText className="h-5 w-5 text-red-600" />
+                        Resume / CV
+                      </h3>
+                      <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                        {candidate.resumeUrl && candidate.resumeUrl !== '#' ? (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-red-100 rounded-lg">
+                                <FileText className="h-6 w-6 text-red-600" />
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-900">Resume Uploaded</div>
+                                <div className="text-sm text-gray-500">Click to view or download</div>
+                              </div>
+                            </div>
+                            <a 
+                              href={candidate.resumeUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                            >
+                              <Download className="h-4 w-4" />
+                              Download
+                            </a>
+                          </div>
+                        ) : (
+                          <div className="text-center py-4">
+                            <FileText className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                            <p className="text-gray-500">No resume uploaded</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Application Metadata */}
+                    <div className="pt-4 border-t border-gray-200">
+                      <div className="flex items-center justify-between text-sm text-gray-500">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Applied on {new Date(candidate.appliedAt).toLocaleDateString('en-US', { 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
+                        <Badge variant="outline" className={
+                          candidate.status === 'qualified' || candidate.status === 'CV Qualified' 
+                            ? 'bg-green-50 text-green-700 border-green-300'
+                            : candidate.status === 'applied' 
+                            ? 'bg-blue-50 text-blue-700 border-blue-300'
+                            : 'bg-gray-50 text-gray-700 border-gray-300'
+                        }>
+                          Status: {candidate.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <FileText className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+                    <h3 className="text-lg font-semibold text-gray-700 mb-2">No Application Data Available</h3>
+                    <p className="text-gray-500">Unable to load the application details for this candidate.</p>
                   </div>
                 )}
               </CardContent>

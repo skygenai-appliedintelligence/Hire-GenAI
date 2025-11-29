@@ -98,17 +98,28 @@ interface EvaluationData {
     totalExperience: string
     skills: string[]
     notes: string[]
+    workExperience?: Array<{
+      company: string
+      title: string
+      duration: string
+      start_date?: string | null
+      end_date?: string | null
+    }>
   }
 }
 
 interface Props {
   data: EvaluationData
   isGeneratingPDF?: boolean
+  expandedSkillSetMatch?: boolean
+  onToggleSkillSetMatch?: (expanded: boolean) => void
+  candidateLocation?: string | null
 }
 
-export function CVEvaluationReport({ data, isGeneratingPDF = false }: Props) {
+export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkillSetMatch = false, onToggleSkillSetMatch, candidateLocation }: Props) {
   const [faqOpen, setFaqOpen] = useState(false)
   const [profileClassificationOpen, setProfileClassificationOpen] = useState(true)
+  const [localExpandedSkillSetMatch, setLocalExpandedSkillSetMatch] = useState(expandedSkillSetMatch)
   
   // Get profile classification
   const profileGroup = classifyCandidate(data.candidateProfile)
@@ -416,13 +427,41 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false }: Props) {
                     <CardHeader className="p-4 bg-gradient-to-b from-purple-50 to-white">
                       <CardTitle className="text-base flex items-center">
                         <Building className="w-5 h-5 mr-2 text-purple-600" />
-                        Employer
+                        Employer History
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-4 pt-2">
-                      <Badge variant="outline" className="capitalize mt-1">
-                        {data.candidateProfile.employer}
-                      </Badge>
+                      {data.extractedInfo.workExperience && data.extractedInfo.workExperience.length > 0 ? (
+                        <div className="space-y-2">
+                          {data.extractedInfo.workExperience.map((exp, idx) => (
+                            <div key={idx} className="text-sm">
+                              <p className="font-medium text-slate-800">{exp.company}</p>
+                              <p className="text-slate-500 text-xs">{exp.title} • {exp.duration}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : data.candidateProfile.experience > 0 ? (
+                        <div className="text-sm">
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            {data.candidateProfile.experience}+ Years Experience
+                          </Badge>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Work history details not extracted. Re-upload resume to see employer list.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-sm">
+                          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                            Fresher Candidate
+                          </Badge>
+                          <p className="text-xs text-slate-500 mt-1">No prior work experience listed</p>
+                        </div>
+                      )}
+                      <div className="mt-2 pt-2 border-t border-slate-100">
+                        <Badge variant="outline" className="capitalize text-xs">
+                          Profile: {data.candidateProfile.employer}
+                        </Badge>
+                      </div>
                     </CardContent>
                   </Card>
                   
@@ -742,8 +781,22 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false }: Props) {
                 return 'bg-red-50 hover:bg-red-100/50';
               };
               
+              const isSkillSetMatch = category.category === 'Skill Set Match'
+              const isExpanded = isSkillSetMatch ? localExpandedSkillSetMatch : false
+              
+              const handleToggleSkillSetMatch = () => {
+                if (isSkillSetMatch) {
+                  setLocalExpandedSkillSetMatch(!localExpandedSkillSetMatch)
+                  onToggleSkillSetMatch?.(!localExpandedSkillSetMatch)
+                }
+              }
+              
               return (
-                <div key={index} className={`border-2 border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 ${getScoreBgColor(category.score)}`}>
+                <div 
+                  key={index} 
+                  className={`border-2 border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200 ${getScoreBgColor(category.score)} ${isSkillSetMatch ? 'cursor-pointer' : ''}`}
+                  onClick={isSkillSetMatch ? handleToggleSkillSetMatch : undefined}
+                >
                   {/* Category Header */}
                   <div className="flex justify-between items-center px-6 py-5 bg-gradient-to-r from-slate-50 to-white border-b-2 border-slate-200">
                     <div className="flex items-center gap-4">
@@ -756,7 +809,12 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false }: Props) {
                         {index + 1}
                       </div>
                       <div>
-                        <h4 className="font-bold text-lg text-slate-900 leading-tight">{category.category}</h4>
+                        <h4 className="font-bold text-lg text-slate-900 leading-tight flex items-center gap-2">
+                          {category.category}
+                          {isSkillSetMatch && (
+                            <ChevronDown className={`w-5 h-5 text-slate-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          )}
+                        </h4>
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-sm font-semibold text-slate-600">Weight: <span className="text-slate-800">{category.weight}%</span></span>
                         </div>
@@ -773,20 +831,48 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false }: Props) {
                   </div>
                   
                   {/* Category Details - Grid Only */}
-                  <div className="px-6 py-6 bg-white/80">
+                  <div className={`px-6 py-6 bg-white/80 transition-all duration-300 ${isExpanded ? 'max-h-none' : 'max-h-96'} overflow-hidden`}>
                     {/* Grid Format (2x2 for all grid categories) */}
                     {(category as any).isGrid && (category as any).gridData ? (
                       <div className="grid grid-cols-2 gap-4">
-                        {(category as any).gridData.map((item: any, idx: number) => (
-                          <div key={idx} className="bg-white border border-slate-200 rounded-lg p-4">
-                            <div className="text-sm font-medium text-slate-600 mb-2">
-                              {item.label}
+                        {(category as any).gridData.map((item: any, idx: number) => {
+                          // For Skill Set Match, show full skills when expanded
+                          if (isSkillSetMatch && isExpanded && (item.label.includes('Matched Skills') || item.label.includes('Missing Skills'))) {
+                            const skillsArray = item.label.includes('Matched Skills') 
+                              ? (category as any).fullMatchedSkills || []
+                              : (category as any).fullMissingSkills || []
+                            
+                            return (
+                              <div key={idx} className="bg-white border border-slate-200 rounded-lg p-4 col-span-2">
+                                <div className="text-sm font-medium text-slate-600 mb-2">
+                                  {item.label}
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {skillsArray.length > 0 ? (
+                                    skillsArray.map((skill: string, sidx: number) => (
+                                      <Badge key={sidx} variant="outline" className="bg-slate-50">
+                                        {skill}
+                                      </Badge>
+                                    ))
+                                  ) : (
+                                    <p className="text-sm text-slate-500">None</p>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          }
+                          
+                          return (
+                            <div key={idx} className="bg-white border border-slate-200 rounded-lg p-4">
+                              <div className="text-sm font-medium text-slate-600 mb-2">
+                                {item.label}
+                              </div>
+                              <p className="text-sm text-slate-800">
+                                {item.value}
+                              </p>
                             </div>
-                            <p className="text-sm text-slate-800">
-                              {item.value}
-                            </p>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     ) : null}
                   </div>
