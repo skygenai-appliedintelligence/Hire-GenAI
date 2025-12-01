@@ -23,10 +23,15 @@ interface SendEmailModalProps {
     id: string
     name: string
   } | null
+  user?: {
+    id: string
+    full_name: string
+    email: string
+  } | null
   onSendEmail: (message: string, category: 'interview' | 'new_job') => Promise<void>
 }
 
-export default function SendEmailModal({ isOpen, onClose, candidate, company, onSendEmail }: SendEmailModalProps) {
+export default function SendEmailModal({ isOpen, onClose, candidate, company, user, onSendEmail }: SendEmailModalProps) {
   const [selectedCategory, setSelectedCategory] = useState<'interview' | 'new_job'>('interview')
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
@@ -41,10 +46,12 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, on
     companyName: string
     userJobTitle: string
     interviewLink: string
+    recruiterName: string
   }>({
     companyName: "",
     userJobTitle: "",
-    interviewLink: ""
+    interviewLink: "",
+    recruiterName: ""
   })
 
   // Load saved messages and company data when modal opens
@@ -117,6 +124,7 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, on
       const savedCompanyData = localStorage.getItem('companyData')
       let companyName = (company as any)?.name || ""
       let userJobTitle = "HR Manager"
+      let recruiterName = user?.full_name || ""
       
       if (savedCompanyData) {
         try {
@@ -131,7 +139,8 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, on
       setCompanyData({
         companyName,
         userJobTitle,
-        interviewLink
+        interviewLink,
+        recruiterName
       })
     } catch (error) {
       console.error('Error loading company data:', error)
@@ -140,7 +149,8 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, on
       setCompanyData({
         companyName: (company as any)?.name || "",
         userJobTitle: "HR Manager", 
-        interviewLink: `${baseUrl}/interview/${encodeURIComponent(candidate.id)}/start`
+        interviewLink: `${baseUrl}/interview/${encodeURIComponent(candidate.id)}/start`,
+        recruiterName: user?.full_name || ""
       })
     }
   }
@@ -157,6 +167,9 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, on
       .replace(/\[Candidate Name\]/g, candidate.candidateName)
       .replace(/\[Insert Meeting Link\]/g, companyData.interviewLink)
       .replace(/\[Your Job Title\]/g, companyData.userJobTitle)
+      .replace(/\[Date\]/g, "Valid for 48 hours")
+      .replace(/\[Your Name\]/g, companyData.recruiterName || "Recruitment Team")
+      .replace(/\[Your Designation\]/g, companyData.userJobTitle)
   }
 
   const handleCategorySelect = (category: 'interview' | 'new_job') => {

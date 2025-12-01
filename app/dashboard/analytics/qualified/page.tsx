@@ -36,7 +36,7 @@ type Bucket = {
 }
 
 export default function QualifiedCandidatesInterviewFlowPage() {
-  const { company } = useAuth()
+  const { company, user } = useAuth()
   const searchParams = useSearchParams()
   const jobId = searchParams.get('jobId')
   const [rows, setRows] = useState<CandidateRow[]>([])
@@ -336,6 +336,7 @@ export default function QualifiedCandidatesInterviewFlowPage() {
           }}
           candidate={selectedCandidate}
           company={company}
+          user={user}
           onSendEmail={handleSendEmail}
         />
       )}

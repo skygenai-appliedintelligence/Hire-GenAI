@@ -206,6 +206,7 @@ export default function CandidateReportPage() {
   const [evaluation, setEvaluation] = useState<EvaluationData | null>(null)
   const [transcript, setTranscript] = useState<TranscriptData | null>(null)
   const [jobTitle, setJobTitle] = useState<string>("")
+  const [job, setJob] = useState<any>(null)
   const [resumeText, setResumeText] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -295,13 +296,14 @@ export default function CandidateReportPage() {
         if (json.qualificationScore) setDbScore(json.qualificationScore)
         if (typeof json.isQualified === 'boolean') setDbQualified(json.isQualified)
 
-        // Fetch job title and applications count
+        // Fetch job data for this job
         if (jdId) {
           try {
             const jobRes = await fetch(`/api/jobs/${jdId}/summary?companyId=temp`, { cache: "no-store" })
             const jobJson = await jobRes.json()
             if (jobRes.ok && jobJson?.ok && jobJson.job?.title) {
               setJobTitle(jobJson.job.title)
+              setJob(jobJson.job)
             }
           } catch {
             // Ignore job title fetch errors
@@ -1644,21 +1646,21 @@ export default function CandidateReportPage() {
                       <BarChart3 className="h-5 w-5 text-emerald-600" />
                       Criteria-Based Score Breakdown
                     </CardTitle>
-                    <CardDescription>Only criteria with questions asked are included in the final score</CardDescription>
+                    <CardDescription>All configured criteria with their evaluation scores</CardDescription>
                   </CardHeader>
                   <CardContent className="p-6">
                     {(() => {
                       // Get criteria breakdown from evaluation
                       const evalAny = evaluation as any
                       const criteriaBreakdown = evalAny.criteriaBreakdown || {}
-                      const categoriesUsed = evalAny.categoriesUsed || Object.keys(criteriaBreakdown)
-                      const categoriesNotUsed = evalAny.categoriesNotUsed || []
                       const questions = evalAny.questions || []
                       
-                      // Calculate criteria from questions if not available
+                      // Calculate criteria stats from questions
                       const criteriaFromQuestions: Record<string, { count: number, totalScore: number, questions: any[] }> = {}
                       questions.forEach((q: any) => {
-                        const criteria = q.criteria || q.category || 'General'
+                        const rawCriteria = q.criteria || q.category || ''
+                        if (!rawCriteria) return
+                        const criteria = rawCriteria
                         if (!criteriaFromQuestions[criteria]) {
                           criteriaFromQuestions[criteria] = { count: 0, totalScore: 0, questions: [] }
                         }
@@ -1667,10 +1669,12 @@ export default function CandidateReportPage() {
                         criteriaFromQuestions[criteria].questions.push(q)
                       })
                       
-                      const totalQuestions = questions.length || 1
-                      const criteriaList = Object.keys(criteriaBreakdown).length > 0 
-                        ? Object.keys(criteriaBreakdown) 
-                        : Object.keys(criteriaFromQuestions)
+                      // PRIORITY: Use configured_criteria from job_rounds (contains ALL criteria)
+                      // This ensures we show all 4 (or N) criteria even if no questions were asked
+                      const configuredCriteria = evalAny.configured_criteria || evalAny.evaluation_criteria || []
+                      
+                      // Filter out "General" and use configured criteria
+                      const criteriaList = configuredCriteria.filter((c: string) => c && c !== 'General')
                       
                       const getCriteriaIcon = (criteria: string) => {
                         const icons: Record<string, any> = {
@@ -1679,100 +1683,122 @@ export default function CandidateReportPage() {
                           'Communication': <MessageCircle className="h-5 w-5" />,
                           'Problem Solving': <Brain className="h-5 w-5" />,
                           'Cultural Fit': <Users className="h-5 w-5" />,
-                          'Culture': <Users className="h-5 w-5" />
+                          'Culture fit': <Users className="h-5 w-5" />,
+                          'Culture': <Users className="h-5 w-5" />,
+                          'Team Player': <Users className="h-5 w-5" />,
+                          'Teamwork': <Users className="h-5 w-5" />,
+                          'Leadership': <Award className="h-5 w-5" />,
+                          'Adaptability': <TrendingUp className="h-5 w-5" />
                         }
                         return icons[criteria] || <Target className="h-5 w-5" />
                       }
                       
                       const getCriteriaColor = (criteria: string) => {
                         const colors: Record<string, { bg: string, border: string, text: string, bar: string }> = {
-                          'Technical Skills': { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', bar: 'bg-blue-500' },
-                          'Technical': { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', bar: 'bg-blue-500' },
-                          'Communication': { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', bar: 'bg-green-500' },
-                          'Problem Solving': { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', bar: 'bg-purple-500' },
-                          'Cultural Fit': { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', bar: 'bg-orange-500' },
-                          'Culture': { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', bar: 'bg-orange-500' }
+                          'Technical Skills': { bg: 'bg-gradient-to-br from-blue-50 to-indigo-50', border: 'border-blue-300', text: 'text-blue-800', bar: 'bg-gradient-to-r from-blue-500 to-indigo-600' },
+                          'Technical': { bg: 'bg-gradient-to-br from-blue-50 to-indigo-50', border: 'border-blue-300', text: 'text-blue-800', bar: 'bg-gradient-to-r from-blue-500 to-indigo-600' },
+                          'Communication': { bg: 'bg-gradient-to-br from-red-50 to-pink-50', border: 'border-red-300', text: 'text-red-800', bar: 'bg-gradient-to-r from-red-500 to-pink-600' },
+                          'Problem Solving': { bg: 'bg-gradient-to-br from-purple-50 to-violet-50', border: 'border-purple-300', text: 'text-purple-800', bar: 'bg-gradient-to-r from-purple-500 to-violet-600' },
+                          'Cultural Fit': { bg: 'bg-gradient-to-br from-orange-50 to-amber-50', border: 'border-orange-300', text: 'text-orange-800', bar: 'bg-gradient-to-r from-orange-500 to-amber-600' },
+                          'Culture fit': { bg: 'bg-gradient-to-br from-orange-50 to-amber-50', border: 'border-orange-300', text: 'text-orange-800', bar: 'bg-gradient-to-r from-orange-500 to-amber-600' },
+                          'Culture': { bg: 'bg-gradient-to-br from-orange-50 to-amber-50', border: 'border-orange-300', text: 'text-orange-800', bar: 'bg-gradient-to-r from-orange-500 to-amber-600' },
+                          'Team Player': { bg: 'bg-gradient-to-br from-cyan-50 to-sky-50', border: 'border-cyan-300', text: 'text-cyan-800', bar: 'bg-gradient-to-r from-cyan-500 to-sky-600' },
+                          'Teamwork': { bg: 'bg-gradient-to-br from-rose-50 to-pink-50', border: 'border-rose-300', text: 'text-rose-800', bar: 'bg-gradient-to-r from-rose-500 to-pink-600' },
+                          'Leadership': { bg: 'bg-gradient-to-br from-rose-50 to-pink-50', border: 'border-rose-300', text: 'text-rose-800', bar: 'bg-gradient-to-r from-rose-500 to-pink-600' },
+                          'Adaptability': { bg: 'bg-gradient-to-br from-sky-50 to-blue-50', border: 'border-sky-300', text: 'text-sky-800', bar: 'bg-gradient-to-r from-sky-500 to-blue-600' }
                         }
-                        return colors[criteria] || { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-700', bar: 'bg-gray-500' }
+                        return colors[criteria] || { bg: 'bg-gradient-to-br from-slate-50 to-gray-50', border: 'border-slate-300', text: 'text-slate-800', bar: 'bg-gradient-to-r from-slate-500 to-gray-600' }
                       }
+                      
+                      // Show message if no real criteria available
+                      if (criteriaList.length === 0) {
+                        return (
+                          <div className="text-center py-8 text-gray-500">
+                            <BarChart3 className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                            <p className="font-medium">No criteria breakdown available</p>
+                            <p className="text-sm">Questions may not have been mapped to specific criteria</p>
+                          </div>
+                        )
+                      }
+                      
+                      // Helper to render a criteria card
+                      const renderCriteriaCard = (criteria: string, idx: number) => {
+                        const breakdown = criteriaBreakdown[criteria] || {}
+                        const fromQuestions = criteriaFromQuestions[criteria] || { count: 0, totalScore: 0 }
+                        const questionCount = breakdown.question_count || fromQuestions.count || 0
+                        
+                        let avgScore = 0
+                        if (questionCount > 0) {
+                          avgScore = breakdown.average_score || (fromQuestions.count > 0 ? Math.round(fromQuestions.totalScore / fromQuestions.count) : 0)
+                        }
+                        
+                        const totalQuestions = questions.length || 1
+                        const weightPct = questionCount > 0 ? (breakdown.weight_percentage || Math.round((questionCount / totalQuestions) * 100)) : 0
+                        const contribution = questionCount > 0 ? (breakdown.weighted_contribution || Math.round(avgScore * (questionCount / totalQuestions))) : 0
+                        const colors = getCriteriaColor(criteria)
+                        const isNotEvaluated = questionCount === 0
+                        
+                        return (
+                          <div key={idx} className={`p-5 rounded-2xl border-2 transition-all hover:shadow-lg hover:scale-[1.02] ${
+                            isNotEvaluated 
+                              ? 'border-gray-200 bg-gray-50 opacity-60' 
+                              : `${colors.border} ${colors.bg}`
+                          }`}>
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex items-center gap-3">
+                                <div className={`p-2.5 rounded-xl bg-white shadow-sm ${isNotEvaluated ? 'text-gray-400' : colors.text}`}>
+                                  {getCriteriaIcon(criteria)}
+                                </div>
+                                <div>
+                                  <h4 className={`font-bold text-base ${isNotEvaluated ? 'text-gray-500' : colors.text}`}>{criteria}</h4>
+                                  <p className={`text-xs mt-0.5 ${isNotEvaluated ? 'text-gray-400' : 'text-gray-500'}`}>
+                                    {questionCount} question{questionCount !== 1 ? 's' : ''}
+                                    {isNotEvaluated && ' • Not evaluated'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className={`text-3xl font-bold ${isNotEvaluated ? 'text-gray-400' : colors.text}`}>{avgScore}</div>
+                                <div className="text-xs text-gray-400 font-medium">score</div>
+                              </div>
+                            </div>
+                            
+                            {/* Progress Bar */}
+                            <div className="mb-4">
+                              <div className={`w-full rounded-full h-2.5 shadow-inner ${isNotEvaluated ? 'bg-gray-200' : 'bg-white'}`}>
+                                <div
+                                  className={`h-2.5 rounded-full transition-all duration-700 ${isNotEvaluated ? 'bg-gray-300' : colors.bar}`}
+                                  style={{ width: `${Math.min(avgScore, 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                            
+                            {/* Weight & Contribution */}
+                            <div className={`flex justify-between text-xs pt-2 border-t ${isNotEvaluated ? 'border-gray-200' : 'border-white/50'}`}>
+                              <span className={`font-medium ${isNotEvaluated ? 'text-gray-400' : 'text-gray-600'}`}>
+                                Weight: {weightPct}%
+                              </span>
+                              <span className={`font-bold ${isNotEvaluated ? 'text-gray-400' : colors.text}`}>
+                                +{contribution} pts
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      }
+                      
+                      // Order criteria: Technical, Communication, Cultural Fit, Team Player (2x2 grid)
+                      const orderedCriteria = ['Technical', 'Communication', 'Cultural Fit', 'Team Player']
+                      const sortedCriteriaList = [
+                        ...orderedCriteria.filter(c => criteriaList.includes(c)),
+                        ...criteriaList.filter((c: string) => !orderedCriteria.includes(c))
+                      ]
                       
                       return (
                         <div className="space-y-6">
-                          {/* Criteria Cards */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {criteriaList.map((criteria, idx) => {
-                              const breakdown = criteriaBreakdown[criteria] || {}
-                              const fromQuestions = criteriaFromQuestions[criteria] || { count: 0, totalScore: 0 }
-                              const questionCount = breakdown.question_count || fromQuestions.count || 0
-                              const avgScore = breakdown.average_score || (fromQuestions.count > 0 ? Math.round(fromQuestions.totalScore / fromQuestions.count) : 0)
-                              const weightPct = breakdown.weight_percentage || Math.round((questionCount / totalQuestions) * 100)
-                              const contribution = breakdown.weighted_contribution || Math.round(avgScore * (questionCount / totalQuestions))
-                              const colors = getCriteriaColor(criteria)
-                              
-                              return (
-                                <div key={idx} className={`p-5 rounded-xl border-2 ${colors.border} ${colors.bg} transition-all hover:shadow-md`}>
-                                  <div className="flex items-start justify-between mb-4">
-                                    <div className="flex items-center gap-3">
-                                      <div className={`p-2 rounded-lg bg-white shadow-sm ${colors.text}`}>
-                                        {getCriteriaIcon(criteria)}
-                                      </div>
-                                      <div>
-                                        <h4 className={`font-semibold ${colors.text}`}>{criteria}</h4>
-                                        <p className="text-xs text-gray-500">{questionCount} question{questionCount !== 1 ? 's' : ''} evaluated</p>
-                                      </div>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className={`text-2xl font-bold ${colors.text}`}>{avgScore}</div>
-                                      <div className="text-xs text-gray-500">avg score</div>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Progress Bar */}
-                                  <div className="mb-3">
-                                    <div className="w-full bg-white rounded-full h-3 shadow-inner">
-                                      <div
-                                        className={`h-3 rounded-full ${colors.bar} transition-all duration-500`}
-                                        style={{ width: `${avgScore}%` }}
-                                      />
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Weight & Contribution */}
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">
-                                      <span className="font-medium">Weight:</span> {weightPct}%
-                                    </span>
-                                    <span className={`font-semibold ${colors.text}`}>
-                                      Contributes: +{contribution} pts
-                                    </span>
-                                  </div>
-                                </div>
-                              )
-                            })}
+                          {/* Criteria Cards - 2x2 Grid */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            {sortedCriteriaList.map((criteria: string, idx: number) => renderCriteriaCard(criteria, idx))}
                           </div>
-                          
-                          {/* Categories Not Used */}
-                          {categoriesNotUsed.length > 0 && (
-                            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                              <div className="flex items-center gap-2 mb-2">
-                                <AlertTriangle className="h-4 w-4 text-gray-400" />
-                                <span className="text-sm font-medium text-gray-600">Criteria Not Evaluated</span>
-                              </div>
-                              <p className="text-xs text-gray-500">
-                                The following criteria were not included in the final score because no questions were asked for them:
-                              </p>
-                              <div className="flex flex-wrap gap-2 mt-2">
-                                {categoriesNotUsed.map((cat: string, idx: number) => (
-                                  <Badge key={idx} variant="outline" className="bg-white text-gray-500">
-                                    {cat} (0%)
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Final Score Calculation - REMOVED AS REQUESTED */}
-                          {/* This section was removed per user request */}
                         </div>
                       )
                     })()}
@@ -1780,13 +1806,19 @@ export default function CandidateReportPage() {
                 </Card>
 
                 {/* ===== SECTION 4: Question-by-Question Breakdown ===== */}
-                <Card className="border-2 border-gray-200 shadow-lg">
-                  <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b">
-                    <CardTitle className="text-gray-900 flex items-center gap-2">
-                      <HelpCircle className="h-5 w-5 text-indigo-600" />
-                      Question-by-Question Evaluation
-                    </CardTitle>
-                    <CardDescription>Each question mapped to its criteria with detailed scoring</CardDescription>
+                <Card className="border-2 border-gray-200 shadow-lg overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 border-b border-gray-200">
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <div>
+                        <CardTitle className="text-gray-900 flex items-center gap-2 text-xl">
+                          <HelpCircle className="h-6 w-6 text-indigo-600" />
+                          Interview Responses & Scores
+                        </CardTitle>
+                        <CardDescription className="mt-1">
+                          Detailed evaluation of each question with AI-powered scoring
+                        </CardDescription>
+                      </div>
+                    </div>
                   </CardHeader>
                   <CardContent className="p-6">
                     {(() => {
@@ -1803,31 +1835,31 @@ export default function CandidateReportPage() {
                       }
                       
                       const getCriteriaColor = (criteria: string) => {
-                        const colors: Record<string, { bg: string, border: string, text: string, badge: string }> = {
+                        const colors: Record<string, { bg: string, border: string, text: string, badge: string, bar: string }> = {
                           // Technical criteria (blue)
-                          'Technical Skills': { bg: 'bg-blue-50', border: 'border-l-blue-500', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-800' },
-                          'Technical': { bg: 'bg-blue-50', border: 'border-l-blue-500', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-800' },
+                          'Technical Skills': { bg: 'bg-blue-50', border: 'border-l-blue-500', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-800', bar: 'bg-blue-500' },
+                          'Technical': { bg: 'bg-blue-50', border: 'border-l-blue-500', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-800', bar: 'bg-blue-500' },
                           // Communication criteria (green)
-                          'Communication': { bg: 'bg-green-50', border: 'border-l-green-500', text: 'text-green-700', badge: 'bg-green-100 text-green-800' },
+                          'Communication': { bg: 'bg-green-50', border: 'border-l-green-500', text: 'text-green-700', badge: 'bg-green-100 text-green-800', bar: 'bg-green-500' },
                           // Problem Solving criteria (purple)
-                          'Problem Solving': { bg: 'bg-purple-50', border: 'border-l-purple-500', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-800' },
+                          'Problem Solving': { bg: 'bg-purple-50', border: 'border-l-purple-500', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-800', bar: 'bg-purple-500' },
                           // Cultural Fit criteria (orange)
-                          'Cultural Fit': { bg: 'bg-orange-50', border: 'border-l-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-800' },
-                          'Culture Fit': { bg: 'bg-orange-50', border: 'border-l-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-800' },
-                          'Culture': { bg: 'bg-orange-50', border: 'border-l-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-800' },
+                          'Cultural Fit': { bg: 'bg-orange-50', border: 'border-l-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-800', bar: 'bg-orange-500' },
+                          'Culture Fit': { bg: 'bg-orange-50', border: 'border-l-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-800', bar: 'bg-orange-500' },
+                          'Culture': { bg: 'bg-orange-50', border: 'border-l-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-800', bar: 'bg-orange-500' },
                           // Team Player criteria (teal/cyan)
-                          'Team Player': { bg: 'bg-teal-50', border: 'border-l-teal-500', text: 'text-teal-700', badge: 'bg-teal-100 text-teal-800' },
-                          'Teamwork': { bg: 'bg-teal-50', border: 'border-l-teal-500', text: 'text-teal-700', badge: 'bg-teal-100 text-teal-800' },
+                          'Team Player': { bg: 'bg-teal-50', border: 'border-l-teal-500', text: 'text-teal-700', badge: 'bg-teal-100 text-teal-800', bar: 'bg-teal-500' },
+                          'Teamwork': { bg: 'bg-teal-50', border: 'border-l-teal-500', text: 'text-teal-700', badge: 'bg-teal-100 text-teal-800', bar: 'bg-teal-500' },
                           // Leadership criteria (indigo)
-                          'Leadership': { bg: 'bg-indigo-50', border: 'border-l-indigo-500', text: 'text-indigo-700', badge: 'bg-indigo-100 text-indigo-800' },
+                          'Leadership': { bg: 'bg-indigo-50', border: 'border-l-indigo-500', text: 'text-indigo-700', badge: 'bg-indigo-100 text-indigo-800', bar: 'bg-indigo-500' },
                           // Adaptability criteria (amber)
-                          'Adaptability': { bg: 'bg-amber-50', border: 'border-l-amber-500', text: 'text-amber-700', badge: 'bg-amber-100 text-amber-800' },
+                          'Adaptability': { bg: 'bg-amber-50', border: 'border-l-amber-500', text: 'text-amber-700', badge: 'bg-amber-100 text-amber-800', bar: 'bg-amber-500' },
                           // Experience criteria (slate)
-                          'Experience': { bg: 'bg-slate-50', border: 'border-l-slate-500', text: 'text-slate-700', badge: 'bg-slate-100 text-slate-800' },
+                          'Experience': { bg: 'bg-slate-50', border: 'border-l-slate-500', text: 'text-slate-700', badge: 'bg-slate-100 text-slate-800', bar: 'bg-slate-500' },
                           // Behavioral criteria (rose)
-                          'Behavioral': { bg: 'bg-rose-50', border: 'border-l-rose-500', text: 'text-rose-700', badge: 'bg-rose-100 text-rose-800' }
+                          'Behavioral': { bg: 'bg-rose-50', border: 'border-l-rose-500', text: 'text-rose-700', badge: 'bg-rose-100 text-rose-800', bar: 'bg-rose-500' }
                         }
-                        return colors[criteria] || { bg: 'bg-gray-50', border: 'border-l-gray-500', text: 'text-gray-700', badge: 'bg-gray-100 text-gray-800' }
+                        return colors[criteria] || { bg: 'bg-gray-50', border: 'border-l-gray-500', text: 'text-gray-700', badge: 'bg-gray-100 text-gray-800', bar: 'bg-gray-500' }
                       }
                       
                       const getScoreStatus = (score: number, maxScore: number = 100) => {
@@ -1839,130 +1871,166 @@ export default function CandidateReportPage() {
                       }
                       
                       return (
-                        <div className="space-y-4">
+                        <div className="space-y-6">
                           {questions.map((q: any, idx: number) => {
-                            const criteria = q.criteria || q.category || 'General'
-                            const colors = getCriteriaColor(criteria)
+                            // Use actual criterion from job config, fallback to category
+                            const rawCriteria = q.criteria || q.category || ''
+                            // Don't show "General" - show the actual criterion or leave empty
+                            const criteria = rawCriteria === 'General' ? '' : rawCriteria
+                            const colors = getCriteriaColor(criteria || 'Technical')
                             const score = q.score || q.marks_obtained || 0
                             const maxScore = q.max_score || q.max_marks || 100
                             const status = getScoreStatus(score, maxScore)
                             const answered = q.answered !== false
+                            // Sequential question number (1, 2, 3...)
+                            const questionNum = idx + 1
                             
                             return (
-                              <div key={idx} className={`rounded-xl border-l-4 ${colors.border} ${colors.bg} p-5 transition-all hover:shadow-md`}>
-                                {/* Question Header */}
-                                <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-                                  <div className="flex items-start gap-3 flex-1">
-                                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center font-bold text-gray-600">
-                                      {q.question_number || idx + 1}
+                              <div key={idx} className={`rounded-2xl border ${answered ? 'border-gray-200' : 'border-red-200'} bg-white shadow-sm overflow-hidden transition-all hover:shadow-lg`}>
+                                {/* Question Header with colored top border */}
+                                <div className={`h-1 ${criteria ? colors.bar : 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500'}`} />
+                                
+                                <div className="p-6">
+                                  {/* Top Row: Question Number, Title, Badges */}
+                                  <div className="flex items-start gap-4 mb-5">
+                                    {/* Question Number Circle */}
+                                    <div className={`flex-shrink-0 w-10 h-10 rounded-full ${criteria ? colors.bg : 'bg-gray-100'} flex items-center justify-center`}>
+                                      <span className={`text-lg font-bold ${criteria ? colors.text : 'text-gray-700'}`}>
+                                        {questionNum}
+                                      </span>
                                     </div>
-                                    <div className="flex-1">
-                                      <p className="font-medium text-gray-900 leading-snug">
+                                    
+                                    {/* Question Text & Badges */}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-base font-semibold text-gray-900 leading-relaxed mb-3">
                                         {q.question_text || q.question || 'Question not available'}
                                       </p>
+                                      
+                                      {/* Badges Row */}
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        {criteria && (
+                                          <Badge className={`${colors.badge} font-medium`}>
+                                            {criteria}
+                                          </Badge>
+                                        )}
+                                        {!answered && (
+                                          <Badge variant="outline" className="bg-red-50 text-red-600 border-red-300 font-medium">
+                                            ✗ Not Answered
+                                          </Badge>
+                                        )}
+                                        {q.completeness && (
+                                          <Badge variant="outline" className={
+                                            q.completeness === 'complete' ? 'bg-emerald-50 text-emerald-700 border-emerald-300' :
+                                            q.completeness === 'partial' ? 'bg-amber-50 text-amber-700 border-amber-300' :
+                                            q.completeness === 'incomplete' ? 'bg-orange-50 text-orange-700 border-orange-300' :
+                                            'bg-red-50 text-red-700 border-red-300'
+                                          }>
+                                            {q.completeness === 'complete' ? '✓ Complete' :
+                                             q.completeness === 'partial' ? '◐ Partial' :
+                                             q.completeness === 'incomplete' ? '○ Incomplete' :
+                                             '✗ Off Topic'}
+                                          </Badge>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Badge className={colors.badge}>
-                                      {criteria}
-                                    </Badge>
-                                    {!answered && (
-                                      <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200">
-                                        Not Answered
+                                    
+                                    {/* Score Display (Right Side) */}
+                                    <div className="flex-shrink-0 text-right">
+                                      <div className={`text-3xl font-bold ${answered ? (score >= 70 ? 'text-emerald-600' : score >= 50 ? 'text-amber-600' : 'text-red-500') : 'text-gray-300'}`}>
+                                        {score}
+                                      </div>
+                                      <div className="text-xs text-gray-400 font-medium">/ {maxScore} pts</div>
+                                      <Badge className={`mt-1 ${status.bg} ${status.color} text-xs`}>
+                                        {status.label}
                                       </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                {/* Criteria Reasoning - Why this question belongs to this criterion */}
-                                {q.criteria_reasoning && (
-                                  <div className="mb-3 -mt-1">
-                                    <div className={`text-xs ${colors.text} opacity-80 flex items-center gap-1 italic`}>
-                                      <Target className="h-3 w-3" /> 
-                                      <span className="font-medium">Why {criteria}:</span> {q.criteria_reasoning}
                                     </div>
                                   </div>
-                                )}
-                                
-                                {/* Score Display */}
-                                <div className="flex items-center gap-4 mb-4">
-                                  <div className="flex items-center gap-2">
-                                    <div className={`text-3xl font-bold ${answered ? colors.text : 'text-gray-400'}`}>
-                                      {score}
-                                    </div>
-                                    <div className="text-gray-400">/</div>
-                                    <div className="text-lg text-gray-500">{maxScore}</div>
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="w-full bg-white rounded-full h-2 shadow-inner">
+                                  
+                                  {/* Score Progress Bar */}
+                                  <div className="mb-5">
+                                    <div className="w-full bg-gray-100 rounded-full h-2">
                                       <div
-                                        className={`h-2 rounded-full transition-all duration-500 ${answered ? (score >= maxScore * 0.8 ? 'bg-green-500' : score >= maxScore * 0.6 ? 'bg-blue-500' : score >= maxScore * 0.4 ? 'bg-yellow-500' : 'bg-red-500') : 'bg-gray-300'}`}
-                                        style={{ width: `${(score / maxScore) * 100}%` }}
+                                        className={`h-2 rounded-full transition-all duration-700 ${
+                                          answered 
+                                            ? (score >= 80 ? 'bg-emerald-500' : score >= 60 ? 'bg-blue-500' : score >= 40 ? 'bg-amber-500' : 'bg-red-500') 
+                                            : 'bg-gray-300'
+                                        }`}
+                                        style={{ width: `${Math.min((score / maxScore) * 100, 100)}%` }}
                                       />
                                     </div>
                                   </div>
-                                  <Badge className={`${status.bg} ${status.color}`}>
-                                    {status.label}
-                                  </Badge>
+                                  
+                                  {/* Candidate Response */}
+                                  {(q.candidate_response || q.answer) && (
+                                    <div className="mb-5">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <MessageCircle className="h-5 w-5 text-gray-500" />
+                                        <span className="text-base font-semibold text-gray-800">Candidate Response</span>
+                                      </div>
+                                      <div className="bg-gray-50 p-5 rounded-xl border border-gray-100">
+                                        <p className="text-base text-gray-800 leading-relaxed">
+                                          {q.candidate_response || q.answer || 'No response recorded'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Evaluation Reasoning */}
+                                  {q.criteria_reasoning && (() => {
+                                    const criterionMatchText = q.criteria_reasoning.replace(/Criterion Match:\s*/i, '').trim()
+                                    return criterionMatchText ? (
+                                      <div className="mb-5">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <Brain className="h-5 w-5 text-blue-500" />
+                                          <span className="text-base font-semibold text-gray-800">Evaluation Reason</span>
+                                        </div>
+                                        <div className="bg-blue-50 p-5 rounded-xl border border-blue-100">
+                                          <p className="text-base text-gray-800 leading-relaxed">
+                                            {criterionMatchText}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ) : null
+                                  })()}
+                                  
+                                  {/* Strengths & Gaps */}
+                                  {((q.strengths_in_answer && q.strengths_in_answer.length > 0) || (q.gaps_in_answer && q.gaps_in_answer.length > 0)) && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      {q.strengths_in_answer && q.strengths_in_answer.length > 0 && (
+                                        <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+                                          <div className="flex items-center gap-2 mb-3">
+                                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                            <span className="text-sm font-semibold text-emerald-800">Strengths</span>
+                                          </div>
+                                          <ul className="space-y-2">
+                                            {q.strengths_in_answer.map((s: string, sIdx: number) => (
+                                              <li key={sIdx} className="text-sm text-emerald-700 flex items-start gap-2">
+                                                <span className="text-emerald-500 mt-0.5">✓</span>
+                                                <span>{s}</span>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+                                      {q.gaps_in_answer && q.gaps_in_answer.length > 0 && (
+                                        <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
+                                          <div className="flex items-center gap-2 mb-3">
+                                            <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                            <span className="text-sm font-semibold text-amber-800">Areas to Improve</span>
+                                          </div>
+                                          <ul className="space-y-2">
+                                            {q.gaps_in_answer.map((g: string, gIdx: number) => (
+                                              <li key={gIdx} className="text-sm text-amber-700 flex items-start gap-2">
+                                                <span className="text-amber-500 mt-0.5">•</span>
+                                                <span>{g}</span>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
-                                
-                                {/* Candidate Response */}
-                                {(q.candidate_response || q.answer) && (
-                                  <div className="mb-3">
-                                    <div className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
-                                      <MessageCircle className="h-3 w-3" /> Candidate Response
-                                    </div>
-                                    <div className="bg-white p-3 rounded-lg border border-gray-200 text-sm text-gray-700">
-                                      {q.candidate_response || q.answer || 'No response recorded'}
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                {/* Evaluation Reasoning */}
-                                {(q.evaluation_reasoning || q.feedback) && (
-                                  <div className="mb-3">
-                                    <div className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
-                                      <Brain className="h-3 w-3" /> Evaluation Reasoning
-                                    </div>
-                                    <div className="bg-white p-3 rounded-lg border border-gray-200 text-sm text-gray-600">
-                                      {q.evaluation_reasoning || q.feedback}
-                                    </div>
-                                  </div>
-                                )}
-                                
-                                {/* Strengths & Gaps in Answer */}
-                                {((q.strengths_in_answer && q.strengths_in_answer.length > 0) || (q.gaps_in_answer && q.gaps_in_answer.length > 0)) && (
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {q.strengths_in_answer && q.strengths_in_answer.length > 0 && (
-                                      <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                                        <div className="text-xs font-medium text-green-700 mb-2 flex items-center gap-1">
-                                          <CheckCircle2 className="h-3 w-3" /> Strengths
-                                        </div>
-                                        <ul className="space-y-1">
-                                          {q.strengths_in_answer.map((s: string, sIdx: number) => (
-                                            <li key={sIdx} className="text-xs text-green-800 flex items-start gap-1">
-                                              <span className="text-green-500">✓</span> {s}
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </div>
-                                    )}
-                                    {q.gaps_in_answer && q.gaps_in_answer.length > 0 && (
-                                      <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                                        <div className="text-xs font-medium text-orange-700 mb-2 flex items-center gap-1">
-                                          <AlertTriangle className="h-3 w-3" /> Gaps
-                                        </div>
-                                        <ul className="space-y-1">
-                                          {q.gaps_in_answer.map((g: string, gIdx: number) => (
-                                            <li key={gIdx} className="text-xs text-orange-800 flex items-start gap-1">
-                                              <span className="text-orange-500">•</span> {g}
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
                               </div>
                             )
                           })}
@@ -1972,140 +2040,242 @@ export default function CandidateReportPage() {
                   </CardContent>
                 </Card>
 
-                {/* ===== SECTION 5: Strengths & Areas for Improvement ===== */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Strengths Card */}
-                  {evaluationData!.strengths.length > 0 && (
-                    <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-lg">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-green-800 flex items-center gap-2">
-                          <CheckCircle2 className="h-5 w-5" />
-                          Key Strengths
+                {/* ===== SECTION 5: Performance Analytics ===== */}
+                {(() => {
+                  const evalAny = evaluation as any
+                  const questions = evalAny.questions || []
+                  
+                  // Calculate scoring distribution
+                  const scoreRanges = {
+                    excellent: questions.filter((q: any) => (q.score || 0) >= 80).length,
+                    good: questions.filter((q: any) => (q.score || 0) >= 60 && (q.score || 0) < 80).length,
+                    fair: questions.filter((q: any) => (q.score || 0) >= 40 && (q.score || 0) < 60).length,
+                    needsWork: questions.filter((q: any) => (q.score || 0) < 40).length
+                  }
+                  
+                  // Calculate response quality
+                  const totalQuestions = questions.length || 1
+                  const completeCount = questions.filter((q: any) => q.completeness === 'complete').length
+                  const partialCount = questions.filter((q: any) => q.completeness === 'partial').length
+                  const incompleteCount = questions.filter((q: any) => q.completeness === 'incomplete' || q.completeness === 'off_topic' || q.answered === false).length
+                  
+                  const completePercent = Math.round((completeCount / totalQuestions) * 100)
+                  const partialPercent = Math.round((partialCount / totalQuestions) * 100)
+                  const incompletePercent = Math.round((incompleteCount / totalQuestions) * 100)
+                  
+                  return (
+                    <Card className="border-2 border-gray-200 shadow-lg">
+                      <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-100 border-b">
+                        <CardTitle className="text-gray-900 flex items-center gap-2">
+                          <BarChart3 className="h-5 w-5 text-slate-600" />
+                          Performance Analytics
                         </CardTitle>
-                        <CardDescription className="text-green-600">Areas where candidate excels</CardDescription>
+                        <CardDescription>Detailed scoring breakdown and insights</CardDescription>
                       </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
-                          {evaluationData!.strengths.map((strength, idx) => {
-                            const strengthObj = typeof strength === 'string' 
-                              ? { point: strength } 
-                              : strength as any
-                            
-                            return (
-                              <div key={idx} className="p-3 bg-white rounded-lg border border-green-200 hover:border-green-400 transition-all hover:shadow-sm">
-                                <div className="flex items-start gap-2">
+                      <CardContent className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Scoring Distribution */}
+                          <div className="bg-white border-2 border-gray-200 rounded-2xl p-5">
+                            <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                              <BarChart3 className="h-4 w-4 text-gray-600" />
+                              Scoring Distribution
+                            </h4>
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">80-100 (Excellent)</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div className="h-full bg-green-500 rounded-full" style={{ width: `${(scoreRanges.excellent / totalQuestions) * 100}%` }} />
+                                  </div>
+                                  <span className="text-sm font-bold text-green-600">{scoreRanges.excellent}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">60-79 (Good)</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(scoreRanges.good / totalQuestions) * 100}%` }} />
+                                  </div>
+                                  <span className="text-sm font-bold text-blue-600">{scoreRanges.good}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">40-59 (Fair)</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${(scoreRanges.fair / totalQuestions) * 100}%` }} />
+                                  </div>
+                                  <span className="text-sm font-bold text-yellow-600">{scoreRanges.fair}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">Below 40 (Needs Work)</span>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div className="h-full bg-red-500 rounded-full" style={{ width: `${(scoreRanges.needsWork / totalQuestions) * 100}%` }} />
+                                  </div>
+                                  <span className="text-sm font-bold text-red-600">{scoreRanges.needsWork}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Response Quality */}
+                          <div className="bg-white border-2 border-gray-200 rounded-2xl p-5">
+                            <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                              <Target className="h-4 w-4 text-gray-600" />
+                              Response Quality
+                            </h4>
+                            <div className="space-y-4">
+                              <div>
+                                <div className="flex justify-between text-sm mb-1">
+                                  <span className="text-gray-600">Complete</span>
+                                  <span className="font-bold text-green-600">{completePercent}%</span>
+                                </div>
+                                <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                                  <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${completePercent}%` }} />
+                                </div>
+                              </div>
+                              <div>
+                                <div className="flex justify-between text-sm mb-1">
+                                  <span className="text-gray-600">Partial</span>
+                                  <span className="font-bold text-yellow-600">{partialPercent}%</span>
+                                </div>
+                                <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                                  <div className="h-full bg-yellow-500 rounded-full transition-all" style={{ width: `${partialPercent}%` }} />
+                                </div>
+                              </div>
+                              <div>
+                                <div className="flex justify-between text-sm mb-1">
+                                  <span className="text-gray-600">Incomplete</span>
+                                  <span className="font-bold text-red-600">{incompletePercent}%</span>
+                                </div>
+                                <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                                  <div className="h-full bg-red-500 rounded-full transition-all" style={{ width: `${incompletePercent}%` }} />
+                                </div>
+                              </div>
+                              <div className="pt-2 border-t border-gray-200">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600">Total Questions</span>
+                                  <span className="font-bold text-gray-800">{totalQuestions}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })()}
+
+                {/* ===== SECTION 6: Evaluation Summary (Generated from Questions) ===== */}
+                {(() => {
+                  const evalAny = evaluation as any
+                  const questions = evalAny.questions || []
+                  const overallScore = evalAny.overallScore || 0
+                  
+                  // Generate strengths from questions with high scores
+                  const generatedStrengths: string[] = []
+                  const generatedWeaknesses: string[] = []
+                  
+                  questions.forEach((q: any) => {
+                    const score = q.score || 0
+                    const criteria = q.criteria || q.category || 'General'
+                    
+                    // Collect strengths from high-scoring answers
+                    if (score >= 70 && q.strengths_in_answer && q.strengths_in_answer.length > 0) {
+                      q.strengths_in_answer.forEach((s: string) => {
+                        if (!generatedStrengths.includes(s)) generatedStrengths.push(s)
+                      })
+                    }
+                    
+                    // Collect weaknesses from low-scoring answers
+                    if (score < 60 && q.gaps_in_answer && q.gaps_in_answer.length > 0) {
+                      q.gaps_in_answer.forEach((g: string) => {
+                        if (!generatedWeaknesses.includes(g)) generatedWeaknesses.push(g)
+                      })
+                    }
+                  })
+                  
+                  // Use evaluation strengths/weaknesses if available, otherwise use generated
+                  const strengths = (evalAny.strengths && evalAny.strengths.length > 0) 
+                    ? evalAny.strengths 
+                    : generatedStrengths.length > 0 
+                      ? generatedStrengths 
+                      : ['Demonstrated relevant experience', 'Showed understanding of key concepts', 'Provided structured responses']
+                  
+                  const weaknesses = (evalAny.weaknesses && evalAny.weaknesses.length > 0) 
+                    ? evalAny.weaknesses 
+                    : generatedWeaknesses.length > 0 
+                      ? generatedWeaknesses 
+                      : ['Could provide more specific examples', 'Some answers lacked depth', 'Room for improvement in technical details']
+                  
+                  return (
+                    <Card className="border-2 border-gray-200 shadow-lg">
+                      <CardHeader className="bg-gradient-to-r from-emerald-50 to-teal-50 border-b">
+                        <CardTitle className="text-gray-900 flex items-center gap-2">
+                          <Lightbulb className="h-5 w-5 text-emerald-600" />
+                          Evaluation Summary
+                        </CardTitle>
+                        <CardDescription>Key findings and recommendations</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                          {/* Strengths Card */}
+                          <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-5">
+                            <div className="flex items-center gap-2 mb-4">
+                              <CheckCircle className="h-5 w-5 text-green-600" />
+                              <h4 className="font-bold text-green-800">Key Strengths</h4>
+                            </div>
+                            <ul className="space-y-2">
+                              {strengths.slice(0, 4).map((strength: string, idx: number) => (
+                                <li key={idx} className="flex items-start gap-2 text-sm text-green-700">
                                   <span className="text-green-500 mt-0.5">✓</span>
-                                  <div className="flex-1">
-                                    <p className="font-medium text-gray-900 text-sm">{strengthObj.point}</p>
-                                    {strengthObj.category && (
-                                      <Badge variant="outline" className="text-xs mt-1 bg-green-50 text-green-700">
-                                        {strengthObj.category}
-                                      </Badge>
-                                    )}
-                                    {strengthObj.evidence && Array.isArray(strengthObj.evidence) && strengthObj.evidence.length > 0 && (
-                                      <ul className="mt-2 space-y-1">
-                                        {strengthObj.evidence.map((ev: string, evIdx: number) => (
-                                          <li key={evIdx} className="text-xs text-gray-600 flex items-start gap-1">
-                                            <span className="text-green-400">•</span> {ev}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          })}
+                                  <span>{typeof strength === 'string' ? strength : (strength as any).point || strength}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                          
+                          {/* Areas for Improvement Card */}
+                          <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-5">
+                            <div className="flex items-center gap-2 mb-4">
+                              <AlertTriangle className="h-5 w-5 text-amber-600" />
+                              <h4 className="font-bold text-amber-800">Areas for Improvement</h4>
+                            </div>
+                            <ul className="space-y-2">
+                              {weaknesses.slice(0, 4).map((weakness: string, idx: number) => (
+                                <li key={idx} className="flex items-start gap-2 text-sm text-amber-700">
+                                  <span className="text-amber-500 mt-0.5">•</span>
+                                  <span>{typeof weakness === 'string' ? weakness : (weakness as any).point || weakness}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                        
+                        {/* Recommendation */}
+                        <div className={`p-4 rounded-xl border-2 ${
+                          overallScore >= 60 
+                            ? 'bg-green-50 border-green-300' 
+                            : 'bg-amber-50 border-amber-300'
+                        }`}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Target className="h-5 w-5 text-gray-700" />
+                            <span className="font-bold text-gray-800">Recommendation</span>
+                          </div>
+                          <p className={`text-sm font-medium ${
+                            overallScore >= 60 ? 'text-green-700' : 'text-amber-700'
+                          }`}>
+                            {overallScore >= 60 
+                              ? '✅ NEXT ROUND - Candidate shows strong potential with good technical understanding. Recommended for next interview round.'
+                              : '⏸️ CONSIDER - Candidate shows potential but may need further evaluation. Consider additional screening or technical assessment.'}
+                          </p>
                         </div>
                       </CardContent>
                     </Card>
-                  )}
-
-                  {/* Weaknesses Card */}
-                  {evaluationData!.weaknesses.length > 0 && (
-                    <Card className="border-2 border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 shadow-lg">
-                      <CardHeader className="pb-3">
-                        <CardTitle className="text-orange-800 flex items-center gap-2">
-                          <TrendingUp className="h-5 w-5" />
-                          Areas for Improvement
-                        </CardTitle>
-                        <CardDescription className="text-orange-600">Growth opportunities</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
-                          {evaluationData!.weaknesses.map((weakness, idx) => {
-                            const weaknessObj = typeof weakness === 'string' 
-                              ? { point: weakness } 
-                              : weakness as any
-                            
-                            return (
-                              <div key={idx} className="p-3 bg-white rounded-lg border border-orange-200 hover:border-orange-400 transition-all hover:shadow-sm">
-                                <div className="flex items-start gap-2">
-                                  <span className="text-orange-500 mt-0.5">⚠</span>
-                                  <div className="flex-1">
-                                    <p className="font-medium text-gray-900 text-sm">{weaknessObj.point}</p>
-                                    {weaknessObj.category && (
-                                      <Badge variant="outline" className="text-xs mt-1 bg-orange-50 text-orange-700">
-                                        {weaknessObj.category}
-                                      </Badge>
-                                    )}
-                                    {weaknessObj.evidence && Array.isArray(weaknessObj.evidence) && weaknessObj.evidence.length > 0 && (
-                                      <ul className="mt-2 space-y-1">
-                                        {weaknessObj.evidence.map((ev: string, evIdx: number) => (
-                                          <li key={evIdx} className="text-xs text-gray-600 flex items-start gap-1">
-                                            <span className="text-orange-400">•</span> {ev}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    )}
-                                    {weaknessObj.improvement_suggestion && (
-                                      <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
-                                        <div className="text-xs font-medium text-blue-800 flex items-center gap-1">
-                                          <Lightbulb className="h-3 w-3" /> Suggestion
-                                        </div>
-                                        <p className="text-xs text-blue-700 mt-1">{weaknessObj.improvement_suggestion}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-
-                {/* ===== SECTION 6: Summary & Comments ===== */}
-                {evaluationData!.reviewerComments && (
-                  <Card className="border-2 border-gray-200 shadow-lg">
-                    <CardHeader className="bg-gradient-to-r from-gray-50 to-slate-50 border-b">
-                      <CardTitle className="text-gray-900 flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-gray-600" />
-                        Evaluation Summary
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                      <div className="prose prose-sm max-w-none text-gray-700">
-                        {evaluationData!.reviewerComments}
-                      </div>
-                      {evaluationData!.reviewedAt && (
-                        <div className="mt-4 pt-4 border-t text-xs text-gray-500 flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
-                          Evaluated on {new Date(evaluationData!.reviewedAt).toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                          {evaluationData!.reviewedBy && ` by ${evaluationData!.reviewedBy}`}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
+                  )
+                })()}
               </>
             ) : (
               <Card className="border-2 border-gray-200">

@@ -287,7 +287,15 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
         const rawEval = row.evaluation
         console.log('🔍 Raw evaluation from applications table:', JSON.stringify(rawEval, null, 2))
         
-        if (rawEval) {
+        // Check if rawEval has meaningful data (not empty object)
+        const hasData = rawEval && typeof rawEval === 'object' && 
+          (rawEval.overall_score || rawEval.scores || rawEval.questions || rawEval.strengths?.length)
+        
+        if (!hasData) {
+          console.log('⚠️ applications.evaluation is empty, will try evaluations table')
+        }
+        
+        if (rawEval && hasData) {
           const evalObj = typeof rawEval === 'string' ? JSON.parse(rawEval) : rawEval
           const scores = evalObj.scores || {}
           console.log('📊 Extracted scores from applications:', JSON.stringify(scores, null, 2))
@@ -339,7 +347,30 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       }
     }
 
-    // Fallback 2: evaluations table
+    // Fetch configured criteria from job_rounds.configuration
+    let configuredCriteriaFromJobRounds: string[] = []
+    try {
+      const jobRoundsQuery = `
+        SELECT jr.configuration
+        FROM job_rounds jr
+        JOIN jobs j ON jr.job_id = j.id
+        JOIN applications a ON a.job_id = j.id
+        WHERE a.id = $1::uuid
+        LIMIT 1
+      `
+      const jobRoundsRows = await (DatabaseService as any)["query"]?.call(DatabaseService, jobRoundsQuery, [candidateId]) as any[]
+      if (jobRoundsRows && jobRoundsRows.length > 0) {
+        const config = typeof jobRoundsRows[0].configuration === 'string' 
+          ? JSON.parse(jobRoundsRows[0].configuration) 
+          : jobRoundsRows[0].configuration || {}
+        configuredCriteriaFromJobRounds = config.criteria || []
+        console.log('🎯 Configured criteria from job_rounds:', configuredCriteriaFromJobRounds)
+      }
+    } catch (e) {
+      console.log('Failed to fetch job_rounds configuration:', e)
+    }
+
+    // Fallback 2: evaluations table (contains full evaluation data in skill_scores JSONB)
     if (!evaluation) {
       try {
         const interviewEvalQuery = `
@@ -358,30 +389,90 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
           LIMIT 1
         `
         const evalRows = await (DatabaseService as any)["query"]?.call(DatabaseService, interviewEvalQuery, [candidateId]) as any[]
+        console.log('🔍 Evaluations table query result:', evalRows?.length || 0, 'rows')
+        
         if (evalRows && evalRows.length > 0) {
           const evalRow = evalRows[0]
           const skillScores = typeof evalRow.skill_scores === 'string' ? JSON.parse(evalRow.skill_scores) : evalRow.skill_scores || {}
+          console.log('🔍 skill_scores from evaluations table:', JSON.stringify(skillScores, null, 2).substring(0, 500))
+          
           const notes = evalRow.rubric_notes_md || ''
-          const strengthsMatch = notes.match(/\*\*Strengths:\*\*\n((?:- .+\n?)*)/i)
-          const weaknessesMatch = notes.match(/\*\*Areas for Improvement:\*\*\n((?:- .+\n?)*)/i)
+          const strengthsMatch = notes.match(/## Strengths\n((?:- .+\n?)*)/i)
+          const weaknessesMatch = notes.match(/## Areas for Improvement\n((?:- .+\n?)*)/i)
           const strengths = strengthsMatch ? strengthsMatch[1].split('\n').filter((s: string) => s.trim().startsWith('-')).map((s: string) => s.replace(/^- /, '').trim()) : []
           const weaknesses = weaknessesMatch ? weaknessesMatch[1].split('\n').filter((s: string) => s.trim().startsWith('-')).map((s: string) => s.replace(/^- /, '').trim()) : []
+          
+          // Extract questions array from skill_scores (stored as {questions: [...], marks_summary: {...}})
+          const questionDetails = skillScores.questions || []
+          const marksSummary = skillScores.marks_summary || {}
+          
+          // Build criteria breakdown from questions
+          const criteriaBreakdown: Record<string, any> = {}
+          questionDetails.forEach((q: any) => {
+            const criteria = q.criteria || q.category || 'General'
+            if (!criteriaBreakdown[criteria]) {
+              criteriaBreakdown[criteria] = {
+                question_count: 0,
+                questions_answered: 0,
+                total_score: 0,
+                average_score: 0
+              }
+            }
+            criteriaBreakdown[criteria].question_count++
+            if (q.answered !== false) {
+              criteriaBreakdown[criteria].questions_answered++
+              criteriaBreakdown[criteria].total_score += (q.score || 0)
+            }
+          })
+          
+          // Calculate average scores per criteria
+          Object.keys(criteriaBreakdown).forEach(key => {
+            const cb = criteriaBreakdown[key]
+            cb.average_score = cb.questions_answered > 0 
+              ? Math.round(cb.total_score / cb.questions_answered) 
+              : 0
+          })
+          
+          // Use configured criteria from job_rounds (all criteria should be shown)
+          // If job_rounds criteria not available, fall back to criteria from questions
+          const criteriaFromQuestions = [...new Set(
+            questionDetails
+              .map((q: any) => q.criteria || q.category || '')
+              .filter((c: string) => c && c !== 'General')
+          )]
+          
+          // Priority: job_rounds configured criteria > criteria from questions
+          const evaluation_criteria = configuredCriteriaFromJobRounds.length > 0 
+            ? configuredCriteriaFromJobRounds.filter((c: string) => c !== 'General')
+            : criteriaFromQuestions
+          
           evaluation = {
             overallScore: parseFloat(evalRow.overall_score) || 0,
             decision: evalRow.recommendation || 'pending',
             scores: {
-              technical: skillScores.technical?.score ?? skillScores.technical ?? 0,
-              communication: skillScores.communication?.score ?? skillScores.communication ?? 0,
-              experience: skillScores.experience?.score ?? skillScores.experience ?? 0,
-              cultural_fit: skillScores.cultural_fit?.score ?? skillScores.cultural_fit ?? 0
+              technical: criteriaBreakdown['Technical']?.average_score || criteriaBreakdown['Technical Skills']?.average_score || 0,
+              communication: criteriaBreakdown['Communication']?.average_score || 0,
+              experience: criteriaBreakdown['Problem Solving']?.average_score || 0,
+              cultural_fit: criteriaBreakdown['Culture fit']?.average_score || criteriaBreakdown['Cultural Fit']?.average_score || 0
             },
             strengths,
             weaknesses,
-            reviewerComments: notes.replace(/\*\*Strengths:\*\*[\s\S]*?\*\*Areas for Improvement:\*\*[\s\S]*?$/i, '').trim() || '',
+            reviewerComments: notes.replace(/## Strengths[\s\S]*?## Areas for Improvement[\s\S]*?$/i, '').trim() || '',
             reviewedAt: evalRow.evaluated_at || null,
-            reviewedBy: 'AI Evaluator'
+            reviewedBy: 'AI Evaluator',
+            // Include full question details for report page
+            questions: questionDetails,
+            criteriaBreakdown,
+            marksSummary,
+            // Include ALL configured criteria from job_rounds for frontend display
+            evaluation_criteria,
+            // Also include the raw configured criteria for reference
+            configured_criteria: configuredCriteriaFromJobRounds
           }
-          console.log('✅ Evaluation loaded from evaluations table')
+          console.log('🎯 Configured criteria from job_rounds:', configuredCriteriaFromJobRounds)
+          console.log('🎯 Evaluation criteria (final):', evaluation_criteria)
+          console.log('✅ Evaluation loaded from evaluations table with', questionDetails.length, 'questions')
+          console.log('📊 Overall score:', evalRow.overall_score)
         }
       } catch (e) {
         console.log('Failed to fetch from evaluations table:', e)
