@@ -274,6 +274,7 @@ Thank you for your interest in joining our team!
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: ${gradientColor}; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
           <h1 style="color: white; margin: 0; font-size: 24px;">${companyName}</h1>
+          <p style="color: white; margin: 10px 0 0 0; font-size: 12px; opacity: 0.9;">This interview is organised by HireGenAI</p>
         </div>
         
         <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
@@ -283,11 +284,11 @@ Thank you for your interest in joining our team!
         </div>
         
         <div style="text-align: center; margin-top: 20px; color: #6c757d; font-size: 12px;">
-          <p>This email was sent by ${companyName}</p>
+          <p style="margin: 5px 0;">This email was sent by ${companyName}</p>
         </div>
       </div>`;
 
-    const text = `${bodyContent}\n\n---\nThis email was sent by ${companyName}`;
+    const text = `${bodyContent}\n\n---\nThis interview is organised by HireGenAI\nThis email was sent by ${companyName}`;
 
     return await sendMail({
       to: candidateEmail,

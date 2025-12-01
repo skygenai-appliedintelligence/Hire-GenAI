@@ -5,6 +5,15 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, CheckCircle2, X, Briefcase, AlertCircle } from "lucide-react"
 
+type QuestionElaborationState = {
+  question: string
+  combinedText: string
+  prompts: number
+}
+
+const normalizeText = (text: string) => text.trim()
+const countWords = (text: string) => normalizeText(text).split(/\s+/).filter(Boolean).length
+
 export default function InterviewPage() {
   const params = useParams()
   const router = useRouter()
@@ -33,6 +42,152 @@ export default function InterviewPage() {
   const userTextBufferRef = useRef<string>("")
   const avatarFirstPlayRef = useRef<boolean>(true)
   const questionCountRef = useRef<number>(0)
+  const lastAnalyzedAnswerRef = useRef<string>('')
+  const isAnalyzingRef = useRef<boolean>(false)
+  const lastQuestionAskedRef = useRef<string>('')
+  const currentCriterionRef = useRef<string>('')
+  const questionElaborationRef = useRef<QuestionElaborationState | null>(null)
+  const [realTimeEvaluations, setRealTimeEvaluations] = useState<any[]>([])
+  const realTimeEvaluationsRef = useRef<any[]>([]) // Ref to avoid stale closure
+  const companyIdRef = useRef<string | null>(null) // Ref to avoid stale closure with state
+  const currentQuestionNumberRef = useRef<number>(1)
+
+  // Real-time answer evaluation function - calls OpenAI with company's service key
+  const evaluateAnswer = async (question: string, answer: string, criterion: string) => {
+    if (isAnalyzingRef.current) return null
+    if (answer === lastAnalyzedAnswerRef.current) return null
+    if (answer.trim().length < 10) return null // Skip very short utterances
+    
+    // Skip if no company ID available (use ref to avoid stale closure)
+    if (!companyIdRef.current) {
+      console.warn('⚠️ [REAL-TIME EVAL] No company ID available - skipping evaluation')
+      console.warn('   companyIdRef.current:', companyIdRef.current)
+      return null
+    }
+    
+    isAnalyzingRef.current = true
+    lastAnalyzedAnswerRef.current = answer
+    
+    try {
+      console.log('🎯 [REAL-TIME EVAL] Sending answer for OpenAI evaluation...')
+      console.log('📝 Question:', question.substring(0, 80))
+      console.log('💬 Answer length:', answer.length)
+      console.log('🎯 Criterion:', criterion)
+      
+      const response = await fetch('/api/interview/evaluate-answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question,
+          answer,
+          criterion: criterion || 'General',
+          questionNumber: currentQuestionNumberRef.current,
+          totalQuestions: interviewQuestions.length || 10,
+          jobTitle: jobDetails?.jobTitle,
+          companyName: jobDetails?.company,
+          companyId: companyIdRef.current, // Use ref instead of state
+          applicationId: applicationId
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (!response.ok || !result.ok) {
+        console.error('❌ [REAL-TIME EVAL] API error:', result.error || 'Unknown error')
+        console.error('💡 [REAL-TIME EVAL] Message:', result.message)
+        return null
+      }
+      
+      console.log('✅ [REAL-TIME EVAL] Evaluation received:')
+      console.log('📊 Score:', result.evaluation?.score)
+      console.log('📋 Completeness:', result.evaluation?.completeness)
+      console.log('🎯 Matches Question:', result.evaluation?.matches_question)
+      
+      // Store the evaluation for later use
+      if (result.evaluation) {
+        // Update both state and ref to avoid stale closure issues
+        const newEval = result.evaluation
+        
+        // Update ref immediately (sync)
+        const existingIdx = realTimeEvaluationsRef.current.findIndex(e => e.question_text === question)
+        if (existingIdx >= 0) {
+          realTimeEvaluationsRef.current[existingIdx] = newEval
+        } else {
+          realTimeEvaluationsRef.current.push(newEval)
+        }
+        console.log('📦 [REAL-TIME EVAL] Stored in ref:', realTimeEvaluationsRef.current.length, 'evaluations')
+        
+        // Also update state for UI
+        setRealTimeEvaluations([...realTimeEvaluationsRef.current])
+        currentQuestionNumberRef.current++
+      }
+      
+      return result.evaluation
+    } catch (error) {
+      console.error('❌ [REAL-TIME EVAL] Error:', error)
+      return null
+    } finally {
+      isAnalyzingRef.current = false
+    }
+  }
+  
+  // Simple analysis function for flow control (not scoring)
+  const analyzeAnswer = async (question: string, answer: string, criterion: string) => {
+    if (isAnalyzingRef.current) return null
+    if (answer === lastAnalyzedAnswerRef.current) return null
+    if (answer.trim().length < 5) return null
+    
+    try {
+      const response = await fetch('/api/interview/analyze-answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question,
+          answer,
+          criterion: criterion || 'General',
+          questionNumber: currentQuestionIndex + 1,
+          totalQuestions: interviewQuestions.length,
+          jobTitle: jobDetails?.jobTitle,
+          companyName: jobDetails?.company,
+          isSetupPhase: false
+        })
+      })
+      
+      if (!response.ok) return null
+      const result = await response.json()
+      return result.analysis
+    } catch (error) {
+      return null
+    }
+  }
+  
+  // Send instruction to AI agent via session update (invisible to transcript)
+  const sendAgentInstruction = (instruction: string, forceSpeak: boolean = false) => {
+    const dc = dcRef.current
+    if (!dc || dc.readyState !== 'open') {
+      console.log('⚠️ [INSTRUCT] Data channel not ready')
+      return
+    }
+    
+    console.log('📤 [INSTRUCT] Updating session with instruction:', instruction.substring(0, 100))
+    
+    // Use response.create with instructions to guide the next response
+    // This doesn't add to conversation history, just guides the next AI response
+    if (forceSpeak) {
+      const responseMsg = {
+        type: 'response.create',
+        response: {
+          modalities: ['audio', 'text'],
+          instructions: instruction
+        }
+      }
+      dc.send(JSON.stringify(responseMsg))
+    } else {
+      // Just log the analysis - let the AI follow its built-in instructions
+      // The AI already has detailed instructions for handling incomplete answers
+      console.log('📝 [INSTRUCT] Analysis logged (not forcing AI response):', instruction)
+    }
+  }
   
   const logTs = (label: string, text?: string) => {
     const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -60,11 +215,52 @@ export default function InterviewPage() {
   }
   
   const pendingUserItems = useRef<Map<string, number>>(new Map())
+
+  const ensureElaborationState = (question: string) => {
+    if (!question) return
+    const existing = questionElaborationRef.current
+    if (!existing || existing.question !== question) {
+      questionElaborationRef.current = { question, combinedText: '', prompts: 0 }
+    }
+  }
+
+  const appendToCombinedAnswer = (chunk: string) => {
+    const normalizedChunk = normalizeText(chunk)
+    if (!normalizedChunk) return ''
+    const state = questionElaborationRef.current
+    if (!state) return normalizedChunk
+    const combined = state.combinedText
+      ? `${state.combinedText} ${normalizedChunk}`
+      : normalizedChunk
+    state.combinedText = combined
+    return combined
+  }
+
+  const maybePromptForElaboration = () => {
+    const state = questionElaborationRef.current
+    if (!state) return
+    const totalWords = countWords(state.combinedText)
+    if (totalWords >= 80) return
+    if (state.prompts >= 2) {
+      console.log('[ELABORATE] Maximum prompts reached, moving on')
+      return
+    }
+
+    const promptMessage = state.prompts === 0
+      ? 'Your answer seems brief. Could you please elaborate more?' 
+      : 'Could you please explain it a bit more?'
+    console.log(`[ELABORATE] Prompting (${state.prompts + 1}) for question "${state.question}" (wordCount=${totalWords})`)
+    sendAgentInstruction(`Please politely ask: "${promptMessage}"`, true)
+    state.prompts += 1
+  }
   
-  const handleTranscriptionCompleted = (event: any) => {
+  const handleTranscriptionCompleted = async (event: any) => {
     if (event.type === 'conversation.item.input_audio_transcription.completed') {
       const itemId = event.item_id
       const finalTranscript = !event.transcript || event.transcript === "\n" ? "[inaudible]" : event.transcript
+      console.log('🎤 [TRANSCRIPTION] User said:', finalTranscript.substring(0, 100))
+      console.log('🎤 [TRANSCRIPTION] lastQuestionAskedRef.current:', lastQuestionAskedRef.current?.substring(0, 50) || '(EMPTY!)')
+      
       if (itemId && finalTranscript) {
         console.log('[You]', finalTranscript)
         setConversation(prev => {
@@ -77,12 +273,82 @@ export default function InterviewPage() {
           } catch {}
           return next
         })
+        
+        // Real-time answer analysis
+        // Only analyze if we have a meaningful question context (not setup confirmations)
+        const isSetupQuestion = lastQuestionAskedRef.current.toLowerCase().includes('audio') ||
+                                lastQuestionAskedRef.current.toLowerCase().includes('video') ||
+                                lastQuestionAskedRef.current.toLowerCase().includes('hear') ||
+                                lastQuestionAskedRef.current.toLowerCase().includes('see me') ||
+                                lastQuestionAskedRef.current.toLowerCase().includes('setup') ||
+                                lastQuestionAskedRef.current.toLowerCase().includes('working fine')
+        
+        // Debug: Log the conditions for evaluation
+        console.log('🔍 [EVAL DEBUG] Checking conditions:')
+        console.log('  - isSetupQuestion:', isSetupQuestion)
+        console.log('  - lastQuestionAskedRef:', lastQuestionAskedRef.current?.substring(0, 50) || '(empty)')
+        console.log('  - finalTranscript length:', finalTranscript.length)
+        console.log('  - companyId:', companyId || '(not set)')
+        
+        // Skip analysis for setup questions - these just need simple confirmations
+        if (isSetupQuestion) {
+          console.log('⏭️ [ANALYZE] Skipping analysis for setup question')
+        } else if (lastQuestionAskedRef.current && finalTranscript !== '[inaudible]' && finalTranscript.length > 5) {
+          // Only analyze actual interview questions with meaningful answers
+          console.log('✅ [ANALYZE] ALL CONDITIONS MET - Will call evaluateAnswer now!')
+          
+          const combinedAnswer = appendToCombinedAnswer(finalTranscript)
+          
+          // CRITICAL: Call real-time OpenAI evaluation for scoring
+          // This evaluates the answer using the company's service key
+          const evaluation = await evaluateAnswer(
+            lastQuestionAskedRef.current,
+            combinedAnswer,
+            currentCriterionRef.current
+          )
+          
+          if (evaluation) {
+            console.log('✅ [REAL-TIME EVAL] Stored evaluation for question:', currentQuestionNumberRef.current - 1)
+            console.log('📊 Score:', evaluation.score, '/ 100')
+            console.log('📋 Reasoning:', evaluation.reasoning?.substring(0, 100))
+          }
+          
+          // Also run simple flow analysis for redirects only
+          const analysis = await analyzeAnswer(
+            lastQuestionAskedRef.current,
+            combinedAnswer,
+            currentCriterionRef.current
+          )
+          
+          if (analysis) {
+            // Only intervene for redirect (completely off-topic)
+            if (analysis.recommendation === 'redirect' && analysis.confidenceScore >= 80) {
+              const prompt = analysis.followUpPrompt || 
+                "I appreciate your thoughts, but could you please address the specific question I asked?"
+              console.log('🔄 [ANALYZE] Redirecting (high confidence off-topic):', prompt)
+              sendAgentInstruction(`Please politely redirect: "${prompt}"`, true)
+            } else {
+              console.log('✅ [ANALYZE] Letting AI handle flow naturally')
+              maybePromptForElaboration()
+            }
+          }
+        } else {
+          console.log('⚠️ [ANALYZE] Conditions NOT met for evaluation:')
+          if (!lastQuestionAskedRef.current) console.log('  - lastQuestionAskedRef is EMPTY')
+          if (finalTranscript === '[inaudible]') console.log('  - finalTranscript is [inaudible]')
+          if (finalTranscript.length <= 5) console.log('  - finalTranscript too short:', finalTranscript.length)
+        }
       }
     } else if (event.type === 'response.audio_transcript.done') {
       const text = agentTextBufferRef.current
+      console.log('🤖 [AGENT TRANSCRIPT DONE] agentTextBufferRef.current length:', text.length)
+      console.log('🤖 [AGENT TRANSCRIPT DONE] Text:', text.substring(0, 100))
+      
       if (text) {
         agentTextBufferRef.current = ''
         setConversation(prev => {
+          const last = prev[prev.length - 1]
+          if (last && last.role === 'agent' && last.text === text) return prev
           const next = [...prev, { role: 'agent' as const, text, t: Date.now() }]
           try {
             const payload = { id: applicationId, createdAt: Date.now(), conversation: next }
@@ -90,6 +356,51 @@ export default function InterviewPage() {
           } catch {}
           return next
         })
+        
+        // Track the question asked by the agent for real-time analysis
+        // Check if agent's response contains a question (for answer analysis context)
+        console.log('🤖 [AGENT] Agent spoke:', text.substring(0, 100))
+        console.log('🤖 [AGENT] Contains question mark?', text.includes('?'))
+        console.log('🤖 [AGENT] interviewQuestions length:', interviewQuestions.length)
+        
+        if (text.includes('?')) {
+          // Find if this matches one of our interview questions
+          const matchedQuestion = interviewQuestions.find((q, idx) => {
+            const qText = q.text?.toLowerCase() || ''
+            const agentText = text.toLowerCase()
+            // Check if the agent mentioned key parts of the question
+            const keyWords = qText.split(' ').filter((w: string) => w.length > 4).slice(0, 5)
+            const matchCount = keyWords.filter((kw: string) => agentText.includes(kw)).length
+            return matchCount >= 2 || agentText.includes(qText.substring(0, 30))
+          })
+          
+          if (matchedQuestion) {
+            lastQuestionAskedRef.current = matchedQuestion.text
+            currentCriterionRef.current = matchedQuestion.criterion || matchedQuestion.criteria?.[0] || 'General'
+            console.log('📝 [TRACK] Current question:', lastQuestionAskedRef.current.substring(0, 50))
+            console.log('🎯 [TRACK] Criterion:', currentCriterionRef.current)
+            ensureElaborationState(matchedQuestion.text)
+          } else {
+            // If no exact match, use the question text from agent's response
+            // Extract the last sentence that ends with ?
+            const sentences = text.split(/[.!]/).filter(s => s.includes('?'))
+            console.log('📝 [TRACK] No matched question found. Extracted sentences with ?:', sentences.length)
+            if (sentences.length > 0) {
+              lastQuestionAskedRef.current = sentences[sentences.length - 1].trim()
+              // Set a default criterion if we couldn't match to a known question
+              if (!currentCriterionRef.current) {
+                currentCriterionRef.current = 'General'
+              }
+              console.log('📝 [TRACK] Detected question:', lastQuestionAskedRef.current.substring(0, 50))
+              console.log('📝 [TRACK] Using criterion:', currentCriterionRef.current)
+              ensureElaborationState(lastQuestionAskedRef.current)
+            } else {
+              console.log('⚠️ [TRACK] Could not extract any question from agent speech')
+            }
+          }
+        } else {
+          console.log('⚠️ [TRACK] Agent spoke but no question mark found - not tracking as question')
+        }
       }
     }
   }
@@ -97,6 +408,7 @@ export default function InterviewPage() {
   const handleTranscriptionDelta = (event: any) => {
     if (event.type === 'response.audio_transcript.delta' && typeof event.delta === 'string') {
       agentTextBufferRef.current += event.delta
+      console.log('📝 [DELTA] Agent text delta:', event.delta.substring(0, 50), '| Total so far:', agentTextBufferRef.current.length, 'chars')
     }
   }
   
@@ -208,6 +520,8 @@ export default function InterviewPage() {
           console.log('🏢 Fetched Company ID:', fetchedCompanyId)
           if (fetchedCompanyId) {
             setCompanyId(fetchedCompanyId)
+            companyIdRef.current = fetchedCompanyId // Also set ref immediately
+            console.log('✅ [INIT] Company ID set in both state and ref')
           } else {
             console.warn('⚠️ No company ID found in application data')
           }
@@ -382,7 +696,7 @@ export default function InterviewPage() {
 - Keep track of time and ensure interview finishes within ${duration} minutes.
 
 **STEP 3: QUESTION FLOW**
-Ask these questions sequentially:`
+You MUST ask ONLY these questions in this exact order. Do NOT ask any other questions, do NOT generate new questions, do NOT deviate from this list:`
 
         // Add the specific questions from database
         if (questions && questions.length > 0) {
@@ -391,22 +705,24 @@ Ask these questions sequentially:`
           })
           instructions += `
 
-**ANSWER VALIDATION PROCESS (Follow this for EVERY question):**
-After each candidate response, you MUST:
-1. **Analyze the answer** - Check if:
-   - The answer is RELEVANT to the question asked
-   - The candidate appears to have COMPLETED their response (not mid-thought)
-   
-2. **Confirm completion** - Ask: "Have you finished your answer?" or "Is there anything else you'd like to add?"
+**CRITICAL CONSTRAINT: QUESTION ADHERENCE**
+- You MUST ask ONLY the questions listed above
+- Do NOT ask any follow-up questions beyond what is listed
+- Do NOT generate or improvise new questions
+- Do NOT ask clarifying questions that are not in the list
+- If the candidate asks you to ask a different question, politely decline and continue with the next question from the list
 
-3. **Handle based on response:**
-   - If candidate says YES (finished) AND answer was relevant and complete → Acknowledge briefly ("Thank you for that response") and proceed to the NEXT question
-   - If candidate says NO (not finished) → Say "Please continue, I'm listening" and wait for them to complete
-   - If answer was NOT relevant to the question → Politely redirect: "I appreciate your thoughts, but could you please address the specific question about [topic]? Let me repeat it..."
-   - If answer was too brief or incomplete → Ask for elaboration: "Could you please elaborate on that? I'd like to understand your experience in more detail."
-   - If candidate goes off-track or takes too long → Politely redirect: "Thank you, let's move to the next question so we can cover everything within our time."
+**ANSWER HANDLING (Simple Flow):**
+After each candidate response:
+1. If the answer is RELEVANT → Acknowledge briefly ("Thank you for that response" or "Got it") and proceed to the NEXT question from the list
+2. If the answer is NOT relevant to the question → Politely redirect: "I appreciate your thoughts, but could you please address the specific question about [topic]?"
+3. If instructed by the system to ask for elaboration → Follow the system's instruction exactly
+4. Do NOT ask "Have you finished your answer?" - just listen and move forward naturally
 
-**IMPORTANT:** Do NOT move to the next question until you have confirmed the candidate has finished AND the answer is appropriate.`
+**IMPORTANT:** 
+- Do NOT ask "Have you finished?" or "Anything else to add?" - just proceed naturally
+- The system will prompt you if the candidate needs to elaborate more
+- Keep the flow conversational and natural`
         } else {
           instructions += `\n1. Tell me about yourself and your relevant experience.
 2. Why are you interested in this ${details?.jobTitle || 'position'}?
@@ -419,22 +735,24 @@ After each candidate response, you MUST:
 9. Describe a technical problem you solved recently.
 10. Do you have any questions about the role or company?
 
-**ANSWER VALIDATION PROCESS (Follow this for EVERY question):**
-After each candidate response, you MUST:
-1. **Analyze the answer** - Check if:
-   - The answer is RELEVANT to the question asked
-   - The candidate appears to have COMPLETED their response (not mid-thought)
-   
-2. **Confirm completion** - Ask: "Have you finished your answer?" or "Is there anything else you'd like to add?"
+**CRITICAL CONSTRAINT: QUESTION ADHERENCE**
+- You MUST ask ONLY the questions listed above
+- Do NOT ask any follow-up questions beyond what is listed
+- Do NOT generate or improvise new questions
+- Do NOT ask clarifying questions that are not in the list
+- If the candidate asks you to ask a different question, politely decline and continue with the next question from the list
 
-3. **Handle based on response:**
-   - If candidate says YES (finished) AND answer was relevant and complete → Acknowledge briefly ("Thank you for that response") and proceed to the NEXT question
-   - If candidate says NO (not finished) → Say "Please continue, I'm listening" and wait for them to complete
-   - If answer was NOT relevant to the question → Politely redirect: "I appreciate your thoughts, but could you please address the specific question about [topic]? Let me repeat it..."
-   - If answer was too brief or incomplete → Ask for elaboration: "Could you please elaborate on that? I'd like to understand your experience in more detail."
-   - If candidate goes off-track or takes too long → Politely redirect: "Thank you, let's move to the next question so we can cover everything within our time."
+**ANSWER HANDLING (Simple Flow):**
+After each candidate response:
+1. If the answer is RELEVANT → Acknowledge briefly ("Thank you for that response" or "Got it") and proceed to the NEXT question from the list
+2. If the answer is NOT relevant to the question → Politely redirect: "I appreciate your thoughts, but could you please address the specific question about [topic]?"
+3. If instructed by the system to ask for elaboration → Follow the system's instruction exactly
+4. Do NOT ask "Have you finished your answer?" - just listen and move forward naturally
 
-**IMPORTANT:** Do NOT move to the next question until you have confirmed the candidate has finished AND the answer is appropriate.`
+**IMPORTANT:** 
+- Do NOT ask "Have you finished?" or "Anything else to add?" - just proceed naturally
+- The system will prompt you if the candidate needs to elaborate more
+- Keep the flow conversational and natural`
         }
 
         instructions += `
@@ -462,8 +780,11 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
 2. If candidate uses any other language, politely redirect to English immediately
 3. Be professional, warm, and keep the interview structured and on-time
 4. Maintain the English-only policy throughout the entire interview
-5. ALWAYS ask "Have you finished your answer?" after each candidate response before moving to the next question
-6. NEVER proceed to the next question until you have confirmed the candidate has completed their answer AND the answer is relevant`
+5. Do NOT ask "Have you finished your answer?" - the system will handle elaboration prompts automatically
+6. When the system instructs you to ask for elaboration, follow the exact phrasing provided
+7. **CRITICAL: ONLY ask the questions listed above - NO ad-hoc questions, NO generated questions, NO clarifying questions beyond the list**
+8. **If candidate asks for a different question, politely decline and continue with the next question from the list**
+9. **NEVER deviate from the question list under any circumstances**`
 
         // Update session with instructions
         const updateMsg = {
@@ -514,11 +835,13 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
             break;
           }
           case "response.audio_transcript.done": {
+            console.log('🤖 [AGENT DONE] Agent finished speaking');
             console.log('[handleTranscriptionCompleted]', msg);
             handleTranscriptionCompleted(msg);
             
             // Increment question counter after agent speaks
             questionCountRef.current++
+            console.log('🤖 [AGENT DONE] Question count:', questionCountRef.current);
             break;
           }
           case "response.audio_transcript.delta": {
@@ -729,12 +1052,16 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
       console.log('📝 Transcript preview:', transcript.substring(0, 300))
       
       // Step 6: Store transcript and mark as completed
+      // Include real-time evaluations if available
+      console.log('📊 [END INTERVIEW] Real-time evaluations collected:', realTimeEvaluations.length)
+      
       const response = await fetch(`/api/applications/${encodeURIComponent(applicationId)}/interview-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           transcript,
-          startedAt: interviewStartTime // Send actual start time for accurate duration
+          startedAt: interviewStartTime, // Send actual start time for accurate duration
+          realTimeEvaluations: realTimeEvaluations // Send all collected evaluations
         })
       }).catch(e => {
         console.error('❌ Failed to mark interview as completed:', e)
@@ -745,12 +1072,21 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
         const result = await response.json()
         console.log('✅ Interview marked as completed:', result)
         
-        // Trigger evaluation pipeline
+        // Trigger evaluation pipeline with real-time evaluations
+        // Use ref to get current evaluations (avoids stale closure)
+        const evaluationsToSend = realTimeEvaluationsRef.current
         console.log('🔍 Starting evaluation pipeline...')
+        console.log('📊 Sending', evaluationsToSend.length, 'real-time evaluations to final evaluation')
+        console.log('📋 Evaluation details:', evaluationsToSend.map(e => ({ q: e.question_number, score: e.score })))
+        
         const evaluationResponse = await fetch(`/api/applications/${encodeURIComponent(applicationId)}/evaluate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transcript })
+          body: JSON.stringify({ 
+            transcript,
+            realTimeEvaluations: evaluationsToSend, // Use ref to get current evaluations
+            companyId: companyId // Include company ID for credential lookup
+          })
         }).catch(e => {
           console.error('❌ Failed to run evaluation:', e)
           return null

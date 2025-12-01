@@ -9,12 +9,21 @@ export const dynamic = 'force-dynamic'
 const TOTAL_MARKS = 100
 const DEFAULT_TOTAL_QUESTIONS = 10
 
-// All possible evaluation criteria with default weights
-const ALL_CRITERIA = {
-  "Technical Skills": { weight: 0.40, description: "Technical knowledge, coding, frameworks, tools" },
-  "Communication": { weight: 0.25, description: "Clarity, articulation, listening skills" },
-  "Problem Solving": { weight: 0.20, description: "Analytical thinking, debugging, approach" },
-  "Cultural Fit": { weight: 0.15, description: "Teamwork, values, collaboration" }
+// Standard evaluation criteria with descriptions for AI guidance
+const CRITERIA_DESCRIPTIONS: Record<string, string> = {
+  // Standard criteria
+  "Technical": "Programming skills, frameworks, tools, databases, APIs, system design, technical accuracy and depth",
+  "Technical Skills": "Programming skills, frameworks, tools, databases, APIs, system design, technical accuracy and depth",
+  "Communication": "Clarity of expression, presenting ideas, explaining concepts, articulation, listening skills",
+  "Problem Solving": "Debugging, troubleshooting, analytical thinking, approach to challenges, logical reasoning",
+  "Cultural Fit": "Motivation, alignment with company values, work style preferences, career goals",
+  "Culture Fit": "Motivation, alignment with company values, work style preferences, career goals",
+  "Team Player": "Collaboration experience, working with cross-functional teams, teamwork, cooperation",
+  "Teamwork": "Collaboration experience, working with cross-functional teams, teamwork, cooperation",
+  "Leadership": "Leadership experience, mentoring, decision making, taking initiative",
+  "Adaptability": "Flexibility, learning new skills, handling change, resilience",
+  "Experience": "Relevant work experience, project examples, domain knowledge",
+  "Behavioral": "Past behavior examples, situational responses, work ethics"
 }
 
 export async function POST(req: Request, ctx: { params: Promise<{ applicationId: string }> } | { params: { applicationId: string } }) {
@@ -32,10 +41,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ applicationId:
     }
 
     const body = await req.json()
-    const { transcript } = body
+    const { transcript, realTimeEvaluations, companyId: bodyCompanyId } = body
 
     console.log('📝 Transcript length:', transcript?.length || 0)
     console.log('📝 Transcript preview:', transcript?.substring(0, 200))
+    console.log('📊 Real-time evaluations received:', realTimeEvaluations?.length || 0)
+    
+    // Check if we have real-time evaluations from OpenAI
+    const hasRealTimeEvaluations = Array.isArray(realTimeEvaluations) && 
+      realTimeEvaluations.length > 0 && 
+      realTimeEvaluations.every(e => e.source === 'openai-realtime' && typeof e.score === 'number')
 
     if (!transcript) {
       return NextResponse.json({ ok: false, error: 'Missing transcript' }, { status: 400 })
@@ -78,8 +93,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ applicationId:
     `
     const roundsRows = await DatabaseService.query(roundsQuery, [jobId]) as any[]
 
-    // Extract criteria from all rounds
+    // Extract criteria and total questions from all rounds
     const allCriteria = new Set<string>()
+    let totalConfiguredQuestions = 0
+    
     roundsRows.forEach(round => {
       try {
         if (round.configuration) {
@@ -88,6 +105,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ applicationId:
             : round.configuration
           const criteria = config.criteria || []
           criteria.forEach((c: string) => allCriteria.add(c))
+          
+          // Count total questions from configuration
+          const questions = config.questions || []
+          totalConfiguredQuestions += questions.length
         }
       } catch (e) {
         console.error('Error parsing round configuration:', e)
@@ -95,7 +116,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ applicationId:
     })
 
     const criteriaList = Array.from(allCriteria)
+    // Use configured questions count, or default to 10 if not configured
+    const totalInterviewQuestions = totalConfiguredQuestions > 0 ? totalConfiguredQuestions : DEFAULT_TOTAL_QUESTIONS
+    
     console.log('📊 Evaluation criteria:', criteriaList)
+    console.log('📊 Total configured questions:', totalInterviewQuestions)
 
     // DYNAMIC CRITERIA-BASED EVALUATION
     // The system identifies the correct criteria for EACH question
@@ -115,6 +140,7 @@ If there are 8 Technical questions and 2 Communication questions, the final scor
 - Position: ${application.job_title}
 - Company: ${application.company_name}
 - Candidate: ${application.first_name} ${application.last_name}
+- Total Interview Questions Configured: ${totalInterviewQuestions}
 
 **Original Evaluation Criteria from Job:**
 ${criteriaList.map(c => `- ${c}`).join('\n')}
@@ -125,14 +151,26 @@ ${transcript}
 **STEP-BY-STEP EVALUATION PROCESS:**
 
 **STEP 1: EXTRACT ALL QUESTIONS**
-Identify EVERY question asked in the transcript (may be more or less than 10).
+Identify EVERY question asked in the transcript. The interview was configured with ${totalInterviewQuestions} questions total.
+- If fewer questions were asked than configured, the candidate loses marks for questions not asked.
+- If a question was asked but not answered properly, score it as 0.
 
-**STEP 2: CATEGORIZE EACH QUESTION**
-For EACH question, determine its criteria based on content:
-- **Technical Skills**: Coding, programming, frameworks, tools, databases, architecture, APIs, algorithms, system design
-- **Communication**: Explaining concepts, presenting ideas, describing experiences, clarity of expression
-- **Problem Solving**: Debugging, troubleshooting, analytical thinking, approach to challenges
-- **Cultural Fit**: Teamwork, collaboration, values, work style, motivation
+**STEP 2: CATEGORIZE EACH QUESTION - USE ONLY THESE CRITERIA:**
+You MUST categorize each question into ONE of these criteria ONLY (as defined in the job configuration):
+${criteriaList.length > 0 ? criteriaList.map(c => {
+  const description = CRITERIA_DESCRIPTIONS[c] || `Questions related to ${c.toLowerCase()}`
+  return `- **${c}**: ${description}`
+}).join('\n') : `- **Technical**: Programming skills, frameworks, tools, technical accuracy
+- **Communication**: Clarity of expression, presenting ideas
+- **Cultural Fit**: Company values, motivation, career goals
+- **Team Player**: Collaboration, teamwork experience`}
+
+**IMPORTANT MAPPING RULES:**
+- If a question asks about tools/technologies/coding → map to Technical (or Technical Skills)
+- If a question asks about teamwork/collaboration → map to Team Player (or Teamwork)
+- If a question asks about company/motivation/values → map to Cultural Fit (or Culture Fit)
+- If a question asks about explaining/presenting → map to Communication
+- If a question asks about salary/location/availability → map to Cultural Fit
 
 **STEP 3: EVALUATE EACH ANSWER**
 For each question-answer pair:
@@ -140,18 +178,19 @@ For each question-answer pair:
 - Document WHY this score was given (specific evidence from transcript)
 - Note if answer was complete, partial, or missing
 
-**STEP 4: CALCULATE CATEGORY SCORES**
-For each criteria that has questions:
-- Average the scores of all questions in that criteria
-- This becomes the criteria score (0-100)
+**STEP 4: EVALUATE ANSWER QUALITY**
+For each question, evaluate the candidate's answer based on the assigned criterion:
+- **Technical**: Evaluate technical accuracy, depth of knowledge, practical experience
+- **Communication**: Evaluate clarity, structure, articulation of ideas
+- **Cultural Fit**: Evaluate motivation, alignment with company values, career goals
+- **Team Player**: Evaluate collaboration experience, teamwork examples, interpersonal skills
 
-**STEP 5: CALCULATE FINAL WEIGHTED SCORE**
-**IMPORTANT:** Only include criteria that actually have questions!
-- If 8 questions are Technical and 2 are Communication: 
-  - Technical weight: 8/10 = 80%
-  - Communication weight: 2/10 = 20%
-  - Cultural Fit weight: 0% (no questions)
-- Final Score = (Technical_Score × 0.80) + (Communication_Score × 0.20)
+**STEP 5: SCORING RULES**
+- Total marks = 100, distributed equally across ALL ${totalInterviewQuestions} configured questions
+- Each question is worth approximately ${Math.floor(100 / totalInterviewQuestions)} marks
+- Score each answer from 0-100 based on quality, then we'll convert to marks
+- If candidate didn't answer or gave poor answer → score = 0
+- If candidate gave excellent answer → score = 90-100
 
 **Response Format (JSON):**
 {
@@ -164,7 +203,7 @@ For each criteria that has questions:
       "score": 85,
       "max_score": 100,
       "answered": true,
-      "candidate_response": "Summary of candidate's answer",
+      "candidate_response": "FULL exact text of candidate's answer - do NOT summarize or truncate",
       "evaluation_reasoning": "Detailed explanation of why this score was given, citing specific parts of the answer",
       "strengths_in_answer": ["Specific strength 1", "Specific strength 2"],
       "gaps_in_answer": ["What was missing or could be improved"]
@@ -215,7 +254,8 @@ For each criteria that has questions:
 4. Reference SPECIFIC parts of candidate's answers as evidence
 5. Do NOT assume or invent categories that had no questions
 6. The sum of all weight_percentages must equal 100%
-7. Be specific in feedback - cite actual words/phrases from transcript`
+7. Be specific in feedback - cite actual words/phrases from transcript
+8. IMPORTANT: candidate_response MUST contain the COMPLETE answer - do NOT summarize, truncate, or shorten the candidate's response. Include EVERY word they said.`
 
     // Fetch company's OpenAI service account key from database (like CV parsing and video interviews)
     let openaiApiKey: string | undefined = undefined
@@ -292,66 +332,142 @@ For each criteria that has questions:
       }
     }
 
-    // Check if OpenAI API key is configured
-    if (!openaiApiKey) {
-      console.warn('⚠️ [INTERVIEW EVAL] No OpenAI API key configured (no company key, no env key), using mock evaluation')
-      // Use school-exam style scoring: each question has different marks based on importance
-      const mockEvaluation = {
-        questions: [
-          // Technical Skills - 40 marks total (4 questions)
-          { question_number: 1, question_text: "Can you explain your experience with React and state management?", category: "Technical Skills", max_marks: 15, marks_obtained: 12, answered: true, candidate_response: "Discussed Redux and Context API usage in previous projects", feedback: "Good understanding of state management. Lost 3 marks for not mentioning newer solutions." },
-          { question_number: 2, question_text: "How would you optimize a slow-loading web application?", category: "Technical Skills", max_marks: 12, marks_obtained: 9, answered: true, candidate_response: "Mentioned code splitting, lazy loading, and performance monitoring", feedback: "Solid knowledge of optimization techniques." },
-          { question_number: 3, question_text: "What is your experience with serverless architecture?", category: "Technical Skills", max_marks: 8, marks_obtained: 0, answered: false, candidate_response: "Vague response: 'Hmm'", feedback: "No substantive answer provided. 0 marks." },
-          { question_number: 4, question_text: "Explain the difference between SQL and NoSQL databases", category: "Technical Skills", max_marks: 5, marks_obtained: 0, answered: false, candidate_response: "Not asked", feedback: "Question not asked during interview." },
-          // Problem Solving - 25 marks total (2 questions)
-          { question_number: 5, question_text: "How would you approach debugging a production issue?", category: "Problem Solving", max_marks: 15, marks_obtained: 11, answered: true, candidate_response: "Systematic approach: logs, monitoring, reproduction, fix, testing", feedback: "Good systematic approach. Could improve on rollback strategies." },
-          { question_number: 6, question_text: "Describe a time when you solved a complex technical problem", category: "Problem Solving", max_marks: 10, marks_obtained: 0, answered: false, candidate_response: "Not asked", feedback: "Question not asked during interview." },
-          // Communication - 20 marks total (2 questions)
-          { question_number: 7, question_text: "Tell me about a challenging project you worked on", category: "Communication", max_marks: 12, marks_obtained: 10, answered: true, candidate_response: "Clearly explained project scope, challenges, and solutions", feedback: "Excellent storytelling and clear communication." },
-          { question_number: 8, question_text: "How do you explain technical concepts to non-technical stakeholders?", category: "Communication", max_marks: 8, marks_obtained: 0, answered: false, candidate_response: "Not asked", feedback: "Question not asked during interview." },
-          // Cultural Fit - 15 marks total (2 questions)
-          { question_number: 9, question_text: "How do you handle working in a team environment?", category: "Cultural Fit", max_marks: 8, marks_obtained: 7, answered: true, candidate_response: "Emphasized collaboration and shared responsibility", feedback: "Strong team player mentality." },
-          { question_number: 10, question_text: "Tell me about a time you had a conflict with a team member", category: "Cultural Fit", max_marks: 7, marks_obtained: 0, answered: false, candidate_response: "Not asked", feedback: "Question not asked during interview." }
-        ],
-        marks_summary: {
-          total_max_marks: 100,
-          total_obtained: 49, // 12+9+0+0+11+0+10+0+7+0 = 49
-          percentage: 49,
-          questions_asked: 6,
-          questions_answered: 5,
-          by_category: {
-            "Technical Skills": { max: 40, obtained: 21 },
-            "Problem Solving": { max: 25, obtained: 11 },
-            "Communication": { max: 20, obtained: 10 },
-            "Cultural Fit": { max: 15, obtained: 7 }
+    // CRITICAL: If we have real-time evaluations from OpenAI, use them directly
+    // This ensures we never use mock scores
+    if (hasRealTimeEvaluations) {
+      console.log('✅ [INTERVIEW EVAL] Using real-time OpenAI evaluations (no mock scores)')
+      console.log('📊 [INTERVIEW EVAL] Processing', realTimeEvaluations.length, 'real-time evaluations')
+      
+      // Helper function to map question to criterion using ChatGPT
+      const mapQuestionToCriterion = async (questionText: string, availableCriteria: string[]): Promise<string> => {
+        if (!openaiApiKey || availableCriteria.length === 0) return availableCriteria[0] || 'Technical'
+        
+        const mappingPrompt = `Given this interview question and the available evaluation criteria, determine which criterion best matches the question.
+
+**Question:** "${questionText}"
+
+**Available Criteria:**
+${availableCriteria.map(c => `- ${c}`).join('\n')}
+
+**MAPPING RULES:**
+- If question asks about tools/technologies/coding/technical skills → Technical
+- If question asks about teamwork/collaboration/working with others → Team Player
+- If question asks about company/motivation/values/salary/location/role preferences → Culture Fit
+- If question asks about explaining/presenting/communication skills → Communication
+
+Respond with ONLY the criterion name.`
+
+        try {
+          const headers: Record<string, string> = {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json',
           }
-        },
-        overall_score: 49,
-        recommendation: 'Maybe',
-        summary: 'Candidate scored 49/100. Only 5 out of 10 questions were properly answered. Technical skills decent (21/40) but many questions unanswered.',
-        strengths: ['Good React/state management knowledge', 'Clear communication skills', 'Systematic debugging approach'],
-        areas_for_improvement: ['Many questions unanswered', 'Needs to elaborate more on technical topics'],
-        scoring_explanation: 'Score calculated like school exam: Q1(12/15) + Q2(9/12) + Q3(0/8) + Q4(0/5) + Q5(11/15) + Q6(0/10) + Q7(10/12) + Q8(0/8) + Q9(7/8) + Q10(0/7) = 49/100 = 49%'
-      }
-      
-      // Skip to storing mock evaluation
-      const evaluation = mockEvaluation
-      
-      // Convert new format to storage format
-      const evaluationData = {
-        application_id: applicationId,
-        scores: evaluation.questions || [],
-        overall_score: evaluation.overall_score || 0,
-        recommendation: evaluation.recommendation || 'Maybe',
-        summary: evaluation.summary || '',
-        strengths: evaluation.strengths || [],
-        areas_for_improvement: evaluation.areas_for_improvement || [],
-        evaluated_at: new Date().toISOString(),
-        evaluation_criteria: criteriaList,
-        marks_summary: evaluation.marks_summary || {},
-        scoring_explanation: evaluation.scoring_explanation || ''
+          if (openaiProjectId) headers['OpenAI-Project'] = openaiProjectId
+
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                { role: 'system', content: 'You are an expert at categorizing interview questions. Respond with ONLY the criterion name.' },
+                { role: 'user', content: mappingPrompt }
+              ],
+              temperature: 0.1,
+              max_tokens: 50
+            })
+          })
+
+          if (response.ok) {
+            const data = await response.json()
+            const suggested = data.choices[0]?.message?.content?.trim()
+            const matched = availableCriteria.find(c => 
+              c.toLowerCase() === suggested?.toLowerCase() ||
+              c.toLowerCase().includes(suggested?.toLowerCase()) ||
+              suggested?.toLowerCase().includes(c.toLowerCase())
+            )
+            return matched || availableCriteria[0]
+          }
+        } catch (e) {
+          console.error('Error mapping criterion:', e)
+        }
+        return availableCriteria[0] || 'Technical'
       }
 
+      // Convert real-time evaluations to the expected format
+      // Re-map any "General" criteria to correct configured criteria
+      const questionsPromises = realTimeEvaluations.map(async (rtEval: any, index: number) => {
+        let criterion = rtEval.criterion || 'General'
+        
+        // If criterion is still "General", re-map it using ChatGPT
+        if (criterion === 'General' || criterion === '' || !criterion) {
+          console.log(`🔄 [INTERVIEW EVAL] Re-mapping criterion for Q${index + 1}: "${rtEval.question_text?.substring(0, 50)}..."`)
+          criterion = await mapQuestionToCriterion(rtEval.question_text || '', criteriaList)
+          console.log(`✅ [INTERVIEW EVAL] Q${index + 1} mapped to: ${criterion}`)
+        }
+        
+        return {
+          question_number: rtEval.question_number || index + 1,
+          question_text: rtEval.question_text || '',
+          criteria: criterion,
+          criteria_reasoning: rtEval.criterion_match?.criterion_reasoning || '',
+          score: rtEval.score || 0,
+          max_score: 100,
+          answered: rtEval.matches_question !== false,
+          candidate_response: rtEval.full_answer || '', // Store FULL answer
+          evaluation_reasoning: rtEval.reasoning || '',
+          strengths_in_answer: rtEval.answer_analysis?.strengths || [],
+          gaps_in_answer: rtEval.answer_analysis?.weaknesses || [],
+          completeness: rtEval.completeness || 'partial',
+          source: 'openai-realtime' // Mark as real OpenAI evaluation
+        }
+      })
+      
+      const questions = await Promise.all(questionsPromises)
+      
+      // Calculate overall score from real-time evaluations
+      const calculated = calculateCriteriaBasedScore(questions, totalInterviewQuestions)
+      
+      const evaluation = {
+        questions: calculated.final_score_calculation.questions_with_marks || questions,
+        criteria_breakdown: calculated.criteria_breakdown,
+        categories_used: calculated.categories_used,
+        categories_not_used: calculated.categories_not_used,
+        final_score_calculation: calculated.final_score_calculation,
+        overall_score: calculated.overall_score,
+        marks_summary: {
+          total_max_marks: 100,
+          total_obtained: calculated.overall_score,
+          percentage: calculated.overall_score,
+          total_interview_questions: totalInterviewQuestions,
+          questions_asked: questions.length,
+          questions_answered: questions.filter((q: any) => q.answered).length,
+          by_category: {}
+        },
+        recommendation: calculated.overall_score >= 65 ? 'Hire' : (calculated.overall_score >= 40 ? 'Maybe' : 'No Hire'),
+        summary: `Evaluation based on ${questions.length} real-time OpenAI evaluations. Score: ${calculated.overall_score}/100`,
+        strengths: questions.flatMap((q: any) => q.strengths_in_answer || []).slice(0, 5),
+        areas_for_improvement: questions.flatMap((q: any) => q.gaps_in_answer || []).slice(0, 5),
+        scoring_explanation: `Real-time OpenAI evaluation: ${calculated.final_score_calculation.formula}`,
+        source: 'openai-realtime'
+      }
+      
+      // Store the real-time evaluation
+      const evaluationData = {
+        application_id: applicationId,
+        scores: evaluation.questions,
+        overall_score: evaluation.overall_score,
+        recommendation: evaluation.recommendation,
+        summary: evaluation.summary,
+        strengths: evaluation.strengths,
+        areas_for_improvement: evaluation.areas_for_improvement,
+        evaluated_at: new Date().toISOString(),
+        evaluation_criteria: criteriaList,
+        marks_summary: evaluation.marks_summary,
+        scoring_explanation: evaluation.scoring_explanation,
+        source: 'openai-realtime'
+      }
+      
       // Find interview and store evaluation
       const findInterviewQuery = `
         SELECT i.id as interview_id
@@ -365,15 +481,11 @@ For each criteria that has questions:
       
       if (interviewRows && interviewRows.length > 0) {
         const interviewId = interviewRows[0].interview_id
+        const status = evaluation.overall_score >= 65 ? 'Pass' : 'Fail'
         
-        // Status column exists in evaluations table (added via migration)
-
         // Check if evaluation exists
         const checkEvaluationQuery = `SELECT id FROM evaluations WHERE interview_id = $1::uuid LIMIT 1`
         const existingEval = await DatabaseService.query(checkEvaluationQuery, [interviewId]) as any[]
-        
-        // Calculate Pass/Fail status for mock data
-        const mockStatus = evaluation.overall_score >= 65 ? 'Pass' : 'Fail'
         
         let evaluationQuery: string
         if (existingEval && existingEval.length > 0) {
@@ -391,76 +503,65 @@ For each criteria that has questions:
           `
         }
         
-        const recOutcome = 'on_hold'
-        
-        // Group questions by category for display
-        const questionsByCategory: Record<string, any[]> = {}
-        evaluation.questions.forEach((q: any) => {
-          if (!questionsByCategory[q.category]) {
-            questionsByCategory[q.category] = []
-          }
-          questionsByCategory[q.category].push(q)
-        })
+        const recOutcome = evaluation.overall_score >= 65 ? 'next_round' : (evaluation.overall_score >= 40 ? 'on_hold' : 'unqualified')
         
         const rubricNotes = `
-## Summary
+## Summary (Real-time OpenAI Evaluation)
 ${evaluation.summary}
 
-## Marks Summary
-- **Total Marks:** ${evaluation.marks_summary.total_obtained}/${evaluation.marks_summary.total_max_marks} (${evaluation.marks_summary.percentage}%)
-- **Questions Asked:** ${evaluation.marks_summary.questions_asked}/${evaluation.questions?.length || DEFAULT_TOTAL_QUESTIONS}
-- **Questions Answered:** ${evaluation.marks_summary.questions_answered}/${evaluation.questions?.length || DEFAULT_TOTAL_QUESTIONS}
-
-## Strengths
-${evaluation.strengths.map((s: string) => `- ${s}`).join('\n')}
-
-## Areas for Improvement
-${evaluation.areas_for_improvement.map((a: string) => `- ${a}`).join('\n')}
-
-## Detailed Scores by Question (School Exam Style)
+## Detailed Scores by Question
 ${evaluation.questions.map((q: any) => 
   `### Q${q.question_number}: ${q.question_text}
-- **Category:** ${q.category}
-- **Marks:** ${q.marks_obtained}/${q.max_marks} ${q.answered ? '✓' : '✗ (Not answered)'}
-- **Response:** ${q.candidate_response}
-- **Feedback:** ${q.feedback}`
+- **Criterion:** ${q.criteria}
+- **Score:** ${q.score}/100 (${q.marks_obtained || 0}/${q.max_marks || 10} marks)
+- **Completeness:** ${q.completeness}
+- **Full Answer:** ${q.candidate_response}
+- **AI Reasoning:** ${q.evaluation_reasoning}
+- **Strengths:** ${(q.strengths_in_answer || []).join(', ') || 'None noted'}
+- **Gaps:** ${(q.gaps_in_answer || []).join(', ') || 'None noted'}`
 ).join('\n\n')}
-
-## Category Breakdown
-${Object.entries(evaluation.marks_summary.by_category).map(([cat, data]: [string, any]) => 
-  `- **${cat}:** ${data.obtained}/${data.max} marks`
-).join('\n')}
 
 ## Scoring Explanation
 ${evaluation.scoring_explanation}
+
+## Source
+✅ Real-time OpenAI evaluation (not mock)
         `.trim()
         
-        const evaluationResult = await DatabaseService.query(evaluationQuery, [
+        await DatabaseService.query(evaluationQuery, [
           interviewId,
           evaluation.overall_score,
-          JSON.stringify({ questions: evaluation.questions, marks_summary: evaluation.marks_summary }),
+          JSON.stringify({ questions: evaluation.questions, marks_summary: evaluation.marks_summary, source: 'openai-realtime' }),
           recOutcome,
           rubricNotes,
-          mockStatus
-        ]) as any[]
+          status
+        ])
         
-        console.log('✅ Mock evaluation stored in evaluations table:', evaluationResult[0]?.id)
-        console.log(`📊 Mock candidate result: ${mockStatus} (Score: ${evaluation.overall_score}/100)`)
-        if (mockStatus === 'Pass') {
-          console.log('🎉 Mock candidate PASSED - will appear in Successful Hire tab!')
-        } else {
-          console.log('❌ Mock candidate FAILED - will NOT appear in Successful Hire tab')
-        }
+        console.log('✅ [INTERVIEW EVAL] Real-time evaluation stored successfully')
+        console.log(`📊 [INTERVIEW EVAL] Score: ${evaluation.overall_score}/100 - ${status}`)
       }
-
+      
       return NextResponse.json({
         ok: true,
         evaluation: evaluationData,
-        message: 'Mock evaluation completed (OpenAI API key not configured)'
+        message: 'Evaluation completed using real-time OpenAI evaluations',
+        source: 'openai-realtime'
       })
     }
-
-    console.log('🤖 [INTERVIEW EVAL] Calling OpenAI API for evaluation...')
+    
+    // Check if OpenAI API key is configured
+    if (!openaiApiKey) {
+      // NO FALLBACK TO MOCK - Return error if no OpenAI key
+      console.error('❌ [INTERVIEW EVAL] No OpenAI API key configured and no real-time evaluations available')
+      return NextResponse.json({
+        ok: false,
+        error: 'OpenAI credentials not configured',
+        message: 'Please connect OpenAI in Settings → Billing to enable interview evaluation. No mock scores are used.'
+      }, { status: 400 })
+    }
+    
+    // Proceed with batch OpenAI evaluation (when no real-time evaluations available)
+    console.log('🤖 [INTERVIEW EVAL] Proceeding with batch OpenAI evaluation...')
     console.log('🔑 [INTERVIEW EVAL] Using API key:', openaiApiKey.substring(0, 15) + '...')
     
     // Build headers with project ID if available (for proper attribution)
@@ -520,7 +621,8 @@ ${evaluation.scoring_explanation}
       }
       
       // Normalize the evaluation response to ensure it has the correct format
-      evaluation = normalizeEvaluationResponse(evaluation)
+      // Pass the actual total questions from job configuration for accurate scoring
+      evaluation = normalizeEvaluationResponse(evaluation, totalInterviewQuestions)
       
     } catch (e) {
       console.error('Failed to parse evaluation JSON:', e)
@@ -554,20 +656,27 @@ ${evaluation.scoring_explanation}
       }
     }
 
-    // Store evaluation in database
+    // Store evaluation in database - include ALL evaluation data for report page
     const evaluationData = {
       application_id: applicationId,
       scores: evaluation.questions || [],
+      questions: evaluation.questions || [], // Full question details for report
       overall_score: evaluation.overall_score || 0,
       recommendation: evaluation.recommendation || 'Maybe',
       summary: evaluation.summary || '',
       strengths: evaluation.strengths || [],
+      weaknesses: evaluation.areas_for_improvement || [], // Alias for report page
       areas_for_improvement: evaluation.areas_for_improvement || [],
       evaluated_at: new Date().toISOString(),
       evaluation_criteria: criteriaList,
       marks_summary: evaluation.marks_summary || {},
-      scoring_explanation: evaluation.scoring_explanation || ''
+      scoring_explanation: evaluation.scoring_explanation || '',
+      criteria_breakdown: evaluation.criteria_breakdown || {},
+      categories_used: evaluation.categories_used || [],
+      final_score_calculation: evaluation.final_score_calculation || {}
     }
+    
+    console.log('📦 [EVAL] Evaluation data to store:', JSON.stringify(evaluationData, null, 2).substring(0, 500))
 
     // Find the interview for this application
     const findInterviewQuery = `
@@ -695,22 +804,32 @@ ${evaluation.scoring_explanation || 'No detailed scoring breakdown available'}
       }
       
       // Also store in interviews.metadata for backward compatibility
-      const updateInterviewEvalQuery = `
-        UPDATE interviews
-        SET metadata = jsonb_set(
-              COALESCE(metadata, '{}'::jsonb),
-              '{evaluation}',
-              $2::jsonb,
-              true
-            )
-        WHERE id = $1::uuid
-        RETURNING id
-      `
-      await DatabaseService.query(updateInterviewEvalQuery, [
-        interviewId,
-        JSON.stringify(evaluationData)
-      ])
-      console.log('✅ Evaluation also stored in interviews.metadata for interview:', interviewId)
+      try {
+        const updateInterviewEvalQuery = `
+          UPDATE interviews
+          SET metadata = jsonb_set(
+                COALESCE(metadata, '{}'::jsonb),
+                '{evaluation}',
+                $2::jsonb,
+                true
+              )
+          WHERE id = $1::uuid
+          RETURNING id
+        `
+        const metadataResult = await DatabaseService.query(updateInterviewEvalQuery, [
+          interviewId,
+          JSON.stringify(evaluationData)
+        ]) as any[]
+        
+        if (metadataResult && metadataResult.length > 0) {
+          console.log('✅ Evaluation stored in interviews.metadata for interview:', interviewId)
+        } else {
+          console.warn('⚠️ interviews.metadata update returned no rows for interview:', interviewId)
+        }
+      } catch (metadataErr: any) {
+        console.error('❌ Failed to store in interviews.metadata:', metadataErr?.message)
+        // Don't throw - evaluations table storage succeeded
+      }
     } else {
       console.log('⚠️ No interview found for application:', applicationId)
       throw new Error('No interview found for this application')
@@ -839,10 +958,11 @@ function calculateCriteriaBasedScore(questions: any[], totalInterviewQuestions: 
   console.log('📊 [SCORING] Final score:', finalScore, '/ 100')
   console.log('📊 [SCORING] Questions answered:', questionsWithMarks.filter(q => q.answered).length, '/', questionsAsked, '(asked) out of', totalInterviewQuestions, '(total)')
   
-  // Determine used and unused categories
-  const allPossibleCategories = ['Technical Skills', 'Communication', 'Problem Solving', 'Cultural Fit']
+  // Determine used and unused categories (dynamic - based on what questions were actually categorized as)
   const categoriesUsed = Object.keys(byCategory)
-  const categoriesNotUsed = allPossibleCategories.filter(c => !categoriesUsed.includes(c))
+  // Note: categories_not_used will be populated from the original criteriaList passed to the evaluation
+  // For now, we only track what was actually used
+  const categoriesNotUsed: string[] = [] // Will be populated during normalization if needed
   
   return {
     overall_score: finalScore,
