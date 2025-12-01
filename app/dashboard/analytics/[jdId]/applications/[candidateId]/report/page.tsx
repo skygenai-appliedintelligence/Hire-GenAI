@@ -141,6 +141,59 @@ const extractScore = (scoreObj: any): number => {
   return 0
 }
 
+const parseConversationTranscript = (text: string): Array<{role: 'agent' | 'candidate', text: string}> => {
+  if (!text || typeof text !== 'string') return []
+  
+  const lines = text.split('\n').filter(line => line.trim())
+  const messages: Array<{role: 'agent' | 'candidate', text: string}> = []
+  
+  for (const line of lines) {
+    const trimmedLine = line.trim()
+    if (!trimmedLine) continue
+    
+    // Detect role based on common patterns
+    let role: 'agent' | 'candidate' = 'candidate'
+    let messageText = trimmedLine
+    
+    // Check for Agent patterns
+    if (trimmedLine.startsWith('[Agent]') || 
+        trimmedLine.startsWith('Agent:') || 
+        trimmedLine.match(/^(Olivia|AI Agent|interviewer):/i)) {
+      role = 'agent'
+      // Remove the role prefix
+      messageText = trimmedLine.replace(/^\[(Agent|Olivia|AI Agent|interviewer)\]:?\s*/i, '')
+                           .replace(/^(Agent|Olivia|AI Agent|interviewer):\s*/i, '')
+    }
+    // Check for Candidate patterns  
+    else if (trimmedLine.startsWith('[You]') || 
+             trimmedLine.startsWith('You:') || 
+             trimmedLine.startsWith('[') ||
+             trimmedLine.match(/^(candidate|user):/i)) {
+      role = 'candidate'
+      // Remove the role prefix
+      messageText = trimmedLine.replace(/^\[(You|candidate|user)\]:?\s*/i, '')
+                           .replace(/^(You|candidate|user):\s*/i, '')
+    }
+    // If no clear pattern, try to infer from content
+    else {
+      // Questions typically end with ? and are from agent
+      if (trimmedLine.includes('?') && trimmedLine.length > 10) {
+        role = 'agent'
+      }
+      // Short answers are typically from candidate
+      else if (trimmedLine.length < 100 && !trimmedLine.includes('?')) {
+        role = 'candidate'
+      }
+    }
+    
+    if (messageText.trim()) {
+      messages.push({ role, text: messageText.trim() })
+    }
+  }
+  
+  return messages
+}
+
 export default function CandidateReportPage() {
   const params = useParams()
   const router = useRouter()
@@ -1557,8 +1610,15 @@ export default function CandidateReportPage() {
                         <div>
                           <h2 className="text-2xl font-bold mb-2">Interview Evaluation</h2>
                           <p className="text-emerald-100 text-sm max-w-md">
-                            Score calculated based on criteria actually evaluated in the interview
+                            Score calculated based on all {(evaluation as any).marks_summary?.total_interview_questions || (evaluation as any).questions?.length || 10} configured questions
                           </p>
+                          {(evaluation as any).marks_summary && (
+                            <div className="flex gap-4 mt-2 text-xs text-emerald-200">
+                              <span>Questions Asked: {(evaluation as any).marks_summary.questions_asked || (evaluation as any).questions?.length || 0}</span>
+                              <span>|</span>
+                              <span>Answered: {(evaluation as any).marks_summary.questions_answered || 0}</span>
+                            </div>
+                          )}
                           <div className="mt-3">
                             {getDecisionBadge(evaluationData!.decision)}
                           </div>
@@ -1567,9 +1627,7 @@ export default function CandidateReportPage() {
                       <div className="text-center md:text-right">
                         <div className="text-sm opacity-80 mb-1">Recommendation</div>
                         <div className="text-xl font-semibold">
-                          {(evaluation as any).overallScore >= 80 ? '🎯 Strong Hire' :
-                           (evaluation as any).overallScore >= 65 ? '✅ Hire' :
-                           (evaluation as any).overallScore >= 50 ? '🤔 Maybe' : '❌ No Hire'}
+                          {(evaluation as any).overallScore >= 60 ? 'Hire' : 'Not Hire'}
                         </div>
                       </div>
                     </div>
@@ -1746,12 +1804,28 @@ export default function CandidateReportPage() {
                       
                       const getCriteriaColor = (criteria: string) => {
                         const colors: Record<string, { bg: string, border: string, text: string, badge: string }> = {
+                          // Technical criteria (blue)
                           'Technical Skills': { bg: 'bg-blue-50', border: 'border-l-blue-500', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-800' },
                           'Technical': { bg: 'bg-blue-50', border: 'border-l-blue-500', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-800' },
+                          // Communication criteria (green)
                           'Communication': { bg: 'bg-green-50', border: 'border-l-green-500', text: 'text-green-700', badge: 'bg-green-100 text-green-800' },
+                          // Problem Solving criteria (purple)
                           'Problem Solving': { bg: 'bg-purple-50', border: 'border-l-purple-500', text: 'text-purple-700', badge: 'bg-purple-100 text-purple-800' },
+                          // Cultural Fit criteria (orange)
                           'Cultural Fit': { bg: 'bg-orange-50', border: 'border-l-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-800' },
-                          'Culture': { bg: 'bg-orange-50', border: 'border-l-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-800' }
+                          'Culture Fit': { bg: 'bg-orange-50', border: 'border-l-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-800' },
+                          'Culture': { bg: 'bg-orange-50', border: 'border-l-orange-500', text: 'text-orange-700', badge: 'bg-orange-100 text-orange-800' },
+                          // Team Player criteria (teal/cyan)
+                          'Team Player': { bg: 'bg-teal-50', border: 'border-l-teal-500', text: 'text-teal-700', badge: 'bg-teal-100 text-teal-800' },
+                          'Teamwork': { bg: 'bg-teal-50', border: 'border-l-teal-500', text: 'text-teal-700', badge: 'bg-teal-100 text-teal-800' },
+                          // Leadership criteria (indigo)
+                          'Leadership': { bg: 'bg-indigo-50', border: 'border-l-indigo-500', text: 'text-indigo-700', badge: 'bg-indigo-100 text-indigo-800' },
+                          // Adaptability criteria (amber)
+                          'Adaptability': { bg: 'bg-amber-50', border: 'border-l-amber-500', text: 'text-amber-700', badge: 'bg-amber-100 text-amber-800' },
+                          // Experience criteria (slate)
+                          'Experience': { bg: 'bg-slate-50', border: 'border-l-slate-500', text: 'text-slate-700', badge: 'bg-slate-100 text-slate-800' },
+                          // Behavioral criteria (rose)
+                          'Behavioral': { bg: 'bg-rose-50', border: 'border-l-rose-500', text: 'text-rose-700', badge: 'bg-rose-100 text-rose-800' }
                         }
                         return colors[criteria] || { bg: 'bg-gray-50', border: 'border-l-gray-500', text: 'text-gray-700', badge: 'bg-gray-100 text-gray-800' }
                       }
@@ -1799,6 +1873,16 @@ export default function CandidateReportPage() {
                                     )}
                                   </div>
                                 </div>
+                                
+                                {/* Criteria Reasoning - Why this question belongs to this criterion */}
+                                {q.criteria_reasoning && (
+                                  <div className="mb-3 -mt-1">
+                                    <div className={`text-xs ${colors.text} opacity-80 flex items-center gap-1 italic`}>
+                                      <Target className="h-3 w-3" /> 
+                                      <span className="font-medium">Why {criteria}:</span> {q.criteria_reasoning}
+                                    </div>
+                                  </div>
+                                )}
                                 
                                 {/* Score Display */}
                                 <div className="flex items-center gap-4 mb-4">
@@ -2090,10 +2174,30 @@ export default function CandidateReportPage() {
                         ))}
                       </div>
                     ) : (
-                      <div className="max-h-96 overflow-y-auto prose prose-sm max-w-none">
-                        <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
-                          {transcriptData!.text || "No transcript available"}
-                        </div>
+                      <div className="space-y-4 max-h-96 overflow-y-auto">
+                        {parseConversationTranscript(transcriptData!.text).map((msg, idx) => (
+                          <div key={idx} className={`flex ${msg.role === 'agent' ? 'justify-start' : 'justify-end'}`}>
+                            <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${
+                              msg.role === 'agent' 
+                                ? 'bg-blue-100 text-blue-900 border border-blue-200' 
+                                : 'bg-green-100 text-green-900 border border-green-200'
+                            }`}>
+                              <div className={`text-xs font-semibold mb-1 ${
+                                msg.role === 'agent' ? 'text-blue-700' : 'text-green-700'
+                              }`}>
+                                {msg.role === 'agent' ? '🤖 Agent' : '👤 Candidate'}
+                              </div>
+                              <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                                {msg.text}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {(!transcriptData!.text || transcriptData!.text.trim().length === 0) && (
+                          <div className="text-center text-gray-500 py-8">
+                            No transcript available
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
