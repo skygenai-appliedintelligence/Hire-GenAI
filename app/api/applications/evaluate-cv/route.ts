@@ -206,6 +206,40 @@ export async function POST(request: NextRequest) {
               )
               console.log(`[CV Evaluator] Application status set to ${chosen}`)
             }
+
+            // Trigger auto-send interview email if candidate is qualified
+            try {
+              // Get the job_id for this application
+              const jobQuery = `SELECT job_id FROM applications WHERE id = $1::uuid`
+              const jobRows = await (DatabaseService as any)["query"]?.call(
+                DatabaseService,
+                jobQuery,
+                [applicationId]
+              ) as any[]
+              
+              const jobId = jobRows?.[0]?.job_id
+              
+              if (jobId) {
+                console.log(`🎯 [CV EVALUATOR] Candidate qualified, triggering auto-email check...`)
+                
+                // Call the auto-send-interview-email API with 1 minute delay (60000ms)
+                const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+                fetch(`${baseUrl}/api/applications/auto-send-interview-email`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    applicationId,
+                    jobId,
+                    delay: 60000 // 1 minute delay
+                  })
+                }).catch(err => {
+                  console.error(`⚠️ [CV EVALUATOR] Failed to trigger auto-email:`, err)
+                })
+              }
+            } catch (autoEmailErr) {
+              // Don't fail the main request if auto-email scheduling fails
+              console.error(`⚠️ [CV EVALUATOR] Auto-email scheduling error:`, autoEmailErr)
+            }
           }
         } catch (setStatusErr) {
           console.warn('[CV Evaluator] Could not set qualified status:', setStatusErr)

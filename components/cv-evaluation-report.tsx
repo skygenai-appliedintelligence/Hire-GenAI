@@ -117,7 +117,6 @@ interface Props {
 }
 
 export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkillSetMatch = false, onToggleSkillSetMatch, candidateLocation }: Props) {
-  const [faqOpen, setFaqOpen] = useState(false)
   const [profileClassificationOpen, setProfileClassificationOpen] = useState(true)
   const [localExpandedSkillSetMatch, setLocalExpandedSkillSetMatch] = useState(expandedSkillSetMatch)
   
@@ -232,7 +231,7 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
   }
 
   return (
-    <div className="max-w-[1200px] mx-auto">
+    <div className="w-full">
       {/* Main Header with Company Logo */}
       <div className="bg-white shadow-md rounded-lg overflow-hidden mb-6 border border-slate-200">
         <div className="p-6 border-b border-slate-200">
@@ -1021,112 +1020,6 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
         </CardContent>
       </Card>
 
-      {/* FAQ Section */}
-      <Card className="shadow-md border border-slate-200 overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 py-4 px-6">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold flex items-center">
-              <HelpCircle className="w-5 h-5 text-blue-600 mr-3" />
-              Frequently Asked Questions
-            </CardTitle>
-            <Collapsible open={faqOpen} onOpenChange={setFaqOpen} className="w-auto">
-              <CollapsibleTrigger className="hover:bg-slate-200/50 p-1 rounded inline-flex items-center justify-center">
-                {faqOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </CollapsibleTrigger>
-            </Collapsible>
-          </div>
-          <CardDescription className="text-slate-600 mt-1 ml-8">
-            Common questions about the evaluation process
-          </CardDescription>
-        </CardHeader>
-        
-        <Collapsible open={faqOpen} onOpenChange={setFaqOpen}>
-          <CollapsibleContent>
-            <CardContent className="p-0">
-              <div className="divide-y divide-slate-200">
-                <div className="p-5 hover:bg-slate-50 transition-colors">
-                  <h4 className="font-semibold text-slate-800 mb-2 flex items-center">
-                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center mr-2">Q</span>
-                    How is the overall score calculated?
-                  </h4>
-                  <div className="ml-8 text-sm text-slate-600">
-                    <p>
-                      The overall score is a weighted average of all evaluation categories:
-                    </p>
-                    <ul className="mt-2 space-y-1 list-disc ml-5">
-                      <li><span className="font-medium">Hard Skills & Tools (35%)</span> - Technical abilities required for the role</li>
-                      <li><span className="font-medium">Experience Depth (20%)</span> - Years and relevance of experience</li>
-                      <li><span className="font-medium">Role Alignment (15%)</span> - Match with job title and responsibilities</li>
-                      <li><span className="font-medium">Domain/Industry Relevance (10%)</span> - Experience in relevant sectors</li>
-                      <li><span className="font-medium">Education & Certifications (10%)</span> - Relevant qualifications</li>
-                      <li><span className="font-medium">Nice-to-Have Skills (5%)</span> - Additional beneficial skills</li>
-                      <li><span className="font-medium">Communication & Quality (5%)</span> - Quality of presentation</li>
-                    </ul>
-                    <div className="mt-2 bg-blue-50 p-2 rounded border border-blue-200 text-xs text-blue-800">
-                      Formula: Sum of (category score × category weight)
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="p-5 hover:bg-slate-50 transition-colors">
-                  <h4 className="font-semibold text-slate-800 mb-2 flex items-center">
-                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center mr-2">Q</span>
-                    What determines the profile classification?
-                  </h4>
-                  <div className="ml-8 text-sm text-slate-600">
-                    <p>
-                      Profile classification is based on three key factors:
-                    </p>
-                    <ul className="mt-2 space-y-1 list-disc ml-5">
-                      <li><span className="font-medium">University background</span> - Targeted vs non-targeted institutions</li>
-                      <li><span className="font-medium">Employer background</span> - Targeted vs non-targeted companies</li>
-                      <li><span className="font-medium">Years of relevant experience</span> - 3+ years typically required for higher profiles</li>
-                    </ul>
-                  </div>
-                </div>
-                
-                <div className="p-5 hover:bg-slate-50 transition-colors">
-                  <h4 className="font-semibold text-slate-800 mb-2 flex items-center">
-                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center mr-2">Q</span>
-                    What does "qualified" mean?
-                  </h4>
-                  <div className="ml-8 text-sm text-slate-600">
-                    <p>
-                      A candidate is marked as "qualified" when their overall score is 65 or above, indicating they meet the minimum requirements for the role and should proceed to the next round of evaluation.
-                    </p>
-                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                      <div className="bg-emerald-50 p-2 rounded border border-emerald-200 text-emerald-800">
-                        <div className="font-bold">85-100:</div>
-                        <div>Excellent match</div>
-                      </div>
-                      <div className="bg-blue-50 p-2 rounded border border-blue-200 text-blue-800">
-                        <div className="font-bold">75-84:</div>
-                        <div>Strong match</div>
-                      </div>
-                      <div className="bg-amber-50 p-2 rounded border border-amber-200 text-amber-800">
-                        <div className="font-bold">65-74:</div>
-                        <div>Good match</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="p-5 hover:bg-slate-50 transition-colors">
-                  <h4 className="font-semibold text-slate-800 mb-2 flex items-center">
-                    <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center mr-2">Q</span>
-                    How accurate is the skills matching?
-                  </h4>
-                  <div className="ml-8 text-sm text-slate-600">
-                    <p>
-                      Our AI-powered CV parsing has over 95% accuracy in identifying skills, experience, and qualifications. However, we recommend human review for final decisions, especially for borderline cases.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </CollapsibleContent>
-        </Collapsible>
-      </Card>
     </div>
   )
 }

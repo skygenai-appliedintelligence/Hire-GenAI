@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { EmailService } from '@/lib/email-service'
+import { DatabaseService } from '@/lib/database'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -13,7 +14,8 @@ export async function POST(req: Request) {
       jobTitle, 
       companyName, 
       messageContent, 
-      category 
+      category,
+      applicationId // Optional: if provided, will mark email as sent in database
     } = body
 
     // Validate required fields
@@ -61,6 +63,29 @@ export async function POST(req: Request) {
     })
 
     console.log('✅ Custom email sent successfully to:', candidateEmail)
+
+    // If applicationId is provided and it's an interview email, mark as sent in database
+    if (applicationId && category === 'interview') {
+      try {
+        if (DatabaseService.isDatabaseConfigured()) {
+          const updateQuery = `
+            UPDATE applications 
+            SET interview_email_sent = TRUE, 
+                interview_email_sent_at = NOW()
+            WHERE id = $1::uuid
+          `
+          await (DatabaseService as any)["query"]?.call(
+            DatabaseService,
+            updateQuery,
+            [applicationId]
+          )
+          console.log('✅ Marked interview email as sent for application:', applicationId)
+        }
+      } catch (dbErr) {
+        // Don't fail the request if database update fails
+        console.error('⚠️ Failed to mark email as sent in database:', dbErr)
+      }
+    }
 
     return NextResponse.json({
       ok: true,

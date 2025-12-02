@@ -59,6 +59,8 @@ export async function GET(req: NextRequest) {
         j.title AS job_title,
         a.status AS app_status,
         ${hasIsQualified ? 'a.is_qualified,' : 'false AS is_qualified,'}
+        COALESCE(a.interview_email_sent, false) AS interview_email_sent,
+        a.interview_email_sent_at,
         f.storage_key AS resume_url,
         i.status AS interview_status,
         i.completed_at,
@@ -93,6 +95,8 @@ export async function GET(req: NextRequest) {
         cvUrl: r.resume_url || '',
         status,
         createdAt: r.created_at,
+        interviewEmailSent: r.interview_email_sent === true,
+        interviewEmailSentAt: r.interview_email_sent_at,
       }
     })
 

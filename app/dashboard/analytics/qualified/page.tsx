@@ -26,6 +26,8 @@ type CandidateRow = {
   phone: string
   cvUrl: string
   status: InterviewStatus
+  interviewEmailSent?: boolean
+  interviewEmailSentAt?: string
 }
 
 type Bucket = {
@@ -94,6 +96,16 @@ export default function QualifiedCandidatesInterviewFlowPage() {
             status: "Qualified" as InterviewStatus
           }))
           setRows(mappedCandidates)
+          
+          // Initialize sentMap from database interviewEmailSent values
+          const initialSentMap: Record<string, boolean> = {}
+          for (const candidate of json.candidates) {
+            if (candidate.interviewEmailSent === true) {
+              initialSentMap[candidate.id] = true
+            }
+          }
+          setSentMap(initialSentMap)
+          
           // Reset selections when data changes
           setSelectedRows(new Set())
           setSelectAll(false)
@@ -176,6 +188,7 @@ export default function QualifiedCandidatesInterviewFlowPage() {
 
     try {
       // Send real email using the custom email API
+      // Include applicationId so the database can be updated to mark email as sent
       const res = await fetch('/api/emails/send-custom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -185,7 +198,8 @@ export default function QualifiedCandidatesInterviewFlowPage() {
           jobTitle: selectedCandidate.appliedJD,
           companyName: (company as any)?.name || '',
           messageContent: message,
-          category: category
+          category: category,
+          applicationId: selectedCandidate.id // Pass applicationId to mark email as sent in DB
         }),
       })
       const json = await res.json()

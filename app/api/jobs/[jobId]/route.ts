@@ -103,6 +103,7 @@ export async function GET(req: Request, ctx: { params: { id?: string; jobId?: st
         joining_timeline: row.joining_timeline,
         travel_requirements: row.travel_requirements,
         visa_requirements: row.visa_requirements,
+        auto_schedule_interview: row.auto_schedule_interview ?? false,
         created_by: row.created_by,
         created_at: row.created_at,
         updated_at: (row as any).updated_at ?? null,
@@ -177,6 +178,7 @@ export async function PATCH(req: Request, ctx: { params: { id?: string; jobId?: 
     if ('joining_timeline' in body) updates.joining_timeline = (body.joining_timeline ?? null)
     if ('travel_requirements' in body) updates.travel_requirements = (body.travel_requirements ?? null)
     if ('visa_requirements' in body) updates.visa_requirements = (body.visa_requirements ?? null)
+    if ('auto_schedule_interview' in body) updates.auto_schedule_interview = body.auto_schedule_interview === true
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ ok: false, error: 'No updatable fields provided' }, { status: 400 })
