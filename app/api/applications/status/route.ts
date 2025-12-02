@@ -77,6 +77,42 @@ export async function POST(req: NextRequest) {
       params
     )
 
+    // If candidate is marked as qualified, trigger auto-send interview email
+    if (qualified) {
+      try {
+        // Get the job_id for this application
+        const jobQuery = `SELECT job_id FROM applications WHERE id = $1::uuid`
+        const jobRows = await (DatabaseService as any)["query"]?.call(
+          DatabaseService,
+          jobQuery,
+          [applicationId]
+        ) as any[]
+        
+        const jobId = jobRows?.[0]?.job_id
+        
+        if (jobId) {
+          console.log(`🎯 [STATUS] Candidate marked qualified, triggering auto-email check...`)
+          
+          // Call the auto-send-interview-email API with 1 minute delay (60000ms)
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+          fetch(`${baseUrl}/api/applications/auto-send-interview-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              applicationId,
+              jobId,
+              delay: 60000 // 1 minute delay
+            })
+          }).catch(err => {
+            console.error(`⚠️ [STATUS] Failed to trigger auto-email:`, err)
+          })
+        }
+      } catch (autoEmailErr) {
+        // Don't fail the main request if auto-email scheduling fails
+        console.error(`⚠️ [STATUS] Auto-email scheduling error:`, autoEmailErr)
+      }
+    }
+
     return NextResponse.json({ ok: true, applicationId, qualified, status: chosenStatus })
   } catch (e: any) {
     console.error("Update application status error:", e)

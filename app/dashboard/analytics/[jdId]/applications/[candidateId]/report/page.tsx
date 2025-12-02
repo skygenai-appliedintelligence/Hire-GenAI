@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, User, FileText, MessageSquare, Download, Mail, Phone, Calendar, ExternalLink, Star, Briefcase, ChevronDown, CheckCircle2, TrendingUp, Target, Award, BarChart3, HelpCircle, Lightbulb, AlertTriangle, Zap, Brain, Users, MessageCircle, Code, Globe, DollarSign, Link as LinkIcon, XCircle, CheckCircle } from "lucide-react"
+import { ArrowLeft, User, FileText, MessageSquare, Download, Mail, Phone, Calendar, ExternalLink, Star, Briefcase, ChevronDown, CheckCircle2, TrendingUp, Target, Award, BarChart3, HelpCircle, Lightbulb, AlertTriangle, Zap, Brain, Users, MessageCircle, Code, Globe, DollarSign, Link as LinkIcon, XCircle, CheckCircle, MapPin, Clock } from "lucide-react"
 import { CVEvaluationReport } from "@/components/cv-evaluation-report"
 // Dynamic import for html2pdf to avoid TypeScript issues
 const html2pdf = () => import('html2pdf.js')
@@ -210,7 +210,7 @@ export default function CandidateReportPage() {
   const [resumeText, setResumeText] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<"candidate" | "evaluation" | "transcript" | "job">("candidate")
+  const [activeTab, setActiveTab] = useState<"candidate" | "evaluation" | "transcript">("candidate")
   const [applicationsCount, setApplicationsCount] = useState<number | null>(null)
   const [dbScore, setDbScore] = useState<number | null>(null)
   const [dbQualified, setDbQualified] = useState<boolean | null>(null)
@@ -255,13 +255,13 @@ export default function CandidateReportPage() {
   // Read tab from URL on mount
   useEffect(() => {
     const tabParam = searchParams?.get('tab')
-    if (tabParam && ['candidate', 'evaluation', 'transcript', 'job'].includes(tabParam)) {
-      setActiveTab(tabParam as "candidate" | "evaluation" | "transcript" | "job")
+    if (tabParam && ['candidate', 'evaluation', 'transcript'].includes(tabParam)) {
+      setActiveTab(tabParam as "candidate" | "evaluation" | "transcript")
     }
   }, [searchParams])
 
   // Function to change tab and update URL
-  const changeTab = (tab: "candidate" | "evaluation" | "transcript" | "job") => {
+  const changeTab = (tab: "candidate" | "evaluation" | "transcript") => {
     setActiveTab(tab)
     const url = `/dashboard/analytics/${jdId}/applications/${candidateId}/report?tab=${tab}`
     router.push(url, { scroll: false })
@@ -523,7 +523,7 @@ export default function CandidateReportPage() {
           </div>
 
           {/* Tabs Navigation */}
-          <div className="flex items-center gap-8 border-b border-gray-200 -mb-px">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 md:gap-6 lg:gap-8 border-b border-gray-200 -mb-px">
             <button
               onClick={() => changeTab("candidate")}
               className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
@@ -532,7 +532,7 @@ export default function CandidateReportPage() {
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              Candidate
+              Candidate Job Application
               {activeTab === "candidate" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600" />
               )}
@@ -545,7 +545,7 @@ export default function CandidateReportPage() {
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              Evaluation
+              Interview Evaluation
               {activeTab === "evaluation" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600" />
               )}
@@ -558,21 +558,8 @@ export default function CandidateReportPage() {
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              Transcript
+              Interview Transcript
               {activeTab === "transcript" && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600" />
-              )}
-            </button>
-            <button
-              onClick={() => changeTab("job")}
-              className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
-                activeTab === "job"
-                  ? "text-purple-600"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Job Application
-              {activeTab === "job" && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600" />
               )}
             </button>
@@ -581,10 +568,212 @@ export default function CandidateReportPage() {
       </div>
 
       {/* Content Area */}
-      <div className="px-4 md:px-6 py-6 bg-gradient-to-b from-gray-50/60 via-white to-gray-50/40" ref={reportRef}>
+      <div className="px-2 md:px-4 lg:px-6 py-6 bg-gradient-to-b from-gray-50/60 via-white to-gray-50/40 max-w-full" ref={reportRef}>
+        
+        {/* Application Details - Always at top for candidate tab */}
+        {activeTab === "candidate" && (
+          <Card className="border-0 bg-white shadow-md mb-6 overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-slate-900 to-slate-800 border-b-0 py-4 px-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/10 rounded-lg">
+                    <FileText className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-white text-lg">Application Details</CardTitle>
+                    <CardDescription className="text-slate-300 text-xs mt-0.5">Candidate information & preferences</CardDescription>
+                  </div>
+                </div>
+                {candidate && (
+                  <Badge className={
+                    candidate.status === 'qualified' || candidate.status === 'CV Qualified' 
+                      ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100'
+                      : candidate.status === 'applied' 
+                      ? 'bg-blue-100 text-blue-800 hover:bg-blue-100'
+                      : 'bg-slate-100 text-slate-800 hover:bg-slate-100'
+                  }>
+                    {candidate.status}
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              {candidate ? (
+                <div className="space-y-6">
+                  {/* Row 1: Contact Information */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Contact Information</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="flex items-start gap-3">
+                        <div className="text-slate-400 mt-0.5">
+                          <User className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs text-slate-500 font-medium">Name</p>
+                          <p className="text-sm text-slate-900 font-medium truncate">{candidate.name || '—'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="text-slate-400 mt-0.5">
+                          <Mail className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs text-slate-500 font-medium">Email</p>
+                          <p className="text-sm text-slate-900 truncate">{candidate.email || '—'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="text-slate-400 mt-0.5">
+                          <Phone className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs text-slate-500 font-medium">Phone</p>
+                          <p className="text-sm text-slate-900">{candidate.phone || '—'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="text-slate-400 mt-0.5">
+                          <MapPin className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs text-slate-500 font-medium">Location</p>
+                          <p className="text-sm text-slate-900 truncate">{candidate.location || '—'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 2: Compensation & Availability */}
+                  <div className="pt-2 border-t border-slate-200">
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Compensation & Availability</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="flex items-start gap-3">
+                        <div className="text-emerald-600 mt-0.5">
+                          <DollarSign className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs text-slate-500 font-medium">Expected Salary</p>
+                          <p className="text-sm text-slate-900 font-semibold">
+                            {candidate.expectedSalary 
+                              ? `${candidate.salaryCurrency || 'USD'} ${Number(candidate.expectedSalary).toLocaleString()}`
+                              : '—'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="text-slate-400 mt-0.5">
+                          <Clock className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs text-slate-500 font-medium">Pay Period</p>
+                          <p className="text-sm text-slate-900 capitalize">{candidate.salaryPeriod || 'Monthly'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="text-orange-600 mt-0.5">
+                          <Calendar className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs text-slate-500 font-medium">Available From</p>
+                          <p className="text-sm text-slate-900">
+                            {candidate.availableStartDate 
+                              ? new Date(candidate.availableStartDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                              : '—'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className={candidate.willingToRelocate ? 'text-emerald-600' : 'text-slate-400'} >
+                          <MapPin className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs text-slate-500 font-medium">Willing to Relocate</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {candidate.willingToRelocate ? (
+                              <>
+                                <CheckCircle className="h-4 w-4 text-emerald-600" />
+                                <span className="text-sm text-emerald-700 font-medium">Yes</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-4 w-4 text-slate-400" />
+                                <span className="text-sm text-slate-600">No</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 3: Languages & Links */}
+                  <div className="pt-2 border-t border-slate-200">
+                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Additional Information</h4>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className="flex items-start gap-3">
+                        <div className="text-blue-600 mt-0.5">
+                          <Globe className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-slate-500 font-medium mb-2">Languages</p>
+                          <div className="flex flex-wrap gap-2">
+                            {candidate.languages && candidate.languages.length > 0 ? (
+                              candidate.languages.map((lang, idx) => (
+                                <Badge key={idx} variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                                  {lang.language}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-sm text-slate-500">—</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="text-indigo-600 mt-0.5">
+                          <LinkIcon className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs text-slate-500 font-medium mb-2">Professional Links</p>
+                          <div className="flex flex-wrap gap-3">
+                            {candidate.linkedinUrl ? (
+                              <a href={candidate.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700 text-sm font-medium flex items-center gap-1 hover:underline">
+                                <ExternalLink className="h-3.5 w-3.5" /> LinkedIn
+                              </a>
+                            ) : null}
+                            {candidate.portfolioUrl ? (
+                              <a href={candidate.portfolioUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700 text-sm font-medium flex items-center gap-1 hover:underline">
+                                <ExternalLink className="h-3.5 w-3.5" /> Portfolio
+                              </a>
+                            ) : null}
+                            {!candidate.linkedinUrl && !candidate.portfolioUrl && <span className="text-sm text-slate-500">—</span>}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Applied Date */}
+                  <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span>Applied on {new Date(candidate.appliedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+                  <p className="text-slate-600 font-medium">No application data available</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Candidate Tab Content */}
         {activeTab === "candidate" && qualificationDetails && (
-          <div className="mt-6">
+          <div>
             <CVEvaluationReport 
               expandedSkillSetMatch={expandedSkillSetMatch}
               onToggleSkillSetMatch={setExpandedSkillSetMatch}
@@ -984,21 +1173,21 @@ export default function CandidateReportPage() {
             {/* Header Profile Card */}
             <Card className="border-2 border-purple-200 bg-white shadow-lg">
               <CardHeader className="bg-gradient-to-r from-purple-50 to-purple-100">
-                <div className="flex items-start justify-between gap-6">
+                <div className="flex flex-col lg:flex-row items-start justify-between gap-6">
                   {/* Left: Avatar + details */}
-                  <div className="flex items-start gap-8 relative">
+                  <div className="flex items-start gap-4 lg:gap-8 relative flex-1">
                     <div className="relative">
-                      <div className="w-20 h-20 rounded-full bg-purple-600 flex items-center justify-center text-white text-3xl font-bold">
+                      <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-full bg-purple-600 flex items-center justify-center text-white text-2xl lg:text-3xl font-bold">
                         {candidateData.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2)}
                       </div>
-                      <div className="absolute -bottom-2 left-1">
+                      <div className="absolute -bottom-2 left-1 lg:left-1">
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 text-white text-xs px-2 py-0.5">
                           {candidateData.status || 'Interviewed'} <ChevronDown className="h-3 w-3" />
                         </span>
                       </div>
                     </div>
-                    <div className="pt-1 ml-2">
-                      <CardTitle className="text-2xl font-semibold text-purple-700">{candidateData.name}</CardTitle>
+                    <div className="pt-1 ml-2 flex-1">
+                      <CardTitle className="text-xl lg:text-2xl font-semibold text-purple-700">{candidateData.name}</CardTitle>
                       <div className="mt-1.5 space-y-1 text-xs text-gray-700">
                         <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-purple-600" /> {candidateData.email}</div>
                         <div className="flex items-center gap-2"><Phone className="h-4 w-4 text-purple-600" /> {candidateData.phone || '—'}</div>
@@ -1008,27 +1197,30 @@ export default function CandidateReportPage() {
                   </div>
 
                   {/* Right: Scores and button */}
-                  <div className="flex flex-col items-start justify-center gap-4 min-w-[260px] ml-auto">
-                    <div className="flex items-start gap-2">
-                      <Star className="h-4 w-4 text-orange-500 fill-orange-500 mt-0.5" />
-                      <div>
-                        <div className="text-xs text-gray-700">Resume Score</div>
-                        <div className="text-base font-semibold text-gray-900">{resumeScore}/100</div>
-                      </div>
-                    </div>
-                    {/* Only show Interview Score when interview evaluation exists */}
-                    {evaluation?.overallScore && (
+                  <div className="flex flex-col sm:flex-row lg:flex-col items-start justify-center gap-4 w-full lg:w-auto lg:min-w-[260px]">
+                    <div className="flex items-start gap-4 lg:gap-2 flex-1 lg:flex-initial">
                       <div className="flex items-start gap-2">
                         <Star className="h-4 w-4 text-orange-500 fill-orange-500 mt-0.5" />
                         <div>
-                          <div className="text-xs text-gray-700">Interview Score</div>
-                          <div className="text-base font-semibold text-gray-900">{overallScoreDisplay}</div>
+                          <div className="text-xs text-gray-700">Resume Score</div>
+                          <div className="text-base font-semibold text-gray-900">{resumeScore}/100</div>
                         </div>
                       </div>
-                    )}
-                    <Button size="sm" asChild className="bg-purple-600 hover:bg-purple-700 text-white w-48 justify-center mt-1">
+                      {/* Only show Interview Score when interview evaluation exists */}
+                      {evaluation?.overallScore && (
+                        <div className="flex items-start gap-2">
+                          <Star className="h-4 w-4 text-orange-500 fill-orange-500 mt-0.5" />
+                          <div>
+                            <div className="text-xs text-gray-700">Interview Score</div>
+                            <div className="text-base font-semibold text-gray-900">{overallScoreDisplay}</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <Button size="sm" asChild className="bg-purple-600 hover:bg-purple-700 text-white w-full sm:w-auto lg:w-48 justify-center mt-1">
                       <a href={candidateData.resumeUrl} target="_blank" rel="noopener noreferrer">
-                        <Download className="h-4 w-4 mr-2" /> Download Resume
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Resume
                       </a>
                     </Button>
                   </div>
@@ -1104,7 +1296,7 @@ export default function CandidateReportPage() {
                             <h5 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                               🔑 Key Evaluation
                             </h5>
-                            <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                               <div>
                                 <span className="text-gray-600">Skills Match:</span>
                                 <span className={`ml-2 font-semibold ${
@@ -1403,7 +1595,7 @@ export default function CandidateReportPage() {
                         {qualificationDetails.extracted && (
                           <div className="bg-white p-4 rounded-lg border border-gray-300">
                             <h4 className="font-semibold text-gray-900 mb-3">Extracted Information</h4>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                               {qualificationDetails.extracted.name && (
                                 <div>
                                   <span className="text-gray-500">Name:</span>
@@ -1477,7 +1669,7 @@ export default function CandidateReportPage() {
                     <CardDescription className="text-purple-700">Key details at a glance</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                       <div>
                         <div className="text-gray-500">Status</div>
                         <div className="font-semibold text-gray-900">{candidateData.status || '—'}</div>
@@ -1581,6 +1773,7 @@ export default function CandidateReportPage() {
                 </Card>
               </div>
             </div>
+
           </div>
         )}
 
@@ -1592,13 +1785,13 @@ export default function CandidateReportPage() {
                 {/* ===== SECTION 1: Overall Score Hero Card ===== */}
                 <Card className="border-0 shadow-xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-emerald-800 text-white overflow-hidden">
                   <CardContent className="p-8">
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                      <div className="flex items-center gap-6">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-6">
+                      <div className="flex flex-col sm:flex-row items-center gap-4 md:gap-6">
                         <div className="relative">
-                          <div className="w-32 h-32 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-4 border-white/30">
+                          <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-4 border-white/30">
                             <div className="text-center">
-                              <div className="text-4xl font-bold">{overallScoreDisplay.split('/')[0]}</div>
-                              <div className="text-sm opacity-80">out of 100</div>
+                              <div className="text-2xl md:text-4xl font-bold">{overallScoreDisplay.split('/')[0]}</div>
+                              <div className="text-xs md:text-sm opacity-80">out of 100</div>
                             </div>
                           </div>
                           <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-2 shadow-lg">
@@ -2381,271 +2574,6 @@ export default function CandidateReportPage() {
           </div>
         )}
 
-        {/* Job Application Tab Content */}
-        {activeTab === "job" && (
-          <div className="mt-6 space-y-6">
-            {/* Application Overview Card */}
-            <Card className="border-2 border-purple-200 bg-white shadow-lg">
-              <CardHeader className="bg-gradient-to-r from-purple-50 to-purple-100 border-b border-purple-200">
-                <CardTitle className="text-2xl text-purple-900 flex items-center gap-2">
-                  <FileText className="h-6 w-6" />
-                  Application Details
-                </CardTitle>
-                <CardDescription className="text-purple-700">
-                  Information submitted by the candidate during the application process
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6">
-                {candidate ? (
-                  <div className="space-y-8">
-                    {/* Personal Information Section */}
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 border-b pb-2">
-                        <User className="h-5 w-5 text-purple-600" />
-                        Personal Information
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-4 bg-gray-50 rounded-lg border">
-                          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Full Name</div>
-                          <div className="text-gray-900 font-medium">{candidate.name || 'Not provided'}</div>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg border">
-                          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Email Address</div>
-                          <div className="text-gray-900 font-medium">{candidate.email || 'Not provided'}</div>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg border">
-                          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Phone Number</div>
-                          <div className="text-gray-900 font-medium">{candidate.phone || 'Not provided'}</div>
-                        </div>
-                        <div className="p-4 bg-gray-50 rounded-lg border">
-                          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Location</div>
-                          <div className="text-gray-900 font-medium">{candidate.location || 'Not provided'}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Salary & Compensation Section */}
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 border-b pb-2">
-                        <DollarSign className="h-5 w-5 text-green-600" />
-                        Salary Expectations
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                          <div className="text-xs font-medium text-green-700 uppercase tracking-wide mb-1">Expected Salary</div>
-                          <div className="text-gray-900 font-semibold text-lg">
-                            {candidate.expectedSalary 
-                              ? `${candidate.salaryCurrency || 'USD'} ${Number(candidate.expectedSalary).toLocaleString()}`
-                              : 'Not specified'}
-                          </div>
-                        </div>
-                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                          <div className="text-xs font-medium text-green-700 uppercase tracking-wide mb-1">Currency</div>
-                          <div className="text-gray-900 font-medium">{candidate.salaryCurrency || 'USD'}</div>
-                        </div>
-                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                          <div className="text-xs font-medium text-green-700 uppercase tracking-wide mb-1">Pay Period</div>
-                          <div className="text-gray-900 font-medium capitalize">{candidate.salaryPeriod || 'Monthly'}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Language & Proficiency Section */}
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 border-b pb-2">
-                        <Globe className="h-5 w-5 text-blue-600" />
-                        Language Proficiency
-                      </h3>
-                      {candidate.languages && candidate.languages.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {candidate.languages.map((lang, idx) => {
-                            const proficiencyLabels: Record<string, string> = {
-                              'native': 'Native / Bilingual',
-                              'fluent': 'Fluent',
-                              'advanced': 'Advanced',
-                              'intermediate': 'Intermediate',
-                              'basic': 'Basic'
-                            }
-                            const proficiencyColors: Record<string, string> = {
-                              'native': 'bg-purple-100 border-purple-300 text-purple-800',
-                              'fluent': 'bg-blue-100 border-blue-300 text-blue-800',
-                              'advanced': 'bg-green-100 border-green-300 text-green-800',
-                              'intermediate': 'bg-yellow-100 border-yellow-300 text-yellow-800',
-                              'basic': 'bg-gray-100 border-gray-300 text-gray-800'
-                            }
-                            return (
-                              <div key={idx} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                                <div className="flex items-center justify-between">
-                                  <div className="font-medium text-gray-900">{lang.language}</div>
-                                  <Badge className={`${proficiencyColors[lang.proficiency] || 'bg-gray-100 text-gray-800'}`}>
-                                    {proficiencyLabels[lang.proficiency] || lang.proficiency}
-                                  </Badge>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      ) : (
-                        <div className="p-6 bg-gray-50 rounded-lg border border-gray-200 text-center">
-                          <Globe className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                          <p className="text-gray-500">No languages specified in the application</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Availability & Relocation Section */}
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 border-b pb-2">
-                        <Calendar className="h-5 w-5 text-orange-600" />
-                        Availability & Relocation
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                          <div className="text-xs font-medium text-orange-700 uppercase tracking-wide mb-1">Available Start Date</div>
-                          <div className="text-gray-900 font-medium">
-                            {candidate.availableStartDate 
-                              ? new Date(candidate.availableStartDate).toLocaleDateString('en-US', { 
-                                  year: 'numeric', 
-                                  month: 'long', 
-                                  day: 'numeric' 
-                                })
-                              : 'Not specified'}
-                          </div>
-                        </div>
-                        <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                          <div className="text-xs font-medium text-orange-700 uppercase tracking-wide mb-1">Willing to Relocate</div>
-                          <div className="flex items-center gap-2">
-                            {candidate.willingToRelocate ? (
-                              <>
-                                <CheckCircle className="h-5 w-5 text-green-600" />
-                                <span className="text-green-700 font-medium">Yes, willing to relocate</span>
-                              </>
-                            ) : (
-                              <>
-                                <XCircle className="h-5 w-5 text-red-500" />
-                                <span className="text-red-600 font-medium">Not willing to relocate</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Professional Links Section */}
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 border-b pb-2">
-                        <LinkIcon className="h-5 w-5 text-indigo-600" />
-                        Professional Links
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
-                          <div className="text-xs font-medium text-indigo-700 uppercase tracking-wide mb-1">LinkedIn Profile</div>
-                          {candidate.linkedinUrl ? (
-                            <a 
-                              href={candidate.linkedinUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 hover:underline"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                              View LinkedIn Profile
-                            </a>
-                          ) : (
-                            <span className="text-gray-500">Not provided</span>
-                          )}
-                        </div>
-                        <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
-                          <div className="text-xs font-medium text-indigo-700 uppercase tracking-wide mb-1">Portfolio / Website</div>
-                          {candidate.portfolioUrl ? (
-                            <a 
-                              href={candidate.portfolioUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 hover:underline"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                              View Portfolio
-                            </a>
-                          ) : (
-                            <span className="text-gray-500">Not provided</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Resume Section */}
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2 border-b pb-2">
-                        <FileText className="h-5 w-5 text-red-600" />
-                        Resume / CV
-                      </h3>
-                      <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                        {candidate.resumeUrl && candidate.resumeUrl !== '#' ? (
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-red-100 rounded-lg">
-                                <FileText className="h-6 w-6 text-red-600" />
-                              </div>
-                              <div>
-                                <div className="font-medium text-gray-900">Resume Uploaded</div>
-                                <div className="text-sm text-gray-500">Click to view or download</div>
-                              </div>
-                            </div>
-                            <a 
-                              href={candidate.resumeUrl} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
-                            >
-                              <Download className="h-4 w-4" />
-                              Download
-                            </a>
-                          </div>
-                        ) : (
-                          <div className="text-center py-4">
-                            <FileText className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                            <p className="text-gray-500">No resume uploaded</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Application Metadata */}
-                    <div className="pt-4 border-t border-gray-200">
-                      <div className="flex items-center justify-between text-sm text-gray-500">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
-                          Applied on {new Date(candidate.appliedAt).toLocaleDateString('en-US', { 
-                            year: 'numeric', 
-                            month: 'long', 
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </div>
-                        <Badge variant="outline" className={
-                          candidate.status === 'qualified' || candidate.status === 'CV Qualified' 
-                            ? 'bg-green-50 text-green-700 border-green-300'
-                            : candidate.status === 'applied' 
-                            ? 'bg-blue-50 text-blue-700 border-blue-300'
-                            : 'bg-gray-50 text-gray-700 border-gray-300'
-                        }>
-                          Status: {candidate.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <FileText className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                    <h3 className="text-lg font-semibold text-gray-700 mb-2">No Application Data Available</h3>
-                    <p className="text-gray-500">Unable to load the application details for this candidate.</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
 
     </div>

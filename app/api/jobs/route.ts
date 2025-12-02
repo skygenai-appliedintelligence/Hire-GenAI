@@ -559,6 +559,7 @@ export async function GET(req: Request) {
           created_by_email: r.created_by_email,
           created_at: r.created_at,
           interview_rounds: interviewRounds,
+          auto_schedule_interview: r.auto_schedule_interview ?? false,
         })
       }
       return NextResponse.json({ ok: true, jobs: jobsOut })

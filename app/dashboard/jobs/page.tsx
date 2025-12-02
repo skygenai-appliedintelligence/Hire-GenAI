@@ -10,7 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Eye, Trash2, Briefcase, CheckCircle, XCircle, ExternalLink, BarChart3, MapPin, Clock, DollarSign, User, Filter } from "lucide-react"
+import { Plus, Eye, Trash2, Briefcase, CheckCircle, XCircle, ExternalLink, BarChart3, MapPin, Clock, DollarSign, User, Filter, CalendarCheck } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 import Link from "next/link"
 
 export default function JobsPage() {
@@ -26,6 +27,8 @@ export default function JobsPage() {
   const [statusByJob, setStatusByJob] = useState<Record<string, 'open' | 'on_hold' | 'closed' | 'cancelled'>>({})
   const [users, setUsers] = useState<{ id: string; email: string; fullName: string }[]>([])
   const [selectedUserEmail, setSelectedUserEmail] = useState<string>('all')
+  const [autoScheduleByJob, setAutoScheduleByJob] = useState<Record<string, boolean>>({})
+  const [togglingJobId, setTogglingJobId] = useState<string | null>(null)
 
   const normalizeStatus = (s: string | undefined | null): 'open' | 'on_hold' | 'closed' | 'cancelled' => {
     const v = String(s || '').trim().toLowerCase()
@@ -182,6 +185,60 @@ export default function JobsPage() {
       setJobs(filtered)
     }
   }, [selectedUserEmail, allJobs])
+
+  // Initialize auto_schedule_interview state from jobs data
+  useEffect(() => {
+    const autoScheduleState: Record<string, boolean> = {}
+    for (const job of jobs) {
+      autoScheduleState[job.id] = (job as any).auto_schedule_interview ?? false
+    }
+    setAutoScheduleByJob(autoScheduleState)
+  }, [jobs])
+
+  // Handler to toggle auto_schedule_interview
+  const handleAutoScheduleToggle = async (jobId: string, currentValue: boolean) => {
+    if (!company?.name) {
+      toast({ title: "Error", description: "Company context missing", variant: "destructive" })
+      return
+    }
+
+    const newValue = !currentValue
+    setTogglingJobId(jobId)
+    
+    // Optimistically update UI
+    setAutoScheduleByJob(prev => ({ ...prev, [jobId]: newValue }))
+
+    try {
+      const companyName = encodeURIComponent(company.name)
+      const res = await fetch(`/api/jobs/${jobId}?company=${companyName}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auto_schedule_interview: newValue })
+      })
+      const data = await res.json()
+      
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || 'Failed to update')
+      }
+
+      toast({ 
+        title: newValue ? "Auto-Schedule Enabled" : "Auto-Schedule Disabled",
+        description: newValue 
+          ? "Interview links will be auto-scheduled to qualified candidates" 
+          : "Auto-scheduling has been turned off for this job"
+      })
+    } catch (err) {
+      // Revert on error
+      setAutoScheduleByJob(prev => ({ ...prev, [jobId]: currentValue }))
+      toast({ 
+        title: "Update Failed", 
+        description: (err as Error).message, 
+        variant: "destructive" 
+      })
+    } finally {
+      setTogglingJobId(null)
+    }
+  }
 
   const handleDeleteJob = async (jobId: string) => {
     if (!company?.name) {
@@ -420,6 +477,25 @@ export default function JobsPage() {
                       </div>
                     )}
 
+                    {/* Auto-Schedule Toggle */}
+                    <div className="mb-4 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CalendarCheck className="w-4 h-4 text-emerald-600" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">Auto-Schedule Interviews</p>
+                            <p className="text-xs text-gray-500">Send interview links to qualified candidates automatically</p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={autoScheduleByJob[job.id] ?? false}
+                          onCheckedChange={() => handleAutoScheduleToggle(job.id, autoScheduleByJob[job.id] ?? false)}
+                          disabled={togglingJobId === job.id}
+                          className="data-[state=checked]:bg-emerald-600"
+                        />
+                      </div>
+                    </div>
+
                     {/* Divider */}
                     <div className="border-t border-gray-100 my-4"></div>
 
@@ -577,6 +653,25 @@ export default function JobsPage() {
                       </div>
                     )}
 
+                    {/* Auto-Schedule Toggle */}
+                    <div className="mb-4 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CalendarCheck className="w-4 h-4 text-emerald-600" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">Auto-Schedule Interviews</p>
+                            <p className="text-xs text-gray-500">Send interview links to qualified candidates automatically</p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={autoScheduleByJob[job.id] ?? false}
+                          onCheckedChange={() => handleAutoScheduleToggle(job.id, autoScheduleByJob[job.id] ?? false)}
+                          disabled={togglingJobId === job.id}
+                          className="data-[state=checked]:bg-emerald-600"
+                        />
+                      </div>
+                    </div>
+
                     <div className="border-t border-gray-100 my-4"></div>
 
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -731,6 +826,25 @@ export default function JobsPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Auto-Schedule Toggle */}
+                    <div className="mb-4 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CalendarCheck className="w-4 h-4 text-emerald-600" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">Auto-Schedule Interviews</p>
+                            <p className="text-xs text-gray-500">Send interview links to qualified candidates automatically</p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={autoScheduleByJob[job.id] ?? false}
+                          onCheckedChange={() => handleAutoScheduleToggle(job.id, autoScheduleByJob[job.id] ?? false)}
+                          disabled={togglingJobId === job.id}
+                          className="data-[state=checked]:bg-emerald-600"
+                        />
+                      </div>
+                    </div>
 
                     <div className="border-t border-gray-100 my-4"></div>
 
@@ -899,6 +1013,25 @@ export default function JobsPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Auto-Schedule Toggle */}
+                    <div className="mb-4 p-3 bg-emerald-50/50 rounded-lg border border-emerald-100">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CalendarCheck className="w-4 h-4 text-emerald-600" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">Auto-Schedule Interviews</p>
+                            <p className="text-xs text-gray-500">Send interview links to qualified candidates automatically</p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={autoScheduleByJob[job.id] ?? false}
+                          onCheckedChange={() => handleAutoScheduleToggle(job.id, autoScheduleByJob[job.id] ?? false)}
+                          disabled={togglingJobId === job.id}
+                          className="data-[state=checked]:bg-emerald-600"
+                        />
+                      </div>
+                    </div>
 
                     <div className="border-t border-gray-100 my-4"></div>
 

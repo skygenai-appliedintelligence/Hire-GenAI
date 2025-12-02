@@ -1037,7 +1037,7 @@ export class DatabaseService {
     }
     const q = `
       SELECT j.id, j.title, j.location_text, j.status, j.employment_type, j.level,
-             j.salary_min, j.salary_max, j.salary_period, j.created_at,
+             j.salary_min, j.salary_max, j.salary_period, j.auto_schedule_interview, j.created_at,
              COALESCE(u.email, j.created_by_email) as created_by_email
       FROM jobs j
       LEFT JOIN users u ON j.created_by_email = u.id::text
@@ -1066,7 +1066,7 @@ export class DatabaseService {
                duties_day_to_day, duties_strategic, stakeholders,
                decision_scope, salary_min, salary_max, salary_period, bonus_incentives,
                perks_benefits, time_off_policy, joining_timeline, travel_requirements,
-               visa_requirements,
+               visa_requirements, auto_schedule_interview,
                created_by_email, created_at
         FROM jobs
         WHERE id = $1::uuid AND company_id = $2::uuid
@@ -1080,7 +1080,7 @@ export class DatabaseService {
                duties_day_to_day, duties_strategic, stakeholders,
                decision_scope, salary_min, salary_max, salary_period, bonus_incentives,
                perks_benefits, time_off_policy, joining_timeline, travel_requirements,
-               visa_requirements,
+               visa_requirements, auto_schedule_interview,
                created_by_email, created_at
         FROM jobs
         WHERE id = $1::uuid
@@ -1121,6 +1121,7 @@ export class DatabaseService {
     joining_timeline?: string | null
     travel_requirements?: string | null
     visa_requirements?: string | null
+    auto_schedule_interview?: boolean | null
   }): Promise<any | null> {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
@@ -1166,6 +1167,7 @@ export class DatabaseService {
     if (updates.joining_timeline !== undefined) { sets.push(`joining_timeline = $${i++}`); values.push(updates.joining_timeline) }
     if (updates.travel_requirements !== undefined) { sets.push(`travel_requirements = $${i++}`); values.push(updates.travel_requirements) }
     if (updates.visa_requirements !== undefined) { sets.push(`visa_requirements = $${i++}`); values.push(updates.visa_requirements) }
+    if (updates.auto_schedule_interview !== undefined) { sets.push(`auto_schedule_interview = $${i++}`); values.push(updates.auto_schedule_interview) }
 
     if (sets.length === 0) return null
 
@@ -1178,7 +1180,7 @@ export class DatabaseService {
       SET ${sets.join(', ')}
       WHERE id = $${i++}::uuid AND company_id = $${i}::uuid
       RETURNING id, company_id, title, location_text, employment_type, level,
-                salary_min, salary_max, salary_period,
+                salary_min, salary_max, salary_period, auto_schedule_interview,
                 created_by_email, created_at
     `
     const rows = (await this.query(q, values)) as any[]
