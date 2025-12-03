@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, User, FileText, MessageSquare, Download, Mail, Phone, Calendar, ExternalLink, Star, Briefcase, ChevronDown, CheckCircle2, TrendingUp, Target, Award, BarChart3, HelpCircle, Lightbulb, AlertTriangle, Zap, Brain, Users, MessageCircle, Code, Globe, DollarSign, Link as LinkIcon, XCircle, CheckCircle, MapPin, Clock } from "lucide-react"
 import { CVEvaluationReport } from "@/components/cv-evaluation-report"
+import { generateReportPDFHTML, openReportPDF, type ReportPDFData } from "@/lib/report-pdf-generator"
 // Dynamic import for html2pdf to avoid TypeScript issues
 const html2pdf = () => import('html2pdf.js')
 
@@ -221,33 +222,112 @@ export default function CandidateReportPage() {
 
   // Download report as PDF
   const downloadReport = async () => {
-    if (!reportRef.current) return
+    if (!candidate) return
 
     try {
-      // Enable PDF mode to show all tabs
       setIsGeneratingPDF(true)
       
-      // Wait for state update and DOM to render
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      const html2pdfModule = await html2pdf()
-      const element = reportRef.current
-      const opt = {
-        margin: 10,
-        filename: `${candidate?.name || 'Report'}_Evaluation_Report.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      // Build PDF data from current state
+      const pdfData: ReportPDFData = {
+        candidate: {
+          id: candidate.id,
+          name: candidate.name,
+          email: candidate.email,
+          phone: candidate.phone,
+          resumeUrl: candidate.resumeUrl,
+          appliedAt: candidate.appliedAt,
+          location: candidate.location,
+          status: candidate.status,
+          expectedSalary: candidate.expectedSalary,
+          salaryCurrency: candidate.salaryCurrency,
+          salaryPeriod: candidate.salaryPeriod,
+          linkedinUrl: candidate.linkedinUrl,
+          portfolioUrl: candidate.portfolioUrl,
+          availableStartDate: candidate.availableStartDate,
+          willingToRelocate: candidate.willingToRelocate,
+          languages: candidate.languages,
+        },
+        evaluation: evaluation ? {
+          overallScore: evaluation.overallScore,
+          decision: evaluation.decision,
+          scores: evaluation.scores,
+          strengths: evaluation.strengths || [],
+          weaknesses: evaluation.weaknesses || [],
+          reviewerComments: evaluation.reviewerComments,
+          questions: (evaluation as any).questions || [],
+          criteriaBreakdown: (evaluation as any).criteriaBreakdown,
+          configured_criteria: (evaluation as any).configured_criteria,
+          marks_summary: (evaluation as any).marks_summary,
+        } : null,
+        transcript: transcript,
+        jobTitle: jobTitle,
+        resumeScore: resumeScore,
+        interviewScore: evaluation?.overallScore ? (typeof evaluation.overallScore === 'number' && evaluation.overallScore <= 10 ? Math.round(evaluation.overallScore * 10) : Math.round(evaluation.overallScore as number)) : 0,
+        qualificationDetails: qualificationDetails ? {
+          ...qualificationDetails,
+          // Add CV evaluation data for PDF - Generate strengths and gaps dynamically
+          strengths: [
+            ...(qualificationDetails.breakdown?.skill_set_match?.matched_skills?.slice(0, 3).map((skill: string) => 
+              `Strong proficiency in ${skill}`
+            ) || []),
+            ...(qualificationDetails.breakdown?.skill_set_match?.score >= 70 
+              ? ['Excellent skill set match with job requirements'] 
+              : []),
+            ...(qualificationDetails.breakdown?.experience_range_match?.years_actual >= 3 
+              ? [`Solid experience of ${qualificationDetails.breakdown.experience_range_match.years_actual} years`] 
+              : qualificationDetails.extracted?.total_experience_years_estimate >= 3
+              ? [`Solid experience of ${qualificationDetails.extracted.total_experience_years_estimate} years`]
+              : []),
+            ...(qualificationDetails.breakdown?.written_communication?.score >= 85
+              ? ['Professional CV with excellent communication']
+              : []),
+          ],
+          gaps: [
+            ...(qualificationDetails.breakdown?.skill_set_match?.missing_skills?.slice(0, 3).map((skill: string) => 
+              `Missing experience with ${skill}`
+            ) || []),
+            ...(qualificationDetails.breakdown?.missed_skills_analysis?.critical_missing?.slice(0, 2).map((skill: string) =>
+              `Critical skill gap: ${skill}`
+            ) || []),
+            ...(qualificationDetails.gaps_and_notes?.slice(0, 2) || []),
+          ],
+          candidateProfile: {
+            university: 'non-targeted' as const,
+            employer: 'targeted' as const,
+            experience: qualificationDetails.extracted?.total_experience_years_estimate || 4,
+            hasRelevantExperience: true,
+            educationList: (qualificationDetails.extracted?.education || [])
+              .filter((edu: any) => edu?.institution || edu?.degree)
+              .map((edu: any) => ({
+                institution: edu?.institution || '',
+                degree: edu?.degree || ''
+              })),
+          },
+          evaluationBreakdown: qualificationDetails.evaluationBreakdown || [],
+          matchedSkills: qualificationDetails.matchedSkills || [],
+          missingSkills: qualificationDetails.missingSkills || qualificationDetails.breakdown?.skill_set_match?.missing_skills || [],
+          recommendation: qualificationDetails.recommendation || qualificationDetails.reason_summary || '',
+          qualified: qualificationDetails.qualified ?? (resumeScore >= 60),
+          // Add extractedInfo for Employer History in PDF
+          extractedInfo: {
+            name: qualificationDetails.extracted?.name || candidate.name,
+            email: qualificationDetails.extracted?.email || candidate.email,
+            phone: qualificationDetails.extracted?.phone || candidate.phone,
+            totalExperience: qualificationDetails.extracted?.total_experience_years_estimate ? `${qualificationDetails.extracted.total_experience_years_estimate} years` : 'N/A',
+            skills: qualificationDetails.extracted?.skills || [],
+            notes: qualificationDetails.gaps_and_notes || [],
+            workExperience: qualificationDetails.extracted?.work_experience || [],
+          },
+        } : null,
       }
-
-      await html2pdfModule.default().set(opt).from(element).save()
+      
+      // Generate and open PDF in new window
+      openReportPDF(pdfData)
+      
     } catch (error) {
       console.error('Error generating PDF:', error)
-      // Fallback: show alert if PDF generation fails
       alert('PDF generation failed. Please try again.')
     } finally {
-      // Disable PDF mode
       setIsGeneratingPDF(false)
     }
   }
