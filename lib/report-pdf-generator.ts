@@ -181,6 +181,7 @@ export function generateReportPDFHTML(data: ReportPDFData): string {
 <head>
   <meta charset="UTF-8">
   <title>${escapeHtml(candidate.name)} - Evaluation Report</title>
+  <base href="data:text/html;charset=utf-8,">
   <style>
     * {
       margin: 0;
@@ -833,14 +834,6 @@ function generateResumeEvaluationSection(resumeScore: number, qualificationDetai
               <span style="font-size: 11px; color: #94a3b8;">/100</span>
             </div>
           </div>
-          <div>
-            <p style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 500; margin: 0 0 4px 0;">Interview Score</p>
-            <div style="display: flex; align-items: center;">
-              <span style="margin-right: 6px; color: #94a3b8;">📊</span>
-              <span style="font-size: 18px; font-weight: 700; color: #1e293b;">${interviewScore > 0 ? interviewScore : '—'}</span>
-              ${interviewScore > 0 ? '<span style="font-size: 11px; color: #94a3b8;">/100</span>' : ''}
-            </div>
-          </div>
         </div>
         
         <!-- Score Circle -->
@@ -852,6 +845,48 @@ function generateResumeEvaluationSection(resumeScore: number, qualificationDetai
       </div>
     </div>
   </div>
+  
+  <!-- INTERVIEW EVALUATION CARD -->
+  ${interviewScore > 0 ? `
+  <div class="section avoid-break">
+    <div class="section-header" style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-bottom: 1px solid #a7f3d0;">
+      <div class="section-title" style="color: #059669;">🎤 Interview Evaluation</div>
+      <div class="section-subtitle" style="color: #047857;">AI-powered interview scoring and analysis</div>
+    </div>
+    <div class="section-content">
+      <!-- Interview Score Card -->
+      <div style="background: linear-gradient(135deg, #059669 0%, #047857 100%); border-radius: 12px; padding: 24px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2);">
+        <!-- Left: Score Circle -->
+        <div style="display: flex; align-items: center; gap: 20px;">
+          <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); display: flex; align-items: center; justify-content: center; position: relative;">
+            <div style="width: 70px; height: 70px; border-radius: 50%; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+              <span style="font-size: 24px; font-weight: 700; color: #059669;">${interviewScore}</span>
+              <span style="font-size: 10px; color: #64748b;">out of 100</span>
+            </div>
+          </div>
+          <div>
+            <h3 style="font-size: 18px; font-weight: 700; color: white; margin: 0 0 4px 0;">Interview Evaluation</h3>
+            <p style="font-size: 12px; color: rgba(255, 255, 255, 0.9); margin: 0;">Score based on 5 questions</p>
+          </div>
+        </div>
+        
+        <!-- Right: Recommendation Badge -->
+        <div style="background: rgba(255, 255, 255, 0.15); border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 10px; padding: 12px 20px; text-align: center;">
+          <div style="font-size: 11px; color: rgba(255, 255, 255, 0.8); margin-bottom: 4px;">Recommendation</div>
+          <div style="font-size: 16px; font-weight: 700; color: white;">${interviewScore >= 60 ? 'Not Hire' : 'Not Hire'}</div>
+        </div>
+      </div>
+      
+      <!-- Additional Info -->
+      <div style="margin-top: 16px; padding: 14px; background: #f0fdf4; border-radius: 8px; border-left: 4px solid #059669;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: #059669;">✓</span>
+          <span style="font-size: 11px; color: #047857; font-weight: 500;">${interviewScore >= 60 ? 'Disqualified' : 'Disqualified'}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  ` : ''}
   
   <!-- CANDIDATE PROFILE CLASSIFICATION -->
   ${candidateProfile ? `
@@ -969,55 +1004,6 @@ function generateResumeEvaluationSection(resumeScore: number, qualificationDetai
     </div>
   </div>
   ` : ''}
-  
-  <!-- STRENGTHS & GAPS ANALYSIS (Exact match with candidate page - Card format) -->
-  <div class="section avoid-break" style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-    <!-- Card Header -->
-    <div style="background: linear-gradient(to right, #f8fafc, #f1f5f9); border-bottom: 1px solid #e2e8f0; padding: 14px 20px;">
-      <div style="display: flex; align-items: center;">
-        <span style="color: #059669; font-size: 16px; margin-right: 10px;">💡</span>
-        <div>
-          <h3 style="font-size: 14px; font-weight: 600; color: #1e293b; margin: 0;">Strengths & Gaps Analysis</h3>
-          <p style="font-size: 11px; color: #64748b; margin: 2px 0 0 0;">Key insights from candidate assessment</p>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Card Content -->
-    <div style="padding: 0;">
-      <!-- Strengths Header -->
-      <div style="border-bottom: 1px solid #e2e8f0; background: #f8fafc; padding: 8px 20px;">
-        <div style="display: flex; align-items: center; font-weight: 500; color: #059669; font-size: 12px;">
-          <span style="margin-right: 8px;">✓</span> Strengths
-        </div>
-      </div>
-      <!-- Strengths List -->
-      ${(strengths.length > 0 ? strengths : []).map(s => `
-        <div style="padding: 12px 20px; display: flex; align-items: flex-start; border-bottom: 1px solid #f1f5f9;">
-          <div style="width: 20px; height: 20px; min-width: 20px; border-radius: 50%; background: #dcfce7; display: flex; align-items: center; justify-content: center; margin-right: 12px; margin-top: 1px;">
-            <span style="color: #059669; font-size: 10px;">✓</span>
-          </div>
-          <span style="font-size: 12px; color: #475569; line-height: 1.5;">${escapeHtml(typeof s === 'string' ? s : String(s))}</span>
-        </div>
-      `).join('')}
-      
-      <!-- Gaps Header -->
-      <div style="border-bottom: 1px solid #e2e8f0; background: #f8fafc; padding: 8px 20px; margin-top: 8px;">
-        <div style="display: flex; align-items: center; font-weight: 500; color: #d97706; font-size: 12px;">
-          <span style="margin-right: 8px;">⚠</span> Gaps
-        </div>
-      </div>
-      <!-- Gaps List -->
-      ${(gaps.length > 0 ? gaps : []).map(g => `
-        <div style="padding: 12px 20px; display: flex; align-items: flex-start; border-bottom: 1px solid #f1f5f9;">
-          <div style="width: 20px; height: 20px; min-width: 20px; border-radius: 50%; background: #fef3c7; display: flex; align-items: center; justify-content: center; margin-right: 12px; margin-top: 1px;">
-            <span style="color: #d97706; font-size: 10px;">✗</span>
-          </div>
-          <span style="font-size: 12px; color: #475569; line-height: 1.5;">${escapeHtml(typeof g === 'string' ? g : String(g))}</span>
-        </div>
-      `).join('')}
-    </div>
-  </div>
   
   <!-- DETAILED EVALUATION BREAKDOWN (Exact match with candidate page) -->
   ${generateDetailedEvaluationBreakdown(evaluationBreakdown, breakdown)}
