@@ -13,7 +13,7 @@ import Link from "next/link"
 interface DashboardStats {
   totalJobs: number
   qualifiedCandidates: number
-  completedInterviews: number
+  totalInterviews: number
   successRate: number
 }
 
@@ -33,7 +33,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats>({
     totalJobs: 0,
     qualifiedCandidates: 0,
-    completedInterviews: 0,
+    totalInterviews: 0,
     successRate: 0,
   })
   useEffect(() => {
@@ -70,17 +70,15 @@ export default function DashboardPage() {
     const qualifiedData = await qualifiedRes.json().catch(() => ({ ok: false, candidates: [] }))
     const qualifiedCandidatesCount = qualifiedData.ok ? (qualifiedData.candidates?.length || 0) : 0
 
-    // Fetch interview statistics
-    const { data: interviews } = await supabase
-      .from("interview_rounds")
-      .select("*, job_descriptions!inner(*)")
-      .eq("job_descriptions.company_id", company.id)
-      .eq("status", "success")
+    // Fetch interview statistics using the same API as the interviews analytics page
+    const interviewsRes = await fetch(`/api/analytics/interviews?companyId=${company.id}`)
+    const interviewsData = await interviewsRes.json().catch(() => ({ ok: false, interviews: [] }))
+    const totalInterviewsCount = interviewsData.ok ? (interviewsData.interviews?.length || 0) : 0
 
     setStats({
       totalJobs: openJobsCount,
       qualifiedCandidates: qualifiedCandidatesCount,
-      completedInterviews: interviews?.length || 0,
+      totalInterviews: totalInterviewsCount,
       successRate: 85, // This would be calculated based on actual data
     })
   }
@@ -124,7 +122,7 @@ export default function DashboardPage() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.completedInterviews || 0}</div>
+            <div className="text-2xl font-bold">{stats.totalInterviews || 0}</div>
             <p className="text-xs text-muted-foreground">Upcoming and planned</p>
           </CardContent>
         </Card>

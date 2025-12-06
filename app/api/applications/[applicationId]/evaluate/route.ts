@@ -132,9 +132,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ applicationId:
     // Call OpenAI API for evaluation with DYNAMIC CRITERIA
     const evaluationPrompt = `You are an expert HR evaluator. Analyze this interview transcript and provide detailed, criteria-based scoring.
 
-**CRITICAL EVALUATION PRINCIPLE:**
-You must ONLY evaluate based on criteria that have actual questions in the interview.
-If there are 8 Technical questions and 2 Communication questions, the final score should ONLY consider Technical and Communication - NOT Cultural Fit or any other criteria that had no questions.
+**CRITICAL EVALUATION PRINCIPLE - FIXED WEIGHTAGES:**
+The final score uses FIXED weightages regardless of how many questions were asked:
+- Technical Skills: 50% (ALWAYS)
+- Communication: 20% (ALWAYS)
+- Other criteria: 30% (distributed equally among remaining criteria)
+
+Even if NO Technical or Communication questions were asked, they still contribute 0 to their fixed 50% and 20% weightages respectively.
 
 **Job Details:**
 - Position: ${application.job_title}
@@ -178,19 +182,35 @@ For each question-answer pair:
 - Document WHY this score was given (specific evidence from transcript)
 - Note if answer was complete, partial, or missing
 
-**STEP 4: EVALUATE ANSWER QUALITY**
+**STEP 4: EVALUATE ANSWER QUALITY - BE EXTREMELY STRICT**
 For each question, evaluate the candidate's answer based on the assigned criterion:
-- **Technical**: Evaluate technical accuracy, depth of knowledge, practical experience
-- **Communication**: Evaluate clarity, structure, articulation of ideas
-- **Cultural Fit**: Evaluate motivation, alignment with company values, career goals
-- **Team Player**: Evaluate collaboration experience, teamwork examples, interpersonal skills
+- **Technical**: Demand specific tools, frameworks, code examples, technical depth. Generic answers score 40-60 max.
+- **Communication**: Require clear structure, concrete examples, articulate explanations. Vague answers score below 60.
+- **Cultural Fit**: Look for specific motivation, research about company, clear career alignment. Generic interest scores 40-50.
+- **Team Player**: Demand specific collaboration examples with outcomes. "I work well with others" = 30-40 max.
 
-**STEP 5: SCORING RULES**
+**STEP 5: STRICT SCORING RULES - MOST ANSWERS SHOULD SCORE 40-70**
 - Total marks = 100, distributed equally across ALL ${totalInterviewQuestions} configured questions
 - Each question is worth approximately ${Math.floor(100 / totalInterviewQuestions)} marks
 - Score each answer from 0-100 based on quality, then we'll convert to marks
-- If candidate didn't answer or gave poor answer → score = 0
-- If candidate gave excellent answer → score = 90-100
+
+**STRICT SCORING SCALE:**
+- 90-100: EXCEPTIONAL - Multiple specific examples, deep expertise, goes beyond expectations (RARELY given)
+- 80-89: EXCELLENT - Strong concrete examples, clear expertise, thorough coverage
+- 70-79: GOOD - Solid answer with some examples, shows competence
+- 60-69: ADEQUATE - Basic answer, addresses question but lacks depth/examples
+- 50-59: BELOW AVERAGE - Superficial, vague, minimal detail
+- 40-49: WEAK - Very brief, generic, missing key points
+- 30-39: POOR - Off-topic, incoherent, lacks knowledge
+- 0-29: UNACCEPTABLE - No answer, refused, completely irrelevant
+
+**CRITICAL: BE HIGHLY CRITICAL**
+- Default assumption: answers are average (50-60) unless proven otherwise
+- Score 80+ ONLY with multiple specific examples and exceptional depth
+- Generic answers without examples: 40-60 maximum
+- Brief answers (< 30 words): below 50
+- No concrete examples: lose 20-30 points
+- "I don't know" or skipped: 0 points
 
 **Response Format (JSON):**
 {
@@ -213,8 +233,8 @@ For each question, evaluate the candidate's answer based on the assigned criteri
     "Technical Skills": {
       "question_count": 8,
       "average_score": 75,
-      "weight_percentage": 80,
-      "weighted_contribution": 60,
+      "weight_percentage": 50,
+      "weighted_contribution": 37.5,
       "summary": "Strong technical foundation with good framework knowledge"
     },
     "Communication": {
@@ -223,19 +243,35 @@ For each question, evaluate the candidate's answer based on the assigned criteri
       "weight_percentage": 20,
       "weighted_contribution": 14,
       "summary": "Clear communication but could elaborate more"
+    },
+    "Problem Solving": {
+      "question_count": 0,
+      "average_score": 0,
+      "weight_percentage": 15,
+      "weighted_contribution": 0,
+      "summary": "No questions asked in this category"
+    },
+    "Cultural Fit": {
+      "question_count": 0,
+      "average_score": 0,
+      "weight_percentage": 15,
+      "weighted_contribution": 0,
+      "summary": "No questions asked in this category"
     }
   },
   "categories_used": ["Technical Skills", "Communication"],
-  "categories_not_used": ["Cultural Fit", "Problem Solving"],
+  "categories_not_used": ["Problem Solving", "Cultural Fit"],
   "final_score_calculation": {
-    "formula": "(Technical: 75 × 80%) + (Communication: 70 × 20%)",
+    "formula": "(Technical: 75% × 50%) + (Communication: 70% × 20%) + (Problem Solving: 0% × 15%) + (Cultural Fit: 0% × 15%)",
     "breakdown": [
-      { "criteria": "Technical Skills", "score": 75, "weight": 0.80, "contribution": 60 },
-      { "criteria": "Communication", "score": 70, "weight": 0.20, "contribution": 14 }
+      { "criteria": "Technical Skills", "score": 75, "weight": 50, "contribution": 37.5 },
+      { "criteria": "Communication", "score": 70, "weight": 20, "contribution": 14 },
+      { "criteria": "Problem Solving", "score": 0, "weight": 15, "contribution": 0 },
+      { "criteria": "Cultural Fit", "score": 0, "weight": 15, "contribution": 0 }
     ],
-    "total": 74
+    "total": 51.5
   },
-  "overall_score": 74,
+  "overall_score": 52,
   "recommendation": "Hire|Maybe|No Hire",
   "summary": "Overall assessment based ONLY on criteria evaluated",
   "strengths": [
@@ -244,18 +280,26 @@ For each question, evaluate the candidate's answer based on the assigned criteri
   "areas_for_improvement": [
     { "point": "Could elaborate more", "category": "Communication", "evidence": ["Answers were brief"], "improvement_suggestion": "Practice expanding on technical explanations" }
   ],
-  "scoring_explanation": "Final score of 74% calculated from Technical Skills (80% weight, 75 score) and Communication (20% weight, 70 score). Cultural Fit and Problem Solving were not evaluated as no questions were asked in these categories."
+  "scoring_explanation": "Final score calculated using FIXED weightages: Technical Skills (50% weight, 75% score = 37.5 points) + Communication (20% weight, 70% score = 14 points) + Problem Solving (15% weight, 0% score = 0 points) + Cultural Fit (15% weight, 0% score = 0 points) = 51.5 points total."
 }
 
-**CRITICAL RULES:**
-1. ONLY include criteria in final score that have actual questions
-2. Weight each criteria by (number of questions in that criteria / total questions)
-3. Each question must have detailed reasoning for its score
-4. Reference SPECIFIC parts of candidate's answers as evidence
-5. Do NOT assume or invent categories that had no questions
-6. The sum of all weight_percentages must equal 100%
-7. Be specific in feedback - cite actual words/phrases from transcript
-8. IMPORTANT: candidate_response MUST contain the COMPLETE answer - do NOT summarize, truncate, or shorten the candidate's response. Include EVERY word they said.`
+**CRITICAL STRICT EVALUATION RULES:**
+1. BE EXTREMELY STRICT - This is a competitive hiring process, not a participation award
+2. Most candidates should score 45-70, NOT 70-90
+3. Score 80+ ONLY if answer has MULTIPLE specific examples and exceptional depth
+4. Generic or vague answers without concrete examples: 40-60 maximum
+5. Brief answers lacking detail: below 50
+6. Answers without specific examples: automatically lose 20-30 points
+7. FIXED WEIGHTAGES: Technical = 50%, Communication = 20%, Others = 30% (distributed equally)
+8. ALWAYS include ALL criteria in breakdown, even if 0 questions asked (show as 0% score)
+9. Each question must have detailed reasoning citing SPECIFIC evidence from answer
+10. Reference EXACT words/phrases from transcript as evidence
+11. Categories with 0 questions get 0% average score but still show their fixed weight
+12. The sum of all weight_percentages must ALWAYS equal 100%
+13. "I don't know" or skipped questions = 0 points
+14. Off-topic or irrelevant answers: below 30 points
+15. IMPORTANT: candidate_response MUST contain the COMPLETE answer - do NOT summarize, truncate, or shorten
+16. Default mindset: Assume average performance (50-60) unless candidate proves exceptional ability`
 
     // Fetch company's OpenAI service account key from database (like CV parsing and video interviews)
     let openaiApiKey: string | undefined = undefined
@@ -582,7 +626,7 @@ ${evaluation.scoring_explanation}
         messages: [
           {
             role: 'system',
-            content: 'You are an expert HR evaluator. Analyze interview transcripts and provide detailed, objective evaluations.'
+            content: 'You are a STRICT expert HR evaluator for a highly competitive hiring process. Be critical and demanding in your assessment. Most candidates should score 40-70, not 70-90. Only truly exceptional answers with multiple specific examples and deep expertise deserve scores of 80+. Analyze interview transcripts and provide detailed, objective, and STRICT evaluations.'
           },
           {
             role: 'user',
@@ -851,9 +895,16 @@ ${evaluation.scoring_explanation || 'No detailed scoring breakdown available'}
   }
 }
 
-// Helper function to calculate criteria-based weighted score
-// SCHOOL EXAM STYLE: Total marks = 100, distributed across TOTAL INTERVIEW QUESTIONS (default 10)
-// Questions not asked = 0 marks, Unanswered questions = 0 marks
+// FIXED WEIGHTAGES: Technical = 50%, Communication = 20%, Others = 30% (dynamic)
+const FIXED_WEIGHTAGES: Record<string, number> = {
+  'Technical': 50,
+  'Technical Skills': 50,
+  'Communication': 20
+}
+
+// Helper function to calculate criteria-based weighted score with FIXED weightages
+// SCHOOL EXAM STYLE: Total 100 marks distributed across totalInterviewQuestions
+// Unanswered/not asked questions = 0 marks
 function calculateCriteriaBasedScore(questions: any[], totalInterviewQuestions: number = DEFAULT_TOTAL_QUESTIONS): {
   overall_score: number,
   criteria_breakdown: Record<string, any>,
@@ -862,24 +913,17 @@ function calculateCriteriaBasedScore(questions: any[], totalInterviewQuestions: 
   final_score_calculation: any
 } {
   const questionsAsked = questions.length
-  // CRITICAL: Use TOTAL interview questions (e.g., 10), not just questions asked (e.g., 4)
-  const marksPerQuestion = Math.floor(100 / totalInterviewQuestions) // 10 questions = 10 marks each
-  const remainderMarks = 100 - (marksPerQuestion * totalInterviewQuestions) // distribute remainder to first questions
+  const marksPerQuestion = Math.floor(100 / totalInterviewQuestions) // e.g., 10 questions = 10 marks each
   
-  console.log('📊 [SCORING] Total interview questions:', totalInterviewQuestions)
+  console.log('📊 [SCORING] SCHOOL EXAM STYLE: Total 100 marks')
+  console.log('📊 [SCORING] Total interview questions configured:', totalInterviewQuestions)
   console.log('📊 [SCORING] Questions actually asked:', questionsAsked)
   console.log('📊 [SCORING] Marks per question:', marksPerQuestion)
-  console.log('📊 [SCORING] Questions NOT asked (will get 0 marks):', totalInterviewQuestions - questionsAsked)
+  console.log('📊 [SCORING] Questions NOT asked:', totalInterviewQuestions - questionsAsked, '(will get 0 marks)')
+  console.log('📊 [SCORING] Using FIXED weightages: Technical=50%, Communication=20%, Others=30%')
   
-  // First pass: Assign max marks to each question and calculate obtained marks
-  // CRITICAL: Unanswered questions get 0 marks
-  let totalObtained = 0
-  const questionsWithMarks = questions.map((q, index) => {
-    // First few questions get +1 mark to distribute remainder
-    const maxMarks = marksPerQuestion + (index < remainderMarks ? 1 : 0)
-    
-    // CRITICAL FIX: If question is NOT answered, score = 0
-    // Check multiple indicators of unanswered question
+  // Step 1: Process questions and check if answered
+  const processedQuestions = questions.map((q, index) => {
     const isUnanswered = q.answered === false || 
                          (q.candidate_response && (
                            q.candidate_response.toLowerCase().includes('no, sorry') ||
@@ -887,32 +931,25 @@ function calculateCriteriaBasedScore(questions: any[], totalInterviewQuestions: 
                            q.candidate_response.toLowerCase().includes('skip') ||
                            q.candidate_response.toLowerCase().includes('i don\'t know') ||
                            q.candidate_response.toLowerCase().includes('not sure') ||
-                           q.candidate_response.trim().length < 10 // Very short responses
+                           q.candidate_response.trim().length < 10
                          ))
     
-    // Calculate obtained marks: scale the 0-100 score to the question's max marks
-    // BUT if unanswered, give 0 marks regardless of what OpenAI said
-    let obtainedMarks = 0
-    if (!isUnanswered) {
-      const scorePercent = (q.score || 0) / 100
-      obtainedMarks = Math.round(scorePercent * maxMarks)
-    }
-    
-    totalObtained += obtainedMarks
-    
-    console.log(`📊 [SCORING] Q${index + 1}: ${isUnanswered ? 'UNANSWERED' : 'answered'} - ${obtainedMarks}/${maxMarks} marks`)
+    // Convert 0-100 score to marks for this question
+    const scorePercent = isUnanswered ? 0 : ((q.score || 0) / 100)
+    const marksObtained = Math.round(scorePercent * marksPerQuestion)
     
     return {
       ...q,
-      max_marks: maxMarks,
-      marks_obtained: obtainedMarks,
+      score: isUnanswered ? 0 : (q.score || 0),
+      marks_obtained: marksObtained,
+      max_marks: marksPerQuestion,
       answered: !isUnanswered
     }
   })
   
-  // Group questions by criteria for breakdown
+  // Step 2: Group questions by criteria
   const byCategory: Record<string, any[]> = {}
-  questionsWithMarks.forEach((q: any) => {
+  processedQuestions.forEach((q: any) => {
     const criteria = q.criteria || q.category || 'General'
     if (!byCategory[criteria]) {
       byCategory[criteria] = []
@@ -920,49 +957,131 @@ function calculateCriteriaBasedScore(questions: any[], totalInterviewQuestions: 
     byCategory[criteria].push(q)
   })
   
-  // Calculate breakdown by category
-  const criteriaBreakdown: Record<string, any> = {}
-  const breakdown: any[] = []
+  // Step 3: Calculate average score for each criteria (0-100 scale for display)
+  const criteriaScores: Record<string, { avgScore: number, questionCount: number, answeredCount: number, totalMarks: number, obtainedMarks: number }> = {}
   
   Object.entries(byCategory).forEach(([criteria, criteriaQuestions]) => {
-    const questionCount = criteriaQuestions.length
-    const maxMarks = criteriaQuestions.reduce((sum, q) => sum + (q.max_marks || 0), 0)
+    const answeredQuestions = criteriaQuestions.filter(q => q.answered)
+    const totalScore = criteriaQuestions.reduce((sum, q) => sum + (q.score || 0), 0)
+    const avgScore = criteriaQuestions.length > 0 ? totalScore / criteriaQuestions.length : 0
+    const totalMarks = criteriaQuestions.reduce((sum, q) => sum + (q.max_marks || 0), 0)
     const obtainedMarks = criteriaQuestions.reduce((sum, q) => sum + (q.marks_obtained || 0), 0)
-    const answeredCount = criteriaQuestions.filter(q => q.answered).length
-    const averagePercent = maxMarks > 0 ? Math.round((obtainedMarks / maxMarks) * 100) : 0
     
-    criteriaBreakdown[criteria] = {
-      question_count: questionCount,
-      questions_answered: answeredCount,
-      max_marks: maxMarks,
-      obtained_marks: obtainedMarks,
-      average_score: averagePercent,
-      weight_percentage: maxMarks, // In school exam style, weight = max marks
-      summary: `${answeredCount}/${questionCount} questions answered, scored ${obtainedMarks}/${maxMarks} marks`
+    criteriaScores[criteria] = {
+      avgScore: Math.round(avgScore),
+      questionCount: criteriaQuestions.length,
+      answeredCount: answeredQuestions.length,
+      totalMarks,
+      obtainedMarks
     }
-    
-    breakdown.push({
-      criteria,
-      max_marks: maxMarks,
-      obtained_marks: obtainedMarks,
-      questions_answered: answeredCount,
-      total_questions: questionCount
-    })
   })
   
-  // Final score is simply: total obtained out of 100
-  // If only 4 questions asked out of 10, max possible is 40 marks (4 × 10)
-  // The remaining 60 marks (6 questions not asked) are lost
-  const finalScore = totalObtained
+  // Step 4: Apply FIXED weightages and calculate final score
+  // Technical = 50%, Communication = 20%, Others = 30% (distributed)
+  const TECHNICAL_WEIGHT = 50
+  const COMMUNICATION_WEIGHT = 20
+  const OTHERS_WEIGHT = 30
   
+  // Get Technical and Communication scores (0 if no questions asked)
+  const technicalCriteria = Object.keys(criteriaScores).find(c => 
+    c === 'Technical' || c === 'Technical Skills'
+  )
+  const technicalScore = technicalCriteria ? criteriaScores[technicalCriteria].avgScore : 0
+  
+  const communicationScore = criteriaScores['Communication']?.avgScore || 0
+  
+  // Get other criteria (excluding Technical and Communication)
+  const otherCriteria = Object.keys(criteriaScores).filter(c => 
+    c !== 'Technical' && c !== 'Technical Skills' && c !== 'Communication'
+  )
+  
+  // Calculate weighted score for others
+  let othersWeightedScore = 0
+  const otherCriteriaBreakdown: any[] = []
+  
+  if (otherCriteria.length > 0) {
+    const weightPerOther = OTHERS_WEIGHT / otherCriteria.length
+    otherCriteria.forEach(criteria => {
+      const score = criteriaScores[criteria].avgScore
+      const contribution = (score * weightPerOther) / 100
+      othersWeightedScore += contribution
+      otherCriteriaBreakdown.push({
+        criteria,
+        score,
+        weight: weightPerOther,
+        contribution
+      })
+    })
+  }
+  
+  // Calculate final score (out of 100)
+  const technicalContribution = (technicalScore * TECHNICAL_WEIGHT) / 100
+  const communicationContribution = (communicationScore * COMMUNICATION_WEIGHT) / 100
+  const finalScore = Math.round(technicalContribution + communicationContribution + othersWeightedScore)
+  
+  // Calculate total marks obtained (including unanswered questions as 0)
+  const totalMarksObtained = processedQuestions.reduce((sum, q) => sum + (q.marks_obtained || 0), 0)
+  const questionsNotAsked = totalInterviewQuestions - questionsAsked
+  const marksLostFromNotAsked = questionsNotAsked * marksPerQuestion
+  
+  console.log('📊 [SCORING] Questions asked:', questionsAsked, '→ marks obtained:', totalMarksObtained)
+  console.log('📊 [SCORING] Questions NOT asked:', questionsNotAsked, '→ marks lost:', marksLostFromNotAsked)
+  console.log('📊 [SCORING] Total marks obtained:', totalMarksObtained, '/ 100')
+  console.log('📊 [SCORING] Technical:', technicalScore, '× 50% =', technicalContribution.toFixed(2))
+  console.log('📊 [SCORING] Communication:', communicationScore, '× 20% =', communicationContribution.toFixed(2))
+  console.log('📊 [SCORING] Others contribution:', othersWeightedScore.toFixed(2))
   console.log('📊 [SCORING] Final score:', finalScore, '/ 100')
-  console.log('📊 [SCORING] Questions answered:', questionsWithMarks.filter(q => q.answered).length, '/', questionsAsked, '(asked) out of', totalInterviewQuestions, '(total)')
   
-  // Determine used and unused categories (dynamic - based on what questions were actually categorized as)
+  // Step 5: Build criteria breakdown for ALL criteria (including those with 0 questions)
+  const criteriaBreakdown: Record<string, any> = {}
+  
+  // Always include Technical
+  const techKey = technicalCriteria || 'Technical'
+  criteriaBreakdown[techKey] = {
+    question_count: criteriaScores[techKey]?.questionCount || 0,
+    questions_answered: criteriaScores[techKey]?.answeredCount || 0,
+    average_score: technicalScore,
+    weight_percentage: TECHNICAL_WEIGHT,
+    weighted_contribution: technicalContribution,
+    summary: criteriaScores[techKey] 
+      ? `${criteriaScores[techKey].answeredCount}/${criteriaScores[techKey].questionCount} questions answered, avg score ${technicalScore}%`
+      : 'No questions asked in this category'
+  }
+  
+  // Always include Communication
+  criteriaBreakdown['Communication'] = {
+    question_count: criteriaScores['Communication']?.questionCount || 0,
+    questions_answered: criteriaScores['Communication']?.answeredCount || 0,
+    average_score: communicationScore,
+    weight_percentage: COMMUNICATION_WEIGHT,
+    weighted_contribution: communicationContribution,
+    summary: criteriaScores['Communication']
+      ? `${criteriaScores['Communication'].answeredCount}/${criteriaScores['Communication'].questionCount} questions answered, avg score ${communicationScore}%`
+      : 'No questions asked in this category'
+  }
+  
+  // Add other criteria
+  otherCriteriaBreakdown.forEach(({ criteria, score, weight, contribution }) => {
+    criteriaBreakdown[criteria] = {
+      question_count: criteriaScores[criteria]?.questionCount || 0,
+      questions_answered: criteriaScores[criteria]?.answeredCount || 0,
+      average_score: score,
+      weight_percentage: weight,
+      weighted_contribution: contribution,
+      summary: `${criteriaScores[criteria].answeredCount}/${criteriaScores[criteria].questionCount} questions answered, avg score ${score}%`
+    }
+  })
+  
+  // Build breakdown for formula
+  const breakdown: any[] = [
+    { criteria: techKey, score: technicalScore, weight: TECHNICAL_WEIGHT, contribution: technicalContribution },
+    { criteria: 'Communication', score: communicationScore, weight: COMMUNICATION_WEIGHT, contribution: communicationContribution },
+    ...otherCriteriaBreakdown
+  ]
+  
   const categoriesUsed = Object.keys(byCategory)
-  // Note: categories_not_used will be populated from the original criteriaList passed to the evaluation
-  // For now, we only track what was actually used
-  const categoriesNotUsed: string[] = [] // Will be populated during normalization if needed
+  const allPossibleCategories = [techKey, 'Communication', ...otherCriteria]
+  const categoriesNotUsed = allPossibleCategories.filter(c => !categoriesUsed.includes(c))
   
   return {
     overall_score: finalScore,
@@ -970,10 +1089,10 @@ function calculateCriteriaBasedScore(questions: any[], totalInterviewQuestions: 
     categories_used: categoriesUsed,
     categories_not_used: categoriesNotUsed,
     final_score_calculation: {
-      formula: breakdown.map(b => `${b.criteria}: ${b.obtained_marks}/${b.max_marks}`).join(' + '),
+      formula: breakdown.map(b => `${b.criteria}: ${b.score}% × ${b.weight}% = ${b.contribution.toFixed(2)}`).join(' + '),
       breakdown,
       total: finalScore,
-      questions_with_marks: questionsWithMarks
+      questions_with_marks: processedQuestions
     }
   }
 }

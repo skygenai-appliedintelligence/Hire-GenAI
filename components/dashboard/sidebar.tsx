@@ -20,7 +20,7 @@ export function Sidebar() {
   const pathname = usePathname()
   const { signOut } = useAuth()
   const router = useRouter()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const handleLogout = async () => {
     try {

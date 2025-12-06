@@ -17,98 +17,32 @@ export async function GET(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Return dummy data for successful hires (removed salary column, status shows Pass/Hired)
-    const dummyHires = [
-      {
-        id: 'hire-001',
-        jobId: 'job-001',
-        candidateName: 'Sarah Johnson',
-        appliedJD: 'Senior Frontend Developer',
-        email: 'sarah.johnson@email.com',
-        phone: '+1 (555) 123-4567',
-        status: 'Pass'
-      },
-      {
-        id: 'hire-002',
-        jobId: 'job-002',
-        candidateName: 'Michael Chen',
-        appliedJD: 'Full Stack Engineer',
-        email: 'michael.chen@email.com',
-        phone: '+1 (555) 234-5678',
-        status: 'Hired'
-      },
-      {
-        id: 'hire-003',
-        jobId: 'job-001',
-        candidateName: 'Emily Rodriguez',
-        appliedJD: 'Senior Frontend Developer',
-        email: 'emily.rodriguez@email.com',
-        phone: '+1 (555) 345-6789',
-        status: 'Pass'
-      },
-      {
-        id: 'hire-004',
-        jobId: 'job-003',
-        candidateName: 'David Kim',
-        appliedJD: 'DevOps Engineer',
-        email: 'david.kim@email.com',
-        phone: '+1 (555) 456-7890',
-        status: 'Hired'
-      },
-      {
-        id: 'hire-005',
-        jobId: 'job-002',
-        candidateName: 'Jessica Williams',
-        appliedJD: 'Full Stack Engineer',
-        email: 'jessica.williams@email.com',
-        phone: '+1 (555) 567-8901',
-        status: 'Pass'
-      },
-      {
-        id: 'hire-006',
-        jobId: 'job-004',
-        candidateName: 'Alex Thompson',
-        appliedJD: 'Product Manager',
-        email: 'alex.thompson@email.com',
-        phone: '+1 (555) 678-9012',
-        status: 'Hired'
-      },
-      {
-        id: 'hire-007',
-        jobId: 'job-001',
-        candidateName: 'Maria Garcia',
-        appliedJD: 'Senior Frontend Developer',
-        email: 'maria.garcia@email.com',
-        phone: '+1 (555) 789-0123',
-        status: 'Pass'
-      },
-      {
-        id: 'hire-008',
-        jobId: 'job-005',
-        candidateName: 'James Wilson',
-        appliedJD: 'UX Designer',
-        email: 'james.wilson@email.com',
-        phone: '+1 (555) 890-1234',
-        status: 'Hired'
-      }
-    ]
-
-    // Filter by job if provided
-    let filteredHires = dummyHires
-    if (jobId && jobId !== 'all') {
-      filteredHires = dummyHires.filter(hire => hire.jobId === jobId)
+    if (!DatabaseService.isDatabaseConfigured()) {
+      return NextResponse.json({ ok: true, hires: [] })
     }
 
-    console.log(`Found ${filteredHires.length} successful hires (dummy data)`)
-    console.log('Successful hires:', filteredHires.map(h => ({
-      name: h.candidateName,
-      position: h.appliedJD,
-      status: h.status
-    })))
+    // Fetch all interviews for the company
+    const interviews = await DatabaseService.getInterviews(companyId, jobId || undefined)
+    
+    // Filter only candidates who passed the interview
+    const passedCandidates = interviews.filter(interview => interview.result === 'Pass')
+    
+    // Transform the data to match the expected format for successful hires
+    const hires = passedCandidates.map(interview => ({
+      id: interview.id,
+      jobId: interview.jobId,
+      candidateName: interview.candidateName,
+      appliedJD: interview.appliedJD,
+      email: interview.email,
+      phone: interview.phone,
+      status: 'Pass' // All passed candidates start with 'Pass' status
+    }))
+
+    console.log(`Found ${hires.length} successful hires (candidates who passed interviews)`)
 
     return NextResponse.json({
       ok: true,
-      hires: filteredHires
+      hires: hires
     })
 
   } catch (error) {
