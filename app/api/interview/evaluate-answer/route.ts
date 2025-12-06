@@ -302,20 +302,28 @@ Respond with ONLY the criterion name, nothing else. Example response: "Technical
   "recommendation": "proceed" | "needs_improvement" | "insufficient"
 }
 
-**SCORING GUIDELINES:**
-- 90-100: Exceptional answer - comprehensive, detailed, directly addresses the question with specific examples
-- 75-89: Good answer - covers main points well, may lack some depth or specificity
-- 60-74: Adequate answer - addresses the question but lacks detail or examples
-- 40-59: Partial answer - some relevant content but significant gaps
-- 20-39: Weak answer - minimal relevant content, mostly off-topic or vague
-- 0-19: Inadequate answer - does not address the question, inaudible, or refused to answer
+**STRICT SCORING GUIDELINES - BE HIGHLY CRITICAL:**
+- 90-100: EXCEPTIONAL - Comprehensive answer with multiple specific examples, deep technical/domain knowledge, goes beyond expectations. RARELY given.
+- 80-89: EXCELLENT - Very strong answer with concrete examples, demonstrates clear expertise, covers all aspects thoroughly
+- 70-79: GOOD - Solid answer with some examples, shows competence but lacks exceptional depth or detail
+- 60-69: ADEQUATE - Basic answer that addresses the question but lacks examples, depth, or specificity
+- 50-59: BELOW AVERAGE - Superficial answer with minimal detail, vague responses, lacks concrete examples
+- 40-49: WEAK - Very brief or generic answer, missing key points, shows limited understanding
+- 30-39: POOR - Mostly off-topic, incoherent, or demonstrates lack of knowledge
+- 20-29: VERY POOR - Almost no relevant content, refused to answer properly, or completely off-topic
+- 0-19: UNACCEPTABLE - No answer, inaudible, or completely irrelevant
 
-**CRITICAL RULES:**
-1. Score must reflect ONLY the actual content of the answer - NO assumptions
-2. If answer is very brief (< 20 words), score should be lower unless it's a yes/no question
-3. If answer is off-topic, score should be below 40
-4. If answer shows specific knowledge/examples relevant to the criterion, score should be higher
-5. DO NOT give default scores like 85 - evaluate the actual content
+**CRITICAL STRICT EVALUATION RULES:**
+1. BE HIGHLY CRITICAL - Most answers should score 50-70, not 80-90
+2. Score 80+ ONLY if answer has MULTIPLE specific examples and exceptional depth
+3. Generic or vague answers without examples should score 40-60 maximum
+4. Brief answers (< 30 words) should score below 50 unless perfectly targeted
+5. Answers lacking concrete examples should lose 20-30 points
+6. Off-topic or irrelevant content should score below 30
+7. "I don't know" or skipped questions = 0 points
+8. DO NOT be lenient - evaluate strictly as if this is a competitive hiring process
+9. If answer doesn't demonstrate CLEAR expertise, score should be 60 or below
+10. Default assumption: answers are average (50-60) unless they prove otherwise
 
 Return ONLY the JSON object, no other text.`
 
@@ -339,7 +347,7 @@ Return ONLY the JSON object, no other text.`
         messages: [
           {
             role: 'system',
-            content: 'You are an expert interview evaluator. Provide detailed, objective evaluations in JSON format only.'
+            content: 'You are a STRICT expert interview evaluator for a highly competitive hiring process. Be critical and demanding. Most answers should score 40-70. Only exceptional answers with multiple specific examples deserve 80+. Provide detailed, objective evaluations in JSON format only.'
           },
           {
             role: 'user',

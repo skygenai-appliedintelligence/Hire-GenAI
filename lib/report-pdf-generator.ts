@@ -181,7 +181,6 @@ export function generateReportPDFHTML(data: ReportPDFData): string {
 <head>
   <meta charset="UTF-8">
   <title>${escapeHtml(candidate.name)} - Evaluation Report</title>
-  <base href="data:text/html;charset=utf-8,">
   <style>
     * {
       margin: 0;
@@ -601,6 +600,19 @@ export function generateReportPDFHTML(data: ReportPDFData): string {
       font-size: 10px;
       border-top: 1px solid #e5e7eb;
       margin-top: 20px;
+    }
+    
+    /* Page numbering when printing */
+    @page {
+      margin: 0.5in;
+      @bottom-center {
+        content: "Page " counter(page) " of " counter(pages);
+        font-size: 10px;
+        color: #9ca3af;
+      }
+      @top-center {
+        content: "";
+      }
     }
     
     /* Criteria Card */
@@ -1761,15 +1773,19 @@ function generateTranscriptSection(transcript: TranscriptData | null): string {
  */
 export function openReportPDF(data: ReportPDFData): void {
   const html = generateReportPDFHTML(data)
-  const printWindow = window.open('', '_blank')
+  const printWindow = window.open()
+  
   if (printWindow) {
+    // Write HTML to the window
     printWindow.document.write(html)
     printWindow.document.close()
+    
+    // Set the title for the window
+    printWindow.document.title = `${data.candidate.name} - Evaluation Report`
+    
     // Auto-trigger print dialog after content loads
-    printWindow.onload = () => {
-      setTimeout(() => {
-        printWindow.print()
-      }, 500)
-    }
+    setTimeout(() => {
+      printWindow.print()
+    }, 500)
   }
 }

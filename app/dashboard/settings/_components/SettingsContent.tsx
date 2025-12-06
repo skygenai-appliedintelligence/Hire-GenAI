@@ -106,7 +106,6 @@ export default function SettingsContent({ section }: { section?: string }) {
     emailNotifications: true,
     candidateUpdates: true,
     interviewReminders: true,
-    weeklyReports: false,
   })
 
   // Get user role for access control
@@ -959,18 +958,6 @@ export default function SettingsContent({ section }: { section?: string }) {
                   id="interviewReminders"
                   checked={notifications.interviewReminders}
                   onCheckedChange={(checked) => setNotifications((prev) => ({ ...prev, interviewReminders: checked }))}
-                  disabled={!canEditSection}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label htmlFor="weeklyReports">Weekly Reports</Label>
-                  <p className="text-sm text-gray-500">Get weekly summaries of your recruitment activity</p>
-                </div>
-                <Switch
-                  id="weeklyReports"
-                  checked={notifications.weeklyReports}
-                  onCheckedChange={(checked) => setNotifications((prev) => ({ ...prev, weeklyReports: checked }))}
                   disabled={!canEditSection}
                 />
               </div>

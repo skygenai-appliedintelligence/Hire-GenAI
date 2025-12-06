@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Download, FileText } from "lucide-react"
+import { Download, FileText, Filter } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 type SuccessfulHireRow = {
@@ -31,14 +31,35 @@ export default function SuccessfulHirePage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set())
   const [selectAll, setSelectAll] = useState(false)
+  const [jobs, setJobs] = useState<{ id: string; title: string }[]>([])
+  const [selectedJobId, setSelectedJobId] = useState<string>(jobId || 'all')
   const { toast } = useToast()
 
   useEffect(() => {
+    const loadJobs = async () => {
+      if (!(company as any)?.id) return
+      try {
+        const res = await fetch(`/api/jobs/titles?companyId=${(company as any).id}`, { 
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
+        const data = await res.json()
+        if (data.ok && data.jobs) {
+          setJobs(data.jobs)
+        }
+      } catch (e) {
+        console.error('Failed to load job titles:', e)
+      }
+    }
+
     const load = async () => {
       if (!(company as any)?.id) return
       try {
-        const url = jobId && jobId !== 'all' 
-          ? `/api/analytics/successful-hire?companyId=${(company as any).id}&jobId=${encodeURIComponent(jobId)}`
+        const url = selectedJobId && selectedJobId !== 'all' 
+          ? `/api/analytics/successful-hire?companyId=${(company as any).id}&jobId=${encodeURIComponent(selectedJobId)}`
           : `/api/analytics/successful-hire?companyId=${(company as any).id}`
         const res = await fetch(url, { cache: 'no-store' })
         const json = await res.json()
@@ -56,10 +77,12 @@ export default function SuccessfulHirePage() {
         setLoading(false)
       }
     }
+
     if ((company as any)?.id) {
+      loadJobs()
       load()
     }
-  }, [jobId, company])
+  }, [selectedJobId, company])
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -195,9 +218,27 @@ Generated on: ${new Date().toLocaleString()}`
     <div className="max-w-7xl mx-auto px-4 space-y-6 py-6 overflow-x-hidden bg-gradient-to-b from-green-50/60 via-white to-green-50/40">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Successful Hires</h1>
-        <Link href="/dashboard/analytics" className="text-sm text-blue-600 hover:underline">
-          Back to Analytics
-        </Link>
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <Filter className="h-4 w-4 text-gray-500" />
+            <Select value={selectedJobId} onValueChange={setSelectedJobId}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by job title" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Jobs</SelectItem>
+                {jobs.map((job) => (
+                  <SelectItem key={job.id} value={job.id}>
+                    {job.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Link href="/dashboard/analytics" className="text-sm text-blue-600 hover:underline">
+            Back to Analytics
+          </Link>
+        </div>
       </div>
 
       <div className="space-y-8">
