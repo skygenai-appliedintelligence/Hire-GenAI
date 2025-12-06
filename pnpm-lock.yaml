@@ -21,8 +21,8 @@ importers:
         specifier: ^0.1.6
         version: 0.1.11(ws@8.18.3)(zod@3.25.76)
       '@prisma/client':
-        specifier: ^5.22.0
-        version: 5.22.0(prisma@6.19.0(typescript@5.9.2))
+        specifier: ^6.14.0
+        version: 6.19.0(prisma@6.19.0(typescript@5.9.2))(typescript@5.9.2)
       '@radix-ui/react-accordion':
         specifier: 1.2.2
         version: 1.2.2(@types/react-dom@19.1.7(@types/react@19.1.9))(@types/react@19.1.9)(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
@@ -829,13 +829,16 @@ packages:
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
 
-  '@prisma/client@5.22.0':
-    resolution: {integrity: sha512-M0SVXfyHnQREBKxCgyo7sffrKttwE6R8PMq330MIUF0pTwjUhLbW84pFDlf06B27XyCR++VtjugEnIHdr07SVA==}
-    engines: {node: '>=16.13'}
+  '@prisma/client@6.19.0':
+    resolution: {integrity: sha512-QXFT+N/bva/QI2qoXmjBzL7D6aliPffIwP+81AdTGq0FXDoLxLkWivGMawG8iM5B9BKfxLIXxfWWAF6wbuJU6g==}
+    engines: {node: '>=18.18'}
     peerDependencies:
       prisma: '*'
+      typescript: '>=5.1.0'
     peerDependenciesMeta:
       prisma:
+        optional: true
+      typescript:
         optional: true
 
   '@prisma/config@6.19.0':
@@ -4678,9 +4681,10 @@ snapshots:
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
-  '@prisma/client@5.22.0(prisma@6.19.0(typescript@5.9.2))':
+  '@prisma/client@6.19.0(prisma@6.19.0(typescript@5.9.2))(typescript@5.9.2)':
     optionalDependencies:
       prisma: 6.19.0(typescript@5.9.2)
+      typescript: 5.9.2
 
   '@prisma/config@6.19.0':
     dependencies:

@@ -150,3 +150,14 @@ export const getBillingPrices = () => {
     videoInterviewCostPerMinute: config.billing.videoInterviewCostPerMinute,
   }
 }
+
+// Get profit margin percentage from .env (default: 20%)
+export const getProfitMarginPercentage = (): number => {
+  return parseFloat(process.env.PROFIT_MARGIN_PERCENTAGE || '20')
+}
+
+// Apply profit margin to a base cost
+export const applyProfitMargin = (baseCost: number): number => {
+  const marginPercentage = getProfitMarginPercentage()
+  return baseCost * (1 + marginPercentage / 100)
+}
