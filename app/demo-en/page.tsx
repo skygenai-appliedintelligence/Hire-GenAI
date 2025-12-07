@@ -1,6 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useState as useStateNav } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
+import { Button } from "@/components/ui/button";
+import { LoginModal } from "@/components/auth/login-modal";
+import Link from "next/link";
+import {
+  Facebook,
+  Instagram,
+  Youtube,
+  Linkedin,
+  Lock,
+  Star,
+  Zap,
+} from "lucide-react";
 
 // Screen identifiers
 const SCREENS = ["job", "candidate", "interview", "assessment"] as const;
@@ -64,8 +79,12 @@ function buildQuestionPlan(jobTitle: string, jobDescription: string, resume: str
 }
 
 export default function DemoEnPage() {
+  const router = useRouter();
+  // ALL hooks must be called at the top before any conditional returns
   const [screen, setScreen] = useState<Screen>("job");
-
+  const { user, loading } = useAuth();
+  const [showLoginModal, setShowLoginModal] = useStateNav(false);
+  
   // Job + candidate state
   const [jobTitle, setJobTitle] = useState("SEO Specialist");
   const [jobDescription, setJobDescription] = useState(defaultJobDescription);
@@ -101,13 +120,8 @@ export default function DemoEnPage() {
 
   const [initialLoading, setInitialLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    setHydrated(true);
-    const timer = window.setTimeout(() => setInitialLoading(false), 700);
-    return () => window.clearTimeout(timer);
-  }, []);
-
+  
+  // useMemo hooks must also be called before conditional returns
   const questionPlan = useMemo(
     () => buildQuestionPlan(jobTitle, jobDescription, resumeText),
     [jobTitle, jobDescription, resumeText]
@@ -123,6 +137,31 @@ export default function DemoEnPage() {
     const n = `${firstName} ${lastName}`.trim();
     return n || "Candidate";
   }, [firstName, lastName]);
+  
+  useEffect(() => {
+    setHydrated(true);
+    const timer = window.setTimeout(() => setInitialLoading(false), 700);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.push("/dashboard");
+    }
+  }, [user, loading, router]);
+
+  // Early returns after all hooks are called
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-emerald-500"></div>
+      </div>
+    );
+  }
+
+  if (user) {
+    return null;
+  }
 
   function resetInterview() {
     setTranscript([]);
@@ -511,6 +550,73 @@ export default function DemoEnPage() {
 
   return (
     <div className={`page-wrap ${initialLoading ? "page-wrap--loading" : ""}`}>
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Link href="/">
+                  <h1 className="text-2xl font-bold">
+                    <span className="text-slate-800">Hire</span>
+                    <span className="sr-text-gradient">GenAI</span>
+                  </h1>
+                </Link>
+              </div>
+              <nav className="hidden md:ml-10 md:flex md:space-x-8">
+                <Link
+                  href="/demo-en"
+                  className="text-emerald-600 px-3 py-2 text-sm font-medium border-b-2 border-emerald-600"
+                >
+                  Product
+                </Link>
+                <Link
+                  href="/pricing"
+                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
+                >
+                  Pricing
+                </Link>
+                <Link
+                  href="/roi"
+                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
+                >
+                  ROI
+                </Link>
+                <Link
+                  href="/about"
+                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
+                >
+                  Company
+                </Link>
+              </nav>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                onClick={() => setShowLoginModal(true)}
+                className="text-gray-700 hover:text-emerald-600 font-medium"
+              >
+                Login
+              </Button>
+              <Link href="/signup">
+                <Button className="sr-button-primary">Get started</Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Announcement Banner */}
+      <div className="bg-emerald-50 border-b border-emerald-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center justify-center">
+            <div className="flex items-center space-x-2 text-emerald-800">
+              <Zap className="w-4 h-4" />
+              <span className="text-sm font-medium">HireGenAI Launches All-New AI-Powered Recruitment Suite</span>
+            </div>
+          </div>
+        </div>
+      </div>
       {initialLoading && (
         <div className="initial-loading">
           <div className="initial-loading__spinner" />
@@ -576,26 +682,410 @@ export default function DemoEnPage() {
 
         {/* job screen */}
         {screen === "job" && (
-          <section className="screen">
-            <div className="card">
+          <section className="screen" style={{ maxWidth: 1000 }}>
+            <div className="card" style={{ padding: "28px 32px" }}>
               <h2>Job Details</h2>
-              <div className="form-group">
-                <label className="input-label">Job Title</label>
-                <input
-                  className="form-input"
-                  value={jobTitle}
-                  onChange={(e) => setJobTitle(e.target.value)}
-                />
+              
+              {/* Job Status Bar */}
+              <div style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "space-between", 
+                padding: "12px 16px", 
+                background: "#f8fafc", 
+                borderRadius: 8, 
+                marginBottom: 24,
+                border: "1px solid #e2e8f0"
+              }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: "#1e293b" }}>Job Status</div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>Set whether the job is open, on hold, or closed</div>
+                </div>
+                <div style={{ 
+                  padding: "6px 16px", 
+                  background: "#dcfce7", 
+                  color: "#166534", 
+                  borderRadius: 6, 
+                  fontSize: 13, 
+                  fontWeight: 600 
+                }}>
+                  Open
+                </div>
               </div>
-              <div className="form-group">
-                <label className="input-label">Job Description</label>
-                <textarea
-                  className="form-input"
-                  rows={8}
-                  value={jobDescription}
-                  onChange={(e) => setJobDescription(e.target.value)}
-                />
+
+              {/* Tabs */}
+              <div style={{ 
+                display: "flex", 
+                gap: 8, 
+                marginBottom: 24, 
+                overflowX: "auto",
+                padding: "4px",
+                background: "#f1f5f9",
+                borderRadius: 8
+              }}>
+                {["Basic Info", "Requirements", "Responsibilities", "Compensation", "Visa & Others", "Resume Screening", "Interview Process"].map((tab, idx) => (
+                  <div 
+                    key={tab}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: 6,
+                      fontSize: 12,
+                      fontWeight: 500,
+                      whiteSpace: "nowrap",
+                      background: idx === 0 ? "#059669" : "transparent",
+                      color: idx === 0 ? "#fff" : "#64748b",
+                      cursor: "default"
+                    }}
+                  >
+                    {tab}
+                  </div>
+                ))}
               </div>
+
+              {/* Basic Information Section */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8, 
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: "1px solid #e2e8f0"
+                }}>
+                  <span style={{ fontSize: 18 }}>💼</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Basic Information</div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Enter the fundamental details about the job position</div>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label className="input-label">Job Title *</label>
+                    <input
+                      className="form-input"
+                      value="SEO Specialist"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="input-label">Company *</label>
+                    <input
+                      className="form-input"
+                      value="HireGenAI Demo"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label className="input-label">Location *</label>
+                    <input
+                      className="form-input"
+                      value="Remote / San Francisco, CA"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="input-label">Work Arrangement *</label>
+                    <input
+                      className="form-input"
+                      value="Full-time"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="input-label">Job Level / Seniority</label>
+                  <input
+                    className="form-input"
+                    value="Mid-level"
+                    readOnly
+                    style={{ background: "#f8fafc", cursor: "default", maxWidth: "50%" }}
+                  />
+                </div>
+              </div>
+
+              {/* Requirements Section */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8, 
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: "1px solid #e2e8f0"
+                }}>
+                  <span style={{ fontSize: 18 }}>🎯</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Requirements</div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Describe the background and skills expected</div>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label className="input-label">Educational Background</label>
+                    <input
+                      className="form-input"
+                      value="Bachelor's in Marketing, Communications, or related field"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="input-label">Years of Experience</label>
+                    <input
+                      className="form-input"
+                      value="3-5 years"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label className="input-label">Technical Skills</label>
+                  <textarea
+                    className="form-input"
+                    rows={3}
+                    value="Google Analytics, Google Search Console, SEMrush, Ahrefs, Moz, Screaming Frog, HTML/CSS basics, WordPress"
+                    readOnly
+                    style={{ background: "#f8fafc", cursor: "default", resize: "none" }}
+                  />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <div>
+                    <label className="input-label">Must-Have Skills</label>
+                    <textarea
+                      className="form-input"
+                      rows={3}
+                      value="Keyword research and analysis&#10;On-page and off-page SEO&#10;Content optimization&#10;Link building strategies"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default", resize: "none" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="input-label">Nice-to-Have Skills</label>
+                    <textarea
+                      className="form-input"
+                      rows={3}
+                      value="Technical SEO audits&#10;Schema markup&#10;International SEO experience&#10;E-commerce SEO"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default", resize: "none" }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Responsibilities Section */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8, 
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: "1px solid #e2e8f0"
+                }}>
+                  <span style={{ fontSize: 18 }}>👥</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Responsibilities</div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Outline what the role will do</div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label className="input-label">Day-to-Day Duties</label>
+                  <textarea
+                    className="form-input"
+                    rows={4}
+                    value="Conduct keyword research and analysis&#10;Optimize website content and landing pages for SEO&#10;Monitor and analyze SEO performance metrics&#10;Stay updated with SEO trends and algorithm changes"
+                    readOnly
+                    style={{ background: "#f8fafc", cursor: "default", resize: "none" }}
+                  />
+                </div>
+
+                <div>
+                  <label className="input-label">Team Collaboration / Stakeholders</label>
+                  <textarea
+                    className="form-input"
+                    rows={2}
+                    value="Content team, Web developers, Marketing managers, Product team"
+                    readOnly
+                    style={{ background: "#f8fafc", cursor: "default", resize: "none" }}
+                  />
+                </div>
+              </div>
+
+              {/* Compensation Section */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8, 
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: "1px solid #e2e8f0"
+                }}>
+                  <span style={{ fontSize: 18 }}>🏢</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Compensation & Benefits</div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Share ranges only if you intend to publish them</div>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label className="input-label">Salary Min</label>
+                    <input
+                      className="form-input"
+                      value="$70,000"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="input-label">Salary Max</label>
+                    <input
+                      className="form-input"
+                      value="$95,000"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="input-label">Period</label>
+                    <input
+                      className="form-input"
+                      value="Yearly"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="input-label">Perks & Benefits</label>
+                  <textarea
+                    className="form-input"
+                    rows={2}
+                    value="Health insurance, 401(k) matching, Remote work flexibility, Professional development budget, Wellness programs"
+                    readOnly
+                    style={{ background: "#f8fafc", cursor: "default", resize: "none" }}
+                  />
+                </div>
+              </div>
+
+              {/* Interview Process Section */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8, 
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: "1px solid #e2e8f0"
+                }}>
+                  <span style={{ fontSize: 18 }}>🤖</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Interview Process</div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Configure the interview rounds and process for this position</div>
+                  </div>
+                </div>
+
+                <div style={{ 
+                  border: "2px solid #3b82f6", 
+                  borderRadius: 12, 
+                  padding: 16, 
+                  background: "#eff6ff"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                    <input type="checkbox" checked readOnly style={{ width: 16, height: 16 }} />
+                    <span style={{ fontSize: 18 }}>🤖</span>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: "#1e293b" }}>Screening Agent</div>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>Initial candidate screening and basic qualification assessment</div>
+                    </div>
+                    <div style={{ marginLeft: "auto", fontSize: 11, color: "#64748b" }}>Phone/Video • 30 min • Pass/Fail + notes</div>
+                  </div>
+
+                  <div style={{ 
+                    background: "#fff", 
+                    borderRadius: 8, 
+                    padding: 16,
+                    borderTop: "1px solid #e2e8f0"
+                  }}>
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: "#1e293b" }}>Interview Questions (4)</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {[
+                          "Can you walk me through your experience with keyword research and SEO tools?",
+                          "How do you approach optimizing website content for search engines?",
+                          "Describe a successful SEO campaign you've led and the results achieved.",
+                          "How do you stay updated with the latest SEO trends and algorithm changes?"
+                        ].map((q, i) => (
+                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 12, color: "#64748b", minWidth: 20 }}>{i + 1}.</span>
+                            <input
+                              className="form-input"
+                              value={q}
+                              readOnly
+                              style={{ background: "#f8fafc", cursor: "default", fontSize: 13, padding: "8px 12px" }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: "#1e293b" }}>Evaluation Criteria</div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {["Communication", "Culture fit", "Technical", "Team player"].map((c) => (
+                          <span 
+                            key={c}
+                            style={{
+                              padding: "4px 12px",
+                              background: "#f1f5f9",
+                              borderRadius: 999,
+                              fontSize: 12,
+                              color: "#475569",
+                              fontWeight: 500
+                            }}
+                          >
+                            {c}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Read-only notice */}
+              <div style={{ 
+                background: "#fef3c7", 
+                border: "1px solid #fcd34d", 
+                borderRadius: 8, 
+                padding: "12px 16px",
+                marginBottom: 24,
+                display: "flex",
+                alignItems: "center",
+                gap: 8
+              }}>
+                <span style={{ fontSize: 16 }}>ℹ️</span>
+                <span style={{ fontSize: 13, color: "#92400e" }}>
+                  This is a demo preview. All fields are pre-filled and read-only for the SEO Specialist position.
+                </span>
+              </div>
+
               <div className="button-row">
                 <button
                   className="btn btn-next"
@@ -611,64 +1101,311 @@ export default function DemoEnPage() {
 
         {/* candidate screen */}
         {screen === "candidate" && (
-          <section className="screen">
-            <div className="card">
+          <section className="screen" style={{ maxWidth: 1000 }}>
+            <div className="card" style={{ padding: "28px 32px" }}>
               <h2>Candidate Details</h2>
-              <div className="form-row">
-                <div className="form-col">
-                  <label className="input-label">First Name</label>
-                  <input
-                    className="form-input"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    placeholder="Enter your first name"
-                  />
+              
+              {/* General Information Section */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8, 
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: "1px solid #e2e8f0"
+                }}>
+                  <span style={{ fontSize: 18 }}>👤</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>General Information (all required)</div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Enter your personal and contact details</div>
+                  </div>
                 </div>
-                <div className="form-col">
-                  <label className="input-label">Last Name</label>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label className="input-label">First name *</label>
+                    <input
+                      className="form-input"
+                      value="John"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="input-label">Last name *</label>
+                    <input
+                      className="form-input"
+                      value="Anderson"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label className="input-label">Email *</label>
+                    <input
+                      className="form-input"
+                      type="email"
+                      value="john.anderson@email.com"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="input-label">Phone *</label>
+                    <input
+                      className="form-input"
+                      type="tel"
+                      value="+1 555 123 4567"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label className="input-label">Expected salary *</label>
+                  <div style={{ display: "grid", gridTemplateColumns: "120px 1fr auto", gap: 8, alignItems: "center" }}>
+                    <input
+                      className="form-input"
+                      value="USD"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                    <input
+                      className="form-input"
+                      value="6500"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                    <div style={{ color: "#64748b", fontSize: 14, paddingLeft: 8 }}>/month</div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="input-label">Location *</label>
                   <input
                     className="form-input"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Enter your last name"
+                    value="San Francisco, CA"
+                    readOnly
+                    style={{ background: "#f8fafc", cursor: "default" }}
                   />
                 </div>
               </div>
 
-              <div
-                className="upload-box"
-                onClick={() => document.getElementById("resumeUpload")?.click()}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const file = e.dataTransfer.files?.[0];
-                  if (file) handleResume(file);
-                }}
-              >
-                <div className="upload-message">
-                  <div className="upload-icon">📄</div>
-                  <div className="upload-text">
-                    <div className="drag-text">Drag & drop file here</div>
-                    <div className="or-text">or click to select a file</div>
-                    <div className="file-hint">(PDF or DOCX only; plain text is auto-read)</div>
+              {/* Resume & Documents Section */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8, 
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: "1px solid #e2e8f0"
+                }}>
+                  <span style={{ fontSize: 18 }}>📄</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Resume & Documents (required)</div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Upload your resume for AI evaluation</div>
                   </div>
                 </div>
-                <input
-                  id="resumeUpload"
-                  type="file"
-                  accept=".pdf,.docx,.txt,.md"
-                  style={{ display: "none" }}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleResume(file);
-                  }}
+
+                <div style={{
+                  border: "2px dashed #3b82f6",
+                  borderRadius: 8,
+                  padding: 24,
+                  textAlign: "center",
+                  background: "#eff6ff",
+                  cursor: "default"
+                }}>
+                  <div style={{ marginBottom: 12, fontSize: 24, color: "#3b82f6" }}>📄</div>
+                  <div style={{ marginBottom: 8, color: "#64748b", fontSize: 14 }}>Drag & drop file here</div>
+                  <div style={{ 
+                    display: "inline-block", 
+                    background: "#059669", 
+                    color: "white", 
+                    padding: "6px 16px", 
+                    borderRadius: 6, 
+                    fontSize: 14, 
+                    fontWeight: 600 
+                  }}>
+                    Resume uploaded successfully
+                  </div>
+                  <div style={{ marginTop: 12, fontSize: 12, color: "#64748b" }}>
+                    <span style={{ background: "#dcfce7", color: "#166534", padding: "4px 8px", borderRadius: 4 }}>
+                      john_anderson_resume.pdf
+                    </span>
+                    <span style={{ margin: "0 8px", color: "#94a3b8" }}>•</span>
+                    <span>245 KB</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cover Letter Section */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8, 
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: "1px solid #e2e8f0"
+                }}>
+                  <span style={{ fontSize: 18 }}>✉️</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Cover Letter</div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Tell us why you're interested in this role</div>
+                  </div>
+                </div>
+
+                <textarea
+                  className="form-input"
+                  rows={5}
+                  value="I am excited to apply for the SEO Specialist position at HireGenAI. With over 4 years of experience in search engine optimization and a proven track record of improving organic search rankings, I believe my skills in keyword research, content optimization, and technical SEO align perfectly with your requirements. I have successfully managed SEO campaigns that resulted in 40% increase in organic traffic and 25% improvement in conversion rates. My expertise with tools like Google Analytics, SEMrush, and Ahrefs, combined with my passion for staying updated with the latest SEO trends, makes me confident in my ability to contribute significantly to your team's success."
+                  readOnly
+                  style={{ background: "#f8fafc", cursor: "default", resize: "none" }}
                 />
               </div>
-              {resumeFileName && (
-                <div className="info-message">Selected: {resumeFileName}</div>
-              )}
+
+              {/* Language and Proficiency Section */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8, 
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: "1px solid #e2e8f0"
+                }}>
+                  <span style={{ fontSize: 18 }}>🌐</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Language and Proficiency Levels</div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Select languages you speak and your proficiency</div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "center" }}>
+                    <div>
+                      <label className="input-label">Language</label>
+                      <input
+                        className="form-input"
+                        value="English"
+                        readOnly
+                        style={{ background: "#f8fafc", cursor: "default" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="input-label">Proficiency Level</label>
+                      <input
+                        className="form-input"
+                        value="Native / Bilingual"
+                        readOnly
+                        style={{ background: "#f8fafc", cursor: "default" }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "center" }}>
+                    <div>
+                      <label className="input-label">Language</label>
+                      <input
+                        className="form-input"
+                        value="Spanish"
+                        readOnly
+                        style={{ background: "#f8fafc", cursor: "default" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="input-label">Proficiency Level</label>
+                      <input
+                        className="form-input"
+                        value="Fluent"
+                        readOnly
+                        style={{ background: "#f8fafc", cursor: "default" }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Information Section */}
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8, 
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: "1px solid #e2e8f0"
+                }}>
+                  <span style={{ fontSize: 18 }}>📋</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Additional Information</div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Professional links and availability</div>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label className="input-label">LinkedIn URL</label>
+                    <input
+                      className="form-input"
+                      value="https://linkedin.com/in/johnanderson"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="input-label">Portfolio/Website</label>
+                    <input
+                      className="form-input"
+                      value="https://johnanderson-seo.com"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label className="input-label">Available Start Date *</label>
+                    <input
+                      className="form-input"
+                      type="date"
+                      value="2024-02-01"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 24 }}>
+                    <input type="checkbox" checked readOnly style={{ width: 16, height: 16 }} />
+                    <label style={{ fontSize: 14, color: "#475569", cursor: "default" }}>
+                      I am willing to relocate for this position
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Read-only notice */}
+              <div style={{ 
+                background: "#fef3c7", 
+                border: "1px solid #fcd34d", 
+                borderRadius: 8, 
+                padding: "12px 16px",
+                marginBottom: 24,
+                display: "flex",
+                alignItems: "center",
+                gap: 8
+              }}>
+                <span style={{ fontSize: 16 }}>ℹ️</span>
+                <span style={{ fontSize: 13, color: "#92400e" }}>
+                  This is a demo preview. All fields are pre-filled and read-only for the candidate application.
+                </span>
+              </div>
 
               <div className="button-row">
                 <button className="btn btn-back" onClick={() => goToNext("job")}>
@@ -743,107 +1480,783 @@ export default function DemoEnPage() {
               </div>
             </div>
 
-            <div className="question-box">
-              <div className="ai-message" id="currentQuestion" ref={questionElRef}>
-                <div className="ai-avatar">AI</div>
-                <div className="message-content">
-                  Welcome to your SEO Specialist interview. I'll be asking you some questions about your experience and skills. Ready to begin?
-                </div>
-              </div>
-            </div>
-
-            <div className="ai-avatar-container">
-              <video ref={remoteVideoRef} id="remoteVideo" autoPlay playsInline />
-              <audio ref={remoteAudioRef} id="remoteAudio" autoPlay />
-            </div>
-          </section>
+            
+                      </section>
         )}
 
         {/* assessment screen */}
         {screen === "assessment" && (
-          <section className="screen">
-            <div className="assessment-header">
-              <div className="assessment-title">
-                <h1>
-                  Interview for <span>{candidateName}</span> — <span>{jobTitle || "Role"}</span>
-                </h1>
-              </div>
-              <div className="assessment-tabs">
-                <button className="tab-btn active">Evaluation</button>
-                <button
-                  className="tab-btn"
-                  onClick={() => {
-                    const el = document.getElementById("finalTranscript");
-                    if (el) el.scrollIntoView({ behavior: "smooth" });
-                  }}
-                >
-                  Transcript
+          <section className="screen" style={{ maxWidth: 1100, margin: "0 auto", padding: "0 16px" }}>
+            {/* Header */}
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              alignItems: "center", 
+              marginBottom: 24,
+              flexWrap: "wrap",
+              gap: 16
+            }}>
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: "#1e293b" }}>
+                Interview Report: <span style={{ color: "#059669" }}>{candidateName || "John Anderson"}</span> — <span style={{ color: "#6366f1" }}>{jobTitle || "SEO Specialist"}</span>
+              </h1>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button style={{ 
+                  padding: "8px 16px", 
+                  background: "#059669", 
+                  color: "white", 
+                  border: "none", 
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 500,
+                  cursor: "pointer"
+                }}>
+                  Evaluation
                 </button>
-                <button id="downloadReport" className="btn btn-next" onClick={exportPdf}>
-                  Download Full Report
-                </button>
               </div>
             </div>
 
-            <div className="score-section">
-              <div className="score-circle">
-                <svg viewBox="0 0 36 36">
-                  <path
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none"
-                    stroke="#6b46ff"
-                    strokeWidth="2"
-                    strokeDasharray={`${totalScore}, 100`}
-                  />
-                  <text x="18" y="20" textAnchor="middle" fill="#2d3748" fontSize="8">
-                    {totalScore}
-                  </text>
-                </svg>
-                <div className="score-label">/100</div>
-              </div>
-            </div>
-
-            <div className="evaluation-sections">
-              <div className="eval-section">
-                <h3>Overall Summary</h3>
-                <p style={{ whiteSpace: "pre-wrap" }}>{generalNotes}</p>
-              </div>
-              {([
-                ["Technical Expertise", scores.technical, "technical"],
-                ["Communication Skills", scores.communication, "communication"],
-                ["Problem Solving", scores.problemSolving, "problemSolving"],
-                ["Leadership Potential", scores.leadership, "leadership"],
-                ["Cultural Fit", scores.cultural, "cultural"],
-                ["Professional Conduct", scores.conduct, "conduct"],
-              ] as const).map(([label, score, key]) => (
-                <div key={key} className="eval-section">
-                  <h3>
-                    {label}
-                    <span className="eval-score">{score}/10</span>
-                  </h3>
-                  <p>Assessment will appear after the interview.</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="card" id="finalTranscript" style={{ marginTop: 24 }}>
-              <h3>Interview Transcript</h3>
-              <div className="chat-transcript">
-                {transcript.map((line, i) => {
-                  const isAI = line.startsWith("AI: ");
-                  const text = isAI ? line.slice(4) : line.replace(/^User: /, "");
-                  return (
-                    <div key={i} className={`chat-message ${isAI ? "ai" : "user"}`}>
-                      <div className="chat-avatar">{isAI ? "AI" : "U"}</div>
-                      <div className="chat-bubble">{text}</div>
+            {/* Overall Score Hero Card */}
+            <div style={{ 
+              background: "linear-gradient(135deg, #059669 0%, #047857 50%, #065f46 100%)",
+              borderRadius: 16,
+              padding: 32,
+              color: "white",
+              marginBottom: 24,
+              boxShadow: "0 10px 40px rgba(5, 150, 105, 0.3)"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 24 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+                  <div style={{ 
+                    width: 120, 
+                    height: 120, 
+                    borderRadius: "50%", 
+                    background: "rgba(255,255,255,0.2)", 
+                    display: "flex", 
+                    flexDirection: "column",
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    border: "4px solid rgba(255,255,255,0.3)"
+                  }}>
+                    <div style={{ fontSize: 36, fontWeight: 700 }}>70</div>
+                    <div style={{ fontSize: 12, opacity: 0.8 }}>out of 100</div>
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Interview Evaluation</h2>
+                    <p style={{ opacity: 0.9, fontSize: 14, marginBottom: 8 }}>Score calculated based on all 10 configured questions</p>
+                    <div style={{ display: "flex", gap: 16, fontSize: 12, opacity: 0.8 }}>
+                      <span>Questions Asked: 10</span>
+                      <span>|</span>
+                      <span>Answered: 10</span>
                     </div>
-                  );
-                })}
+                    <div style={{ 
+                      marginTop: 12, 
+                      display: "inline-block", 
+                      background: "rgba(255,255,255,0.2)", 
+                      padding: "6px 16px", 
+                      borderRadius: 20,
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}>
+                      ✓ Qualified
+                    </div>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 14, opacity: 0.8, marginBottom: 4 }}>Recommendation</div>
+                  <div style={{ fontSize: 20, fontWeight: 600 }}>Hire</div>
+                </div>
               </div>
+            </div>
+
+            {/* Criteria Breakdown */}
+            <div style={{ 
+              background: "white", 
+              borderRadius: 16, 
+              border: "2px solid #e5e7eb", 
+              marginBottom: 24,
+              boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+            }}>
+              <div style={{ 
+                padding: "20px 24px", 
+                borderBottom: "1px solid #e5e7eb",
+                background: "linear-gradient(to right, #f9fafb, #f3f4f6)"
+              }}>
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", display: "flex", alignItems: "center", gap: 8 }}>
+                  📊 Criteria-Based Score Breakdown
+                </h3>
+                <p style={{ fontSize: 14, color: "#64748b", marginTop: 4 }}>All configured criteria with their evaluation scores</p>
+              </div>
+              <div style={{ padding: 24 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                  {/* Technical */}
+                  <div style={{ 
+                    padding: 20, 
+                    borderRadius: 16, 
+                    border: "2px solid #93c5fd",
+                    background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ padding: 10, background: "white", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+                          <span style={{ fontSize: 20 }}>💻</span>
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: "#1e40af" }}>Technical</div>
+                          <div style={{ fontSize: 12, color: "#64748b" }}>4 questions</div>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: "#1e40af" }}>70</div>
+                        <div style={{ fontSize: 11, color: "#94a3b8" }}>score</div>
+                      </div>
+                    </div>
+                    <div style={{ height: 10, background: "white", borderRadius: 5, marginBottom: 12 }}>
+                      <div style={{ height: "100%", width: "70%", background: "linear-gradient(to right, #3b82f6, #6366f1)", borderRadius: 5 }}></div>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.5)" }}>
+                      <span style={{ color: "#475569" }}>Weight: 50%</span>
+                      <span style={{ fontWeight: 700, color: "#1e40af" }}>+35 pts</span>
+                    </div>
+                  </div>
+
+                  {/* Communication */}
+                  <div style={{ 
+                    padding: 20, 
+                    borderRadius: 16, 
+                    border: "2px solid #86efac",
+                    background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ padding: 10, background: "white", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+                          <span style={{ fontSize: 20 }}>💬</span>
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: "#166534" }}>Communication</div>
+                          <div style={{ fontSize: 12, color: "#64748b" }}>2 questions</div>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: "#166534" }}>75</div>
+                        <div style={{ fontSize: 11, color: "#94a3b8" }}>score</div>
+                      </div>
+                    </div>
+                    <div style={{ height: 10, background: "white", borderRadius: 5, marginBottom: 12 }}>
+                      <div style={{ height: "100%", width: "75%", background: "linear-gradient(to right, #22c55e, #10b981)", borderRadius: 5 }}></div>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.5)" }}>
+                      <span style={{ color: "#475569" }}>Weight: 20%</span>
+                      <span style={{ fontWeight: 700, color: "#166534" }}>+15 pts</span>
+                    </div>
+                  </div>
+
+                  {/* Team Player */}
+                  <div style={{ 
+                    padding: 20, 
+                    borderRadius: 16, 
+                    border: "2px solid #5eead4",
+                    background: "linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%)"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ padding: 10, background: "white", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+                          <span style={{ fontSize: 20 }}>👥</span>
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: "#0f766e" }}>Team Player</div>
+                          <div style={{ fontSize: 12, color: "#64748b" }}>2 questions</div>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: "#0f766e" }}>68</div>
+                        <div style={{ fontSize: 11, color: "#94a3b8" }}>score</div>
+                      </div>
+                    </div>
+                    <div style={{ height: 10, background: "white", borderRadius: 5, marginBottom: 12 }}>
+                      <div style={{ height: "100%", width: "68%", background: "linear-gradient(to right, #14b8a6, #06b6d4)", borderRadius: 5 }}></div>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.5)" }}>
+                      <span style={{ color: "#475569" }}>Weight: 15%</span>
+                      <span style={{ fontWeight: 700, color: "#0f766e" }}>+10 pts</span>
+                    </div>
+                  </div>
+
+                  {/* Culture Fit */}
+                  <div style={{ 
+                    padding: 20, 
+                    borderRadius: 16, 
+                    border: "2px solid #fdba74",
+                    background: "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ padding: 10, background: "white", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+                          <span style={{ fontSize: 20 }}>🤝</span>
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, color: "#c2410c" }}>Culture Fit</div>
+                          <div style={{ fontSize: 12, color: "#64748b" }}>2 questions</div>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: "#c2410c" }}>65</div>
+                        <div style={{ fontSize: 11, color: "#94a3b8" }}>score</div>
+                      </div>
+                    </div>
+                    <div style={{ height: 10, background: "white", borderRadius: 5, marginBottom: 12 }}>
+                      <div style={{ height: "100%", width: "65%", background: "linear-gradient(to right, #f97316, #fb923c)", borderRadius: 5 }}></div>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.5)" }}>
+                      <span style={{ color: "#475569" }}>Weight: 15%</span>
+                      <span style={{ fontWeight: 700, color: "#c2410c" }}>+10 pts</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Question-by-Question Breakdown */}
+            <div style={{ 
+              background: "white", 
+              borderRadius: 16, 
+              border: "2px solid #e5e7eb", 
+              marginBottom: 24,
+              boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+              overflow: "hidden"
+            }}>
+              <div style={{ 
+                padding: "20px 24px", 
+                borderBottom: "1px solid #e5e7eb",
+                background: "linear-gradient(to right, #eef2ff, #faf5ff, #fdf2f8)"
+              }}>
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", display: "flex", alignItems: "center", gap: 8 }}>
+                  ❓ Interview Responses & Scores
+                </h3>
+                <p style={{ fontSize: 14, color: "#64748b", marginTop: 4 }}>Detailed evaluation of each question with AI-powered scoring</p>
+              </div>
+              <div style={{ padding: 24 }}>
+                {/* Question 1 - Technical */}
+                <div style={{ 
+                  borderRadius: 16, 
+                  border: "1px solid #e5e7eb", 
+                  marginBottom: 24,
+                  overflow: "hidden",
+                  background: "white",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.04)"
+                }}>
+                  <div style={{ height: 4, background: "linear-gradient(to right, #3b82f6, #6366f1)" }}></div>
+                  <div style={{ padding: 24 }}>
+                    {/* Question Header */}
+                    <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
+                      <div style={{ 
+                        width: 40, 
+                        height: 40, 
+                        borderRadius: "50%", 
+                        background: "#eff6ff", 
+                        display: "flex", 
+                        alignItems: "center", 
+                        justifyContent: "center",
+                        flexShrink: 0
+                      }}>
+                        <span style={{ fontSize: 16, fontWeight: 700, color: "#1e40af" }}>1</span>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: 16, fontWeight: 600, color: "#1e293b", lineHeight: 1.5, marginBottom: 12 }}>
+                          How do your skills and experience with UiPath and Automation Anywhere align with the requirements of this role?
+                        </p>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <span style={{ 
+                            padding: "4px 12px", 
+                            background: "#dbeafe", 
+                            color: "#1e40af", 
+                            borderRadius: 20, 
+                            fontSize: 12, 
+                            fontWeight: 600 
+                          }}>Technical</span>
+                          <span style={{ 
+                            padding: "4px 12px", 
+                            background: "#dcfce7", 
+                            color: "#166534", 
+                            borderRadius: 20, 
+                            fontSize: 12, 
+                            fontWeight: 600 
+                          }}>✓ Complete</span>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontSize: 32, fontWeight: 700, color: "#059669" }}>70</div>
+                        <div style={{ fontSize: 12, color: "#94a3b8" }}>/ 100 pts</div>
+                        <span style={{ 
+                          display: "inline-block",
+                          marginTop: 4,
+                          padding: "2px 10px", 
+                          background: "#dbeafe", 
+                          color: "#1e40af", 
+                          borderRadius: 12, 
+                          fontSize: 11, 
+                          fontWeight: 600 
+                        }}>Good</span>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div style={{ height: 8, background: "#f1f5f9", borderRadius: 4, marginBottom: 20 }}>
+                      <div style={{ height: "100%", width: "70%", background: "#3b82f6", borderRadius: 4 }}></div>
+                    </div>
+
+                    {/* Candidate Response */}
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 16 }}>💬</span>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>Candidate Response</span>
+                      </div>
+                      <div style={{ background: "#f8fafc", padding: 20, borderRadius: 12, border: "1px solid #e2e8f0" }}>
+                        <p style={{ fontSize: 14, color: "#374151", lineHeight: 1.7 }}>
+                          I have 6 years of IT experience, out of which 4 years are hands-on RP development and support using automation anywhere. My work covers the complete IP lifecycle, requirement gathering, creating PDD, SD, deployment, testing and post-production support. I have automated web applications, desktop, app, SAP, Excel, PDS, database and worked on both deployment and bot support projects. This aligns strongly with the responsibility of this role, especially because I am already experienced in debugging, handling bot failures and monitoring schedules and providing fixes.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Evaluation Reason */}
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 16 }}>🧠</span>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>Evaluation Reason</span>
+                      </div>
+                      <div style={{ background: "#eff6ff", padding: 20, borderRadius: 12, border: "1px solid #bfdbfe" }}>
+                        <p style={{ fontSize: 14, color: "#374151", lineHeight: 1.7 }}>
+                          The candidate demonstrates a good understanding of technical aspects related to Automation Anywhere, mentioning various applications and processes involved in automation. However, the lack of specific examples of tools or technologies used limits the depth of the response.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Strengths & Gaps */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                      <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                          <span style={{ color: "#16a34a" }}>✓</span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "#166534" }}>Strengths</span>
+                        </div>
+                        <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
+                          <li style={{ fontSize: 13, color: "#166534", marginBottom: 6, display: "flex", alignItems: "flex-start", gap: 8 }}>
+                            <span style={{ color: "#22c55e" }}>✓</span>
+                            <span>Comprehensive overview of relevant experience and tasks</span>
+                          </li>
+                        </ul>
+                      </div>
+                      <div style={{ background: "#fffbeb", padding: 16, borderRadius: 12, border: "1px solid #fde68a" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                          <span style={{ color: "#d97706" }}>⚠</span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "#92400e" }}>Areas to Improve</span>
+                        </div>
+                        <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
+                          <li style={{ fontSize: 13, color: "#92400e", marginBottom: 6, display: "flex", alignItems: "flex-start", gap: 8 }}>
+                            <span style={{ color: "#f59e0b" }}>•</span>
+                            <span>Lack of specific examples and mention of UiPath</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Question 2 - Team Player */}
+                <div style={{ 
+                  borderRadius: 16, 
+                  border: "1px solid #e5e7eb", 
+                  marginBottom: 24,
+                  overflow: "hidden",
+                  background: "white",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.04)"
+                }}>
+                  <div style={{ height: 4, background: "linear-gradient(to right, #14b8a6, #06b6d4)" }}></div>
+                  <div style={{ padding: 24 }}>
+                    <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
+                      <div style={{ 
+                        width: 40, 
+                        height: 40, 
+                        borderRadius: "50%", 
+                        background: "#f0fdfa", 
+                        display: "flex", 
+                        alignItems: "center", 
+                        justifyContent: "center",
+                        flexShrink: 0
+                      }}>
+                        <span style={{ fontSize: 16, fontWeight: 700, color: "#0f766e" }}>2</span>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: 16, fontWeight: 600, color: "#1e293b", lineHeight: 1.5, marginBottom: 12 }}>
+                          Describe a situation where you collaborated with business analysts to understand requirements. How did you ensure effective communication?
+                        </p>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <span style={{ 
+                            padding: "4px 12px", 
+                            background: "#ccfbf1", 
+                            color: "#0f766e", 
+                            borderRadius: 20, 
+                            fontSize: 12, 
+                            fontWeight: 600 
+                          }}>Team Player</span>
+                          <span style={{ 
+                            padding: "4px 12px", 
+                            background: "#dcfce7", 
+                            color: "#166534", 
+                            borderRadius: 20, 
+                            fontSize: 12, 
+                            fontWeight: 600 
+                          }}>✓ Complete</span>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontSize: 32, fontWeight: 700, color: "#059669" }}>68</div>
+                        <div style={{ fontSize: 12, color: "#94a3b8" }}>/ 100 pts</div>
+                        <span style={{ 
+                          display: "inline-block",
+                          marginTop: 4,
+                          padding: "2px 10px", 
+                          background: "#dbeafe", 
+                          color: "#1e40af", 
+                          borderRadius: 12, 
+                          fontSize: 11, 
+                          fontWeight: 600 
+                        }}>Good</span>
+                      </div>
+                    </div>
+                    <div style={{ height: 8, background: "#f1f5f9", borderRadius: 4, marginBottom: 20 }}>
+                      <div style={{ height: "100%", width: "68%", background: "#14b8a6", borderRadius: 4 }}></div>
+                    </div>
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 16 }}>💬</span>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>Candidate Response</span>
+                      </div>
+                      <div style={{ background: "#f8fafc", padding: 20, borderRadius: 12, border: "1px solid #e2e8f0" }}>
+                        <p style={{ fontSize: 14, color: "#374151", lineHeight: 1.7 }}>
+                          In my previous role, I worked closely with business analysts to gather requirements for automation projects. I scheduled regular meetings to discuss process flows and documented everything in shared documents. I also created visual diagrams to ensure both technical and non-technical stakeholders understood the proposed solutions.
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                      <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                          <span style={{ color: "#16a34a" }}>✓</span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "#166534" }}>Strengths</span>
+                        </div>
+                        <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
+                          <li style={{ fontSize: 13, color: "#166534", marginBottom: 6, display: "flex", alignItems: "flex-start", gap: 8 }}>
+                            <span style={{ color: "#22c55e" }}>✓</span>
+                            <span>Good collaboration approach with stakeholders</span>
+                          </li>
+                        </ul>
+                      </div>
+                      <div style={{ background: "#fffbeb", padding: 16, borderRadius: 12, border: "1px solid #fde68a" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                          <span style={{ color: "#d97706" }}>⚠</span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "#92400e" }}>Areas to Improve</span>
+                        </div>
+                        <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
+                          <li style={{ fontSize: 13, color: "#92400e", marginBottom: 6, display: "flex", alignItems: "flex-start", gap: 8 }}>
+                            <span style={{ color: "#f59e0b" }}>•</span>
+                            <span>Could provide more specific examples of challenges faced</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Question 3 - Culture Fit */}
+                <div style={{ 
+                  borderRadius: 16, 
+                  border: "1px solid #e5e7eb", 
+                  marginBottom: 24,
+                  overflow: "hidden",
+                  background: "white",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.04)"
+                }}>
+                  <div style={{ height: 4, background: "linear-gradient(to right, #f97316, #fb923c)" }}></div>
+                  <div style={{ padding: 24 }}>
+                    <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
+                      <div style={{ 
+                        width: 40, 
+                        height: 40, 
+                        borderRadius: "50%", 
+                        background: "#fff7ed", 
+                        display: "flex", 
+                        alignItems: "center", 
+                        justifyContent: "center",
+                        flexShrink: 0
+                      }}>
+                        <span style={{ fontSize: 16, fontWeight: 700, color: "#c2410c" }}>3</span>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: 16, fontWeight: 600, color: "#1e293b", lineHeight: 1.5, marginBottom: 12 }}>
+                          Are you interested in working onsite in Bangalore? What are your salary expectations for this role?
+                        </p>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <span style={{ 
+                            padding: "4px 12px", 
+                            background: "#ffedd5", 
+                            color: "#c2410c", 
+                            borderRadius: 20, 
+                            fontSize: 12, 
+                            fontWeight: 600 
+                          }}>Culture Fit</span>
+                          <span style={{ 
+                            padding: "4px 12px", 
+                            background: "#dcfce7", 
+                            color: "#166534", 
+                            borderRadius: 20, 
+                            fontSize: 12, 
+                            fontWeight: 600 
+                          }}>✓ Complete</span>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontSize: 32, fontWeight: 700, color: "#059669" }}>65</div>
+                        <div style={{ fontSize: 12, color: "#94a3b8" }}>/ 100 pts</div>
+                        <span style={{ 
+                          display: "inline-block",
+                          marginTop: 4,
+                          padding: "2px 10px", 
+                          background: "#dbeafe", 
+                          color: "#1e40af", 
+                          borderRadius: 12, 
+                          fontSize: 11, 
+                          fontWeight: 600 
+                        }}>Good</span>
+                      </div>
+                    </div>
+                    <div style={{ height: 8, background: "#f1f5f9", borderRadius: 4, marginBottom: 20 }}>
+                      <div style={{ height: "100%", width: "65%", background: "#f97316", borderRadius: 4 }}></div>
+                    </div>
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                        <span style={{ fontSize: 16 }}>💬</span>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>Candidate Response</span>
+                      </div>
+                      <div style={{ background: "#f8fafc", padding: 20, borderRadius: 12, border: "1px solid #e2e8f0" }}>
+                        <p style={{ fontSize: 14, color: "#374151", lineHeight: 1.7 }}>
+                          Yes, I am open to working onsite in Bangalore. I am currently based in Hyderabad but willing to relocate. Regarding salary, I am expecting around 12-15 LPA based on my experience and the market standards for this role.
+                        </p>
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                      <div style={{ background: "#f0fdf4", padding: 16, borderRadius: 12, border: "1px solid #bbf7d0" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                          <span style={{ color: "#16a34a" }}>✓</span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "#166534" }}>Strengths</span>
+                        </div>
+                        <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
+                          <li style={{ fontSize: 13, color: "#166534", marginBottom: 6, display: "flex", alignItems: "flex-start", gap: 8 }}>
+                            <span style={{ color: "#22c55e" }}>✓</span>
+                            <span>Flexible with location and willing to relocate</span>
+                          </li>
+                        </ul>
+                      </div>
+                      <div style={{ background: "#fffbeb", padding: 16, borderRadius: 12, border: "1px solid #fde68a" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                          <span style={{ color: "#d97706" }}>⚠</span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "#92400e" }}>Areas to Improve</span>
+                        </div>
+                        <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
+                          <li style={{ fontSize: 13, color: "#92400e", marginBottom: 6, display: "flex", alignItems: "flex-start", gap: 8 }}>
+                            <span style={{ color: "#f59e0b" }}>•</span>
+                            <span>Salary expectation may be above budget range</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Read-only notice */}
+                <div style={{ 
+                  background: "#fef3c7", 
+                  border: "1px solid #fcd34d", 
+                  borderRadius: 12, 
+                  padding: "16px 20px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12
+                }}>
+                  <span style={{ fontSize: 20 }}>ℹ️</span>
+                  <div>
+                    <span style={{ fontSize: 14, color: "#92400e", fontWeight: 500 }}>
+                      This is a demo preview showing 3 of 10 questions. The full report includes all interview questions with detailed AI-powered evaluation.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24 }}>
+              <button 
+                className="btn btn-back" 
+                onClick={() => goToNext("interview")}
+                style={{ padding: "12px 24px", borderRadius: 8 }}
+              >
+                Back to Interview
+              </button>
+              <button 
+                className="btn btn-next" 
+                onClick={() => router.push("/")}
+                style={{ padding: "12px 24px", borderRadius: 8, background: "#059669", color: "white" }}
+              >
+                Back to Home
+              </button>
             </div>
           </section>
         )}
       </div>
+
+      {/* Footer */}
+      <footer className="bg-slate-900 text-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Main Footer Content */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-12">
+            {/* Left Section - Brand Block */}
+            <div className="md:col-span-3">
+              <h3 className="text-2xl font-bold mb-2">
+                <span className="text-white">Hire</span>
+                <span className="text-emerald-400">GenAI</span>
+              </h3>
+              <p className="text-sm text-slate-400 mb-4">By SKYGENAI</p>
+              <p className="text-slate-400 mb-6 text-sm leading-relaxed">
+                HireGenAI pre-screens and interviews candidates, helping you shortlist talent 20x faster and more efficiently.
+              </p>
+              <p className="text-slate-400 mb-6 text-sm font-medium">
+                Email: <a href="mailto:support@hire-genai.com" className="text-emerald-400 hover:text-emerald-300 transition-colors">support@hire-genai.com</a>
+              </p>
+              {/* Social Icons */}
+              <div className="flex space-x-4">
+                <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
+                  <Facebook className="w-5 h-5" />
+                </a>
+                <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
+                  <Instagram className="w-5 h-5" />
+                </a>
+                <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
+                  <Youtube className="w-5 h-5" />
+                </a>
+                <a href="https://www.linkedin.com/company/hire-genai" className="text-slate-400 hover:text-emerald-400 transition-colors">
+                  <Linkedin className="w-5 h-5" />
+                </a>
+              </div>
+            </div>
+
+            {/* Product Section */}
+            <div className="md:col-span-2">
+              <h4 className="font-semibold mb-4 text-white text-sm uppercase tracking-wide">Product</h4>
+              <ul className="space-y-3 text-slate-400 text-sm">
+                <li>
+                  <Link href="/demo-en" className="hover:text-emerald-400 transition-colors">
+                    Try the Demo
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/pricing" className="hover:text-emerald-400 transition-colors">
+                    Pricing
+                  </Link>
+                </li>
+                <li>
+                  <a href="#assessment" className="hover:text-emerald-400 transition-colors">
+                    Assessment
+                  </a>
+                </li>
+                <li>
+                  <a href="#faq" className="hover:text-emerald-400 transition-colors">
+                    FAQs
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Company Section */}
+            <div className="md:col-span-2">
+              <h4 className="font-semibold mb-4 text-white text-sm uppercase tracking-wide">Company</h4>
+              <ul className="space-y-3 text-slate-400 text-sm">
+                <li>
+                  <Link href="/about" className="hover:text-emerald-400 transition-colors">
+                    About us
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/contact" className="hover:text-emerald-400 transition-colors">
+                    Contact
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/book-meeting" className="hover:text-emerald-400 transition-colors">
+                    Book a Meeting
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/owner-login" className="hover:text-emerald-400 transition-colors">
+                    Admin
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Legal Section */}
+            <div className="md:col-span-2">
+              <h4 className="font-semibold mb-4 text-white text-sm uppercase tracking-wide">Legal</h4>
+              <ul className="space-y-3 text-slate-400 text-sm">
+                <li>
+                  <Link href="/privacy" className="hover:text-emerald-400 transition-colors">
+                    Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/terms" className="hover:text-emerald-400 transition-colors">
+                    Terms and Conditions
+                  </Link>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-emerald-400 transition-colors">
+                    Imprint
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Right Section - Badges Block */}
+            <div className="md:col-span-3">
+              <div className="space-y-4">
+                {/* Trustpilot Badge */}
+                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                  <p className="text-xs text-slate-400 mb-2 font-semibold">Trustpilot</p>
+                  <div className="flex items-center gap-2 mb-2">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                    ))}
+                  </div>
+                  <p className="text-sm font-semibold text-white">TrustScore 4.5</p>
+                </div>
+
+                {/* GDPR Compliant Badge */}
+                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Lock className="w-4 h-4 text-emerald-400" />
+                    <p className="text-sm font-semibold text-white">GDPR COMPLIANT</p>
+                  </div>
+                  <p className="text-xs text-slate-400">Your data is secure and compliant</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer Bottom */}
+          <div className="border-t border-slate-800 pt-8 text-center text-slate-400 text-sm">
+            <p>&copy; 2024 HireGenAI. All rights reserved.</p>
+          </div>
+        </div>
+      </footer>
+
+      {/* Modals */}
+      <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} />
 
       <style jsx>{`
         :global(body) {

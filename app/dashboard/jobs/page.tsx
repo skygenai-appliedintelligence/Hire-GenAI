@@ -187,12 +187,15 @@ export default function JobsPage() {
   }, [selectedUserEmail, allJobs])
 
   // Initialize auto_schedule_interview state from jobs data
+  // This effect runs whenever jobs change to ensure state reflects database values
   useEffect(() => {
     const autoScheduleState: Record<string, boolean> = {}
     for (const job of jobs) {
-      autoScheduleState[job.id] = (job as any).auto_schedule_interview ?? false
+      // Always use the value from the job object (which comes from database)
+      autoScheduleState[job.id] = (job as any).auto_schedule_interview === true
     }
     setAutoScheduleByJob(autoScheduleState)
+    console.log('📋 [AUTO-SCHEDULE] Initialized state from jobs:', autoScheduleState)
   }, [jobs])
 
   // Handler to toggle auto_schedule_interview
@@ -204,6 +207,7 @@ export default function JobsPage() {
 
     const newValue = !currentValue
     setTogglingJobId(jobId)
+    console.log(`🔄 [AUTO-SCHEDULE] Toggling job ${jobId} from ${currentValue} to ${newValue}`)
     
     // Optimistically update UI
     setAutoScheduleByJob(prev => ({ ...prev, [jobId]: newValue }))
@@ -221,14 +225,20 @@ export default function JobsPage() {
         throw new Error(data?.error || 'Failed to update')
       }
 
+      console.log(`✅ [AUTO-SCHEDULE] Successfully updated job ${jobId} to ${newValue}`)
+      
       toast({ 
         title: newValue ? "Auto-Schedule Enabled" : "Auto-Schedule Disabled",
         description: newValue 
           ? "Interview links will be auto-scheduled to qualified candidates" 
           : "Auto-scheduling has been turned off for this job"
       })
+      
+      // Refresh jobs to ensure state is synced with database
+      await fetchJobs()
     } catch (err) {
       // Revert on error
+      console.error(`❌ [AUTO-SCHEDULE] Failed to update job ${jobId}:`, err)
       setAutoScheduleByJob(prev => ({ ...prev, [jobId]: currentValue }))
       toast({ 
         title: "Update Failed", 

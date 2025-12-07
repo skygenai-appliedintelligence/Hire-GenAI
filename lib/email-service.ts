@@ -1,4 +1,4 @@
-import { sendMail } from "./smtp";
+import { sendMail, sendContactMail } from "./smtp";
 
 export interface EmailTemplate {
   subject: string;
@@ -7,6 +7,149 @@ export interface EmailTemplate {
 }
 
 export class EmailService {
+  /**
+   * Send contact form confirmation email to user
+   */
+  static async sendContactFormConfirmation({
+    fullName,
+    workEmail,
+    companyName,
+    subject,
+  }: {
+    fullName: string;
+    workEmail: string;
+    companyName: string;
+    subject: string;
+  }) {
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f7fa; padding: 40px 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%;">
+                <!-- Header -->
+                <tr>
+                  <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 30px; border-radius: 16px 16px 0 0; text-align: center;">
+                    <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Hire<span style="color: #a7f3d0;">GenAI</span></h1>
+                    <p style="color: #d1fae5; margin: 8px 0 0 0; font-size: 14px;">AI-Powered Recruitment Platform</p>
+                  </td>
+                </tr>
+                
+                <!-- Main Content -->
+                <tr>
+                  <td style="background: white; padding: 40px 30px; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">
+                    <!-- Greeting -->
+                    <h2 style="color: #1f2937; margin: 0 0 20px 0; font-size: 24px; font-weight: 600;">Hello ${fullName}! 👋</h2>
+                    
+                    <!-- Thank You Message -->
+                    <p style="color: #4b5563; font-size: 16px; line-height: 1.7; margin: 0 0 25px 0;">
+                      Thank you for reaching out to us! We've received your message and our team is already on it.
+                    </p>
+                    
+                    <!-- Message Summary Box -->
+                    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 1px solid #bbf7d0; border-radius: 12px; padding: 25px; margin: 25px 0;">
+                      <h3 style="color: #166534; margin: 0 0 15px 0; font-size: 16px; font-weight: 600;">📋 Your Message Summary</h3>
+                      <table style="width: 100%;">
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding: 5px 0;">Subject:</td>
+                          <td style="color: #1f2937; font-size: 14px; padding: 5px 0; font-weight: 500;">${subject}</td>
+                        </tr>
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding: 5px 0;">Company:</td>
+                          <td style="color: #1f2937; font-size: 14px; padding: 5px 0; font-weight: 500;">${companyName}</td>
+                        </tr>
+                      </table>
+                    </div>
+                    
+                    <!-- Response Time -->
+                    <div style="background: #eff6ff; border-radius: 12px; padding: 20px; margin: 25px 0; text-align: center;">
+                      <p style="color: #1e40af; font-size: 18px; font-weight: 600; margin: 0 0 8px 0;">⏱️ Expected Response Time</p>
+                      <p style="color: #3b82f6; font-size: 24px; font-weight: 700; margin: 0;">Within 24 Hours</p>
+                      <p style="color: #6b7280; font-size: 13px; margin: 10px 0 0 0;">Usually much faster during business hours</p>
+                    </div>
+                    
+                    <!-- What to Expect -->
+                    <h3 style="color: #1f2937; margin: 30px 0 15px 0; font-size: 18px; font-weight: 600;">What happens next?</h3>
+                    <ul style="color: #4b5563; font-size: 15px; line-height: 1.8; margin: 0; padding-left: 20px;">
+                      <li style="margin-bottom: 10px;">Our team will review your inquiry</li>
+                      <li style="margin-bottom: 10px;">We'll prepare a personalized response for you</li>
+                      <li style="margin-bottom: 10px;">You'll receive a detailed reply at <strong>${workEmail}</strong></li>
+                    </ul>
+                    
+                    <!-- CTA Button -->
+                    <div style="text-align: center; margin: 35px 0;">
+                      <a href="https://hire-genai.com" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);">Explore HireGenAI</a>
+                    </div>
+                  </td>
+                </tr>
+                
+                <!-- Footer -->
+                <tr>
+                  <td style="background: #f9fafb; padding: 30px; border-radius: 0 0 16px 16px; border: 1px solid #e5e7eb; border-top: none; text-align: center;">
+                    <p style="color: #6b7280; font-size: 14px; margin: 0 0 15px 0;">
+                      Need immediate assistance? Reply to this email or contact us at:
+                    </p>
+                    <p style="margin: 0 0 20px 0;">
+                      <a href="mailto:support@hire-genai.com" style="color: #10b981; text-decoration: none; font-weight: 500;">support@hire-genai.com</a>
+                    </p>
+                    
+                    <!-- Social Links -->
+                    <div style="margin: 20px 0;">
+                      <a href="https://www.linkedin.com/company/hire-genai" style="display: inline-block; margin: 0 8px;">
+                        <img src="https://cdn-icons-png.flaticon.com/24/3536/3536505.png" alt="LinkedIn" style="width: 24px; height: 24px;">
+                      </a>
+                    </div>
+                    
+                    <p style="color: #9ca3af; font-size: 12px; margin: 20px 0 0 0;">
+                      © ${new Date().getFullYear()} HireGenAI by SKYGENAI. All rights reserved.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>`;
+
+    const text = `
+Hello ${fullName}!
+
+Thank you for reaching out to us! We've received your message and our team is already on it.
+
+Your Message Summary:
+- Subject: ${subject}
+- Company: ${companyName}
+
+Expected Response Time: Within 24 Hours
+(Usually much faster during business hours)
+
+What happens next?
+1. Our team will review your inquiry
+2. We'll prepare a personalized response for you
+3. You'll receive a detailed reply at ${workEmail}
+
+Need immediate assistance? Contact us at: support@hire-genai.com
+
+---
+© ${new Date().getFullYear()} HireGenAI by SKYGENAI. All rights reserved.
+    `;
+
+    return await sendContactMail({
+      to: workEmail,
+      subject: `We've received your message - HireGenAI`,
+      html,
+      text,
+      from: 'HireGenAI Support <support@hiregenai.com>',
+    });
+  }
+
   /**
    * Send a contact form submission email
    */
@@ -157,6 +300,7 @@ Good luck with your interview!
       subject: `Interview Invitation - ${jobTitle} at ${companyName}`,
       html,
       text,
+      from: 'HireGenAI <no-reply@hire-genai.com>',
     });
   }
 
@@ -231,6 +375,7 @@ Thank you for your interest in joining our team!
       subject: `Application Received - ${jobTitle} at ${companyName}`,
       html,
       text,
+      from: 'HireGenAI <no-reply@hire-genai.com>',
     });
   }
 
@@ -295,6 +440,7 @@ Thank you for your interest in joining our team!
       subject,
       html,
       text,
+      from: 'HireGenAI <no-reply@hire-genai.com>',
     });
   }
 }
