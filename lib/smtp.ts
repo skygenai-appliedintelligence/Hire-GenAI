@@ -19,8 +19,9 @@ export const transporter = nodemailer.createTransport({
 export const contactTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST_CONTACT || process.env.SMTP_HOST!,
   port: Number(process.env.SMTP_PORT_CONTACT || process.env.SMTP_PORT || 465),
-  secure: process.env.SMTP_SECURE_CONTACT?.toLowerCase() === "true" || process.env.SMTP_SECURE?.toLowerCase() === "true" || true,
-  auth: {
+  secure: process.env.SMTP_SECURE_CONTACT !== undefined 
+    ? process.env.SMTP_SECURE_CONTACT.toLowerCase() === "true"
+    : process.env.SMTP_SECURE?.toLowerCase() === "true" || true,  auth: {
     user: process.env.SMTP_USER_CONTACT || process.env.SMTP_USER!,
     pass: process.env.SMTP_PASS_CONTACT || process.env.SMTP_PASS!,
   },

@@ -307,7 +307,7 @@ export default function ContactPage() {
               </p>
               {/* Social Icons */}
               <div className="flex space-x-4">
-                <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
+                <a href="https://facebook.com/hiregenai" className="text-slate-400 hover:text-emerald-400 transition-colors" target="_blank" rel="noopener noreferrer">
                   <Facebook className="w-5 h-5" />
                 </a>
                 <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
@@ -319,8 +319,7 @@ export default function ContactPage() {
                 <a href="https://www.linkedin.com/company/hire-genai" className="text-slate-400 hover:text-emerald-400 transition-colors">
                   <Linkedin className="w-5 h-5" />
                 </a>
-              </div>
-            </div>
+              </div>            </div>
 
             {/* Product Section */}
             <div className="md:col-span-2">
