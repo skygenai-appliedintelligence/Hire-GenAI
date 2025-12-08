@@ -23,10 +23,10 @@ const SCREENS = ["job", "candidate", "interview", "assessment"] as const;
 type Screen = (typeof SCREENS)[number];
 
 const defaultJobDescription = `Key Responsibilities:
-- Conduct keyword research and analysis.
-- Optimize website content and landing pages for SEO.
-- Monitor and analyze SEO performance metrics.
-- Stay up-to-date with the latest SEO trends and algorithm changes.`
+- Design and develop RPA bots using UiPath/Automation Anywhere.
+- Analyze business processes for automation opportunities.
+- Deploy, monitor and maintain production bots.
+- Collaborate with business teams to gather requirements.`
 
 const initialScores = {
   technical: 7,
@@ -40,7 +40,7 @@ const initialScores = {
 const initialNotes = `Based on the interview evaluation, here are the key observations:
 
 • Strong communication skills and professional conduct
-• Good understanding of SEO fundamentals
+• Good understanding of RPA fundamentals and UiPath
 • Shows enthusiasm and cultural alignment
 • Areas for growth in advanced technical skills`;
 
@@ -86,7 +86,7 @@ export default function DemoEnPage() {
   const [showLoginModal, setShowLoginModal] = useStateNav(false);
   
   // Job + candidate state
-  const [jobTitle, setJobTitle] = useState("SEO Specialist");
+  const [jobTitle, setJobTitle] = useState("RPA Developer");
   const [jobDescription, setJobDescription] = useState(defaultJobDescription);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -120,6 +120,26 @@ export default function DemoEnPage() {
 
   const [initialLoading, setInitialLoading] = useState(true);
   const [hydrated, setHydrated] = useState(false);
+  
+  // Job Details tabs state and refs
+  const [activeJobTab, setActiveJobTab] = useState(0);
+  const basicInfoRef = useRef<HTMLDivElement>(null);
+  const requirementsRef = useRef<HTMLDivElement>(null);
+  const responsibilitiesRef = useRef<HTMLDivElement>(null);
+  const compensationRef = useRef<HTMLDivElement>(null);
+  const visaRef = useRef<HTMLDivElement>(null);
+  const resumeScreeningRef = useRef<HTMLDivElement>(null);
+  const interviewProcessRef = useRef<HTMLDivElement>(null);
+  
+  const jobTabRefs = [basicInfoRef, requirementsRef, responsibilitiesRef, compensationRef, visaRef, resumeScreeningRef, interviewProcessRef];
+  
+  const scrollToSection = (index: number) => {
+    setActiveJobTab(index);
+    const ref = jobTabRefs[index];
+    if (ref?.current) {
+      ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
   
   // useMemo hooks must also be called before conditional returns
   const questionPlan = useMemo(
@@ -726,15 +746,17 @@ export default function DemoEnPage() {
                 {["Basic Info", "Requirements", "Responsibilities", "Compensation", "Visa & Others", "Resume Screening", "Interview Process"].map((tab, idx) => (
                   <div 
                     key={tab}
+                    onClick={() => scrollToSection(idx)}
                     style={{
                       padding: "8px 14px",
                       borderRadius: 6,
                       fontSize: 12,
                       fontWeight: 500,
                       whiteSpace: "nowrap",
-                      background: idx === 0 ? "#059669" : "transparent",
-                      color: idx === 0 ? "#fff" : "#64748b",
-                      cursor: "default"
+                      background: activeJobTab === idx ? "#059669" : "transparent",
+                      color: activeJobTab === idx ? "#fff" : "#64748b",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease"
                     }}
                   >
                     {tab}
@@ -743,7 +765,7 @@ export default function DemoEnPage() {
               </div>
 
               {/* Basic Information Section */}
-              <div style={{ marginBottom: 24 }}>
+              <div ref={basicInfoRef} style={{ marginBottom: 24, scrollMarginTop: 100 }}>
                 <div style={{ 
                   display: "flex", 
                   alignItems: "center", 
@@ -764,7 +786,7 @@ export default function DemoEnPage() {
                     <label className="input-label">Job Title *</label>
                     <input
                       className="form-input"
-                      value="SEO Specialist"
+                      value="RPA Developer"
                       readOnly
                       style={{ background: "#f8fafc", cursor: "default" }}
                     />
@@ -813,7 +835,7 @@ export default function DemoEnPage() {
               </div>
 
               {/* Requirements Section */}
-              <div style={{ marginBottom: 24 }}>
+              <div ref={requirementsRef} style={{ marginBottom: 24, scrollMarginTop: 100 }}>
                 <div style={{ 
                   display: "flex", 
                   alignItems: "center", 
@@ -834,7 +856,7 @@ export default function DemoEnPage() {
                     <label className="input-label">Educational Background</label>
                     <input
                       className="form-input"
-                      value="Bachelor's in Marketing, Communications, or related field"
+                      value="Bachelor's in Computer Science, IT, or related field"
                       readOnly
                       style={{ background: "#f8fafc", cursor: "default" }}
                     />
@@ -855,7 +877,7 @@ export default function DemoEnPage() {
                   <textarea
                     className="form-input"
                     rows={3}
-                    value="Google Analytics, Google Search Console, SEMrush, Ahrefs, Moz, Screaming Frog, HTML/CSS basics, WordPress"
+                    value="UiPath, Automation Anywhere, Blue Prism, Python, .NET, SQL, REST APIs, Process Mining Tools"
                     readOnly
                     style={{ background: "#f8fafc", cursor: "default", resize: "none" }}
                   />
@@ -867,7 +889,7 @@ export default function DemoEnPage() {
                     <textarea
                       className="form-input"
                       rows={3}
-                      value="Keyword research and analysis&#10;On-page and off-page SEO&#10;Content optimization&#10;Link building strategies"
+                      value="UiPath Studio development&#10;Process analysis and documentation&#10;Bot deployment and monitoring&#10;Exception handling and logging"
                       readOnly
                       style={{ background: "#f8fafc", cursor: "default", resize: "none" }}
                     />
@@ -877,7 +899,7 @@ export default function DemoEnPage() {
                     <textarea
                       className="form-input"
                       rows={3}
-                      value="Technical SEO audits&#10;Schema markup&#10;International SEO experience&#10;E-commerce SEO"
+                      value="Blue Prism or Automation Anywhere&#10;Machine Learning integration&#10;OCR and Document Understanding&#10;Orchestrator administration"
                       readOnly
                       style={{ background: "#f8fafc", cursor: "default", resize: "none" }}
                     />
@@ -886,7 +908,7 @@ export default function DemoEnPage() {
               </div>
 
               {/* Responsibilities Section */}
-              <div style={{ marginBottom: 24 }}>
+              <div ref={responsibilitiesRef} style={{ marginBottom: 24, scrollMarginTop: 100 }}>
                 <div style={{ 
                   display: "flex", 
                   alignItems: "center", 
@@ -907,7 +929,7 @@ export default function DemoEnPage() {
                   <textarea
                     className="form-input"
                     rows={4}
-                    value="Conduct keyword research and analysis&#10;Optimize website content and landing pages for SEO&#10;Monitor and analyze SEO performance metrics&#10;Stay updated with SEO trends and algorithm changes"
+                    value="Design and develop RPA bots using UiPath/Automation Anywhere&#10;Analyze business processes for automation opportunities&#10;Deploy, monitor and maintain production bots&#10;Collaborate with business teams to gather requirements"
                     readOnly
                     style={{ background: "#f8fafc", cursor: "default", resize: "none" }}
                   />
@@ -918,7 +940,7 @@ export default function DemoEnPage() {
                   <textarea
                     className="form-input"
                     rows={2}
-                    value="Content team, Web developers, Marketing managers, Product team"
+                    value="Business Analysts, IT Infrastructure team, Process Owners, QA team"
                     readOnly
                     style={{ background: "#f8fafc", cursor: "default", resize: "none" }}
                   />
@@ -926,7 +948,7 @@ export default function DemoEnPage() {
               </div>
 
               {/* Compensation Section */}
-              <div style={{ marginBottom: 24 }}>
+              <div ref={compensationRef} style={{ marginBottom: 24, scrollMarginTop: 100 }}>
                 <div style={{ 
                   display: "flex", 
                   alignItems: "center", 
@@ -947,7 +969,7 @@ export default function DemoEnPage() {
                     <label className="input-label">Salary Min</label>
                     <input
                       className="form-input"
-                      value="$70,000"
+                      value="$85,000"
                       readOnly
                       style={{ background: "#f8fafc", cursor: "default" }}
                     />
@@ -956,7 +978,7 @@ export default function DemoEnPage() {
                     <label className="input-label">Salary Max</label>
                     <input
                       className="form-input"
-                      value="$95,000"
+                      value="$120,000"
                       readOnly
                       style={{ background: "#f8fafc", cursor: "default" }}
                     />
@@ -984,8 +1006,87 @@ export default function DemoEnPage() {
                 </div>
               </div>
 
+              {/* Visa & Others Section */}
+              <div ref={visaRef} style={{ marginBottom: 24, scrollMarginTop: 100 }}>
+                <div style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8, 
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: "1px solid #e2e8f0"
+                }}>
+                  <span style={{ fontSize: 18 }}>🌍</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Visa & Others</div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>Specify visa sponsorship and other requirements</div>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <div>
+                    <label className="input-label">Visa Sponsorship</label>
+                    <input
+                      className="form-input"
+                      value="Available for qualified candidates"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="input-label">Work Authorization</label>
+                    <input
+                      className="form-input"
+                      value="US work authorization required"
+                      readOnly
+                      style={{ background: "#f8fafc", cursor: "default" }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Resume Screening Section */}
+              <div ref={resumeScreeningRef} style={{ marginBottom: 24, scrollMarginTop: 100 }}>
+                <div style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8, 
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: "1px solid #e2e8f0"
+                }}>
+                  <span style={{ fontSize: 18 }}>📋</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Resume Screening</div>
+                    <div style={{ fontSize: 12, color: "#64748b" }}>AI-powered resume screening criteria</div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label className="input-label">Screening Criteria</label>
+                  <textarea
+                    className="form-input"
+                    rows={3}
+                    value="Minimum 3 years RPA development experience&#10;UiPath Advanced Developer Certification&#10;Strong problem-solving skills&#10;Experience with enterprise automation projects"
+                    readOnly
+                    style={{ background: "#f8fafc", cursor: "default", resize: "none" }}
+                  />
+                </div>
+
+                <div>
+                  <label className="input-label">Auto-Reject Criteria</label>
+                  <textarea
+                    className="form-input"
+                    rows={2}
+                    value="No RPA tool experience&#10;Unable to work in specified timezone"
+                    readOnly
+                    style={{ background: "#f8fafc", cursor: "default", resize: "none" }}
+                  />
+                </div>
+              </div>
+
               {/* Interview Process Section */}
-              <div style={{ marginBottom: 24 }}>
+              <div ref={interviewProcessRef} style={{ marginBottom: 24, scrollMarginTop: 100 }}>
                 <div style={{ 
                   display: "flex", 
                   alignItems: "center", 
@@ -1024,13 +1125,14 @@ export default function DemoEnPage() {
                     borderTop: "1px solid #e2e8f0"
                   }}>
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: "#1e293b" }}>Interview Questions (4)</div>
+                      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: "#1e293b" }}>Interview Questions (5)</div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {[
-                          "Can you walk me through your experience with keyword research and SEO tools?",
-                          "How do you approach optimizing website content for search engines?",
-                          "Describe a successful SEO campaign you've led and the results achieved.",
-                          "How do you stay updated with the latest SEO trends and algorithm changes?"
+                          "Can you walk me through your experience with UiPath and Automation Anywhere?",
+                          "How do you approach analyzing a business process for automation feasibility?",
+                          "Describe a complex RPA bot you've developed and the challenges you faced.",
+                          "How do you handle exceptions and error logging in your automation workflows?",
+                          "What is your experience with Orchestrator and bot deployment in production?"
                         ].map((q, i) => (
                           <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <span style={{ fontSize: 12, color: "#64748b", minWidth: 20 }}>{i + 1}.</span>
@@ -1048,7 +1150,7 @@ export default function DemoEnPage() {
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: "#1e293b" }}>Evaluation Criteria</div>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        {["Communication", "Culture fit", "Technical", "Team player"].map((c) => (
+                        {["Technical Skills", "Problem Solving", "Communication", "Process Analysis", "Team Collaboration"].map((c) => (
                           <span 
                             key={c}
                             style={{
@@ -1082,7 +1184,7 @@ export default function DemoEnPage() {
               }}>
                 <span style={{ fontSize: 16 }}>ℹ️</span>
                 <span style={{ fontSize: 13, color: "#92400e" }}>
-                  This is a demo preview. All fields are pre-filled and read-only for the SEO Specialist position.
+                  This is a demo preview. All fields are pre-filled and read-only for the RPA Developer position.
                 </span>
               </div>
 
@@ -1177,7 +1279,7 @@ export default function DemoEnPage() {
                     />
                     <input
                       className="form-input"
-                      value="6500"
+                      value="8500"
                       readOnly
                       style={{ background: "#f8fafc", cursor: "default" }}
                     />
@@ -1236,7 +1338,7 @@ export default function DemoEnPage() {
                   </div>
                   <div style={{ marginTop: 12, fontSize: 12, color: "#64748b" }}>
                     <span style={{ background: "#dcfce7", color: "#166534", padding: "4px 8px", borderRadius: 4 }}>
-                      john_anderson_resume.pdf
+                      john_anderson_rpa_resume.pdf
                     </span>
                     <span style={{ margin: "0 8px", color: "#94a3b8" }}>•</span>
                     <span>245 KB</span>
@@ -1264,7 +1366,7 @@ export default function DemoEnPage() {
                 <textarea
                   className="form-input"
                   rows={5}
-                  value="I am excited to apply for the SEO Specialist position at HireGenAI. With over 4 years of experience in search engine optimization and a proven track record of improving organic search rankings, I believe my skills in keyword research, content optimization, and technical SEO align perfectly with your requirements. I have successfully managed SEO campaigns that resulted in 40% increase in organic traffic and 25% improvement in conversion rates. My expertise with tools like Google Analytics, SEMrush, and Ahrefs, combined with my passion for staying updated with the latest SEO trends, makes me confident in my ability to contribute significantly to your team's success."
+                  value="I am excited to apply for the RPA Developer position at HireGenAI. With over 4 years of experience in robotic process automation and a proven track record of implementing enterprise-grade automation solutions, I believe my skills in UiPath development, process analysis, and bot deployment align perfectly with your requirements. I have successfully automated 50+ business processes that resulted in 60% reduction in manual effort and 40% improvement in operational efficiency. My expertise with UiPath Studio, Orchestrator, and process mining tools, combined with my UiPath Advanced Developer Certification and passion for optimizing business workflows, makes me confident in my ability to contribute significantly to your team's success."
                   readOnly
                   style={{ background: "#f8fafc", cursor: "default", resize: "none" }}
                 />
@@ -1363,7 +1465,7 @@ export default function DemoEnPage() {
                     <label className="input-label">Portfolio/Website</label>
                     <input
                       className="form-input"
-                      value="https://johnanderson-seo.com"
+                      value="https://johnanderson-rpa.com"
                       readOnly
                       style={{ background: "#f8fafc", cursor: "default" }}
                     />
@@ -1421,7 +1523,7 @@ export default function DemoEnPage() {
 
         {/* interview screen */}
         {screen === "interview" && (
-          <section className="interview-container">
+          <section className="interview-container" style={{ position: 'relative' }}>
             <div className="main-video-container">
               <video ref={localVideoRef} autoPlay muted playsInline id="localVideo" />
               <div className="control-bar">
@@ -1480,8 +1582,34 @@ export default function DemoEnPage() {
               </div>
             </div>
 
-            
-                      </section>
+            {/* Avatar Video Container */}
+            <div className="avatar-video-container" style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              width: '200px',
+              height: '200px',
+              borderRadius: '12px',
+              overflow: 'hidden',
+              backgroundColor: '#1e293b',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+              border: '2px solid #3b82f6',
+              zIndex: 10
+            }}>
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover'
+                }}
+                src="https://storage.googleapis.com/ai_recruiter_bucket_prod/assets/videos/olivia_character_no_audio.mp4"
+              />
+            </div>
+          </section>
         )}
 
         {/* assessment screen */}
