@@ -49,36 +49,36 @@ export default function DemoReport() {
                 </h1>
               </div>
               <nav className="hidden md:ml-10 md:flex md:space-x-8">
-                <a
-                  href="#product"
+                <Link
+                  href="/demo-en"
                   className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
                 >
                   Product
-                </a>
-                <a
-                  href="#solutions"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Solutions
-                </a>
+                </Link>
                 <Link
                   href="/pricing"
                   className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
                 >
                   Pricing
                 </Link>
-                <a
-                  href="#resources"
+                <Link
+                  href="/roi"
+                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
+                >
+                  ROI
+                </Link>
+                <Link
+                  href="/about"
+                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
+                >
+                  Solutions
+                </Link>
+                <Link
+                  href="/contact"
                   className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
                 >
                   Resources
-                </a>
-                <a
-                  href="#company"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Company
-                </a>
+                </Link>
               </nav>
             </div>
             <div className="flex items-center space-x-4">

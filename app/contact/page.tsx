@@ -8,32 +8,59 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import Link from "next/link"
-import { ArrowRight, Mail, MessageSquare, Zap } from "lucide-react"
+import { ArrowRight, Mail, MessageSquare, Zap, Facebook, Instagram, Youtube, Linkedin, Lock, Star } from "lucide-react"
 
 export default function ContactPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
+    fullName: '',
+    workEmail: '',
+    companyName: '',
+    phoneNumber: '',
     subject: '',
     message: ''
   })
   const [agreed, setAgreed] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!agreed) return
     
-    // Here you would typically send the form data to your backend
-    console.log('Contact form submitted:', formData)
-    setSubmitted(true)
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          workEmail: formData.workEmail,
+          companyName: formData.companyName,
+          phoneNumber: formData.phoneNumber,
+          subject: formData.subject,
+          message: formData.message,
+          agreedToTerms: agreed
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to submit form')
+      }
+
+      const result = await response.json()
+      console.log('Form submitted successfully:', result)
+      setSubmitted(true)
+    } catch (error) {
+      console.error('Error submitting form:', error)
+      alert('Failed to send message. Please try again.')
+    }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50">
       {/* Header - Same as Homepage */}
-      <header className="bg-white border-b border-gray-100">
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
@@ -46,24 +73,30 @@ export default function ContactPage() {
                 </Link>
               </div>
               <nav className="hidden md:ml-10 md:flex md:space-x-8">
-                <a
-                  href="#product"
+                <Link
+                  href="/demo-en"
                   className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
                 >
                   Product
-                </a>
+                </Link>
                 <Link
                   href="/pricing"
                   className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
                 >
                   Pricing
                 </Link>
-                <a
-                  href="#company"
+                <Link
+                  href="/roi"
+                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
+                >
+                  ROI
+                </Link>
+                <Link
+                  href="/about"
                   className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
                 >
                   Company
-                </a>
+                </Link>
               </nav>
             </div>
             <div className="flex items-center space-x-4">
@@ -136,27 +169,51 @@ export default function ContactPage() {
                 
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div>
-                    <Label htmlFor="name" className="text-slate-700">Name</Label>
+                    <Label htmlFor="fullName" className="text-slate-700">Full Name</Label>
                     <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      id="fullName"
+                      value={formData.fullName}
+                      onChange={(e) => setFormData({...formData, fullName: e.target.value})}
                       className="mt-1"
-                      placeholder="Your name"
+                      placeholder="Your full name"
                       required
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="email" className="text-slate-700">Business Email</Label>
+                    <Label htmlFor="workEmail" className="text-slate-700">Work Email</Label>
                     <Input
-                      id="email"
+                      id="workEmail"
                       type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      value={formData.workEmail}
+                      onChange={(e) => setFormData({...formData, workEmail: e.target.value})}
                       className="mt-1"
                       placeholder="you@company.com"
                       required
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="companyName" className="text-slate-700">Company Name</Label>
+                    <Input
+                      id="companyName"
+                      value={formData.companyName}
+                      onChange={(e) => setFormData({...formData, companyName: e.target.value})}
+                      className="mt-1"
+                      placeholder="Your company name"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="phoneNumber" className="text-slate-700">Phone Number (Optional)</Label>
+                    <Input
+                      id="phoneNumber"
+                      type="tel"
+                      value={formData.phoneNumber}
+                      onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
+                      className="mt-1"
+                      placeholder="+1 (555) 123-4567"
                     />
                   </div>
 
@@ -207,19 +264,6 @@ export default function ContactPage() {
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
                 </form>
-
-                {/* Promo Note */}
-                <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-                  <p className="text-slate-600 text-sm mb-3">
-                    <span className="font-semibold text-emerald-600">14-day trial</span> with no upfront payment — pay only when satisfied.
-                  </p>
-                  <Link href="/signup">
-                    <Button variant="outline" className="text-emerald-600 border-emerald-600 hover:bg-emerald-50">
-                      Sign Up Now
-                      <ArrowRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  </Link>
-                </div>
               </>
             ) : (
               <div className="text-center py-8">
@@ -244,9 +288,146 @@ export default function ContactPage() {
       </div>
 
       {/* Footer */}
-      <footer className="bg-white border-t mt-16 py-8">
-        <div className="max-w-7xl mx-auto px-4 text-center text-slate-500 text-sm">
-          <p>&copy; 2024 HireGenAI. All rights reserved.</p>
+      <footer className="bg-slate-900 text-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Main Footer Content */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-12">
+            {/* Left Section - Brand Block */}
+            <div className="md:col-span-3">
+              <h3 className="text-2xl font-bold mb-2">
+                <span className="text-white">Hire</span>
+                <span className="text-emerald-400">GenAI</span>
+              </h3>
+              <p className="text-sm text-slate-400 mb-4">By SKYGENAI</p>
+              <p className="text-slate-400 mb-6 text-sm leading-relaxed">
+                HireGenAI pre-screens and interviews candidates, helping you shortlist talent 20x faster and more efficiently.
+              </p>
+              <p className="text-slate-400 mb-6 text-sm font-medium">
+                Email: <a href="mailto:support@hire-genai.com" className="text-emerald-400 hover:text-emerald-300 transition-colors">support@hire-genai.com</a>
+              </p>
+              {/* Social Icons */}
+              <div className="flex space-x-4">
+                <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
+                  <Facebook className="w-5 h-5" />
+                </a>
+                <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
+                  <Instagram className="w-5 h-5" />
+                </a>
+                <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
+                  <Youtube className="w-5 h-5" />
+                </a>
+                <a href="https://www.linkedin.com/company/hire-genai" className="text-slate-400 hover:text-emerald-400 transition-colors">
+                  <Linkedin className="w-5 h-5" />
+                </a>
+              </div>
+            </div>
+
+            {/* Product Section */}
+            <div className="md:col-span-2">
+              <h4 className="font-semibold mb-4 text-white text-sm uppercase tracking-wide">Product</h4>
+              <ul className="space-y-3 text-slate-400 text-sm">
+                <li>
+                  <Link href="/demo-en" className="hover:text-emerald-400 transition-colors">
+                    Try the Demo
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/pricing" className="hover:text-emerald-400 transition-colors">
+                    Pricing
+                  </Link>
+                </li>
+                <li>
+                  <a href="#assessment" className="hover:text-emerald-400 transition-colors">
+                    Assessment
+                  </a>
+                </li>
+                <li>
+                  <a href="#faq" className="hover:text-emerald-400 transition-colors">
+                    FAQs
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Company Section */}
+            <div className="md:col-span-2">
+              <h4 className="font-semibold mb-4 text-white text-sm uppercase tracking-wide">Company</h4>
+              <ul className="space-y-3 text-slate-400 text-sm">
+                <li>
+                  <Link href="/about" className="hover:text-emerald-400 transition-colors">
+                    About us
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/contact" className="hover:text-emerald-400 transition-colors">
+                    Contact
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/book-meeting" className="hover:text-emerald-400 transition-colors">
+                    Book a Meeting
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/owner-login" className="hover:text-emerald-400 transition-colors">
+                    Admin
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Legal Section */}
+            <div className="md:col-span-2">
+              <h4 className="font-semibold mb-4 text-white text-sm uppercase tracking-wide">Legal</h4>
+              <ul className="space-y-3 text-slate-400 text-sm">
+                <li>
+                  <Link href="/privacy" className="hover:text-emerald-400 transition-colors">
+                    Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/terms" className="hover:text-emerald-400 transition-colors">
+                    Terms and Conditions
+                  </Link>
+                </li>
+                <li>
+                  <a href="#" className="hover:text-emerald-400 transition-colors">
+                    Imprint
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Right Section - Badges Block */}
+            <div className="md:col-span-3">
+              <div className="space-y-4">
+                {/* Trustpilot Badge */}
+                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                  <p className="text-xs text-slate-400 mb-2 font-semibold">Trustpilot</p>
+                  <div className="flex items-center gap-2 mb-2">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                    ))}
+                  </div>
+                  <p className="text-sm font-semibold text-white">TrustScore 4.5</p>
+                </div>
+
+                {/* GDPR Compliant Badge */}
+                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Lock className="w-4 h-4 text-emerald-400" />
+                    <p className="text-sm font-semibold text-white">GDPR COMPLIANT</p>
+                  </div>
+                  <p className="text-xs text-slate-400">Your data is secure and compliant</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer Bottom */}
+          <div className="border-t border-slate-800 pt-8 text-center text-slate-400 text-sm">
+            <p>&copy; 2024 HireGenAI. All rights reserved.</p>
+          </div>
         </div>
       </footer>
     </div>
