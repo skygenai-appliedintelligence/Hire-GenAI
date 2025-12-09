@@ -24,6 +24,7 @@ export default function AboutPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [showLoginModal, setShowLoginModal] = useState(false)
+  const [loginModalTab, setLoginModalTab] = useState<"demo" | "signin">("signin")
 
   if (loading) {
     return (
@@ -168,10 +169,45 @@ export default function AboutPage() {
               </div>
             </div>
 
+            {/* Contact CTA */}
+            <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white p-12 rounded-3xl text-center shadow-2xl">
+              <h2 className="text-4xl font-bold mb-3">Join Our Journey</h2>
+              <p className="text-lg mb-10 text-emerald-50 max-w-2xl mx-auto">
+                We're building the future of recruitment. Be part of the revolution.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center items-center flex-wrap">
+                <Link href="/contact">
+                  <Button className="bg-white text-emerald-600 hover:bg-emerald-50 font-semibold px-7 py-2.5 h-auto rounded-lg transition-all duration-200 hover:shadow-lg">
+                    Get in Touch
+                  </Button>
+                </Link>
+                <Link href="/book-meeting">
+                  <Button className="bg-white text-emerald-600 hover:bg-emerald-50 font-semibold px-7 py-2.5 h-auto rounded-lg transition-all duration-200 hover:shadow-lg">
+                    Book a Meeting
+                  </Button>
+                </Link>
+                <Button 
+                  onClick={() => {
+                    setLoginModalTab("demo")
+                    setShowLoginModal(true)
+                  }}
+                  className="bg-white text-emerald-600 hover:bg-emerald-50 font-semibold px-7 py-2.5 h-auto rounded-lg transition-all duration-200 hover:shadow-lg"
+                >
+                  Demo Sign In
+                </Button>
+                <Button 
+                  onClick={() => window.location.href = '/contact'}
+                  className="bg-white text-emerald-600 hover:bg-emerald-50 font-semibold px-7 py-2.5 h-auto rounded-lg transition-all duration-200 hover:shadow-lg"
+                >
+                  Contact Us
+                </Button>
+              </div>
+            </div>
+
             {/* Founders Section */}
             <div>
               <h2 className="text-3xl font-bold text-slate-800 mb-12 text-center">Meet Our Founders</h2>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
                 {/* Sandeep Yadav */}
                 <div className="bg-white p-8 rounded-2xl border-2 border-emerald-200 shadow-lg hover:shadow-emerald-500/20 transition-shadow duration-300">
                   <div className="text-center mb-6">
@@ -182,13 +218,39 @@ export default function AboutPage() {
                     <p className="text-emerald-600 font-semibold">Founder / CEO / CTO</p>
                   </div>
                   <p className="text-slate-600 leading-relaxed mb-4">
-                    I am an AI, Robotics, and Cognitive Automation Solution Architect at a leading consulting firm in Singapore, with over 15 years of experience driving innovation and transformation through technologies such as RPA and conversational AI.
+                    I am a builder at heart—someone who turns vision into reality. For over 15 years, I have been designing and scaling intelligent automation systems at a leading global consulting firm, where I specialized in AI, robotics, and cognitive automation.
                   </p>
                   <p className="text-slate-600 leading-relaxed mb-4">
-                    I've led large-scale automation and process reengineering initiatives across diverse industries, including insurance, banking, automotive, and aviation, delivering solutions such as intelligent virtual assistants and enterprise-wide automation strategies.
+                    My role was never just about strategy—it was about building: from architecting enterprise-wide automation frameworks and designing virtual assistants to reengineering processes that saved thousands of hours and millions in operational costs.
+                  </p>
+                  <p className="text-slate-600 leading-relaxed mb-4">
+                    I've delivered large-scale transformations across aviation, banking, automotive, insurance, and manufacturing—each time starting from zero, whether it was establishing an Intelligent Automation Centre of Excellence, implementing an RPA infrastructure, or launching a conversational AI platform.
                   </p>
                   <p className="text-slate-600 leading-relaxed">
-                    I'm currently working on HireGenAI, a visionary project aimed at revolutionizing the recruitment industry through Voice AI, with a strong emphasis on enhancing the candidate experience. This is just the beginning—we envision a future where Voice AI transforms how humans interact across domains like customer service, education, and healthcare.
+                    Now, I'm channelling that same builder's mindset into my own venture: Hire-GenAI, a Voice AI platform set to redefine recruitment by focusing on the human experience. I build. I scale. I transform.
+                  </p>
+                </div>
+
+                {/* Dheeraj Yadav */}
+                <div className="bg-white p-8 rounded-2xl border-2 border-emerald-200 shadow-lg hover:shadow-emerald-500/20 transition-shadow duration-300">
+                  <div className="text-center mb-6">
+                    <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Zap className="w-12 h-12 text-emerald-600" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-800 mb-2">Dheeraj Yadav</h3>
+                    <p className="text-emerald-600 font-semibold">Co-founder & COO</p>
+                  </div>
+                  <p className="text-slate-600 leading-relaxed mb-4">
+                    I'm building the future of recruitment from the ground up. As a cofounder at Hire-GenAi, I partner with industry veteran Sandeep to turn our vision of a human-centric, voice-powered hiring platform into reality.
+                  </p>
+                  <p className="text-slate-600 leading-relaxed mb-4">
+                    My journey started not in a corporate boardroom, but in a college dorm where we first prototyped the idea. I bring a fresh, user-centric perspective—the perspective of a new generation entering the workforce—to tackle the archaic challenges of recruitment.
+                  </p>
+                  <p className="text-slate-600 leading-relaxed mb-4">
+                    My role bridges our ambitious AI architecture with the candidate and recruiter experience, ensuring our technology solves real human problems.
+                  </p>
+                  <p className="text-slate-600 leading-relaxed">
+                    While Sandeep brings 15 years of scaling enterprise AI, I bring the relentless execution, agile learning, and digital-native insight needed to build and iterate at startup speed. We're not just automating hiring; we're re-humanizing it.
                   </p>
                 </div>
 
@@ -202,13 +264,13 @@ export default function AboutPage() {
                     <p className="text-emerald-600 font-semibold">Business Partner</p>
                   </div>
                   <p className="text-slate-600 leading-relaxed mb-4">
-                    A seasoned Talent Acquisition Lead at a French IT multinational firm, based in Singapore, with expertise in social media recruiting, employer branding, and sourcing strategies across APAC.
+                    A seasoned Talent Acquisition Lead with expertise in social media recruiting, employer branding, and sourcing strategies across APAC.
                   </p>
                   <p className="text-slate-600 leading-relaxed mb-4">
                     She specializes in hiring technical talent across Banking, IT, Healthcare, and Retail sectors, partnering closely with business managers to drive impactful hiring outcomes.
                   </p>
                   <p className="text-slate-600 leading-relaxed">
-                    Backed by an MBA from the University of Birmingham, Jyoti is passionate about process improvement, talent management, and inclusive hiring.
+                    Backed by an MBA, she is passionate about process improvement, talent management, and inclusive hiring.
                   </p>
                 </div>
               </div>
@@ -238,26 +300,6 @@ export default function AboutPage() {
                   <h4 className="font-bold text-slate-800 mb-2">Healthcare</h4>
                   <p className="text-slate-600 text-sm">Compassionate virtual assistants for patient support and mental health</p>
                 </div>
-              </div>
-            </div>
-
-            {/* Contact CTA */}
-            <div className="bg-emerald-600 text-white p-8 rounded-2xl text-center">
-              <h2 className="text-3xl font-bold mb-4">Join Our Journey</h2>
-              <p className="text-xl mb-6 text-emerald-100">
-                We're building the future of recruitment. Be part of the revolution.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/contact">
-                  <Button className="bg-white text-emerald-600 hover:bg-gray-100 font-semibold px-8 py-3">
-                    Get in Touch
-                  </Button>
-                </Link>
-                <Link href="/demo-en">
-                  <Button variant="outline" className="border-white text-white hover:bg-white hover:text-emerald-600 font-semibold px-8 py-3">
-                    Try Demo
-                  </Button>
-                </Link>
               </div>
             </div>
           </div>
@@ -409,7 +451,7 @@ export default function AboutPage() {
       </footer>
 
       {/* Modals */}
-      <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} />
+      <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} defaultTab={loginModalTab} />
     </div>
   )
 }

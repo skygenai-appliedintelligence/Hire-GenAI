@@ -366,16 +366,16 @@ export default function BookMeetingPage() {
 
                     {/* Time Slots - Show when date is selected */}
                     {selectedDate && (
-                      <div className="lg:w-64 lg:border-l lg:pl-6 flex flex-col">
+                      <div className="lg:w-48 lg:border-l lg:pl-6 flex flex-col">
                         <p className="font-semibold text-slate-800 mb-4">
                           {formatShortDate(selectedDate).split(',')[0]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}
                         </p>
-                        <div className="space-y-2">
+                        <div className="space-y-2 flex-1 overflow-y-auto" style={{maxHeight: '400px'}}>
                           {TIME_SLOTS.map(time => (
-                            <div key={time} className="flex gap-2 items-center">
+                            <div key={time} className="flex gap-2">
                               <button
                                 onClick={() => handleTimeSelect(time)}
-                                className={`flex-1 py-3 px-4 rounded-lg border text-sm font-medium transition-all min-w-[80px]
+                                className={`flex-1 py-3 px-4 rounded-lg border text-sm font-medium transition-all
                                   ${selectedTime === time 
                                     ? 'bg-slate-800 text-white border-slate-800' 
                                     : 'border-blue-600 text-blue-600 hover:bg-blue-50'
@@ -387,7 +387,7 @@ export default function BookMeetingPage() {
                               {selectedTime === time && (
                                 <Button 
                                   onClick={handleNext}
-                                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 whitespace-nowrap flex-shrink-0 min-w-[60px]"
+                                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 whitespace-nowrap flex-shrink-0"
                                 >
                                   Next
                                 </Button>

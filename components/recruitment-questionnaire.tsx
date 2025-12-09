@@ -136,6 +136,13 @@ export function RecruitmentQuestionnaire() {
   const totalQuestions = 11
 
   const handleNext = () => {
+    if (currentQuestion === 0) {
+      // Validate contact info fields
+      if (!contactInfo.name.trim() || !contactInfo.email.trim() || !contactInfo.company.trim()) {
+        return
+      }
+    }
+    
     if (currentQuestion < totalQuestions - 1) {
       setCurrentQuestion(currentQuestion + 1)
     }
@@ -238,6 +245,22 @@ export function RecruitmentQuestionnaire() {
   }
 
   const progressPercentage = ((currentQuestion + 1) / totalQuestions) * 100
+
+  const isContactInfoValid = () => {
+    return contactInfo.name.trim() !== '' && 
+           contactInfo.email.trim() !== '' && 
+           contactInfo.company.trim() !== ''
+  }
+
+  const isNextButtonDisabled = () => {
+    if (currentQuestion === 0) {
+      return !isContactInfoValid()
+    }
+    if (currentQuestion > 0 && currentQuestion <= questions.length) {
+      return !answers[questions[currentQuestion - 1].id]
+    }
+    return false
+  }
 
   return (
     <section className="py-12 sm:py-20 bg-gradient-to-br from-slate-50 to-emerald-50">
@@ -381,7 +404,11 @@ export function RecruitmentQuestionnaire() {
                   Previous
                 </Button>
                 {currentQuestion < totalQuestions - 1 ? (
-                  <Button onClick={handleNext} className="bg-emerald-600 hover:bg-emerald-700 px-6 order-1 sm:order-2">
+                  <Button 
+                    onClick={handleNext} 
+                    disabled={isNextButtonDisabled()} 
+                    className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed px-6 order-1 sm:order-2"
+                  >
                     {currentQuestion === 0 ? "Start Assessment" : "Next"}
                     <ChevronRight className="w-4 h-4 ml-2" />
                   </Button>
