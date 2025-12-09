@@ -27,6 +27,8 @@ import {
   Star,
   TrendingUp,
   Users,
+  Menu,
+  X,
 } from "lucide-react"
 import { RecruitmentQuestionnaire } from "@/components/recruitment-questionnaire"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
@@ -35,6 +37,7 @@ export default function HomePage() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [showLoginModal, setShowLoginModal] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     if (!loading && user) {
@@ -94,7 +97,7 @@ export default function HomePage() {
                 </Link>
               </nav>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="hidden md:flex items-center space-x-4">
               <Button
                 variant="ghost"
                 onClick={() => setShowLoginModal(true)}
@@ -106,8 +109,75 @@ export default function HomePage() {
                 <Button className="sr-button-primary">Get started</Button>
               </Link>
             </div>
+
+            {/* Mobile menu button */}
+            <div className="md:hidden flex items-center">
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-emerald-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-500 transition-colors"
+              >
+                {mobileMenuOpen ? (
+                  <X className="block h-6 w-6" aria-hidden="true" />
+                ) : (
+                  <Menu className="block h-6 w-6" aria-hidden="true" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Mobile menu panel */}
+        {mobileMenuOpen && (
+          <div className="md:hidden">
+            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white border-t border-gray-100">
+              <Link
+                href="/demo-en"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-emerald-600 hover:bg-gray-50 block px-3 py-2 rounded-md text-base font-medium transition-colors"
+              >
+                Product
+              </Link>
+              <Link
+                href="/pricing"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-emerald-600 hover:bg-gray-50 block px-3 py-2 rounded-md text-base font-medium transition-colors"
+              >
+                Pricing
+              </Link>
+              <Link
+                href="/roi"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-emerald-600 hover:bg-gray-50 block px-3 py-2 rounded-md text-base font-medium transition-colors"
+              >
+                ROI
+              </Link>
+              <Link
+                href="/about"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-emerald-600 hover:bg-gray-50 block px-3 py-2 rounded-md text-base font-medium transition-colors"
+              >
+                Company
+              </Link>
+              <div className="pt-4 pb-3 border-t border-gray-100">
+                <div className="px-3 space-y-2">
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setShowLoginModal(true)
+                      setMobileMenuOpen(false)
+                    }}
+                    className="w-full justify-start text-gray-700 hover:text-emerald-600 hover:bg-gray-50 font-medium transition-colors"
+                  >
+                    Login
+                  </Button>
+                  <Link href="/signup" onClick={() => setMobileMenuOpen(false)}>
+                    <Button className="w-full sr-button-primary">Get started</Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Announcement Banner */}

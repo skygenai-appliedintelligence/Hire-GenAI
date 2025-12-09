@@ -5,7 +5,7 @@ import { useState as useStateNav } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
-import { LoginModal } from "@/components/auth/login-modal";
+import Navbar from "@/components/layout/navbar";
 import Link from "next/link";
 import {
   Facebook,
@@ -83,7 +83,6 @@ export default function DemoEnPage() {
   // ALL hooks must be called at the top before any conditional returns
   const [screen, setScreen] = useState<Screen>("job");
   const { user, loading } = useAuth();
-  const [showLoginModal, setShowLoginModal] = useStateNav(false);
   
   // Job + candidate state
   const [jobTitle, setJobTitle] = useState("RPA Developer");
@@ -570,62 +569,8 @@ export default function DemoEnPage() {
 
   return (
     <div className={`page-wrap ${initialLoading ? "page-wrap--loading" : ""}`}>
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Link href="/">
-                  <h1 className="text-2xl font-bold">
-                    <span className="text-slate-800">Hire</span>
-                    <span className="sr-text-gradient">GenAI</span>
-                  </h1>
-                </Link>
-              </div>
-              <nav className="hidden md:ml-10 md:flex md:space-x-8">
-                <Link
-                  href="/demo-en"
-                  className="text-emerald-600 px-3 py-2 text-sm font-medium border-b-2 border-emerald-600"
-                >
-                  Product
-                </Link>
-                <Link
-                  href="/pricing"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Pricing
-                </Link>
-                <Link
-                  href="/roi"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  ROI
-                </Link>
-                <Link
-                  href="/about"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Company
-                </Link>
-              </nav>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                onClick={() => setShowLoginModal(true)}
-                className="text-gray-700 hover:text-emerald-600 font-medium"
-              >
-                Login
-              </Button>
-              <Link href="/signup">
-                <Button className="sr-button-primary">Get started</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
+      <Navbar />
+      
       {/* Announcement Banner */}
       <div className="bg-emerald-50 border-b border-emerald-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
@@ -705,6 +650,34 @@ export default function DemoEnPage() {
           <section className="screen" style={{ maxWidth: 1000 }}>
             <div className="card" style={{ padding: "28px 32px" }}>
               <h2>Job Details</h2>
+              
+              {/* Demo Preview Notice and Next Button */}
+              <div style={{ 
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                background: "#fef3c7", 
+                border: "1px solid #fcd34d", 
+                borderRadius: 8, 
+                padding: "12px 16px",
+                marginBottom: 24,
+                gap: 16
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+                  <span style={{ fontSize: 16 }}>ℹ️</span>
+                  <span style={{ fontSize: 13, color: "#92400e" }}>
+                    This is a demo preview. All fields are pre-filled and read-only for the RPA Developer position.
+                  </span>
+                </div>
+                <button
+                  className="btn btn-next"
+                  disabled={!canNextFromJob}
+                  onClick={() => goToNext("candidate")}
+                  style={{ flexShrink: 0 }}
+                >
+                  Next
+                </button>
+              </div>
               
               {/* Job Status Bar */}
               <div style={{ 
@@ -1171,32 +1144,6 @@ export default function DemoEnPage() {
                 </div>
               </div>
 
-              {/* Read-only notice */}
-              <div style={{ 
-                background: "#fef3c7", 
-                border: "1px solid #fcd34d", 
-                borderRadius: 8, 
-                padding: "12px 16px",
-                marginBottom: 24,
-                display: "flex",
-                alignItems: "center",
-                gap: 8
-              }}>
-                <span style={{ fontSize: 16 }}>ℹ️</span>
-                <span style={{ fontSize: 13, color: "#92400e" }}>
-                  This is a demo preview. All fields are pre-filled and read-only for the RPA Developer position.
-                </span>
-              </div>
-
-              <div className="button-row">
-                <button
-                  className="btn btn-next"
-                  disabled={!canNextFromJob}
-                  onClick={() => goToNext("candidate")}
-                >
-                  Next
-                </button>
-              </div>
             </div>
           </section>
         )}
@@ -1206,6 +1153,40 @@ export default function DemoEnPage() {
           <section className="screen" style={{ maxWidth: 1000 }}>
             <div className="card" style={{ padding: "28px 32px" }}>
               <h2>Candidate Details</h2>
+              
+              {/* Demo Preview Notice and Navigation Buttons */}
+              <div style={{ 
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                background: "#fef3c7", 
+                border: "1px solid #fcd34d", 
+                borderRadius: 8, 
+                padding: "12px 16px",
+                marginBottom: 24,
+                gap: 16
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+                  <span style={{ fontSize: 16 }}>ℹ️</span>
+                  <span style={{ fontSize: 13, color: "#92400e" }}>
+                    This is a demo preview. All fields are pre-filled and read-only for the candidate application.
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                  <button 
+                    className="btn btn-back" 
+                    onClick={() => goToNext("job")}
+                  >
+                    Back
+                  </button>
+                  <button 
+                    className="btn btn-next" 
+                    onClick={() => goToNext("interview")}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
               
               {/* General Information Section */}
               <div style={{ marginBottom: 24 }}>
@@ -1491,32 +1472,6 @@ export default function DemoEnPage() {
                   </div>
                 </div>
               </div>
-
-              {/* Read-only notice */}
-              <div style={{ 
-                background: "#fef3c7", 
-                border: "1px solid #fcd34d", 
-                borderRadius: 8, 
-                padding: "12px 16px",
-                marginBottom: 24,
-                display: "flex",
-                alignItems: "center",
-                gap: 8
-              }}>
-                <span style={{ fontSize: 16 }}>ℹ️</span>
-                <span style={{ fontSize: 13, color: "#92400e" }}>
-                  This is a demo preview. All fields are pre-filled and read-only for the candidate application.
-                </span>
-              </div>
-
-              <div className="button-row">
-                <button className="btn btn-back" onClick={() => goToNext("job")}>
-                  Back
-                </button>
-                <button className="btn btn-next" onClick={() => goToNext("interview")}>
-                  Next
-                </button>
-              </div>
             </div>
           </section>
         )}
@@ -1614,29 +1569,44 @@ export default function DemoEnPage() {
 
         {/* assessment screen */}
         {screen === "assessment" && (
-          <section className="screen" style={{ maxWidth: 1100, margin: "0 auto", padding: "0 16px" }}>
+          <section className="screen" style={{ 
+            maxWidth: 1100, 
+            margin: "0 auto", 
+            padding: "0 16px",
+            width: "100%",
+            boxSizing: "border-box"
+          }}>
             {/* Header */}
             <div style={{ 
               display: "flex", 
               justifyContent: "space-between", 
-              alignItems: "center", 
-              marginBottom: 24,
+              alignItems: "flex-start", 
+              marginBottom: 20,
               flexWrap: "wrap",
-              gap: 16
+              gap: 12
             }}>
-              <h1 style={{ fontSize: 24, fontWeight: 700, color: "#1e293b" }}>
+              <h1 style={{ 
+                fontSize: "clamp(16px, 5vw, 20px)", 
+                fontWeight: 700, 
+                color: "#1e293b", 
+                lineHeight: 1.3,
+                flex: 1,
+                minWidth: 0,
+                wordBreak: "break-word"
+              }}>
                 Interview Report: <span style={{ color: "#059669" }}>{candidateName || "John Anderson"}</span> — <span style={{ color: "#6366f1" }}>{jobTitle || "SEO Specialist"}</span>
               </h1>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                 <button style={{ 
-                  padding: "8px 16px", 
+                  padding: "8px 12px", 
                   background: "#059669", 
                   color: "white", 
                   border: "none", 
-                  borderRadius: 8,
-                  fontSize: 14,
+                  borderRadius: 6,
+                  fontSize: 12,
                   fontWeight: 500,
-                  cursor: "pointer"
+                  cursor: "pointer",
+                  whiteSpace: "nowrap"
                 }}>
                   Evaluation
                 </button>
@@ -1646,52 +1616,93 @@ export default function DemoEnPage() {
             {/* Overall Score Hero Card */}
             <div style={{ 
               background: "linear-gradient(135deg, #059669 0%, #047857 50%, #065f46 100%)",
-              borderRadius: 16,
-              padding: 32,
+              borderRadius: 12,
+              padding: "clamp(16px, 4vw, 24px)",
               color: "white",
-              marginBottom: 24,
-              boxShadow: "0 10px 40px rgba(5, 150, 105, 0.3)"
+              marginBottom: 20,
+              boxShadow: "0 4px 20px rgba(5, 150, 105, 0.3)",
+              width: "100%",
+              boxSizing: "border-box"
             }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 24 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+              <div style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                justifyContent: "space-between", 
+                flexWrap: "wrap", 
+                gap: "clamp(12px, 3vw, 16px)"
+              }}>
+                <div style={{ 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: "clamp(12px, 3vw, 16px)", 
+                  flex: 1, 
+                  minWidth: 0 
+                }}>
                   <div style={{ 
-                    width: 120, 
-                    height: 120, 
+                    width: "clamp(60px, 15vw, 80px)", 
+                    height: "clamp(60px, 15vw, 80px)", 
                     borderRadius: "50%", 
                     background: "rgba(255,255,255,0.2)", 
                     display: "flex", 
                     flexDirection: "column",
                     alignItems: "center", 
                     justifyContent: "center",
-                    border: "4px solid rgba(255,255,255,0.3)"
+                    border: "3px solid rgba(255,255,255,0.3)",
+                    flexShrink: 0
                   }}>
-                    <div style={{ fontSize: 36, fontWeight: 700 }}>70</div>
-                    <div style={{ fontSize: 12, opacity: 0.8 }}>out of 100</div>
+                    <div style={{ fontSize: "clamp(18px, 5vw, 24px)", fontWeight: 700 }}>70</div>
+                    <div style={{ fontSize: "clamp(8px, 2vw, 10px)", opacity: 0.8 }}>out of 100</div>
                   </div>
-                  <div>
-                    <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Interview Evaluation</h2>
-                    <p style={{ opacity: 0.9, fontSize: 14, marginBottom: 8 }}>Score calculated based on all 10 configured questions</p>
-                    <div style={{ display: "flex", gap: 16, fontSize: 12, opacity: 0.8 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <h2 style={{ 
+                      fontSize: "clamp(14px, 4vw, 18px)", 
+                      fontWeight: 700, 
+                      marginBottom: "clamp(4px, 1vw, 6px)" 
+                    }}>Interview Evaluation</h2>
+                    <p style={{ 
+                      opacity: 0.9, 
+                      fontSize: "clamp(10px, 3vw, 12px)", 
+                      marginBottom: "clamp(4px, 1vw, 6px)",
+                      lineHeight: 1.4
+                    }}>Score calculated based on all 10 configured questions</p>
+                    <div style={{ 
+                      display: "flex", 
+                      gap: "clamp(8px, 2vw, 12px)", 
+                      fontSize: "clamp(9px, 2.5vw, 11px)", 
+                      opacity: 0.8, 
+                      flexWrap: "wrap" 
+                    }}>
                       <span>Questions Asked: 10</span>
                       <span>|</span>
                       <span>Answered: 10</span>
                     </div>
                     <div style={{ 
-                      marginTop: 12, 
+                      marginTop: "clamp(6px, 1.5vw, 8px)", 
                       display: "inline-block", 
                       background: "rgba(255,255,255,0.2)", 
-                      padding: "6px 16px", 
+                      padding: "clamp(3px, 1vw, 4px) clamp(8px, 2vw, 12px)", 
                       borderRadius: 20,
-                      fontSize: 14,
+                      fontSize: "clamp(10px, 3vw, 12px)",
                       fontWeight: 600
                     }}>
                       ✓ Qualified
                     </div>
                   </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 14, opacity: 0.8, marginBottom: 4 }}>Recommendation</div>
-                  <div style={{ fontSize: 20, fontWeight: 600 }}>Hire</div>
+                <div style={{ 
+                  textAlign: "right", 
+                  flexShrink: 0,
+                  minWidth: "fit-content"
+                }}>
+                  <div style={{ 
+                    fontSize: "clamp(10px, 3vw, 12px)", 
+                    opacity: 0.8, 
+                    marginBottom: 2 
+                  }}>Recommendation</div>
+                  <div style={{ 
+                    fontSize: "clamp(14px, 4vw, 16px)", 
+                    fontWeight: 600 
+                  }}>Hire</div>
                 </div>
               </div>
             </div>
@@ -1699,49 +1710,121 @@ export default function DemoEnPage() {
             {/* Criteria Breakdown */}
             <div style={{ 
               background: "white", 
-              borderRadius: 16, 
+              borderRadius: 12, 
               border: "2px solid #e5e7eb", 
-              marginBottom: 24,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.08)"
+              marginBottom: 20,
+              boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+              width: "100%",
+              boxSizing: "border-box"
             }}>
               <div style={{ 
-                padding: "20px 24px", 
+                padding: "clamp(12px, 3vw, 16px) clamp(16px, 4vw, 20px)", 
                 borderBottom: "1px solid #e5e7eb",
                 background: "linear-gradient(to right, #f9fafb, #f3f4f6)"
               }}>
-                <h3 style={{ fontSize: 18, fontWeight: 700, color: "#1e293b", display: "flex", alignItems: "center", gap: 8 }}>
+                <h3 style={{ 
+                  fontSize: "clamp(14px, 4vw, 16px)", 
+                  fontWeight: 700, 
+                  color: "#1e293b", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 8,
+                  lineHeight: 1.3
+                }}>
                   📊 Criteria-Based Score Breakdown
                 </h3>
-                <p style={{ fontSize: 14, color: "#64748b", marginTop: 4 }}>All configured criteria with their evaluation scores</p>
+                <p style={{ 
+                  fontSize: "clamp(10px, 3vw, 12px)", 
+                  color: "#64748b", 
+                  marginTop: 4,
+                  lineHeight: 1.4
+                }}>All configured criteria with their evaluation scores</p>
               </div>
-              <div style={{ padding: 24 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              <div style={{ padding: "clamp(12px, 3vw, 16px)" }}>
+                <div style={{ 
+                  display: "grid", 
+                  gridTemplateColumns: "1fr", 
+                  gap: "clamp(12px, 3vw, 16px)",
+                  width: "100%"
+                }}>
                   {/* Technical */}
                   <div style={{ 
-                    padding: 20, 
-                    borderRadius: 16, 
+                    padding: "clamp(12px, 3vw, 16px)", 
+                    borderRadius: 12, 
                     border: "2px solid #93c5fd",
-                    background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)"
+                    background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+                    width: "100%",
+                    boxSizing: "border-box"
                   }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <div style={{ padding: 10, background: "white", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-                          <span style={{ fontSize: 20 }}>💻</span>
+                    <div style={{ 
+                      display: "flex", 
+                      justifyContent: "space-between", 
+                      alignItems: "flex-start", 
+                      marginBottom: "clamp(8px, 2vw, 12px)" 
+                    }}>
+                      <div style={{ 
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: "clamp(8px, 2vw, 10px)", 
+                        flex: 1, 
+                        minWidth: 0 
+                      }}>
+                        <div style={{ 
+                          padding: "clamp(6px, 1.5vw, 8px)", 
+                          background: "white", 
+                          borderRadius: 8, 
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.08)", 
+                          flexShrink: 0 
+                        }}>
+                          <span style={{ fontSize: "clamp(14px, 3.5vw, 16px)" }}>💻</span>
                         </div>
-                        <div>
-                          <div style={{ fontWeight: 700, color: "#1e40af" }}>Technical</div>
-                          <div style={{ fontSize: 12, color: "#64748b" }}>4 questions</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ 
+                            fontWeight: 700, 
+                            color: "#1e40af", 
+                            fontSize: "clamp(12px, 3vw, 14px)" 
+                          }}>Technical</div>
+                          <div style={{ 
+                            fontSize: "clamp(9px, 2.5vw, 11px)", 
+                            color: "#64748b" 
+                          }}>4 questions</div>
                         </div>
                       </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 28, fontWeight: 700, color: "#1e40af" }}>70</div>
-                        <div style={{ fontSize: 11, color: "#94a3b8" }}>score</div>
+                      <div style={{ 
+                        textAlign: "right", 
+                        flexShrink: 0 
+                      }}>
+                        <div style={{ 
+                          fontSize: "clamp(16px, 4vw, 20px)", 
+                          fontWeight: 700, 
+                          color: "#1e40af" 
+                        }}>70</div>
+                        <div style={{ 
+                          fontSize: "clamp(8px, 2vw, 10px)", 
+                          color: "#94a3b8" 
+                        }}>score</div>
                       </div>
                     </div>
-                    <div style={{ height: 10, background: "white", borderRadius: 5, marginBottom: 12 }}>
-                      <div style={{ height: "100%", width: "70%", background: "linear-gradient(to right, #3b82f6, #6366f1)", borderRadius: 5 }}></div>
+                    <div style={{ 
+                      height: "clamp(6px, 1.5vw, 8px)", 
+                      background: "white", 
+                      borderRadius: 4, 
+                      marginBottom: "clamp(6px, 1.5vw, 10px)" 
+                    }}>
+                      <div style={{ 
+                        height: "100%", 
+                        width: "70%", 
+                        background: "linear-gradient(to right, #3b82f6, #6366f1)", 
+                        borderRadius: 4 
+                      }}></div>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.5)" }}>
+                    <div style={{ 
+                      display: "flex", 
+                      justifyContent: "space-between", 
+                      fontSize: "clamp(9px, 2.5vw, 11px)", 
+                      paddingTop: "clamp(4px, 1vw, 6px)", 
+                      borderTop: "1px solid rgba(255,255,255,0.5)" 
+                    }}>
                       <span style={{ color: "#475569" }}>Weight: 50%</span>
                       <span style={{ fontWeight: 700, color: "#1e40af" }}>+35 pts</span>
                     </div>
@@ -1749,30 +1832,82 @@ export default function DemoEnPage() {
 
                   {/* Communication */}
                   <div style={{ 
-                    padding: 20, 
-                    borderRadius: 16, 
+                    padding: "clamp(12px, 3vw, 16px)", 
+                    borderRadius: 12, 
                     border: "2px solid #86efac",
-                    background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)"
+                    background: "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
+                    width: "100%",
+                    boxSizing: "border-box"
                   }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <div style={{ padding: 10, background: "white", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-                          <span style={{ fontSize: 20 }}>💬</span>
+                    <div style={{ 
+                      display: "flex", 
+                      justifyContent: "space-between", 
+                      alignItems: "flex-start", 
+                      marginBottom: "clamp(8px, 2vw, 12px)" 
+                    }}>
+                      <div style={{ 
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: "clamp(8px, 2vw, 10px)", 
+                        flex: 1, 
+                        minWidth: 0 
+                      }}>
+                        <div style={{ 
+                          padding: "clamp(6px, 1.5vw, 8px)", 
+                          background: "white", 
+                          borderRadius: 8, 
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.08)", 
+                          flexShrink: 0 
+                        }}>
+                          <span style={{ fontSize: "clamp(14px, 3.5vw, 16px)" }}>💬</span>
                         </div>
-                        <div>
-                          <div style={{ fontWeight: 700, color: "#166534" }}>Communication</div>
-                          <div style={{ fontSize: 12, color: "#64748b" }}>2 questions</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ 
+                            fontWeight: 700, 
+                            color: "#166534", 
+                            fontSize: "clamp(12px, 3vw, 14px)" 
+                          }}>Communication</div>
+                          <div style={{ 
+                            fontSize: "clamp(9px, 2.5vw, 11px)", 
+                            color: "#64748b" 
+                          }}>2 questions</div>
                         </div>
                       </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 28, fontWeight: 700, color: "#166534" }}>75</div>
-                        <div style={{ fontSize: 11, color: "#94a3b8" }}>score</div>
+                      <div style={{ 
+                        textAlign: "right", 
+                        flexShrink: 0 
+                      }}>
+                        <div style={{ 
+                          fontSize: "clamp(16px, 4vw, 20px)", 
+                          fontWeight: 700, 
+                          color: "#166534" 
+                        }}>75</div>
+                        <div style={{ 
+                          fontSize: "clamp(8px, 2vw, 10px)", 
+                          color: "#94a3b8" 
+                        }}>score</div>
                       </div>
                     </div>
-                    <div style={{ height: 10, background: "white", borderRadius: 5, marginBottom: 12 }}>
-                      <div style={{ height: "100%", width: "75%", background: "linear-gradient(to right, #22c55e, #10b981)", borderRadius: 5 }}></div>
+                    <div style={{ 
+                      height: "clamp(6px, 1.5vw, 8px)", 
+                      background: "white", 
+                      borderRadius: 4, 
+                      marginBottom: "clamp(6px, 1.5vw, 10px)" 
+                    }}>
+                      <div style={{ 
+                        height: "100%", 
+                        width: "75%", 
+                        background: "linear-gradient(to right, #22c55e, #10b981)", 
+                        borderRadius: 4 
+                      }}></div>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.5)" }}>
+                    <div style={{ 
+                      display: "flex", 
+                      justifyContent: "space-between", 
+                      fontSize: "clamp(9px, 2.5vw, 11px)", 
+                      paddingTop: "clamp(4px, 1vw, 6px)", 
+                      borderTop: "1px solid rgba(255,255,255,0.5)" 
+                    }}>
                       <span style={{ color: "#475569" }}>Weight: 20%</span>
                       <span style={{ fontWeight: 700, color: "#166534" }}>+15 pts</span>
                     </div>
@@ -1780,30 +1915,30 @@ export default function DemoEnPage() {
 
                   {/* Team Player */}
                   <div style={{ 
-                    padding: 20, 
+                    padding: 16, 
                     borderRadius: 16, 
                     border: "2px solid #5eead4",
                     background: "linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%)"
                   }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <div style={{ padding: 10, background: "white", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-                          <span style={{ fontSize: 20 }}>👥</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                        <div style={{ padding: 8, background: "white", borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.08)", flexShrink: 0 }}>
+                          <span style={{ fontSize: 16 }}>👥</span>
                         </div>
-                        <div>
-                          <div style={{ fontWeight: 700, color: "#0f766e" }}>Team Player</div>
-                          <div style={{ fontSize: 12, color: "#64748b" }}>2 questions</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, color: "#0f766e", fontSize: 14 }}>Team Player</div>
+                          <div style={{ fontSize: 11, color: "#64748b" }}>2 questions</div>
                         </div>
                       </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 28, fontWeight: 700, color: "#0f766e" }}>68</div>
-                        <div style={{ fontSize: 11, color: "#94a3b8" }}>score</div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: "#0f766e" }}>68</div>
+                        <div style={{ fontSize: 10, color: "#94a3b8" }}>score</div>
                       </div>
                     </div>
-                    <div style={{ height: 10, background: "white", borderRadius: 5, marginBottom: 12 }}>
-                      <div style={{ height: "100%", width: "68%", background: "linear-gradient(to right, #14b8a6, #06b6d4)", borderRadius: 5 }}></div>
+                    <div style={{ height: 8, background: "white", borderRadius: 4, marginBottom: 10 }}>
+                      <div style={{ height: "100%", width: "68%", background: "linear-gradient(to right, #14b8a6, #06b6d4)", borderRadius: 4 }}></div>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.5)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.5)" }}>
                       <span style={{ color: "#475569" }}>Weight: 15%</span>
                       <span style={{ fontWeight: 700, color: "#0f766e" }}>+10 pts</span>
                     </div>
@@ -1811,30 +1946,30 @@ export default function DemoEnPage() {
 
                   {/* Culture Fit */}
                   <div style={{ 
-                    padding: 20, 
+                    padding: 16, 
                     borderRadius: 16, 
                     border: "2px solid #fdba74",
                     background: "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)"
                   }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <div style={{ padding: 10, background: "white", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-                          <span style={{ fontSize: 20 }}>🤝</span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                        <div style={{ padding: 8, background: "white", borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.08)", flexShrink: 0 }}>
+                          <span style={{ fontSize: 16 }}>🤝</span>
                         </div>
-                        <div>
-                          <div style={{ fontWeight: 700, color: "#c2410c" }}>Culture Fit</div>
-                          <div style={{ fontSize: 12, color: "#64748b" }}>2 questions</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, color: "#c2410c", fontSize: 14 }}>Culture Fit</div>
+                          <div style={{ fontSize: 11, color: "#64748b" }}>2 questions</div>
                         </div>
                       </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 28, fontWeight: 700, color: "#c2410c" }}>65</div>
-                        <div style={{ fontSize: 11, color: "#94a3b8" }}>score</div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: "#c2410c" }}>65</div>
+                        <div style={{ fontSize: 10, color: "#94a3b8" }}>score</div>
                       </div>
                     </div>
-                    <div style={{ height: 10, background: "white", borderRadius: 5, marginBottom: 12 }}>
-                      <div style={{ height: "100%", width: "65%", background: "linear-gradient(to right, #f97316, #fb923c)", borderRadius: 5 }}></div>
+                    <div style={{ height: 8, background: "white", borderRadius: 4, marginBottom: 10 }}>
+                      <div style={{ height: "100%", width: "65%", background: "linear-gradient(to right, #f97316, #fb923c)", borderRadius: 4 }}></div>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.5)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.5)" }}>
                       <span style={{ color: "#475569" }}>Weight: 15%</span>
                       <span style={{ fontWeight: 700, color: "#c2410c" }}>+10 pts</span>
                     </div>
@@ -2378,13 +2513,10 @@ export default function DemoEnPage() {
 
           {/* Footer Bottom */}
           <div className="border-t border-slate-800 pt-8 text-center text-slate-400 text-sm">
-            <p>&copy; 2024 HireGenAI. All rights reserved.</p>
+            <p>&copy; 2025 HireGenAI. All rights reserved.</p>
           </div>
         </div>
       </footer>
-
-      {/* Modals */}
-      <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} />
 
       <style jsx>{`
         :global(body) {
@@ -3029,22 +3161,29 @@ export default function DemoEnPage() {
         }
         @media (max-width: 600px) {
           .progress-bar {
-            flex-direction: column;
-            gap: 16px;
+            flex-direction: row;
+            gap: 8px;
+            padding: 20px 10px;
           }
           .progress-step::before {
-            width: 2px;
-            height: calc(100% - 32px);
-            left: 15px;
-            top: 32px;
+            width: 100%;
+            height: 2px;
+            left: 0;
+            top: 15px;
             transform: none;
           }
           .step-number {
             margin-left: 0;
+            width: 30px;
+            height: 30px;
+            font-size: 12px;
+            line-height: 30px;
           }
           .step-label {
-            text-align: left;
-            margin-left: 44px;
+            text-align: center;
+            margin-left: 0;
+            font-size: 10px;
+            margin-top: 35px;
           }
         }
       `}</style>

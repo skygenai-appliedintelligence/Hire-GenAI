@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import Navbar from '@/components/layout/navbar'
 import { 
   Calculator, 
   ChartLine, 
@@ -250,63 +251,7 @@ export default function ROIPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Link href="/">
-                  <h1 className="text-2xl font-bold">
-                    <span className="text-slate-800">Hire</span>
-                    <span className="text-emerald-500">GenAI</span>
-                  </h1>
-                </Link>
-              </div>
-              <nav className="hidden md:ml-10 md:flex md:space-x-8">
-                <Link
-                  href="/demo-en"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Product
-                </Link>
-                <Link
-                  href="/pricing"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Pricing
-                </Link>
-                <Link
-                  href="/roi"
-                  className="text-emerald-600 px-3 py-2 text-sm font-medium border-b-2 border-emerald-600"
-                >
-                  ROI
-                </Link>
-                <Link
-                  href="/about"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Company
-                </Link>
-              </nav>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                onClick={() => router.push('/login')}
-                className="text-gray-700 hover:text-emerald-600 font-medium"
-              >
-                Login
-              </Button>
-              <Link href="/signup">
-                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                  Get Started
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         {/* Hero Header */}

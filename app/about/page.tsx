@@ -18,13 +18,11 @@ import {
   MessageSquare,
   Target,
 } from "lucide-react"
-import { LoginModal } from "@/components/auth/login-modal"
+import Navbar from "@/components/layout/navbar"
 
 export default function AboutPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [showLoginModal, setShowLoginModal] = useState(false)
-  const [loginModalTab, setLoginModalTab] = useState<"demo" | "signin">("signin")
 
   if (loading) {
     return (
@@ -36,62 +34,8 @@ export default function AboutPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Link href="/">
-                  <h1 className="text-2xl font-bold cursor-pointer">
-                    <span className="text-slate-800">Hire</span>
-                    <span className="sr-text-gradient">GenAI</span>
-                  </h1>
-                </Link>
-              </div>
-              <nav className="hidden md:ml-10 md:flex md:space-x-8">
-                <Link
-                  href="/demo-en"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Product
-                </Link>
-                <Link
-                  href="/pricing"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Pricing
-                </Link>
-                <Link
-                  href="/roi"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  ROI
-                </Link>
-                <Link
-                  href="/about"
-                  className="text-emerald-600 px-3 py-2 text-sm font-medium border-b-2 border-emerald-600"
-                >
-                  Company
-                </Link>
-              </nav>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                onClick={() => setShowLoginModal(true)}
-                className="text-gray-700 hover:text-emerald-600 font-medium"
-              >
-                Login
-              </Button>
-              <Link href="/signup">
-                <Button className="sr-button-primary">Get started</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
+      <Navbar />
+      
       {/* About Content */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -450,8 +394,6 @@ export default function AboutPage() {
         </div>
       </footer>
 
-      {/* Modals */}
-      <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} defaultTab={loginModalTab} />
-    </div>
+      </div>
   )
 }
