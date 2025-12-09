@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
+import Navbar from "@/components/layout/navbar"
 import Link from "next/link"
 import {
   Facebook,
@@ -13,12 +13,10 @@ import {
   Lock,
   Star,
 } from "lucide-react"
-import { LoginModal } from "@/components/auth/login-modal"
 
 export default function TermsAndConditionsPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [showLoginModal, setShowLoginModal] = useState(false)
 
   if (loading) {
     return (
@@ -30,55 +28,7 @@ export default function TermsAndConditionsPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Link href="/">
-                  <h1 className="text-2xl font-bold cursor-pointer">
-                    <span className="text-slate-800">Hire</span>
-                    <span className="sr-text-gradient">GenAI</span>
-                  </h1>
-                </Link>
-              </div>
-              <nav className="hidden md:ml-10 md:flex md:space-x-8">
-                <a
-                  href="/#product"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Product
-                </a>
-                <Link
-                  href="/pricing"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Pricing
-                </Link>
-                <a
-                  href="/#company"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Company
-                </a>
-              </nav>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                onClick={() => setShowLoginModal(true)}
-                className="text-gray-700 hover:text-emerald-600 font-medium"
-              >
-                Login
-              </Button>
-              <Link href="/signup">
-                <Button className="sr-button-primary">Get started</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       {/* Terms and Conditions Content */}
       <section className="py-20 bg-white">
@@ -462,9 +412,6 @@ export default function TermsAndConditionsPage() {
           </div>
         </div>
       </footer>
-
-      {/* Modals */}
-      <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} />
     </div>
   )
 }

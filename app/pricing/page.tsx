@@ -6,14 +6,13 @@ import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { LoginModal } from "@/components/auth/login-modal"
+import Navbar from "@/components/layout/navbar"
 import Link from "next/link"
 import { Check, X, ArrowRight, Star, Facebook, Instagram, Youtube, Linkedin, Lock } from "lucide-react"
 
 export default function PricingPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [showLoginModal, setShowLoginModal] = useState(false)
 
   useEffect(() => {
     if (!loading && user) {
@@ -79,60 +78,8 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <h1 className="text-2xl font-bold">
-                  <span className="text-slate-800">Hire</span>
-                  <span className="sr-text-gradient">GenAI</span>
-                </h1>
-              </div>
-              <nav className="hidden md:ml-10 md:flex md:space-x-8">
-                <Link
-                  href="/demo-en"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Product
-                </Link>
-                <Link
-                  href="/pricing"
-                  className="text-emerald-600 px-3 py-2 text-sm font-medium border-b-2 border-emerald-600"
-                >
-                  Pricing
-                </Link>
-                <Link
-                  href="/roi"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  ROI
-                </Link>
-                <Link
-                  href="/about"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Company
-                </Link>
-              </nav>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                onClick={() => setShowLoginModal(true)}
-                className="text-gray-700 hover:text-emerald-600 font-medium"
-              >
-                Login
-              </Button>
-              <Link href="/signup">
-                <Button className="sr-button-primary">Get started</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
+      <Navbar />
+      
       {/* Hero Section */}
       <section className="sr-hero-bg py-20">
         <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
@@ -441,8 +388,6 @@ export default function PricingPage() {
         </div>
       </footer>
 
-      {/* Modals */}
-      <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} />
-    </div>
+      </div>
   )
 }

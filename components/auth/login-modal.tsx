@@ -15,10 +15,11 @@ import { X, RefreshCw } from "lucide-react"
 interface LoginModalProps {
   open: boolean
   onClose: () => void
+  defaultTab?: "demo" | "signin"
 }
 
-export function LoginModal({ open, onClose }: LoginModalProps) {
-  const [activeTab, setActiveTab] = useState<"demo" | "signin">("signin")
+export function LoginModal({ open, onClose, defaultTab = "signin" }: LoginModalProps) {
+  const [activeTab, setActiveTab] = useState<"demo" | "signin">(defaultTab)
   const [step, setStep] = useState<"email" | "otp">("email")
   const [demoStep, setDemoStep] = useState<"email" | "otp">("email")
   const [email, setEmail] = useState("")
@@ -58,8 +59,10 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
       setDemoOtp("")
       setCountdown(0)
       setDemoCountdown(0)
+    } else {
+      setActiveTab(defaultTab)
     }
-  }, [open])
+  }, [open, defaultTab])
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()

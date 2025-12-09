@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import Link from "next/link"
 import { ArrowRight, Mail, MessageSquare, Zap, Facebook, Instagram, Youtube, Linkedin, Lock, Star } from "lucide-react"
+import Navbar from "@/components/layout/navbar"
 
 export default function ContactPage() {
   const router = useRouter()
@@ -59,62 +60,8 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50">
-      {/* Header - Same as Homepage */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Link href="/">
-                  <h1 className="text-2xl font-bold">
-                    <span className="text-slate-800">Hire</span>
-                    <span className="text-emerald-500">GenAI</span>
-                  </h1>
-                </Link>
-              </div>
-              <nav className="hidden md:ml-10 md:flex md:space-x-8">
-                <Link
-                  href="/demo-en"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Product
-                </Link>
-                <Link
-                  href="/pricing"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Pricing
-                </Link>
-                <Link
-                  href="/roi"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  ROI
-                </Link>
-                <Link
-                  href="/about"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Company
-                </Link>
-              </nav>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                onClick={() => router.push('/login')}
-                className="text-gray-700 hover:text-emerald-600 font-medium"
-              >
-                Login
-              </Button>
-              <Link href="/signup">
-                <Button className="sr-button-primary">Get started</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
+      <Navbar />
+      
       {/* Announcement Banner - Same as Homepage */}
       <div className="bg-emerald-50 border-b border-emerald-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
@@ -307,7 +254,7 @@ export default function ContactPage() {
               </p>
               {/* Social Icons */}
               <div className="flex space-x-4">
-                <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
+                <a href="https://facebook.com/hiregenai" className="text-slate-400 hover:text-emerald-400 transition-colors" target="_blank" rel="noopener noreferrer">
                   <Facebook className="w-5 h-5" />
                 </a>
                 <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors">
@@ -319,8 +266,7 @@ export default function ContactPage() {
                 <a href="https://www.linkedin.com/company/hire-genai" className="text-slate-400 hover:text-emerald-400 transition-colors">
                   <Linkedin className="w-5 h-5" />
                 </a>
-              </div>
-            </div>
+              </div>            </div>
 
             {/* Product Section */}
             <div className="md:col-span-2">

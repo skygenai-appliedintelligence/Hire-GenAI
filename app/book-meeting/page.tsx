@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import Link from "next/link"
-import { LoginModal } from "@/components/auth/login-modal"
+import Navbar from "@/components/layout/navbar"
 
 // Helper functions
 const getDaysInMonth = (year: number, month: number) => {
@@ -48,17 +48,17 @@ const TIME_SLOTS = [
 export default function BookMeetingPage() {
   const router = useRouter()
   const [step, setStep] = useState(1) // 1: Calendar, 2: Time, 3: Details, 4: Confirmation
-  const [showLoginModal, setShowLoginModal] = useState(false)
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth())
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
+    fullName: '',
+    workEmail: '',
+    companyName: '',
+    phoneNumber: '',
     location: 'google-meet-1',
-    notes: '',
-    companyName: ''
+    notes: ''
   })
 
   const today = new Date()
@@ -175,62 +175,8 @@ export default function BookMeetingPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header - Same as Homepage */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Link href="/">
-                  <h1 className="text-2xl font-bold">
-                    <span className="text-slate-800">Hire</span>
-                    <span className="sr-text-gradient">GenAI</span>
-                  </h1>
-                </Link>
-              </div>
-              <nav className="hidden md:ml-10 md:flex md:space-x-8">
-                <Link
-                  href="/demo-en"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Product
-                </Link>
-                <Link
-                  href="/pricing"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Pricing
-                </Link>
-                <Link
-                  href="/roi"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  ROI
-                </Link>
-                <Link
-                  href="/about"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  Company
-                </Link>
-              </nav>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                onClick={() => setShowLoginModal(true)}
-                className="text-gray-700 hover:text-emerald-600 font-medium"
-              >
-                Login
-              </Button>
-              <Link href="/signup">
-                <Button className="sr-button-primary">Get started</Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
+      <Navbar />
+      
       {/* Announcement Banner - Same as Homepage */}
       <div className="bg-emerald-50 border-b border-emerald-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
@@ -244,7 +190,7 @@ export default function BookMeetingPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-lg overflow-visible min-h-[600px]">
           <div className="flex flex-col lg:flex-row">
             {/* Left Column - Meeting Info (Hidden on Step 4) */}
             {step !== 4 && (
@@ -316,7 +262,7 @@ export default function BookMeetingPage() {
                 <>
                   <h2 className="text-xl font-bold text-slate-800 mb-6">Select a Date & Time</h2>
                   
-                  <div className="flex flex-col lg:flex-row gap-8">
+                  <div className="flex flex-col lg:flex-row gap-8 lg:items-start">
                     {/* Calendar */}
                     <div className="flex-1">
                       {/* Month Navigation */}
@@ -365,11 +311,11 @@ export default function BookMeetingPage() {
 
                     {/* Time Slots - Show when date is selected */}
                     {selectedDate && (
-                      <div className="lg:w-48 lg:border-l lg:pl-6">
+                      <div className="lg:w-48 lg:border-l lg:pl-6 flex flex-col">
                         <p className="font-semibold text-slate-800 mb-4">
                           {formatShortDate(selectedDate).split(',')[0]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}
                         </p>
-                        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                        <div className="space-y-2 flex-1 overflow-y-auto" style={{maxHeight: '400px'}}>
                           {TIME_SLOTS.map(time => (
                             <div key={time} className="flex gap-2">
                               <button
@@ -386,7 +332,7 @@ export default function BookMeetingPage() {
                               {selectedTime === time && (
                                 <Button 
                                   onClick={handleNext}
-                                  className="bg-blue-600 hover:bg-blue-700 text-white px-4"
+                                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 whitespace-nowrap flex-shrink-0"
                                 >
                                   Next
                                 </Button>
@@ -407,31 +353,53 @@ export default function BookMeetingPage() {
                   
                   <div className="space-y-5">
                     <div>
-                      <Label htmlFor="name" className="text-slate-700">Name *</Label>
+                      <Label htmlFor="fullName" className="text-slate-700">Full Name *</Label>
                       <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                        id="fullName"
+                        value={formData.fullName}
+                        onChange={(e) => setFormData({...formData, fullName: e.target.value})}
                         className="mt-1"
+                        placeholder="Enter your full name"
                         required
                       />
                     </div>
 
                     <div>
-                      <Label htmlFor="email" className="text-slate-700">Email *</Label>
+                      <Label htmlFor="workEmail" className="text-slate-700">Work Email *</Label>
                       <Input
-                        id="email"
+                        id="workEmail"
                         type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        value={formData.workEmail}
+                        onChange={(e) => setFormData({...formData, workEmail: e.target.value})}
                         className="mt-1"
+                        placeholder="you@company.com"
                         required
                       />
                     </div>
 
-                    <Button variant="outline" size="sm" className="text-blue-600 border-blue-600">
-                      Add Guests
-                    </Button>
+                    <div>
+                      <Label htmlFor="companyName" className="text-slate-700">Company Name *</Label>
+                      <Input
+                        id="companyName"
+                        value={formData.companyName}
+                        onChange={(e) => setFormData({...formData, companyName: e.target.value})}
+                        className="mt-1"
+                        placeholder="Your company name"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="phoneNumber" className="text-slate-700">Phone Number (Optional)</Label>
+                      <Input
+                        id="phoneNumber"
+                        type="tel"
+                        value={formData.phoneNumber}
+                        onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
+                        className="mt-1"
+                        placeholder="+1 (555) 000-0000"
+                      />
+                    </div>
 
                     <div>
                       <Label className="text-slate-700">Location *</Label>
@@ -440,20 +408,18 @@ export default function BookMeetingPage() {
                         onValueChange={(value) => setFormData({...formData, location: value})}
                         className="mt-2 space-y-2"
                       >
-                        {[1, 2, 3].map(i => (
-                          <div key={i} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-slate-50">
-                            <RadioGroupItem value={`google-meet-${i}`} id={`meet-${i}`} />
-                            <div className="flex items-center gap-2">
-                              {/* Google Meet Icon */}
-                              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-                                <rect x="2" y="4" width="14" height="16" rx="2" fill="#00AC47"/>
-                                <path d="M16 8L22 4V20L16 16V8Z" fill="#00832D"/>
-                                <rect x="5" y="9" width="8" height="6" rx="1" fill="white"/>
-                              </svg>
-                              <Label htmlFor={`meet-${i}`} className="cursor-pointer text-slate-700">Google Meet</Label>
-                            </div>
+                        <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-slate-50">
+                          <RadioGroupItem value="google-meet-1" id="meet-1" />
+                          <div className="flex items-center gap-2">
+                            {/* Google Meet Icon */}
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                              <rect x="2" y="4" width="14" height="16" rx="2" fill="#00AC47"/>
+                              <path d="M16 8L22 4V20L16 16V8Z" fill="#00832D"/>
+                              <rect x="5" y="9" width="8" height="6" rx="1" fill="white"/>
+                            </svg>
+                            <Label htmlFor="meet-1" className="cursor-pointer text-slate-700">Google Meet</Label>
                           </div>
-                        ))}
+                        </div>
                       </RadioGroup>
                     </div>
 
@@ -466,17 +432,7 @@ export default function BookMeetingPage() {
                         value={formData.notes}
                         onChange={(e) => setFormData({...formData, notes: e.target.value})}
                         className="mt-1 min-h-[100px]"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="company" className="text-slate-700">Company Name *</Label>
-                      <Input
-                        id="company"
-                        value={formData.companyName}
-                        onChange={(e) => setFormData({...formData, companyName: e.target.value})}
-                        className="mt-1"
-                        required
+                        placeholder="Any specific topics you'd like to discuss..."
                       />
                     </div>
 
@@ -484,7 +440,7 @@ export default function BookMeetingPage() {
                       <Button 
                         onClick={handleSchedule}
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6 text-lg"
-                        disabled={!formData.name || !formData.email || !formData.companyName}
+                        disabled={!formData.fullName || !formData.workEmail || !formData.companyName}
                       >
                         Schedule Event
                       </Button>
@@ -704,8 +660,6 @@ export default function BookMeetingPage() {
         </div>
       </footer>
 
-      {/* Modals */}
-      <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} />
-    </div>
+      </div>
   )
 }

@@ -146,7 +146,7 @@ Need immediate assistance? Contact us at: support@hire-genai.com
       subject: `We've received your message - HireGenAI`,
       html,
       text,
-      from: 'HireGenAI Support <support@hiregenai.com>',
+      from: process.env.EMAIL_FROM_CONTACT || 'HireGenAI Support <support@hire-genai.com>',
     });
   }
 
