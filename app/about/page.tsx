@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
+import { LoginModal } from "@/components/auth/login-modal"
 import Link from "next/link"
 import {
   Facebook,
@@ -19,7 +20,6 @@ import {
   Target,
 } from "lucide-react"
 import Navbar from "@/components/layout/Navbar"
-import { LoginModal } from "@/components/auth/login-modal"
 
 export default function AboutPage() {
   const { user, loading } = useAuth()
@@ -397,7 +397,12 @@ export default function AboutPage() {
         </div>
       </footer>
 
-      <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} />
-    </div>
+      <LoginModal 
+        open={showLoginModal} 
+        onClose={() => setShowLoginModal(false)} 
+        defaultTab={loginModalTab}
+      />
+
+      </div>
   )
 }
