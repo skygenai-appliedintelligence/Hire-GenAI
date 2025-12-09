@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import Navbar from '@/components/layout/navbar'
+import Navbar from '@/components/layout/Navbar'
 import { 
   Calculator, 
   ChartLine, 
