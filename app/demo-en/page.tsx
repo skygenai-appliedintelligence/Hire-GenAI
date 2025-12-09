@@ -5,7 +5,7 @@ import { useState as useStateNav } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
-import Navbar from "@/components/layout/navbar";
+import Navbar from "@/components/layout/Navbar";
 import Link from "next/link";
 import {
   Facebook,

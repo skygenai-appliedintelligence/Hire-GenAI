@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import Link from "next/link"
 import { ArrowRight, Mail, MessageSquare, Zap, Facebook, Instagram, Youtube, Linkedin, Lock, Star } from "lucide-react"
-import Navbar from "@/components/layout/navbar"
+import Navbar from "@/components/layout/Navbar"
 
 export default function ContactPage() {
   const router = useRouter()

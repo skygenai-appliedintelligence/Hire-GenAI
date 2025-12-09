@@ -6,13 +6,16 @@ import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import Navbar from "@/components/layout/navbar"
+import Navbar from "@/components/layout/Navbar"
+import { LoginModal } from "@/components/auth/login-modal"
 import Link from "next/link"
 import { Check, X, ArrowRight, Star, Facebook, Instagram, Youtube, Linkedin, Lock } from "lucide-react"
 
 export default function PricingPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [loginModalTab, setLoginModalTab] = useState<"demo" | "signin">("signin")
 
   useEffect(() => {
     if (!loading && user) {
@@ -388,6 +391,7 @@ export default function PricingPage() {
         </div>
       </footer>
 
+      <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} />
       </div>
   )
 }
