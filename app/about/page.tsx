@@ -18,11 +18,14 @@ import {
   MessageSquare,
   Target,
 } from "lucide-react"
-import Navbar from "@/components/layout/navbar"
+import Navbar from "@/components/layout/Navbar"
+import { LoginModal } from "@/components/auth/login-modal"
 
 export default function AboutPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [loginModalTab, setLoginModalTab] = useState<"demo" | "signin">("signin")
 
   if (loading) {
     return (
@@ -394,6 +397,7 @@ export default function AboutPage() {
         </div>
       </footer>
 
-      </div>
+      <LoginModal open={showLoginModal} onClose={() => setShowLoginModal(false)} />
+    </div>
   )
 }

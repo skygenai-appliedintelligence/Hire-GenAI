@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import Link from "next/link"
-import Navbar from "@/components/layout/navbar"
+import Navbar from "@/components/layout/Navbar"
 
 // Helper functions
 const getDaysInMonth = (year: number, month: number) => {
