@@ -1,5 +1,8 @@
 import { sendMail, sendContactMail } from "./smtp";
 
+// Get support email from SMTP_USER_CONTACT (already in .env) - NO FALLBACK
+const SUPPORT_EMAIL = process.env.SMTP_USER_CONTACT;
+
 export interface EmailTemplate {
   subject: string;
   html: string;
@@ -376,6 +379,345 @@ Thank you for your interest in joining our team!
       html,
       text,
       from: 'HireGenAI <no-reply@hire-genai.com>',
+    });
+  }
+
+  /**
+   * Send meeting booking confirmation to candidate
+   */
+  static async sendMeetingBookingConfirmation({
+    fullName,
+    workEmail,
+    companyName,
+    meetingDate,
+    meetingTime,
+    meetingEndTime,
+    meetingLink,
+    timezone,
+  }: {
+    fullName: string;
+    workEmail: string;
+    companyName: string;
+    meetingDate: string;
+    meetingTime: string;
+    meetingEndTime: string;
+    meetingLink: string;
+    timezone: string;
+  }) {
+    const formattedDate = new Date(meetingDate).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f7fa; padding: 40px 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%;">
+                <!-- Header -->
+                <tr>
+                  <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 30px; border-radius: 16px 16px 0 0; text-align: center;">
+                    <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">Hire<span style="color: #a7f3d0;">GenAI</span></h1>
+                    <p style="color: #d1fae5; margin: 8px 0 0 0; font-size: 14px;">Meeting Confirmed! ✓</p>
+                  </td>
+                </tr>
+                
+                <!-- Main Content -->
+                <tr>
+                  <td style="background: white; padding: 40px 30px; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">
+                    <!-- Greeting -->
+                    <h2 style="color: #1f2937; margin: 0 0 20px 0; font-size: 24px; font-weight: 600;">Hello ${fullName}! 👋</h2>
+                    
+                    <!-- Confirmation Message -->
+                    <p style="color: #4b5563; font-size: 16px; line-height: 1.7; margin: 0 0 25px 0;">
+                      Your meeting with HireGenAI has been successfully scheduled. We're looking forward to speaking with you!
+                    </p>
+                    
+                    <!-- Meeting Details Box -->
+                    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 1px solid #bbf7d0; border-radius: 12px; padding: 25px; margin: 25px 0;">
+                      <h3 style="color: #166534; margin: 0 0 15px 0; font-size: 16px; font-weight: 600;">📅 Meeting Details</h3>
+                      <table style="width: 100%;">
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding: 8px 0; vertical-align: top; width: 100px;">Date:</td>
+                          <td style="color: #1f2937; font-size: 14px; padding: 8px 0; font-weight: 500;">${formattedDate}</td>
+                        </tr>
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding: 8px 0; vertical-align: top;">Time:</td>
+                          <td style="color: #1f2937; font-size: 14px; padding: 8px 0; font-weight: 500;">${meetingTime} - ${meetingEndTime}</td>
+                        </tr>
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding: 8px 0; vertical-align: top;">Timezone:</td>
+                          <td style="color: #1f2937; font-size: 14px; padding: 8px 0; font-weight: 500;">${timezone}</td>
+                        </tr>
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding: 8px 0; vertical-align: top;">Company:</td>
+                          <td style="color: #1f2937; font-size: 14px; padding: 8px 0; font-weight: 500;">${companyName}</td>
+                        </tr>
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding: 8px 0; vertical-align: top;">Duration:</td>
+                          <td style="color: #1f2937; font-size: 14px; padding: 8px 0; font-weight: 500;">30 minutes</td>
+                        </tr>
+                      </table>
+                    </div>
+                    
+                    <!-- Google Meet Link -->
+                    <div style="background: #eff6ff; border-radius: 12px; padding: 20px; margin: 25px 0; text-align: center;">
+                      <p style="color: #1e40af; font-size: 14px; font-weight: 600; margin: 0 0 12px 0;">🎥 Join via Google Meet</p>
+                      <a href="${meetingLink}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);">Join Meeting</a>
+                      <p style="color: #6b7280; font-size: 12px; margin: 12px 0 0 0; word-break: break-all;">${meetingLink}</p>
+                    </div>
+                    
+                    <!-- Tips -->
+                    <div style="background: #fef3c7; border-radius: 12px; padding: 20px; margin: 25px 0;">
+                      <h3 style="color: #92400e; margin: 0 0 10px 0; font-size: 14px; font-weight: 600;">💡 Tips for your meeting</h3>
+                      <ul style="color: #78350f; font-size: 13px; line-height: 1.8; margin: 0; padding-left: 20px;">
+                        <li>Join 5 minutes early to test your audio/video</li>
+                        <li>Ensure you have a stable internet connection</li>
+                        <li>Find a quiet place with good lighting</li>
+                      </ul>
+                    </div>
+                  </td>
+                </tr>
+                
+                <!-- Footer -->
+                <tr>
+                  <td style="background: #f9fafb; padding: 30px; border-radius: 0 0 16px 16px; border: 1px solid #e5e7eb; border-top: none; text-align: center;">
+                    <p style="color: #6b7280; font-size: 14px; margin: 0 0 15px 0;">
+                      Need to reschedule? Contact us at:
+                    </p>
+                    <p style="margin: 0 0 20px 0;">
+                      <a href="mailto:${SUPPORT_EMAIL}" style="color: #10b981; text-decoration: none; font-weight: 500;">${SUPPORT_EMAIL}</a>
+                    </p>
+                    <p style="color: #9ca3af; font-size: 12px; margin: 20px 0 0 0;">
+                      © ${new Date().getFullYear()} HireGenAI by SKYGENAI. All rights reserved.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>`;
+
+    const text = `
+Hello ${fullName}!
+
+Your meeting with HireGenAI has been successfully scheduled.
+
+Meeting Details:
+- Date: ${formattedDate}
+- Time: ${meetingTime} - ${meetingEndTime}
+- Timezone: ${timezone}
+- Company: ${companyName}
+- Duration: 30 minutes
+
+Join via Google Meet: ${meetingLink}
+
+Tips for your meeting:
+- Join 5 minutes early to test your audio/video
+- Ensure you have a stable internet connection
+- Find a quiet place with good lighting
+
+Need to reschedule? Contact us at: ${SUPPORT_EMAIL}
+
+---
+© ${new Date().getFullYear()} HireGenAI by SKYGENAI. All rights reserved.
+    `;
+
+    // Use contact transporter (support@hire-genai.com) like contact page
+    return await sendContactMail({
+      to: workEmail,
+      subject: `Meeting Confirmed - ${formattedDate} at ${meetingTime}`,
+      html,
+      text,
+    });
+  }
+
+  /**
+   * Send meeting booking notification to support team
+   */
+  static async sendMeetingBookingNotification({
+    fullName,
+    workEmail,
+    companyName,
+    phoneNumber,
+    meetingDate,
+    meetingTime,
+    meetingEndTime,
+    meetingLink,
+    timezone,
+    notes,
+    bookingId,
+  }: {
+    fullName: string;
+    workEmail: string;
+    companyName: string;
+    phoneNumber?: string;
+    meetingDate: string;
+    meetingTime: string;
+    meetingEndTime: string;
+    meetingLink: string;
+    timezone: string;
+    notes?: string;
+    bookingId: string;
+  }) {
+    const formattedDate = new Date(meetingDate).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f7fa; padding: 40px 20px;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; width: 100%;">
+                <!-- Header -->
+                <tr>
+                  <td style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); padding: 40px 30px; border-radius: 16px 16px 0 0; text-align: center;">
+                    <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 700;">🗓️ New Meeting Booked!</h1>
+                    <p style="color: #bfdbfe; margin: 8px 0 0 0; font-size: 14px;">Booking ID: ${bookingId}</p>
+                  </td>
+                </tr>
+                
+                <!-- Main Content -->
+                <tr>
+                  <td style="background: white; padding: 40px 30px; border-left: 1px solid #e5e7eb; border-right: 1px solid #e5e7eb;">
+                    <!-- Contact Info -->
+                    <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 25px; margin: 0 0 25px 0;">
+                      <h3 style="color: #0369a1; margin: 0 0 15px 0; font-size: 16px; font-weight: 600;">👤 Contact Information</h3>
+                      <table style="width: 100%;">
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding: 5px 0; width: 120px;">Name:</td>
+                          <td style="color: #1f2937; font-size: 14px; padding: 5px 0; font-weight: 500;">${fullName}</td>
+                        </tr>
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding: 5px 0;">Email:</td>
+                          <td style="color: #1f2937; font-size: 14px; padding: 5px 0;"><a href="mailto:${workEmail}" style="color: #2563eb;">${workEmail}</a></td>
+                        </tr>
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding: 5px 0;">Company:</td>
+                          <td style="color: #1f2937; font-size: 14px; padding: 5px 0; font-weight: 500;">${companyName}</td>
+                        </tr>
+                        ${phoneNumber ? `
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding: 5px 0;">Phone:</td>
+                          <td style="color: #1f2937; font-size: 14px; padding: 5px 0;">${phoneNumber}</td>
+                        </tr>
+                        ` : ''}
+                      </table>
+                    </div>
+                    
+                    <!-- Meeting Details -->
+                    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 1px solid #bbf7d0; border-radius: 12px; padding: 25px; margin: 0 0 25px 0;">
+                      <h3 style="color: #166534; margin: 0 0 15px 0; font-size: 16px; font-weight: 600;">📅 Meeting Details</h3>
+                      <table style="width: 100%;">
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding: 5px 0; width: 120px;">Date:</td>
+                          <td style="color: #1f2937; font-size: 14px; padding: 5px 0; font-weight: 500;">${formattedDate}</td>
+                        </tr>
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding: 5px 0;">Time:</td>
+                          <td style="color: #1f2937; font-size: 14px; padding: 5px 0; font-weight: 500;">${meetingTime} - ${meetingEndTime}</td>
+                        </tr>
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding: 5px 0;">Timezone:</td>
+                          <td style="color: #1f2937; font-size: 14px; padding: 5px 0;">${timezone}</td>
+                        </tr>
+                        <tr>
+                          <td style="color: #6b7280; font-size: 14px; padding: 5px 0;">Duration:</td>
+                          <td style="color: #1f2937; font-size: 14px; padding: 5px 0;">30 minutes</td>
+                        </tr>
+                      </table>
+                    </div>
+                    
+                    <!-- Google Meet Link -->
+                    <div style="background: #eff6ff; border-radius: 12px; padding: 20px; margin: 0 0 25px 0; text-align: center;">
+                      <p style="color: #1e40af; font-size: 14px; font-weight: 600; margin: 0 0 12px 0;">🎥 Google Meet Link</p>
+                      <a href="${meetingLink}" style="display: inline-block; background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">Join Meeting</a>
+                      <p style="color: #6b7280; font-size: 12px; margin: 12px 0 0 0; word-break: break-all;">${meetingLink}</p>
+                    </div>
+                    
+                    ${notes ? `
+                    <!-- Notes -->
+                    <div style="background: #fef3c7; border-radius: 12px; padding: 20px;">
+                      <h3 style="color: #92400e; margin: 0 0 10px 0; font-size: 14px; font-weight: 600;">📝 Additional Notes</h3>
+                      <p style="color: #78350f; font-size: 14px; line-height: 1.6; margin: 0;">${notes}</p>
+                    </div>
+                    ` : ''}
+                  </td>
+                </tr>
+                
+                <!-- Footer -->
+                <tr>
+                  <td style="background: #f9fafb; padding: 20px 30px; border-radius: 0 0 16px 16px; border: 1px solid #e5e7eb; border-top: none; text-align: center;">
+                    <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                      This is an automated notification from HireGenAI booking system.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>`;
+
+    const text = `
+New Meeting Booked!
+Booking ID: ${bookingId}
+
+Contact Information:
+- Name: ${fullName}
+- Email: ${workEmail}
+- Company: ${companyName}
+${phoneNumber ? `- Phone: ${phoneNumber}` : ''}
+
+Meeting Details:
+- Date: ${formattedDate}
+- Time: ${meetingTime} - ${meetingEndTime}
+- Timezone: ${timezone}
+- Duration: 30 minutes
+
+Google Meet Link: ${meetingLink}
+
+${notes ? `Additional Notes:\n${notes}` : ''}
+
+---
+This is an automated notification from HireGenAI booking system.
+    `;
+
+    // Only send if SUPPORT_EMAIL is configured in .env
+    if (!SUPPORT_EMAIL) {
+      console.warn('⚠️ [EMAIL] SUPPORT_EMAIL not configured in .env - skipping support notification');
+      return null;
+    }
+
+    // Use contact transporter (support@hire-genai.com) like contact page
+    return await sendContactMail({
+      to: SUPPORT_EMAIL,
+      subject: `New Meeting Booking - ${fullName} from ${companyName}`,
+      html,
+      text,
+      replyTo: workEmail,
     });
   }
 

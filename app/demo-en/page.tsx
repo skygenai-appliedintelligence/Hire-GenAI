@@ -652,18 +652,8 @@ export default function DemoEnPage() {
               <h2>Job Details</h2>
               
               {/* Demo Preview Notice and Next Button */}
-              <div style={{ 
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                background: "#fef3c7", 
-                border: "1px solid #fcd34d", 
-                borderRadius: 8, 
-                padding: "12px 16px",
-                marginBottom: 24,
-                gap: 16
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+              <div className="demo-notice-box">
+                <div className="demo-notice-content">
                   <span style={{ fontSize: 16 }}>ℹ️</span>
                   <span style={{ fontSize: 13, color: "#92400e" }}>
                     This is a demo preview. All fields are pre-filled and read-only for the RPA Developer position.
@@ -673,23 +663,13 @@ export default function DemoEnPage() {
                   className="btn btn-next"
                   disabled={!canNextFromJob}
                   onClick={() => goToNext("candidate")}
-                  style={{ flexShrink: 0 }}
                 >
                   Next
                 </button>
               </div>
               
               {/* Job Status Bar */}
-              <div style={{ 
-                display: "flex", 
-                alignItems: "center", 
-                justifyContent: "space-between", 
-                padding: "12px 16px", 
-                background: "#f8fafc", 
-                borderRadius: 8, 
-                marginBottom: 24,
-                border: "1px solid #e2e8f0"
-              }}>
+              <div className="job-status-bar">
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 14, color: "#1e293b" }}>Job Status</div>
                   <div style={{ fontSize: 12, color: "#64748b" }}>Set whether the job is open, on hold, or closed</div>
@@ -707,30 +687,12 @@ export default function DemoEnPage() {
               </div>
 
               {/* Tabs */}
-              <div style={{ 
-                display: "flex", 
-                gap: 8, 
-                marginBottom: 24, 
-                overflowX: "auto",
-                padding: "4px",
-                background: "#f1f5f9",
-                borderRadius: 8
-              }}>
+              <div className="job-tabs-container">
                 {["Basic Info", "Requirements", "Responsibilities", "Compensation", "Visa & Others", "Resume Screening", "Interview Process"].map((tab, idx) => (
                   <div 
                     key={tab}
                     onClick={() => scrollToSection(idx)}
-                    style={{
-                      padding: "8px 14px",
-                      borderRadius: 6,
-                      fontSize: 12,
-                      fontWeight: 500,
-                      whiteSpace: "nowrap",
-                      background: activeJobTab === idx ? "#059669" : "transparent",
-                      color: activeJobTab === idx ? "#fff" : "#64748b",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease"
-                    }}
+                    className={`job-tab ${activeJobTab === idx ? 'active' : ''}`}
                   >
                     {tab}
                   </div>
@@ -738,23 +700,16 @@ export default function DemoEnPage() {
               </div>
 
               {/* Basic Information Section */}
-              <div ref={basicInfoRef} style={{ marginBottom: 24, scrollMarginTop: 100 }}>
-                <div style={{ 
-                  display: "flex", 
-                  alignItems: "center", 
-                  gap: 8, 
-                  marginBottom: 16,
-                  paddingBottom: 12,
-                  borderBottom: "1px solid #e2e8f0"
-                }}>
-                  <span style={{ fontSize: 18 }}>💼</span>
+              <div ref={basicInfoRef} className="form-section">
+                <div className="section-header">
+                  <span className="section-header-icon">💼</span>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Basic Information</div>
-                    <div style={{ fontSize: 12, color: "#64748b" }}>Enter the fundamental details about the job position</div>
+                    <div className="section-header-title">Basic Information</div>
+                    <div className="section-header-subtitle">Enter the fundamental details about the job position</div>
                   </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                <div className="form-grid">
                   <div>
                     <label className="input-label">Job Title *</label>
                     <input
@@ -775,7 +730,7 @@ export default function DemoEnPage() {
                   </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                <div className="form-grid">
                   <div>
                     <label className="input-label">Location *</label>
                     <input
@@ -802,7 +757,7 @@ export default function DemoEnPage() {
                     className="form-input"
                     value="Mid-level"
                     readOnly
-                    style={{ background: "#f8fafc", cursor: "default", maxWidth: "50%" }}
+                    style={{ background: "#f8fafc", cursor: "default" }}
                   />
                 </div>
               </div>
@@ -1151,28 +1106,18 @@ export default function DemoEnPage() {
         {/* candidate screen */}
         {screen === "candidate" && (
           <section className="screen" style={{ maxWidth: 1000 }}>
-            <div className="card" style={{ padding: "28px 32px" }}>
+            <div className="card">
               <h2>Candidate Details</h2>
               
               {/* Demo Preview Notice and Navigation Buttons */}
-              <div style={{ 
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                background: "#fef3c7", 
-                border: "1px solid #fcd34d", 
-                borderRadius: 8, 
-                padding: "12px 16px",
-                marginBottom: 24,
-                gap: 16
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+              <div className="demo-notice-box">
+                <div className="demo-notice-content">
                   <span style={{ fontSize: 16 }}>ℹ️</span>
                   <span style={{ fontSize: 13, color: "#92400e" }}>
                     This is a demo preview. All fields are pre-filled and read-only for the candidate application.
                   </span>
                 </div>
-                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                <div className="demo-notice-buttons">
                   <button 
                     className="btn btn-back" 
                     onClick={() => goToNext("job")}
@@ -1189,23 +1134,16 @@ export default function DemoEnPage() {
               </div>
               
               {/* General Information Section */}
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ 
-                  display: "flex", 
-                  alignItems: "center", 
-                  gap: 8, 
-                  marginBottom: 16,
-                  paddingBottom: 12,
-                  borderBottom: "1px solid #e2e8f0"
-                }}>
-                  <span style={{ fontSize: 18 }}>👤</span>
+              <div className="form-section">
+                <div className="section-header">
+                  <span className="section-header-icon">👤</span>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>General Information (all required)</div>
-                    <div style={{ fontSize: 12, color: "#64748b" }}>Enter your personal and contact details</div>
+                    <div className="section-header-title">General Information (all required)</div>
+                    <div className="section-header-subtitle">Enter your personal and contact details</div>
                   </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                <div className="form-grid">
                   <div>
                     <label className="input-label">First name *</label>
                     <input
@@ -1226,7 +1164,7 @@ export default function DemoEnPage() {
                   </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                <div className="form-grid">
                   <div>
                     <label className="input-label">Email *</label>
                     <input
@@ -1251,7 +1189,7 @@ export default function DemoEnPage() {
 
                 <div style={{ marginBottom: 16 }}>
                   <label className="input-label">Expected salary *</label>
-                  <div style={{ display: "grid", gridTemplateColumns: "120px 1fr auto", gap: 8, alignItems: "center" }}>
+                  <div className="salary-grid">
                     <input
                       className="form-input"
                       value="USD"
@@ -1264,7 +1202,7 @@ export default function DemoEnPage() {
                       readOnly
                       style={{ background: "#f8fafc", cursor: "default" }}
                     />
-                    <div style={{ color: "#64748b", fontSize: 14, paddingLeft: 8 }}>/month</div>
+                    <div style={{ color: "#64748b", fontSize: 14 }}>/month</div>
                   </div>
                 </div>
 
@@ -1280,19 +1218,12 @@ export default function DemoEnPage() {
               </div>
 
               {/* Resume & Documents Section */}
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ 
-                  display: "flex", 
-                  alignItems: "center", 
-                  gap: 8, 
-                  marginBottom: 16,
-                  paddingBottom: 12,
-                  borderBottom: "1px solid #e2e8f0"
-                }}>
-                  <span style={{ fontSize: 18 }}>📄</span>
+              <div className="form-section">
+                <div className="section-header">
+                  <span className="section-header-icon">📄</span>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Resume & Documents (required)</div>
-                    <div style={{ fontSize: 12, color: "#64748b" }}>Upload your resume for AI evaluation</div>
+                    <div className="section-header-title">Resume & Documents (required)</div>
+                    <div className="section-header-subtitle">Upload your resume for AI evaluation</div>
                   </div>
                 </div>
 
@@ -1328,19 +1259,12 @@ export default function DemoEnPage() {
               </div>
 
               {/* Cover Letter Section */}
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ 
-                  display: "flex", 
-                  alignItems: "center", 
-                  gap: 8, 
-                  marginBottom: 16,
-                  paddingBottom: 12,
-                  borderBottom: "1px solid #e2e8f0"
-                }}>
-                  <span style={{ fontSize: 18 }}>✉️</span>
+              <div className="form-section">
+                <div className="section-header">
+                  <span className="section-header-icon">✉️</span>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Cover Letter</div>
-                    <div style={{ fontSize: 12, color: "#64748b" }}>Tell us why you're interested in this role</div>
+                    <div className="section-header-title">Cover Letter</div>
+                    <div className="section-header-subtitle">Tell us why you're interested in this role</div>
                   </div>
                 </div>
 
@@ -1354,24 +1278,17 @@ export default function DemoEnPage() {
               </div>
 
               {/* Language and Proficiency Section */}
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ 
-                  display: "flex", 
-                  alignItems: "center", 
-                  gap: 8, 
-                  marginBottom: 16,
-                  paddingBottom: 12,
-                  borderBottom: "1px solid #e2e8f0"
-                }}>
-                  <span style={{ fontSize: 18 }}>🌐</span>
+              <div className="form-section">
+                <div className="section-header">
+                  <span className="section-header-icon">🌐</span>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Language and Proficiency Levels</div>
-                    <div style={{ fontSize: 12, color: "#64748b" }}>Select languages you speak and your proficiency</div>
+                    <div className="section-header-title">Language and Proficiency Levels</div>
+                    <div className="section-header-subtitle">Select languages you speak and your proficiency</div>
                   </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "center" }}>
+                  <div className="form-grid">
                     <div>
                       <label className="input-label">Language</label>
                       <input
@@ -1392,7 +1309,7 @@ export default function DemoEnPage() {
                     </div>
                   </div>
                   
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 12, alignItems: "center" }}>
+                  <div className="form-grid">
                     <div>
                       <label className="input-label">Language</label>
                       <input
@@ -1416,23 +1333,16 @@ export default function DemoEnPage() {
               </div>
 
               {/* Additional Information Section */}
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ 
-                  display: "flex", 
-                  alignItems: "center", 
-                  gap: 8, 
-                  marginBottom: 16,
-                  paddingBottom: 12,
-                  borderBottom: "1px solid #e2e8f0"
-                }}>
-                  <span style={{ fontSize: 18 }}>📋</span>
+              <div className="form-section">
+                <div className="section-header">
+                  <span className="section-header-icon">📋</span>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 16, color: "#1e293b" }}>Additional Information</div>
-                    <div style={{ fontSize: 12, color: "#64748b" }}>Professional links and availability</div>
+                    <div className="section-header-title">Additional Information</div>
+                    <div className="section-header-subtitle">Professional links and availability</div>
                   </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                <div className="form-grid">
                   <div>
                     <label className="input-label">LinkedIn URL</label>
                     <input
@@ -3159,11 +3069,121 @@ export default function DemoEnPage() {
             aspect-ratio: 3 / 4;
           }
         }
+        /* Demo Notice Box - Desktop */
+        .demo-notice-box {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: #fef3c7;
+          border: 1px solid #fcd34d;
+          border-radius: 8px;
+          padding: 12px 16px;
+          margin-bottom: 24px;
+          gap: 16px;
+        }
+        .demo-notice-content {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex: 1;
+        }
+        .demo-notice-buttons {
+          display: flex;
+          gap: 8px;
+          flex-shrink: 0;
+        }
+        /* Salary Grid */
+        .salary-grid {
+          display: grid;
+          grid-template-columns: 100px 1fr auto;
+          gap: 8px;
+          align-items: center;
+        }
+        /* Job Status Bar */
+        .job-status-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 16px;
+          background: #f8fafc;
+          border-radius: 8px;
+          margin-bottom: 24px;
+          border: 1px solid #e2e8f0;
+        }
+        /* Job Tabs */
+        .job-tabs-container {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 24px;
+          overflow-x: auto;
+          padding: 4px;
+          background: #f1f5f9;
+          border-radius: 8px;
+          -webkit-overflow-scrolling: touch;
+        }
+        .job-tabs-container::-webkit-scrollbar {
+          display: none;
+        }
+        .job-tab {
+          padding: 8px 14px;
+          border-radius: 6px;
+          font-size: 12px;
+          font-weight: 500;
+          white-space: nowrap;
+          background: transparent;
+          color: #64748b;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          flex-shrink: 0;
+        }
+        .job-tab:hover {
+          background: rgba(5, 150, 105, 0.1);
+          color: #059669;
+        }
+        .job-tab.active {
+          background: #059669;
+          color: #fff;
+        }
+        /* Section Header */
+        .section-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 16px;
+          padding-bottom: 12px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        .section-header-icon {
+          font-size: 18px;
+        }
+        .section-header-title {
+          font-weight: 600;
+          font-size: 16px;
+          color: #1e293b;
+        }
+        .section-header-subtitle {
+          font-size: 12px;
+          color: #64748b;
+        }
+        /* Form Section */
+        .form-section {
+          margin-bottom: 24px;
+          scroll-margin-top: 100px;
+        }
+        /* Form Grid */
+        .form-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+          margin-bottom: 16px;
+        }
         @media (max-width: 600px) {
           .progress-bar {
             flex-direction: row;
-            gap: 8px;
-            padding: 20px 10px;
+            gap: 4px;
+            padding: 16px 8px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
           }
           .progress-step::before {
             width: 100%;
@@ -3172,18 +3192,147 @@ export default function DemoEnPage() {
             top: 15px;
             transform: none;
           }
+          .progress-step {
+            min-width: 60px;
+            flex: 1;
+          }
           .step-number {
             margin-left: 0;
-            width: 30px;
-            height: 30px;
-            font-size: 12px;
-            line-height: 30px;
+            width: 28px;
+            height: 28px;
+            font-size: 11px;
+            line-height: 28px;
           }
           .step-label {
             text-align: center;
             margin-left: 0;
+            font-size: 9px;
+            margin-top: 4px;
+            line-height: 1.2;
+          }
+          .content-shell {
+            padding: 24px 12px 48px;
+          }
+          .app-header h1 {
+            font-size: 28px;
+          }
+          .app-header .subtitle {
+            font-size: 14px;
+          }
+          .card {
+            padding: 16px !important;
+            border-radius: 12px;
+          }
+          h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+          }
+          /* Demo Notice Box - Mobile */
+          .demo-notice-box {
+            flex-direction: column;
+            gap: 12px;
+            padding: 12px;
+            text-align: center;
+          }
+          .demo-notice-content {
+            flex-direction: column;
+            gap: 8px;
+          }
+          .demo-notice-buttons {
+            width: 100%;
+            flex-direction: row;
+            justify-content: center;
+          }
+          .demo-notice-buttons .btn {
+            flex: 1;
+            min-width: 80px;
+          }
+          /* Salary Grid - Mobile */
+          .salary-grid {
+            grid-template-columns: 80px 1fr;
+            gap: 8px;
+          }
+          .salary-grid > div:last-child {
+            grid-column: span 2;
+            text-align: right;
+          }
+          /* Job Status Bar - Mobile */
+          .job-status-bar {
+            flex-direction: column;
+            gap: 12px;
+            text-align: center;
+          }
+          /* Form Grid - Mobile */
+          .screen {
+            margin: 0 8px;
+          }
+          .form-input {
+            padding: 12px;
+            font-size: 14px;
+          }
+          .input-label {
+            font-size: 11px;
+          }
+          /* Form Grid - Mobile */
+          .form-grid {
+            grid-template-columns: 1fr;
+          }
+          /* Section Header - Mobile */
+          .section-header {
+            flex-direction: column;
+            align-items: flex-start;
+            text-align: left;
+          }
+          .section-header-title {
+            font-size: 14px;
+          }
+          .section-header-subtitle {
+            font-size: 11px;
+          }
+          /* Job Tabs - Mobile */
+          .job-tabs-container {
+            gap: 4px;
+            padding: 4px;
+          }
+          .job-tab {
+            padding: 6px 10px;
+            font-size: 11px;
+          }
+          /* Assessment Report - Mobile */
+          .assessment-header-mobile {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+          /* Upload Box - Mobile */
+          .upload-box {
+            padding: 16px !important;
+          }
+          /* Textarea - Mobile */
+          textarea.form-input {
+            font-size: 13px;
+          }
+        }
+        /* Extra small screens */
+        @media (max-width: 400px) {
+          .progress-step {
+            min-width: 50px;
+          }
+          .step-number {
+            width: 24px;
+            height: 24px;
             font-size: 10px;
-            margin-top: 35px;
+          }
+          .step-label {
+            font-size: 8px;
+          }
+          .app-header h1 {
+            font-size: 24px;
+          }
+          .demo-notice-buttons {
+            flex-direction: column;
+          }
+          .demo-notice-buttons .btn {
+            width: 100%;
           }
         }
       `}</style>
