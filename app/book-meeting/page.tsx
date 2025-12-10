@@ -2,12 +2,13 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronLeft, ChevronRight, Clock, Globe, Calendar, MapPin, ArrowLeft, Zap, Facebook, Instagram, Youtube, Linkedin, Lock, Star } from "lucide-react"
+import { ChevronLeft, ChevronRight, Clock, Globe, Calendar, MapPin, ArrowLeft, Zap, Facebook, Instagram, Youtube, Linkedin, Lock, Star, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import Navbar from "@/components/layout/Navbar"
 
@@ -47,11 +48,14 @@ const TIME_SLOTS = [
 
 export default function BookMeetingPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [step, setStep] = useState(1) // 1: Calendar, 2: Time, 3: Details, 4: Confirmation
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth())
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [bookingId, setBookingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     fullName: '',
     workEmail: '',
@@ -60,6 +64,7 @@ export default function BookMeetingPage() {
     location: 'google-meet-1',
     notes: ''
   })
+  const [meetingLink, setMeetingLink] = useState<string | null>(null)
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -108,9 +113,63 @@ export default function BookMeetingPage() {
     }
   }
 
-  const handleSchedule = () => {
-    // Here you would typically send the booking data to your backend
-    setStep(4)
+  const handleSchedule = async () => {
+    if (!selectedDate || !selectedTime) return
+    
+    setIsSubmitting(true)
+    
+    try {
+      // Format date as YYYY-MM-DD
+      const meetingDate = selectedDate.toISOString().split('T')[0]
+      const meetingEndTime = getEndTime(selectedTime)
+      
+      const response = await fetch('/api/meeting-bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          workEmail: formData.workEmail,
+          companyName: formData.companyName,
+          phoneNumber: formData.phoneNumber || null,
+          meetingDate,
+          meetingTime: selectedTime,
+          meetingEndTime,
+          durationMinutes: 30,
+          timezone: 'India Standard Time',
+          meetingLocation: 'google-meet',
+          notes: formData.notes || null
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to book meeting')
+      }
+      
+      console.log('✅ Meeting booked successfully:', data.booking)
+      setBookingId(data.booking.id)
+      setMeetingLink(data.booking.meetingLink)
+      
+      toast({
+        title: "Meeting Scheduled!",
+        description: "Your meeting has been booked successfully. Check your email for confirmation.",
+      })
+      
+      setStep(4)
+      
+    } catch (error: any) {
+      console.error('❌ Failed to book meeting:', error)
+      toast({
+        title: "Booking Failed",
+        description: error.message || "Failed to book meeting. Please try again.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const renderCalendar = () => {
@@ -440,9 +499,16 @@ export default function BookMeetingPage() {
                       <Button 
                         onClick={handleSchedule}
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6 text-lg"
-                        disabled={!formData.fullName || !formData.workEmail || !formData.companyName}
+                        disabled={!formData.fullName || !formData.workEmail || !formData.companyName || isSubmitting}
                       >
-                        Schedule Event
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                            Scheduling...
+                          </>
+                        ) : (
+                          'Schedule Event'
+                        )}
                       </Button>
                     </div>
                   </div>
@@ -459,9 +525,9 @@ export default function BookMeetingPage() {
                   </div>
                   
                   <h2 className="text-2xl font-bold text-slate-800 mb-2">You're Scheduled!</h2>
-                  <p className="text-slate-600 mb-6">A calendar invitation has been sent to your email.</p>
+                  <p className="text-slate-600 mb-6">A calendar invitation has been sent to your email address.</p>
                   
-                  <div className="bg-slate-50 rounded-lg p-6 mb-8 text-left max-w-md mx-auto">
+                  <div className="bg-slate-50 rounded-lg p-6 mb-6 text-left max-w-md mx-auto">
                     <h3 className="font-semibold text-slate-800 mb-3">30 Minute Meeting</h3>
                     <div className="space-y-2 text-sm text-slate-600">
                       <div className="flex items-center gap-2">
@@ -487,22 +553,37 @@ export default function BookMeetingPage() {
                     </div>
                   </div>
 
+                  {/* Google Meet Link Box */}
+                  {meetingLink && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 max-w-md mx-auto">
+                      <p className="text-sm font-medium text-blue-800 mb-2">🎥 Join via Google Meet</p>
+                      <a 
+                        href={meetingLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                      >
+                        Join Meeting
+                      </a>
+                      <p className="text-xs text-blue-600 mt-2 break-all">{meetingLink}</p>
+                    </div>
+                  )}
+
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <Button variant="outline" className="gap-2">
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 0C5.383 0 0 5.383 0 12s5.383 12 12 12 12-5.383 12-12S18.617 0 12 0zm-1.5 17.25l-4.5-4.5 1.05-1.05 3.45 3.45 7.5-7.5 1.05 1.05-8.55 8.55z"/>
-                      </svg>
-                      Add to Google Calendar
-                    </Button>
-                    <Button variant="outline" className="gap-2">
-                      Add to Outlook
-                    </Button>
-                    <Button variant="outline" className="gap-2">
-                      Add to Apple Calendar
-                    </Button>
+                    {meetingLink && (
+                      <a href={meetingLink} target="_blank" rel="noopener noreferrer">
+                        <Button variant="outline" className="gap-2 w-full sm:w-auto">
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 0C5.383 0 0 5.383 0 12s5.383 12 12 12 12-5.383 12-12S18.617 0 12 0zm-1.5 17.25l-4.5-4.5 1.05-1.05 3.45 3.45 7.5-7.5 1.05 1.05-8.55 8.55z"/>
+                          </svg>
+                          Add to Google Calendar
+                        </Button>
+                      </a>
+                    )}
                   </div>
 
                   <p className="text-slate-500 text-sm mt-8">We're looking forward to meeting you!</p>
+                  <p className="text-slate-400 text-xs mt-2">Check your email for the meeting details and Google Meet link.</p>
                   
                   <Link href="/">
                     <Button variant="link" className="mt-4 text-blue-600">

@@ -3581,7 +3581,7 @@ export class DatabaseService {
             completed_questions: data.completedQuestions || 0,
             total_questions: data.totalQuestions || 0,
             video_quality: data.videoQuality || 'HD',
-            pricing_source: usageResult.source
+            pricing_source: 'env-config'
           })
         ])
 
@@ -4048,5 +4048,274 @@ export class DatabaseService {
 
     const result = await this.query(query, [limit]) as any[]
     return result
+  }
+
+  // ==================== MEETING BOOKINGS ====================
+
+  // Create a new meeting booking
+  static async createMeetingBooking(data: {
+    fullName: string
+    workEmail: string
+    companyName: string
+    phoneNumber?: string
+    meetingDate: string // YYYY-MM-DD format
+    meetingTime: string
+    meetingEndTime: string
+    durationMinutes?: number
+    timezone?: string
+    meetingLocation?: string
+    meetingLink?: string
+    notes?: string
+    ipAddress?: string
+    userAgent?: string
+    source?: string
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      INSERT INTO meeting_bookings (
+        full_name,
+        work_email,
+        company_name,
+        phone_number,
+        meeting_date,
+        meeting_time,
+        meeting_end_time,
+        duration_minutes,
+        timezone,
+        meeting_location,
+        meeting_link,
+        notes,
+        ip_address,
+        user_agent,
+        source,
+        status,
+        created_at
+      ) VALUES (
+        $1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'scheduled', NOW()
+      )
+      RETURNING *
+    `
+
+    const result = await this.query(query, [
+      data.fullName,
+      data.workEmail,
+      data.companyName,
+      data.phoneNumber || null,
+      data.meetingDate,
+      data.meetingTime,
+      data.meetingEndTime,
+      data.durationMinutes || 30,
+      data.timezone || 'India Standard Time',
+      data.meetingLocation || 'google-meet',
+      data.meetingLink || null,
+      data.notes || null,
+      data.ipAddress || null,
+      data.userAgent || null,
+      data.source || 'website'
+    ]) as any[]
+
+    console.log('✅ [MEETING BOOKING] Created:', result[0]?.id)
+    return result[0]
+  }
+
+  // Get all meeting bookings (for admin)
+  static async getMeetingBookings(options?: {
+    status?: string
+    startDate?: string
+    endDate?: string
+    limit?: number
+    offset?: number
+  }) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    let query = `
+      SELECT *
+      FROM meeting_bookings
+      WHERE 1=1
+    `
+    const params: any[] = []
+    let paramIndex = 1
+
+    if (options?.status) {
+      query += ` AND status = $${paramIndex}`
+      params.push(options.status)
+      paramIndex++
+    }
+
+    if (options?.startDate) {
+      query += ` AND meeting_date >= $${paramIndex}::date`
+      params.push(options.startDate)
+      paramIndex++
+    }
+
+    if (options?.endDate) {
+      query += ` AND meeting_date <= $${paramIndex}::date`
+      params.push(options.endDate)
+      paramIndex++
+    }
+
+    query += ` ORDER BY meeting_date DESC, meeting_time DESC`
+
+    if (options?.limit) {
+      query += ` LIMIT $${paramIndex}`
+      params.push(options.limit)
+      paramIndex++
+    }
+
+    if (options?.offset) {
+      query += ` OFFSET $${paramIndex}`
+      params.push(options.offset)
+      paramIndex++
+    }
+
+    const result = await this.query(query, params) as any[]
+    return result
+  }
+
+  // Get meeting booking by ID
+  static async getMeetingBookingById(id: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      SELECT *
+      FROM meeting_bookings
+      WHERE id = $1::uuid
+    `
+
+    const result = await this.query(query, [id]) as any[]
+    return result[0] || null
+  }
+
+  // Update meeting booking status
+  static async updateMeetingBookingStatus(id: string, status: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    let additionalFields = ''
+    if (status === 'confirmed') {
+      additionalFields = ', confirmed_at = NOW()'
+    } else if (status === 'cancelled') {
+      additionalFields = ', cancelled_at = NOW()'
+    }
+
+    const query = `
+      UPDATE meeting_bookings
+      SET status = $2${additionalFields}, updated_at = NOW()
+      WHERE id = $1::uuid
+      RETURNING *
+    `
+
+    const result = await this.query(query, [id, status]) as any[]
+    console.log(`✅ [MEETING BOOKING] Updated status to ${status}:`, id)
+    return result[0]
+  }
+
+  // Get meeting bookings count by status
+  static async getMeetingBookingsStats() {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE status = 'scheduled') as scheduled,
+        COUNT(*) FILTER (WHERE status = 'confirmed') as confirmed,
+        COUNT(*) FILTER (WHERE status = 'completed') as completed,
+        COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
+        COUNT(*) FILTER (WHERE status = 'no_show') as no_show,
+        COUNT(*) FILTER (WHERE meeting_date >= CURRENT_DATE) as upcoming,
+        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') as last_7_days,
+        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') as last_30_days
+      FROM meeting_bookings
+    `
+
+    const result = await this.query(query, []) as any[]
+    return result[0]
+  }
+
+  // Check if time slot is available (considers meeting end time)
+  static async isTimeSlotAvailable(meetingDate: string, meetingTime: string, meetingEndTime?: string): Promise<boolean> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    // Check for overlapping bookings - slot is unavailable if:
+    // 1. Same date AND
+    // 2. Status is not cancelled AND
+    // 3. The requested time overlaps with an existing booking
+    const query = `
+      SELECT COUNT(*) as count
+      FROM meeting_bookings
+      WHERE meeting_date = $1::date
+        AND status NOT IN ('cancelled')
+        AND (
+          -- Exact match
+          meeting_time = $2
+          OR
+          -- Requested start time falls within existing booking
+          ($2 >= meeting_time AND $2 < meeting_end_time)
+          OR
+          -- Requested end time falls within existing booking
+          ($3 > meeting_time AND $3 <= meeting_end_time)
+          OR
+          -- Requested booking completely contains existing booking
+          ($2 <= meeting_time AND $3 >= meeting_end_time)
+        )
+    `
+
+    const endTime = meetingEndTime || meetingTime
+    const result = await this.query(query, [meetingDate, meetingTime, endTime]) as any[]
+    return parseInt(result[0]?.count || '0') === 0
+  }
+
+  // Check if slot is past its end time (for auto-release)
+  static async getExpiredBookings(): Promise<any[]> {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    // Get bookings where the meeting end time has passed
+    const query = `
+      SELECT *
+      FROM meeting_bookings
+      WHERE status = 'scheduled'
+        AND (
+          meeting_date < CURRENT_DATE
+          OR (
+            meeting_date = CURRENT_DATE
+            AND meeting_end_time < TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata', 'HH12:MIam')
+          )
+        )
+    `
+
+    const result = await this.query(query, []) as any[]
+    return result
+  }
+
+  // Update meeting booking with Google Meet link
+  static async updateMeetingBookingLink(id: string, meetingLink: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const query = `
+      UPDATE meeting_bookings
+      SET meeting_link = $2, updated_at = NOW()
+      WHERE id = $1::uuid
+      RETURNING *
+    `
+
+    const result = await this.query(query, [id, meetingLink]) as any[]
+    console.log(`✅ [MEETING BOOKING] Updated meeting link:`, id)
+    return result[0]
   }
 }

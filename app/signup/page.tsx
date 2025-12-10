@@ -142,8 +142,54 @@ export default function SignupPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
 
-  const next = () => setStep((s) => Math.min(totalSteps, s + 1))
+  const next = () => {
+    // Validate current step before proceeding
+    if (step === 1) {
+      // Company Information - all fields marked with * are required
+      if (!form.companyName || !form.industry || !form.companySize) {
+        alert('Please fill in all required fields marked with *')
+        return
+      }
+    } else if (step === 2) {
+      // Contact Information - all fields marked with * are required
+      if (!form.street || !form.city || !form.state || !form.postalCode || !form.country) {
+        alert('Please fill in all required fields marked with *')
+        return
+      }
+    } else if (step === 3) {
+      // Legal Information - Legal Company Name is required
+      if (!form.legalCompanyName) {
+        alert('Please fill in the Legal Company Name marked with *')
+        return
+      }
+    } else if (step === 4) {
+      // Admin Account - name and email are required
+      if (!form.firstName || !form.lastName || !form.email) {
+        alert('Please fill in all required fields marked with *')
+        return
+      }
+    }
+    setStep((s) => Math.min(totalSteps, s + 1))
+  }
   const prev = () => setStep((s) => Math.max(1, s - 1))
+
+  // Check if current step's required fields are filled
+  const isStepValid = () => {
+    if (step === 1) {
+      // Company Information - all fields marked with * are required
+      return !!(form.companyName && form.industry && form.companySize)
+    } else if (step === 2) {
+      // Contact Information - all fields marked with * are required
+      return !!(form.street && form.city && form.state && form.postalCode && form.country)
+    } else if (step === 3) {
+      // Legal Information - Legal Company Name is required
+      return !!form.legalCompanyName
+    } else if (step === 4) {
+      // Admin Account - name and email are required
+      return !!(form.firstName && form.lastName && form.email)
+    }
+    return true // Step 5 doesn't need validation for Next button (it's the submit button)
+  }
 
   const onField = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const value = e.target.type === "checkbox" ? (e.target as HTMLInputElement).checked : e.target.value
@@ -576,7 +622,7 @@ export default function SignupPage() {
               <ChevronLeft className="w-4 h-4 mr-2" /> Previous
             </Button>
             {step < totalSteps ? (
-              <Button type="button" className="sr-button-primary" onClick={next}>
+              <Button type="button" className="sr-button-primary" onClick={next} disabled={!isStepValid()}>
                 Next <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             ) : (
