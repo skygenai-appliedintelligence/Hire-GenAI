@@ -436,55 +436,59 @@ export default function SettingsContent({ section }: { section?: string }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6 px-1 sm:px-0">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600">Manage your account and application preferences</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Settings</h1>
+        <p className="text-sm sm:text-base text-gray-600">Manage your account and application preferences</p>
       </div>
 
-      <Tabs value={current} onValueChange={(v) => router.push(`/dashboard/settings/${v}`)} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="profile" className="flex items-center space-x-2">
-            <User className="h-4 w-4" />
-            <span>Profile</span>
-          </TabsTrigger>
-          <TabsTrigger 
-            value="company" 
-            className="flex items-center space-x-2"
-            disabled={!canAccessTab('company')}
-          >
-            <Building className="h-4 w-4" />
-            <span>Company</span>
-            {!canAccessTab('company') && <Lock className="h-3 w-3 ml-1" />}
-          </TabsTrigger>
-          <TabsTrigger 
-            value="team" 
-            className="flex items-center space-x-2"
-            disabled={!canAccessTab('team')}
-          >
-            <UsersIcon className="h-4 w-4" />
-            <span>Team</span>
-            {!canAccessTab('team') && <Lock className="h-3 w-3 ml-1" />}
-          </TabsTrigger>
-          <TabsTrigger 
-            value="notifications" 
-            className="flex items-center space-x-2"
-            disabled={!canAccessTab('notifications')}
-          >
-            <Bell className="h-4 w-4" />
-            <span>Notifications</span>
-            {!canAccessTab('notifications') && <Lock className="h-3 w-3 ml-1" />}
-          </TabsTrigger>
-          <TabsTrigger 
-            value="billing" 
-            className="flex items-center space-x-2"
-            disabled={!canAccessTab('billing')}
-          >
-            <CreditCard className="h-4 w-4" />
-            <span>Billing</span>
-            {!canAccessTab('billing') && <Lock className="h-3 w-3 ml-1" />}
-          </TabsTrigger>
-        </TabsList>
+      <Tabs value={current} onValueChange={(v) => router.push(`/dashboard/settings/${v}`)} className="space-y-4 md:space-y-6">
+        {/* Scrollable tabs on mobile */}
+        <div className="overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex w-max sm:grid sm:w-full sm:grid-cols-5 gap-1">
+            <TabsTrigger value="profile" className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 text-xs sm:text-sm">
+              <User className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span>Profile</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="company" 
+              className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 text-xs sm:text-sm"
+              disabled={!canAccessTab('company')}
+            >
+              <Building className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span>Company</span>
+              {!canAccessTab('company') && <Lock className="h-2.5 w-2.5 sm:h-3 sm:w-3 ml-1" />}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="team" 
+              className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 text-xs sm:text-sm"
+              disabled={!canAccessTab('team')}
+            >
+              <UsersIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span>Team</span>
+              {!canAccessTab('team') && <Lock className="h-2.5 w-2.5 sm:h-3 sm:w-3 ml-1" />}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="notifications" 
+              className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 text-xs sm:text-sm"
+              disabled={!canAccessTab('notifications')}
+            >
+              <Bell className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden xs:inline">Notifications</span>
+              <span className="xs:hidden">Notif</span>
+              {!canAccessTab('notifications') && <Lock className="h-2.5 w-2.5 sm:h-3 sm:w-3 ml-1" />}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="billing" 
+              className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 text-xs sm:text-sm"
+              disabled={!canAccessTab('billing')}
+            >
+              <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span>Billing</span>
+              {!canAccessTab('billing') && <Lock className="h-2.5 w-2.5 sm:h-3 sm:w-3 ml-1" />}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="profile">
           <Card className="linkedin-card">

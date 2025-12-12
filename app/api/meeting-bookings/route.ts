@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { DatabaseService } from '@/lib/database'
-import { EmailService } from '@/lib/email-service'
 
 // Get calendar scheduling URL from environment - NO FALLBACK
 const CALENDAR_SCHEDULING_URL = process.env.CALENDAR_SCHEDULING_URL
@@ -24,10 +23,10 @@ export async function POST(request: NextRequest) {
       notes
     } = body
 
-    // Validate required fields
-    if (!fullName || !workEmail || !companyName || !meetingDate || !meetingTime) {
+    // Validate required fields (date/time are now optional - will be set via Google Calendar)
+    if (!fullName || !workEmail || !companyName) {
       return NextResponse.json(
-        { error: 'Missing required fields: fullName, workEmail, companyName, meetingDate, meetingTime' },
+        { error: 'Missing required fields: fullName, workEmail, companyName' },
         { status: 400 }
       )
     }
@@ -43,13 +42,15 @@ export async function POST(request: NextRequest) {
 
     const endTime = meetingEndTime || meetingTime
 
-    // Check if time slot is available (with end time for overlap detection)
-    const isAvailable = await DatabaseService.isTimeSlotAvailable(meetingDate, meetingTime, endTime)
-    if (!isAvailable) {
-      return NextResponse.json(
-        { error: 'This time slot is no longer available. Please select a different time.' },
-        { status: 409 }
-      )
+    // Check if time slot is available (only if date/time provided)
+    if (meetingDate && meetingTime) {
+      const isAvailable = await DatabaseService.isTimeSlotAvailable(meetingDate, meetingTime, endTime)
+      if (!isAvailable) {
+        return NextResponse.json(
+          { error: 'This time slot is no longer available. Please select a different time.' },
+          { status: 409 }
+        )
+      }
     }
 
     // Get client info
@@ -86,49 +87,8 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ [API] Meeting booking created successfully:', booking.id)
 
-    // Send emails only if meetingLink is configured in .env
-    if (meetingLink) {
-      // Send confirmation email to candidate
-      try {
-        await EmailService.sendMeetingBookingConfirmation({
-          fullName,
-          workEmail,
-          companyName,
-          meetingDate,
-          meetingTime,
-          meetingEndTime: endTime,
-          meetingLink,
-          timezone: timezone || 'India Standard Time',
-        })
-        console.log('✅ [API] Confirmation email sent to candidate:', workEmail)
-      } catch (emailError: any) {
-        console.error('⚠️ [API] Failed to send confirmation email to candidate:', emailError.message)
-        // Don't fail the booking if email fails
-      }
-
-      // Send notification email to support team
-      try {
-        await EmailService.sendMeetingBookingNotification({
-          fullName,
-          workEmail,
-          companyName,
-          phoneNumber,
-          meetingDate,
-          meetingTime,
-          meetingEndTime: endTime,
-          meetingLink,
-          timezone: timezone || 'India Standard Time',
-          notes,
-          bookingId: booking.id,
-        })
-        console.log('✅ [API] Notification email sent to support team')
-      } catch (emailError: any) {
-        console.error('⚠️ [API] Failed to send notification email to support:', emailError.message)
-        // Don't fail the booking if email fails
-      }
-    } else {
-      console.warn('⚠️ [API] Emails not sent - CALENDAR_SCHEDULING_URL not configured in .env')
-    }
+    // NOTE: Emails are NOT sent here - they will be sent automatically by Google Calendar
+    // when the user selects a time slot in Step 2 (Google Calendar embed)
 
     return NextResponse.json({
       success: true,

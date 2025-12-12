@@ -339,14 +339,15 @@ export default function JobsPage() {
   }
 
   return (
-    <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Job Descriptions</h1>
-          <p className="text-gray-600">Manage your job postings and track their performance across platforms</p>
+    <div className="space-y-4 md:space-y-6 px-3 sm:px-4 md:px-6 py-4 md:py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
+      {/* Header - Stack on mobile */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Job Descriptions</h1>
+          <p className="text-sm sm:text-base text-gray-600">Manage your job postings and track performance</p>
         </div>
-        <Link href="/dashboard/jobs/new">
-          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
+        <Link href="/dashboard/jobs/new" className="w-full sm:w-auto">
+          <Button className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
             <Plus className="h-4 w-4 mr-2" />
             Create Job
           </Button>
@@ -355,19 +356,23 @@ export default function JobsPage() {
 
       {/* Status Tabs and Filter Section */}
       <Tabs value={tab} onValueChange={(v) => setTab(v as 'open' | 'on_hold' | 'closed' | 'cancelled')} className="space-y-4">
-        <div className="flex items-center justify-between">
-          <TabsList>
-            <TabsTrigger value="open">Open</TabsTrigger>
-            <TabsTrigger value="on_hold">On Hold</TabsTrigger>
-            <TabsTrigger value="closed">Closed</TabsTrigger>
-            <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
-          </TabsList>
+        {/* Stack tabs and filter on mobile */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          {/* Scrollable tabs on mobile */}
+          <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+            <TabsList className="inline-flex w-max sm:w-auto">
+              <TabsTrigger value="open" className="text-xs sm:text-sm px-2 sm:px-3">Open</TabsTrigger>
+              <TabsTrigger value="on_hold" className="text-xs sm:text-sm px-2 sm:px-3">On Hold</TabsTrigger>
+              <TabsTrigger value="closed" className="text-xs sm:text-sm px-2 sm:px-3">Closed</TabsTrigger>
+              <TabsTrigger value="cancelled" className="text-xs sm:text-sm px-2 sm:px-3">Cancelled</TabsTrigger>
+            </TabsList>
+          </div>
           
-          {/* Filter Section */}
-          <div className="flex items-center space-x-2">
-            <Filter className="h-4 w-4 text-gray-500" />
+          {/* Filter Section - Full width on mobile */}
+          <div className="flex items-center space-x-2 w-full sm:w-auto">
+            <Filter className="h-4 w-4 text-gray-500 flex-shrink-0" />
             <Select value={selectedUserEmail} onValueChange={setSelectedUserEmail}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="Filter by creator" />
               </SelectTrigger>
               <SelectContent>
