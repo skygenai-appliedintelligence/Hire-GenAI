@@ -4058,9 +4058,9 @@ export class DatabaseService {
     workEmail: string
     companyName: string
     phoneNumber?: string
-    meetingDate: string // YYYY-MM-DD format
-    meetingTime: string
-    meetingEndTime: string
+    meetingDate?: string // YYYY-MM-DD format (optional - will be set via Google Calendar)
+    meetingTime?: string // optional - will be set via Google Calendar
+    meetingEndTime?: string // optional
     durationMinutes?: number
     timezone?: string
     meetingLocation?: string
@@ -4094,7 +4094,7 @@ export class DatabaseService {
         status,
         created_at
       ) VALUES (
-        $1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'scheduled', NOW()
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', NOW()
       )
       RETURNING *
     `
@@ -4104,9 +4104,9 @@ export class DatabaseService {
       data.workEmail,
       data.companyName,
       data.phoneNumber || null,
-      data.meetingDate,
-      data.meetingTime,
-      data.meetingEndTime,
+      data.meetingDate || null,
+      data.meetingTime || null,
+      data.meetingEndTime || null,
       data.durationMinutes || 30,
       data.timezone || 'India Standard Time',
       data.meetingLocation || 'google-meet',

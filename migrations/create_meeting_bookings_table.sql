@@ -11,10 +11,10 @@ CREATE TABLE IF NOT EXISTS meeting_bookings (
     company_name VARCHAR(255) NOT NULL,
     phone_number VARCHAR(50),
     
-    -- Meeting Details
-    meeting_date DATE NOT NULL,
-    meeting_time VARCHAR(20) NOT NULL,
-    meeting_end_time VARCHAR(20) NOT NULL,
+    -- Meeting Details (nullable - will be set via Google Calendar)
+    meeting_date DATE DEFAULT NULL,
+    meeting_time VARCHAR(20) DEFAULT NULL,
+    meeting_end_time VARCHAR(20) DEFAULT NULL,
     duration_minutes INTEGER DEFAULT 30,
     timezone VARCHAR(100) DEFAULT 'India Standard Time',
     

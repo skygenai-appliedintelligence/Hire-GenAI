@@ -2498,6 +2498,7 @@ export default function DemoEnPage() {
           border-radius: 0;
           box-shadow: none;
           border: none;
+          overflow-x: hidden;
         }
         .app-header {
           text-align: center;
@@ -3003,11 +3004,16 @@ export default function DemoEnPage() {
           margin: 0 auto;
           position: relative;
           gap: 16px;
+          width: 100%;
+          overflow-x: auto;
         }
         .progress-step {
           flex: 1;
           text-align: center;
           position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
         }
         .progress-step::before {
           content: "";
@@ -3024,9 +3030,6 @@ export default function DemoEnPage() {
         .progress-step.completed::before {
           background: linear-gradient(90deg, #10b981 0%, #059669 100%);
         }
-        .progress-step:last-child::before {
-          display: none;
-        }
         .step-number {
           width: 36px;
           height: 36px;
@@ -3042,6 +3045,8 @@ export default function DemoEnPage() {
           z-index: 2;
           box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
           transition: all 0.2s ease;
+          font-size: 14px;
+          font-weight: 600;
         }
         .progress-step.active .step-number,
         .progress-step.completed .step-number {
@@ -3055,6 +3060,9 @@ export default function DemoEnPage() {
           color: #64748b;
           font-weight: 500;
           transition: color 0.2s ease;
+          line-height: 1.3;
+          max-width: 120px;
+          margin: 0 auto;
         }
         .progress-step.active .step-label,
         .progress-step.completed .step-label {
@@ -3180,35 +3188,47 @@ export default function DemoEnPage() {
         @media (max-width: 600px) {
           .progress-bar {
             flex-direction: row;
-            gap: 4px;
-            padding: 16px 8px;
+            gap: 8px;
+            padding: 20px 12px;
             flex-wrap: nowrap;
             overflow-x: auto;
+            justify-content: flex-start;
+            max-width: 100%;
+            width: 100%;
           }
           .progress-step::before {
-            width: 100%;
+            width: calc(100% - 8px);
             height: 2px;
-            left: 0;
+            left: calc(100% - 50%);
             top: 15px;
             transform: none;
           }
           .progress-step {
-            min-width: 60px;
-            flex: 1;
+            min-width: 70px;
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
           }
           .step-number {
             margin-left: 0;
-            width: 28px;
-            height: 28px;
-            font-size: 11px;
-            line-height: 28px;
+            margin: 0 auto 8px auto;
+            width: 30px;
+            height: 30px;
+            font-size: 12px;
+            line-height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
           }
           .step-label {
             text-align: center;
             margin-left: 0;
-            font-size: 9px;
-            margin-top: 4px;
+            font-size: 10px;
             line-height: 1.2;
+            max-width: 80px;
+            margin: 0 auto;
           }
           .content-shell {
             padding: 24px 12px 48px;
@@ -3314,16 +3334,32 @@ export default function DemoEnPage() {
         }
         /* Extra small screens */
         @media (max-width: 400px) {
+          .progress-bar {
+            padding: 16px 8px;
+            gap: 6px;
+          }
           .progress-step {
-            min-width: 50px;
+            min-width: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
           }
           .step-number {
-            width: 24px;
-            height: 24px;
-            font-size: 10px;
+            width: 26px;
+            height: 26px;
+            font-size: 11px;
+            line-height: 26px;
+            margin: 0 auto 6px auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
           }
           .step-label {
-            font-size: 8px;
+            font-size: 9px;
+            max-width: 70px;
+            margin: 0 auto;
+            text-align: center;
           }
           .app-header h1 {
             font-size: 24px;

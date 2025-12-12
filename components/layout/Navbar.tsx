@@ -40,25 +40,25 @@ export default function Navbar({ isFixed = false, showAnnouncement = false }: Na
               <nav className="hidden md:ml-10 md:flex md:space-x-8">
                 <Link
                   href="/demo-en"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
+                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors cursor-pointer"
                 >
                   Product
                 </Link>
                 <Link
                   href="/pricing"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
+                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors cursor-pointer"
                 >
                   Pricing
                 </Link>
                 <Link
                   href="/roi"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
+                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors cursor-pointer"
                 >
                   ROI
                 </Link>
                 <Link
                   href="/about"
-                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors"
+                  className="text-gray-700 hover:text-emerald-600 px-3 py-2 text-sm font-medium transition-colors cursor-pointer"
                 >
                   Company
                 </Link>
@@ -100,28 +100,28 @@ export default function Navbar({ isFixed = false, showAnnouncement = false }: Na
               <Link
                 href="/demo-en"
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-gray-700 hover:text-emerald-600 hover:bg-gray-50 block px-3 py-2 rounded-md text-base font-medium transition-colors"
+                className="text-gray-700 hover:text-emerald-600 hover:bg-gray-50 block px-3 py-2 rounded-md text-base font-medium transition-colors cursor-pointer"
               >
                 Product
               </Link>
               <Link
                 href="/pricing"
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-gray-700 hover:text-emerald-600 hover:bg-gray-50 block px-3 py-2 rounded-md text-base font-medium transition-colors"
+                className="text-gray-700 hover:text-emerald-600 hover:bg-gray-50 block px-3 py-2 rounded-md text-base font-medium transition-colors cursor-pointer"
               >
                 Pricing
               </Link>
               <Link
                 href="/roi"
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-gray-700 hover:text-emerald-600 hover:bg-gray-50 block px-3 py-2 rounded-md text-base font-medium transition-colors"
+                className="text-gray-700 hover:text-emerald-600 hover:bg-gray-50 block px-3 py-2 rounded-md text-base font-medium transition-colors cursor-pointer"
               >
                 ROI
               </Link>
               <Link
                 href="/about"
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-gray-700 hover:text-emerald-600 hover:bg-gray-50 block px-3 py-2 rounded-md text-base font-medium transition-colors"
+                className="text-gray-700 hover:text-emerald-600 hover:bg-gray-50 block px-3 py-2 rounded-md text-base font-medium transition-colors cursor-pointer"
               >
                 Company
               </Link>
