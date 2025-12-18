@@ -142,7 +142,7 @@ export default function SignupPage() {
     
     // Only update URL if it doesn't match current step
     if (currentSection !== expectedSection) {
-      router.push(`/signup?section=${expectedSection}`, { scroll: false })
+      router.replace(`/signup?section=${expectedSection}`, { scroll: false })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
@@ -197,7 +197,7 @@ export default function SignupPage() {
       const newStep = step - 1
       setStep(newStep)
       const newSection = stepToSection(newStep)
-      router.push(`/signup?section=${newSection}`, { scroll: false })
+      router.replace(`/signup?section=${newSection}`, { scroll: false })
     }
   }
 

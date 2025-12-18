@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { LoginModal } from "@/components/auth/login-modal"
@@ -24,8 +24,23 @@ import Navbar from "@/components/layout/Navbar"
 export default function AboutPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [loginModalTab, setLoginModalTab] = useState<"demo" | "signin">("signin")
+
+  useEffect(() => {
+    const scrollTo = searchParams?.get('scroll')
+    if (scrollTo) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(scrollTo)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' })
+        }
+        window.history.replaceState({}, '', '/about')
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams])
 
   if (loading) {
     return (
@@ -303,12 +318,24 @@ export default function AboutPage() {
                   </Link>
                 </li>
                 <li>
-                  <a href="/#assessment" className="hover:text-emerald-400 transition-colors">
+                  <a 
+                    className="hover:text-emerald-400 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push('/?scroll=assessment');
+                    }}
+                  >
                     Assessment
                   </a>
                 </li>
                 <li>
-                  <a href="/#faq" className="hover:text-emerald-400 transition-colors">
+                  <a 
+                    className="hover:text-emerald-400 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push('/?scroll=faq');
+                    }}
+                  >
                     FAQs
                   </a>
                 </li>

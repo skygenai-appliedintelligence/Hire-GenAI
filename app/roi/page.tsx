@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import Navbar from '@/components/layout/Navbar'
 import { 
@@ -87,12 +87,27 @@ const CURRENCY_CONFIG: Record<string, { code: string; symbol: string; rate: numb
 
 export default function ROIPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [showLoginModal, setShowLoginModal] = useState(false)
   
   // Currency state
   const [userCountry, setUserCountry] = useState<string>('US')
   const [currencyConfig, setCurrencyConfig] = useState(CURRENCY_CONFIG['US'])
   const [isLoadingLocation, setIsLoadingLocation] = useState(true)
+
+  useEffect(() => {
+    const scrollTo = searchParams?.get('scroll')
+    if (scrollTo) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(scrollTo)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' })
+        }
+        window.history.replaceState({}, '', '/roi')
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams])
 
   // Input states
   const [jobPostings, setJobPostings] = useState(5)
@@ -921,12 +936,24 @@ export default function ROIPage() {
                   </Link>
                 </li>
                 <li>
-                  <a href="#assessment" className="hover:text-emerald-400 transition-colors">
+                  <a 
+                    className="hover:text-emerald-400 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push('/?scroll=assessment');
+                    }}
+                  >
                     Assessment
                   </a>
                 </li>
                 <li>
-                  <a href="#faq" className="hover:text-emerald-400 transition-colors">
+                  <a 
+                    className="hover:text-emerald-400 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push('/?scroll=faq');
+                    }}
+                  >
                     FAQs
                   </a>
                 </li>

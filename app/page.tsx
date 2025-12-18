@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -36,6 +36,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 export default function HomePage() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -44,6 +45,21 @@ export default function HomePage() {
       router.push("/dashboard")
     }
   }, [user, loading, router])
+
+  useEffect(() => {
+    const scrollTo = searchParams?.get('scroll')
+    if (scrollTo) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(scrollTo)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' })
+        }
+        // Remove the scroll parameter from URL after scrolling
+        window.history.replaceState({}, '', '/')
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams])
 
   if (loading) {
     return (
@@ -204,7 +220,14 @@ export default function HomePage() {
                 Automate the most time-consuming parts of your recruitment funnel. Focus on the top 60% of qualified candidates while AI handles the rest.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button className="sr-button-dark">Explore the Benefits</Button>
+                <Button 
+                  className="sr-button-dark"
+                  asChild
+                >
+                  <Link href="/roi">
+                    Explore the Benefits
+                  </Link>
+                </Button>
                 <Button className="sr-button-secondary" asChild>
                   <Link href="/demo-en">
                     <Play className="w-4 h-4 mr-2" />
@@ -676,22 +699,6 @@ export default function HomePage() {
             </div>
           </div>
           
-          {/* CTA Card */}
-          <div className="bg-gradient-to-r from-emerald-600 to-emerald-800 rounded-2xl shadow-xl p-10 text-white text-center">
-            <h3 className="text-3xl font-bold mb-4">Ready to Transform Your Hiring?</h3>
-            <p className="text-emerald-100 mb-8 max-w-2xl mx-auto text-lg">
-              Join forward-thinking companies using HireGenAI to hire better candidates faster, at a fraction of the cost.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button className="bg-white text-emerald-700 hover:bg-emerald-50 font-semibold px-10 py-4 text-lg rounded-full shadow-lg">
-                Start Free Trial
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-              <Button variant="outline" className="border-2 border-white text-white hover:bg-white hover:text-emerald-700 font-semibold px-10 py-4 text-lg rounded-full bg-transparent">
-                Schedule Demo
-              </Button>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -782,6 +789,7 @@ export default function HomePage() {
             <Button
               variant="outline"
               className="border-white text-white hover:bg-white hover:text-emerald-600 font-semibold px-8 py-4 text-lg rounded-full bg-transparent"
+              onClick={() => router.push('/demo-en')}
             >
               Try demo
             </Button>

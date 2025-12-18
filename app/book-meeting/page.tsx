@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Clock, Globe, MapPin, Zap, Facebook, Instagram, Youtube, Linkedin, Lock, Star, Loader2, ArrowRight, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,8 +16,23 @@ const GOOGLE_CALENDAR_URL = "https://calendar.google.com/calendar/u/0/appointmen
 
 export default function BookMeetingPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
   const [step, setStep] = useState(1) // 1: Form, 2: Google Calendar
+
+  useEffect(() => {
+    const scrollTo = searchParams?.get('scroll')
+    if (scrollTo) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(scrollTo)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' })
+        }
+        window.history.replaceState({}, '', '/book-meeting')
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [bookingId, setBookingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -334,12 +349,24 @@ export default function BookMeetingPage() {
                   </Link>
                 </li>
                 <li>
-                  <a href="#assessment" className="hover:text-emerald-400 transition-colors">
+                  <a 
+                    className="hover:text-emerald-400 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push('/?scroll=assessment');
+                    }}
+                  >
                     Assessment
                   </a>
                 </li>
                 <li>
-                  <a href="#faq" className="hover:text-emerald-400 transition-colors">
+                  <a 
+                    className="hover:text-emerald-400 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push('/?scroll=faq');
+                    }}
+                  >
                     FAQs
                   </a>
                 </li>
