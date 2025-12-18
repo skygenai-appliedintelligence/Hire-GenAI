@@ -254,26 +254,20 @@ export default function PrivacyPolicyPage() {
                   </Link>
                 </li>
                 <li>
-                  <button 
-                    onClick={() => {
-                      const element = document.getElementById('assessment');
-                      element?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="text-slate-400 hover:text-emerald-400 transition-colors text-left w-full"
-                  >
+                  <Link href="/" className="hover:text-emerald-400 transition-colors">
                     Assessment
-                  </button>
+                  </Link>
                 </li>
                 <li>
-                  <button
-                    onClick={() => {
-                      const element = document.getElementById('faq');
-                      element?.scrollIntoView({ behavior: 'smooth' });
+                  <a 
+                    className="hover:text-emerald-400 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push('/?scroll=faq');
                     }}
-                    className="text-slate-400 hover:text-emerald-400 transition-colors text-left w-full"
                   >
                     FAQs
-                  </button>
+                  </a>
                 </li>
               </ul>
             </div>

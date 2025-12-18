@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,6 +14,7 @@ import { Check, X, ArrowRight, Star, Facebook, Instagram, Youtube, Linkedin, Loc
 export default function PricingPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [loginModalTab, setLoginModalTab] = useState<"demo" | "signin">("signin")
 
@@ -22,6 +23,20 @@ export default function PricingPage() {
       router.push("/dashboard")
     }
   }, [user, loading, router])
+
+  useEffect(() => {
+    const scrollTo = searchParams?.get('scroll')
+    if (scrollTo) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(scrollTo)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' })
+        }
+        window.history.replaceState({}, '', '/pricing')
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams])
 
   if (loading) {
     return (
@@ -141,13 +156,23 @@ export default function PricingPage() {
                       </div>
                     ))}
                   </div>
-                  <Button
-                    className={`w-full ${plan.popular ? "sr-button-primary" : "sr-button-secondary"}`}
-                    onClick={() => (plan.cta === "Contact Sales" ? null : setShowLoginModal(true))}
-                  >
-                    {plan.cta}
-                    {plan.cta !== "Contact Sales" && <ArrowRight className="w-4 h-4 ml-2" />}
-                  </Button>
+                  {plan.cta === "Contact Sales" ? (
+                    <Button
+                      className={`w-full ${plan.popular ? "sr-button-primary" : "sr-button-secondary"}`}
+                    >
+                      {plan.cta}
+                    </Button>
+                  ) : (
+                    <Button
+                      className={`w-full ${plan.popular ? "sr-button-primary" : "sr-button-secondary"}`}
+                      asChild
+                    >
+                      <Link href="/signup">
+                        {plan.cta}
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Link>
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -210,30 +235,6 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 sr-gradient text-white">
-        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold mb-6">Ready to get started?</h2>
-          <p className="text-xl mb-8 text-emerald-100">
-            Join thousands of companies transforming their hiring process with AI
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button
-              onClick={() => setShowLoginModal(true)}
-              className="bg-white text-emerald-600 hover:bg-gray-100 font-semibold px-8 py-4 text-lg rounded-full"
-            >
-              Start Free Trial
-              <ArrowRight className="w-5 h-5 ml-2" />
-            </Button>
-            <Button
-              variant="outline"
-              className="border-white text-white hover:bg-white hover:text-emerald-600 font-semibold px-8 py-4 text-lg rounded-full bg-transparent"
-            >
-              Contact Sales
-            </Button>
-          </div>
-        </div>
-      </section>
 
       {/* Footer */}
       <footer className="bg-slate-900 text-white py-16">
@@ -285,26 +286,26 @@ export default function PricingPage() {
                   </Link>
                 </li>
                 <li>
-                  <button 
-                    onClick={() => {
-                      const element = document.getElementById('assessment');
-                      element?.scrollIntoView({ behavior: 'smooth' });
+                  <a 
+                    className="hover:text-emerald-400 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push('/?scroll=assessment');
                     }}
-                    className="text-slate-400 hover:text-emerald-400 transition-colors text-left w-full"
                   >
                     Assessment
-                  </button>
+                  </a>
                 </li>
                 <li>
-                  <button
-                    onClick={() => {
-                      const element = document.getElementById('faq');
-                      element?.scrollIntoView({ behavior: 'smooth' });
+                  <a 
+                    className="hover:text-emerald-400 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push('/?scroll=faq');
                     }}
-                    className="text-slate-400 hover:text-emerald-400 transition-colors text-left w-full"
                   >
                     FAQs
-                  </button>
+                  </a>
                 </li>
               </ul>
             </div>

@@ -2334,12 +2334,24 @@ export default function DemoEnPage() {
                   </Link>
                 </li>
                 <li>
-                  <a href="#assessment" className="hover:text-emerald-400 transition-colors">
+                  <a 
+                    className="hover:text-emerald-400 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push('/?scroll=assessment');
+                    }}
+                  >
                     Assessment
                   </a>
                 </li>
                 <li>
-                  <a href="#faq" className="hover:text-emerald-400 transition-colors">
+                  <a 
+                    className="hover:text-emerald-400 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push('/?scroll=faq');
+                    }}
+                  >
                     FAQs
                   </a>
                 </li>

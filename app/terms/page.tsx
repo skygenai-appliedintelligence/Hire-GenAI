@@ -1,6 +1,7 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import Navbar from "@/components/layout/Navbar"
@@ -17,6 +18,21 @@ import {
 export default function TermsAndConditionsPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const scrollTo = searchParams?.get('scroll')
+    if (scrollTo) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(scrollTo)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' })
+        }
+        window.history.replaceState({}, '', '/terms')
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams])
 
   if (loading) {
     return (
@@ -319,12 +335,24 @@ export default function TermsAndConditionsPage() {
                   </Link>
                 </li>
                 <li>
-                  <a href="/#assessment" className="hover:text-emerald-400 transition-colors">
+                  <a 
+                    className="hover:text-emerald-400 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push('/?scroll=assessment');
+                    }}
+                  >
                     Assessment
                   </a>
                 </li>
                 <li>
-                  <a href="/#faq" className="hover:text-emerald-400 transition-colors">
+                  <a 
+                    className="hover:text-emerald-400 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      router.push('/?scroll=faq');
+                    }}
+                  >
                     FAQs
                   </a>
                 </li>
