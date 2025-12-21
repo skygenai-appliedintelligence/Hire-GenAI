@@ -1474,6 +1474,9 @@ export default function DemoEnPage() {
                 src="https://storage.googleapis.com/ai_recruiter_bucket_prod/assets/videos/olivia_character_no_audio.mp4"
               />
             </div>
+
+            {/* Hidden audio element for AI agent voice - CRITICAL for audio playback */}
+            <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
           </section>
         )}
 
@@ -2398,11 +2401,6 @@ export default function DemoEnPage() {
                   <Link href="/terms" className="hover:text-emerald-400 transition-colors">
                     Terms and Conditions
                   </Link>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
-                    Imprint
-                  </a>
                 </li>
               </ul>
             </div>

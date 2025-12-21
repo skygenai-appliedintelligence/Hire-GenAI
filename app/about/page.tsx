@@ -158,10 +158,10 @@ export default function AboutPage() {
                   Demo Sign In
                 </Button>
                 <Button 
-                  onClick={() => window.location.href = '/contact'}
+                  onClick={() => window.location.href = '/pricing'}
                   className="bg-white text-emerald-600 hover:bg-emerald-50 font-semibold px-7 py-2.5 h-auto rounded-lg transition-all duration-200 hover:shadow-lg"
                 >
-                  Contact Us
+                  Pricing
                 </Button>
               </div>
             </div>
@@ -382,11 +382,6 @@ export default function AboutPage() {
                   <Link href="/terms" className="hover:text-emerald-400 transition-colors">
                     Terms and Conditions
                   </Link>
-                </li>
-                <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
-                    Imprint
-                  </a>
                 </li>
               </ul>
             </div>
