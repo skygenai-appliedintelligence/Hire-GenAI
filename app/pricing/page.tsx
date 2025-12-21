@@ -351,11 +351,6 @@ export default function PricingPage() {
                     Terms and Conditions
                   </Link>
                 </li>
-                <li>
-                  <a href="#" className="hover:text-emerald-400 transition-colors">
-                    Imprint
-                  </a>
-                </li>
               </ul>
             </div>
 
