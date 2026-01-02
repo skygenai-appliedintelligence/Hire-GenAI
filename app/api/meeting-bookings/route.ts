@@ -115,6 +115,86 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// PATCH - Update meeting booking status (for admin)
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { id, status, adminNotes } = body
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Booking ID is required' },
+        { status: 400 }
+      )
+    }
+
+    const validStatuses = ['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show', 'rescheduled']
+    if (status && !validStatuses.includes(status)) {
+      return NextResponse.json(
+        { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
+    const updates: string[] = []
+    const params: any[] = []
+    let paramIndex = 1
+
+    if (status) {
+      updates.push(`status = $${paramIndex}`)
+      params.push(status)
+      paramIndex++
+
+      // Set timestamps based on status
+      if (status === 'confirmed') {
+        updates.push(`confirmed_at = NOW()`)
+      } else if (status === 'cancelled') {
+        updates.push(`cancelled_at = NOW()`)
+      }
+    }
+
+    if (adminNotes !== undefined) {
+      updates.push(`admin_notes = $${paramIndex}`)
+      params.push(adminNotes)
+      paramIndex++
+    }
+
+    updates.push(`updated_at = NOW()`)
+
+    if (updates.length === 1) {
+      return NextResponse.json(
+        { error: 'No fields to update' },
+        { status: 400 }
+      )
+    }
+
+    params.push(id)
+    const sql = `UPDATE meeting_bookings SET ${updates.join(', ')} WHERE id = $${paramIndex}::uuid RETURNING *`
+    
+    const result = await DatabaseService.query(sql, params)
+
+    if (!result || result.length === 0) {
+      return NextResponse.json(
+        { error: 'Booking not found' },
+        { status: 404 }
+      )
+    }
+
+    console.log('✅ [API] Meeting booking updated:', id, 'Status:', status)
+
+    return NextResponse.json({
+      success: true,
+      booking: result[0]
+    })
+  } catch (error: any) {
+    console.error('❌ [API] Failed to update meeting booking:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to update meeting booking' },
+      { status: 500 }
+    )
+  }
+}
+
 // GET - Get all meeting bookings (for admin)
 export async function GET(request: NextRequest) {
   try {

@@ -3,6 +3,8 @@ export interface User {
   email: string
   name: string
   role: string
+  phone?: string
+  timezone?: string
 }
 
 export interface Company {
@@ -25,6 +27,8 @@ interface MockUserData {
   password: string
   name: string
   role: string
+  phone?: string
+  timezone?: string
   company: Company
 }
 
@@ -487,10 +491,12 @@ export class MockAuthService {
         }
         return session
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error parsing current user:", error)
-      localStorage.removeItem(this.STORAGE_KEY)
-      localStorage.removeItem(`${this.STORAGE_KEY}_backup`)
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(this.STORAGE_KEY)
+        localStorage.removeItem(`${this.STORAGE_KEY}_backup`)
+      }
     }
 
     return null
@@ -498,10 +504,39 @@ export class MockAuthService {
 
   // Allow setting session from server response (OTP flow)
   static setSessionFromServer(user: User, company: Company) {
-    const session: AuthSession = { user, company }
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(session))
-      localStorage.setItem(`${this.STORAGE_KEY}_backup`, JSON.stringify(session))
+    if (typeof window === "undefined") return
+
+    try {
+      // Store user profile data including phone number and timezone
+      localStorage.setItem(
+        this.STORAGE_KEY,
+        JSON.stringify({ 
+          user: {
+            ...user,
+            // Ensure phone and timezone are included
+            phone: user.phone || '',
+            timezone: user.timezone || 'UTC'
+          }, 
+          company 
+        })
+      )
+      
+      // Also store a backup
+      localStorage.setItem(
+        `${this.STORAGE_KEY}_backup`,
+        JSON.stringify({ 
+          user: {
+            ...user,
+            phone: user.phone || '',
+            timezone: user.timezone || 'UTC'
+          }, 
+          company 
+        })
+      )
+      
+      console.log('📱 Saved user profile with phone:', user.phone)
+    } catch (e) {
+      console.error("Failed to set mock auth session:", e)
     }
   }
 }

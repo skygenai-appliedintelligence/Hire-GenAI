@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Download, FileText, Filter } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { Spinner } from "@/components/ui/spinner"
 
 type SuccessfulHireRow = {
   id: string
@@ -215,7 +216,7 @@ Generated on: ${new Date().toLocaleString()}`
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 space-y-6 py-6 overflow-x-hidden bg-gradient-to-b from-green-50/60 via-white to-green-50/40">
+    <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-green-50/60 via-white to-green-50/40">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Successful Hires</h1>
         <div className="flex items-center space-x-4">
@@ -284,7 +285,9 @@ Generated on: ${new Date().toLocaleString()}`
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">Loading...</TableCell>
+                      <TableCell colSpan={7} className="text-center py-8">
+                        <Spinner size="md" text="Loading successful hires..." className="mx-auto" />
+                      </TableCell>
                     </TableRow>
                   ) : error ? (
                     <TableRow>

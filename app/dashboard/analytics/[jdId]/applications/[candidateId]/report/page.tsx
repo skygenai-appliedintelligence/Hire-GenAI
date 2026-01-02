@@ -591,7 +591,7 @@ export default function CandidateReportPage() {
           {/* Title and Download Report Button */}
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-3xl md:text-4xl font-bold text-purple-600">
-              Interview with {candidateData.name} {jobTitle && `for ${jobTitle}`}
+              Report of {candidateData.name} for {jobTitle || 'Position'}
             </h1>
             <Button 
               onClick={downloadReport}

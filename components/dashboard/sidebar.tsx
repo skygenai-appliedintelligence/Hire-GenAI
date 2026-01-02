@@ -3,10 +3,15 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Briefcase, Settings, BarChart3, MessageSquare, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
+import { LayoutDashboard, Briefcase, Settings, BarChart3, MessageSquare, LogOut, ChevronLeft, ChevronRight, HelpCircle, X } from 'lucide-react'
 import { useAuth } from "@/contexts/auth-context"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+
+interface SidebarProps {
+  isMobileOpen?: boolean
+  onMobileClose?: () => void
+}
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -14,13 +19,20 @@ const navigation = [
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
   { name: "Messages", href: "/dashboard/messages", icon: MessageSquare },
   { name: "Settings", href: "/dashboard/settings/profile", icon: Settings },
+  { name: "Support", href: "/support-hiregenai", icon: HelpCircle },
 ]
 
-export function Sidebar() {
+export function Sidebar({ isMobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname()
   const { signOut } = useAuth()
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  
+  // For mobile, use the isMobileOpen prop instead of internal state
+  const isOpen = isMobileOpen !== undefined ? isMobileOpen : sidebarOpen
+  const setOpen = onMobileClose ? (value: boolean) => {
+    if (!value) onMobileClose()
+  } : setSidebarOpen
 
   const handleLogout = async () => {
     try {
@@ -34,13 +46,13 @@ export function Sidebar() {
   return (
     <div
       className={cn(
-        "bg-white shadow-sm border-r border-gray-200 transition-all duration-300 flex flex-col",
-        sidebarOpen ? "w-52" : "w-16"
+        "bg-white shadow-sm border-r border-gray-200 transition-all duration-300 flex flex-col h-full",
+        isOpen ? "w-52" : "w-16"
       )}
     >
       {/* Logo */}
       <div className="p-4 border-b border-gray-200">
-        {sidebarOpen ? (
+        {isOpen ? (
           <div className="flex items-center justify-between">
             <Link href="/">
               <h1 className="text-lg font-bold">
@@ -49,7 +61,7 @@ export function Sidebar() {
               </h1>
             </Link>
             <button
-              onClick={() => setSidebarOpen(false)}
+              onClick={() => setOpen(false)}
               className="p-1 hover:bg-gray-100 rounded transition-colors"
             >
               <ChevronLeft className="w-4 h-4 text-gray-600" />
@@ -57,7 +69,7 @@ export function Sidebar() {
           </div>
         ) : (
           <button
-            onClick={() => setSidebarOpen(true)}
+            onClick={() => setOpen(true)}
             className="w-full flex justify-center p-1 hover:bg-gray-100 rounded transition-colors"
           >
             <ChevronRight className="w-4 h-4 text-gray-600" />
@@ -66,7 +78,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav Items */}
-      <nav className="flex-1 mt-4">
+      <nav className="flex-1 mt-4 overflow-y-auto">
         <div className="px-2">
           {navigation.map((item) => {
             const Icon = item.icon
@@ -87,11 +99,11 @@ export function Sidebar() {
                 <Icon
                   className={cn(
                     "h-5 w-5 flex-shrink-0",
-                    sidebarOpen ? "mr-2.5" : "mx-auto",
+                    isOpen ? "mr-2.5" : "mx-auto",
                     isActive ? "text-emerald-500" : "text-gray-400 group-hover:text-emerald-500",
                   )}
                 />
-                {sidebarOpen && <span>{item.name}</span>}
+                {isOpen && <span>{item.name}</span>}
               </Link>
             )
           })}
@@ -103,11 +115,11 @@ export function Sidebar() {
         <Button
           variant="outline"
           size="sm"
-          className="w-full text-gray-700 border-gray-300 hover:bg-gray-50"
+          className="w-full border-emerald-600 text-emerald-600 hover:bg-emerald-600 hover:text-white"
           onClick={handleLogout}
         >
-          <LogOut className={cn("w-4 h-4", sidebarOpen && "mr-2")} />
-          {sidebarOpen && "Logout"}
+          <LogOut className={cn("w-4 h-4", isOpen && "mr-2")} />
+          {isOpen && "Logout"}
         </Button>
       </div>
     </div>

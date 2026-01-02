@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
 import { MessageSquare, Send, Mail, Phone, User, Loader2, Briefcase, Users2, X, Lightbulb } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Spinner } from "@/components/ui/spinner"
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 import {
@@ -332,6 +333,12 @@ export default function MessagesPage() {
                 </Badge>
               </div>
               
+              {loading ? (
+                <div className="py-8">
+                  <Spinner size="md" text="Loading interview message..." className="mx-auto" />
+                </div>
+              ) : (
+              <>
               <Textarea
                 ref={textareaRef}
                 placeholder="Type your interview message here..."
@@ -402,6 +409,8 @@ export default function MessagesPage() {
                   ✓ Draft saved
                 </div>
               )}
+              </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -419,6 +428,12 @@ export default function MessagesPage() {
                 </Badge>
               </div>
               
+              {loading ? (
+                <div className="py-8">
+                  <Spinner size="md" text="Loading job message..." className="mx-auto" />
+                </div>
+              ) : (
+              <>
               <Textarea
                 ref={textareaRef}
                 placeholder="Type your job announcement message here..."
@@ -488,6 +503,8 @@ export default function MessagesPage() {
                 <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
                   ✓ Draft saved
                 </div>
+              )}
+              </>
               )}
             </CardContent>
           </Card>

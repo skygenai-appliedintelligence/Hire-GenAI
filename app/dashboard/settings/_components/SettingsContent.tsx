@@ -33,8 +33,40 @@ const companySizes = [
   "51-200 employees",
   "201-500 employees",
   "501-1000 employees",
-  "1000+ employees",
+  "1001-5000 employees",
+  "5001-10000 employees",
+  "10000+ employees",
 ]
+
+// Map UI display values to database enum values
+const mapCompanySizeToDb = (displayValue: string): string => {
+  const mapping: Record<string, string> = {
+    "1-10 employees": "1-10",
+    "11-50 employees": "11-50",
+    "51-200 employees": "51-200",
+    "201-500 employees": "201-500",
+    "501-1000 employees": "501-1000",
+    "1001-5000 employees": "1001-5000",
+    "5001-10000 employees": "5001-10000",
+    "10000+ employees": "10000+",
+  }
+  return mapping[displayValue] || displayValue
+}
+
+// Map database enum values back to UI display values
+const mapDbSizeToDisplay = (dbValue: string): string => {
+  const mapping: Record<string, string> = {
+    "1-10": "1-10 employees",
+    "11-50": "11-50 employees",
+    "51-200": "51-200 employees",
+    "201-500": "201-500 employees",
+    "501-1000": "501-1000 employees",
+    "1001-5000": "1001-5000 employees",
+    "5001-10000": "5001-10000 employees",
+    "10000+": "10000+ employees",
+  }
+  return mapping[dbValue] || dbValue
+}
 
 const countryOptions = [
   { name: "United States", code: "US" },
@@ -81,6 +113,17 @@ export default function SettingsContent({ section }: { section?: string }) {
     phone: (user as any)?.phone || "",
     timezone: (user as any)?.timezone || "UTC",
   })
+
+  // Update profile data when user data changes
+  useEffect(() => {
+    setProfileData(prev => ({
+      ...prev,
+      name: user?.full_name || user?.email?.split("@")[0] || prev.name,
+      email: user?.email || prev.email,
+      phone: (user as any)?.phone || prev.phone,
+      timezone: (user as any)?.timezone || prev.timezone,
+    }))
+  }, [user])
 
   const [companyData, setCompanyData] = useState({
     // Basic Information
@@ -231,12 +274,17 @@ export default function SettingsContent({ section }: { section?: string }) {
         console.log('💡 This likely means the addresses table doesn\'t exist or this company has no address data')
       }
       if (data.ok && data.company) {
+        console.log('📊 [COMPANY SIZE DEBUG] Received from API:', {
+          size: data.company.size,
+          size_band: data.company.size_band,
+          all_keys: Object.keys(data.company)
+        })
         setCompanyData({
           // Basic Information
           name: data.company.name || "",
           website: data.company.website || "",
           industry: data.company.industry || "",
-          size: data.company.size || "",
+          size: data.company.size ? mapDbSizeToDisplay(data.company.size) : "",
           description: data.company.description || "",
           // Contact Information
           street: data.company.street || "",
@@ -330,7 +378,7 @@ export default function SettingsContent({ section }: { section?: string }) {
       const res = await fetch(`/api/company-members`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyId: (company as any).id, email, role }),
+        body: JSON.stringify({ companyId: (company as any).id, email, role, actorEmail: (user as any)?.email }),
       })
       const data = await res.json()
       if (data.ok) {
@@ -346,39 +394,45 @@ export default function SettingsContent({ section }: { section?: string }) {
   }
 
   const handleSaveProfile = async () => {
-    if (!(user as any)?.id) return
+    if (!user?.id) return
     setLoading(true)
     try {
+      const payload = {
+        userId: user.id,
+        email: profileData.email,
+        name: profileData.name,
+        phone: profileData.phone || "", // Ensure phone is not undefined
+        timezone: profileData.timezone
+      }
       const res = await fetch('/api/settings/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          userId: (user as any).id, 
-          email: profileData.email,
-          name: profileData.name,
-          phone: profileData.phone,
-          timezone: profileData.timezone
-        }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok || !data.ok) throw new Error(typeof data.error === 'string' ? data.error : (data.error?.message || 'Failed'))
 
-      setAuthSession(
-        { 
-          ...(user as any), 
-          full_name: data.user?.full_name ?? profileData.name,
-          phone: data.user?.phone ?? profileData.phone,
-          timezone: data.user?.timezone ?? profileData.timezone
-        },
-        (company as any)
-      )
+      // Store phone in user session directly
+      const updatedUser = {
+        ...(user as any),
+        full_name: data.user?.full_name ?? profileData.name,
+        phone: profileData.phone || "", // Use the value from form directly
+        timezone: profileData.timezone || "UTC"
+      }
 
+      // Update auth context with phone number
+      setAuthSession(updatedUser, (company as any))
+
+      // Update local state
       setProfileData(prev => ({
         ...prev,
-        name: data.user?.full_name ?? prev.name,
-        phone: data.user?.phone ?? prev.phone,
-        timezone: data.user?.timezone ?? prev.timezone
+        name: updatedUser.full_name,
+        phone: updatedUser.phone,
+        timezone: updatedUser.timezone
       }))
+
+      // Log the updated user data
+      console.log("Updated user data:", updatedUser)
 
       toast({ title: 'Success', description: 'Profile updated successfully' })
     } catch (error: any) {
@@ -394,11 +448,12 @@ export default function SettingsContent({ section }: { section?: string }) {
     try {
       const payload = {
         companyId: (company as any).id,
+        actorEmail: (user as any)?.email,
         // Basic Information
         name: companyData.name,
         website: companyData.website,
         industry: companyData.industry,
-        size: companyData.size,
+        size: mapCompanySizeToDb(companyData.size),
         description: companyData.description,
         // Contact Information
         street: companyData.street,
@@ -474,8 +529,7 @@ export default function SettingsContent({ section }: { section?: string }) {
               disabled={!canAccessTab('notifications')}
             >
               <Bell className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden xs:inline">Notifications</span>
-              <span className="xs:hidden">Notif</span>
+              <span className="text-xs sm:text-sm">Notification</span>
               {!canAccessTab('notifications') && <Lock className="h-2.5 w-2.5 sm:h-3 sm:w-3 ml-1" />}
             </TabsTrigger>
             <TabsTrigger 
@@ -503,9 +557,9 @@ export default function SettingsContent({ section }: { section?: string }) {
                   <Input
                     id="name"
                     value={profileData.name}
-                    onChange={(e) => setProfileData((prev) => ({ ...prev, name: e.target.value }))}
-                    disabled={!canEditSection}
-                    className="linkedin-input"
+                    disabled={true}
+                    readOnly
+                    className="linkedin-input bg-gray-50 cursor-not-allowed"
                   />
                 </div>
                 <div className="space-y-2">
@@ -514,9 +568,9 @@ export default function SettingsContent({ section }: { section?: string }) {
                     id="email"
                     type="email"
                     value={profileData.email}
-                    onChange={(e) => setProfileData((prev) => ({ ...prev, email: e.target.value }))}
-                    disabled={!canEditSection}
-                    className="linkedin-input"
+                    disabled={true}
+                    readOnly
+                    className="linkedin-input bg-gray-50 cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -606,8 +660,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                     <SelectValue placeholder="Role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="member">Member</SelectItem>
-                    <SelectItem value="user">Team member</SelectItem>
+                    <SelectItem value="member">Team Member</SelectItem>
                     <SelectItem value="company_admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
@@ -631,12 +684,11 @@ export default function SettingsContent({ section }: { section?: string }) {
                     </div>
                     <div className="flex items-center gap-3">
                       <Select value={m.role} onValueChange={(v) => { if (canEditSection) updateRole(m.email, v as any) }}>
-                        <SelectTrigger className="w-40" disabled={!canEditSection}>
+                        <SelectTrigger className="w-40" disabled={!canEditSection || m.email === user?.email}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="member">Member</SelectItem>
-                          <SelectItem value="user">Team member</SelectItem>
+                          <SelectItem value="member">Team Member</SelectItem>
                           <SelectItem value="company_admin">Admin</SelectItem>
                         </SelectContent>
                       </Select>
@@ -684,23 +736,23 @@ export default function SettingsContent({ section }: { section?: string }) {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="companyName">Company Name *</Label>
+                    <Label htmlFor="companyName">Company Name * <span className="text-xs text-gray-500">(Cannot be changed)</span></Label>
                     <Input
                       id="companyName"
                       value={companyData.name}
                       onChange={(e) => setCompanyData((prev) => ({ ...prev, name: e.target.value }))}
-                      disabled={!canEditSection}
-                      className="linkedin-input"
+                      disabled={true}
+                      className="linkedin-input bg-gray-100"
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="industry">Industry *</Label>
+                    <Label htmlFor="industry">Industry * <span className="text-xs text-gray-500">(Cannot be changed)</span></Label>
                     <Select
                       value={companyData.industry}
                       onValueChange={(value) => setCompanyData((prev) => ({ ...prev, industry: value }))}
                     >
-                      <SelectTrigger className="linkedin-input" disabled={!canEditSection}>
+                      <SelectTrigger className="linkedin-input bg-gray-100" disabled={true}>
                         <SelectValue placeholder="Select industry" />
                       </SelectTrigger>
                       <SelectContent>
@@ -713,12 +765,12 @@ export default function SettingsContent({ section }: { section?: string }) {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="companySize">Company Size *</Label>
+                    <Label htmlFor="companySize">Company Size * <span className="text-xs text-gray-500">(Cannot be changed)</span></Label>
                     <Select
                       value={companyData.size}
                       onValueChange={(value) => setCompanyData((prev) => ({ ...prev, size: value }))}
                     >
-                      <SelectTrigger className="linkedin-input" disabled={!canEditSection}>
+                      <SelectTrigger className="linkedin-input bg-gray-100" disabled={true}>
                         <SelectValue placeholder="Select company size" />
                       </SelectTrigger>
                       <SelectContent>
@@ -766,59 +818,59 @@ export default function SettingsContent({ section }: { section?: string }) {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="street">Street Address *</Label>
+                  <Label htmlFor="street">Street Address * <span className="text-xs text-gray-500">(Cannot be changed)</span></Label>
                   <Input
                     id="street"
                     value={companyData.street}
                     onChange={(e) => setCompanyData((prev) => ({ ...prev, street: e.target.value }))}
-                    disabled={!canEditSection}
-                    className="linkedin-input"
+                    disabled={true}
+                    className="linkedin-input bg-gray-100"
                     required
                   />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="city">City *</Label>
+                    <Label htmlFor="city">City * <span className="text-xs text-gray-500">(Cannot be changed)</span></Label>
                     <Input
                       id="city"
                       value={companyData.city}
                       onChange={(e) => setCompanyData((prev) => ({ ...prev, city: e.target.value }))}
-                      disabled={!canEditSection}
-                      className="linkedin-input"
+                      disabled={true}
+                      className="linkedin-input bg-gray-100"
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="state">State/Province *</Label>
+                    <Label htmlFor="state">State/Province * <span className="text-xs text-gray-500">(Cannot be changed)</span></Label>
                     <Input
                       id="state"
                       value={companyData.state}
                       onChange={(e) => setCompanyData((prev) => ({ ...prev, state: e.target.value }))}
-                      disabled={!canEditSection}
-                      className="linkedin-input"
+                      disabled={true}
+                      className="linkedin-input bg-gray-100"
                       required
                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="postalCode">ZIP/Postal Code *</Label>
+                    <Label htmlFor="postalCode">ZIP/Postal Code * <span className="text-xs text-gray-500">(Cannot be changed)</span></Label>
                     <Input
                       id="postalCode"
                       value={companyData.postalCode}
                       onChange={(e) => setCompanyData((prev) => ({ ...prev, postalCode: e.target.value }))}
-                      disabled={!canEditSection}
-                      className="linkedin-input"
+                      disabled={true}
+                      className="linkedin-input bg-gray-100"
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="country">Country *</Label>
+                    <Label htmlFor="country">Country * <span className="text-xs text-gray-500">(Cannot be changed)</span></Label>
                     <Select
                       value={companyData.country}
                       onValueChange={(value) => setCompanyData((prev) => ({ ...prev, country: value }))}
                     >
-                      <SelectTrigger className="linkedin-input" disabled={!canEditSection}>
+                      <SelectTrigger className="linkedin-input bg-gray-100" disabled={true}>
                         <SelectValue placeholder="Select country" />
                       </SelectTrigger>
                       <SelectContent>
@@ -905,6 +957,10 @@ export default function SettingsContent({ section }: { section?: string }) {
         </TabsContent>
 
         <TabsContent value="notifications">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Notification</h2>
+            <p className="text-gray-600 mt-1">Manage your notification preferences</p>
+          </div>
           {!canAccessTab('notifications') ? (
             <Card className="linkedin-card">
               <CardHeader>

@@ -105,11 +105,8 @@ export class DatabaseService {
 
     const domain = email.split('@')[1]
 
-    // TEMPORARY FIX: Database enum values don't match Prisma schema
-    // Setting size_band to NULL to avoid enum errors
-    // The company size is still stored in the form but not in the enum field
-    // TODO: Fix database enum values by running: check_enum_values.sql to see current values
-    const sizeBand = null  // Temporarily disabled due to enum mismatch
+    // Use the size_band value from the request or set to null
+    const sizeBand = signupData.companySize || null
 
     // Build headquarters from address fields (legacy field, kept for compatibility)
     const headquartersArray = [
@@ -1167,7 +1164,13 @@ export class DatabaseService {
     if (updates.joining_timeline !== undefined) { sets.push(`joining_timeline = $${i++}`); values.push(updates.joining_timeline) }
     if (updates.travel_requirements !== undefined) { sets.push(`travel_requirements = $${i++}`); values.push(updates.travel_requirements) }
     if (updates.visa_requirements !== undefined) { sets.push(`visa_requirements = $${i++}`); values.push(updates.visa_requirements) }
-    if (updates.auto_schedule_interview !== undefined) { sets.push(`auto_schedule_interview = $${i++}`); values.push(updates.auto_schedule_interview) }
+    if (updates.auto_schedule_interview !== undefined) { 
+      // Explicitly cast to boolean for PostgreSQL
+      const boolValue = updates.auto_schedule_interview === true
+      sets.push(`auto_schedule_interview = $${i++}::boolean`); 
+      values.push(boolValue)
+      console.log('🔧 [DB] Setting auto_schedule_interview to:', boolValue, 'type:', typeof boolValue)
+    }
 
     if (sets.length === 0) return null
 

@@ -180,6 +180,8 @@ export async function PATCH(req: Request, ctx: { params: { id?: string; jobId?: 
     if ('visa_requirements' in body) updates.visa_requirements = (body.visa_requirements ?? null)
     if ('auto_schedule_interview' in body) updates.auto_schedule_interview = body.auto_schedule_interview === true
 
+    console.log('🔧 [JOB PATCH] Updates to apply:', updates)
+
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ ok: false, error: 'No updatable fields provided' }, { status: 400 })
     }
@@ -188,6 +190,7 @@ export async function PATCH(req: Request, ctx: { params: { id?: string; jobId?: 
       const companyId = await DatabaseService.getCompanyIdByName(companyName)
       if (!companyId) return NextResponse.json({ ok: false, error: 'Company not found' }, { status: 404 })
       const updated = await DatabaseService.updateJobForCompany(id, companyId, updates)
+      console.log('✅ [JOB PATCH] Updated job result:', { id: updated?.id, auto_schedule_interview: updated?.auto_schedule_interview })
       if (!updated) return NextResponse.json({ ok: false, error: 'Job not found or no changes' }, { status: 404 })
       return NextResponse.json({ ok: true, job: updated })
     }

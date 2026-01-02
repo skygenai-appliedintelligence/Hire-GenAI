@@ -48,6 +48,13 @@ export async function GET(req: NextRequest) {
         JOIN application_rounds ar ON ar.id = i.application_round_id
         JOIN base_apps a ON a.id = ar.application_id
       ),
+      passed_interviews AS (
+        SELECT i.*
+        FROM interviews i
+        JOIN application_rounds ar ON ar.id = i.application_round_id
+        JOIN base_apps a ON a.id = ar.application_id
+        WHERE i.status = 'success'
+      ),
       apps_this_month AS (
         SELECT COUNT(*) AS cnt FROM base_apps WHERE date_trunc('month', created_at) = date_trunc('month', now())
       ),
@@ -61,16 +68,16 @@ export async function GET(req: NextRequest) {
         SELECT COUNT(*) AS cnt FROM base_interviews WHERE completed_at IS NOT NULL AND date_trunc('month', completed_at) = date_trunc('month', now() - interval '1 month')
       ),
       hires_this_month AS (
-        SELECT COUNT(*) AS cnt FROM base_apps WHERE status = 'offer' AND date_trunc('month', created_at) = date_trunc('month', now())
+        SELECT COUNT(*) AS cnt FROM passed_interviews WHERE date_trunc('month', completed_at) = date_trunc('month', now())
       ),
       hires_prev_month AS (
-        SELECT COUNT(*) AS cnt FROM base_apps WHERE status = 'offer' AND date_trunc('month', created_at) = date_trunc('month', now() - interval '1 month')
+        SELECT COUNT(*) AS cnt FROM passed_interviews WHERE date_trunc('month', completed_at) = date_trunc('month', now() - interval '1 month')
       )
       SELECT 
         (SELECT COUNT(*) FROM base_apps) AS total_applications,
         (SELECT COUNT(DISTINCT candidate_id) FROM base_apps WHERE ${hasIsQualified ? `is_qualified = true OR` : ''} status IN ('in_progress','offer')) AS qualified_candidates,
         (SELECT COUNT(*) FROM base_interviews WHERE status IN ('success','failed')) AS interviews_completed,
-        (SELECT COUNT(*) FROM base_apps WHERE status = 'offer') AS successful_hires,
+        (SELECT COUNT(*) FROM passed_interviews) AS successful_hires,
         (SELECT COALESCE(ROUND(AVG(EXTRACT(DAY FROM now() - created_at))::numeric, 0), 0) FROM base_apps WHERE status = 'offer') AS avg_time_to_hire_days,
         (SELECT cnt FROM apps_this_month) AS apps_current,
         (SELECT cnt FROM apps_prev_month) AS apps_previous,

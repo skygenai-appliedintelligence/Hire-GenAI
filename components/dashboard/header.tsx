@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, User, LogOut, Settings, AlertTriangle } from "lucide-react"
+import { Bell, User, LogOut, Settings, AlertTriangle, Menu } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,11 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
 
-export function Header() {
+interface HeaderProps {
+  onMenuClick?: () => void
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
   const { user, company, signOut } = useAuth()
   const router = useRouter()
   const [applicationsCount, setApplicationsCount] = useState(0)
@@ -137,9 +141,18 @@ export function Header() {
   }
 
   return (
-    <header className="bg-white border-b border-gray-200 px-6 py-3 h-16 flex items-center">
+    <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 h-16 flex items-center">
       <div className="flex items-center justify-between w-full">
-        <div className="flex items-center space-x-4">
+        {/* Mobile Menu Button */}
+        <button
+          onClick={onMenuClick}
+          className="md:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors mr-2"
+          title="Toggle menu"
+        >
+          <Menu className="w-5 h-5 text-gray-600" />
+        </button>
+
+        <div className="flex items-center space-x-4 flex-1">
           {/* Low Balance Warning */}
           {walletBalance !== null && walletBalance < 100 && (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-md animate-pulse">

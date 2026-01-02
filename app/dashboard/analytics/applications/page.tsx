@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Filter } from "lucide-react"
+import { Spinner } from "@/components/ui/spinner"
 
 // NOTE: Replace with real data fetch later
 // Status is either "CV Unqualified" | "CV Qualified"
@@ -161,7 +162,9 @@ export default function ApplicationsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">Loading...</TableCell>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      <Spinner size="md" text="Loading applications..." className="mx-auto" />
+                    </TableCell>
                   </TableRow>
                 ) : error ? (
                   <TableRow>
