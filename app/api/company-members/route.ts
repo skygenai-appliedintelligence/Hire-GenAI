@@ -11,9 +11,8 @@ function mapUiRoleToDb(role: 'company_admin' | 'user' | 'member'): 'admin' | 're
 }
 function mapDbRoleToUi(role?: string, companyName?: string): 'company_admin' | 'user' | 'member' {
   if (role === 'admin') return 'company_admin'
-  // If it's the demo company (HireGenAI or HireGenAI Demo Company), show recruiter role as 'member'
-  if (companyName === 'HireGenAI' || companyName === 'HireGenAI Demo Company') return 'member'
-  return 'user' // Regular company users with recruiter role show as 'user'
+  // All non-admin roles should show as 'member' (Team Member) in the UI
+  return 'member'
 }
 
 // Reusable admin check

@@ -69,8 +69,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               email: currentUser.user.email,
               full_name: currentUser.user.name,
               status: 'active',
-              phone: undefined,
-              timezone: 'UTC',
+              // Get phone and timezone from stored session
+              phone: currentUser.user.phone || '',
+              timezone: currentUser.user.timezone || 'UTC',
               role: currentUser.user.role as any // Preserve the role from mock auth
             }
             const newCompany: Company = {
@@ -82,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(newUser)
             setCompany(newCompany)
             console.log("✅ Restored session for:", currentUser.user.email)
+            console.log("📱 Restored phone number:", newUser.phone)
           }
         } else {
           console.log("ℹ️ No existing session found")

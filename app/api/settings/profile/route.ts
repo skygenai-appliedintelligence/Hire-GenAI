@@ -32,6 +32,10 @@ export async function PUT(req: Request) {
         }
       })
     }
+    
+    // Store phone and timezone in user session data
+    // This is a workaround since we don't have a user_profiles table
+    // These values will be stored in memory and accessible via user context
 
     // Attempt update by userId, then fallback to email (no auto-creation)
     try {

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Star, Lock, Facebook, Instagram, Youtube, Linkedin } from "lucide-react"
+import { Star, Lock, Facebook, Instagram, Linkedin } from "lucide-react"
 
 export function Footer() {
   return (
@@ -24,9 +24,6 @@ export function Footer() {
               </a>
               <a href="#" className="hover:text-emerald-400 transition-colors">
                 <Instagram className="w-5 h-5" />
-              </a>
-              <a href="#" className="hover:text-emerald-400 transition-colors">
-                <Youtube className="w-5 h-5" />
               </a>
               <a href="#" className="hover:text-emerald-400 transition-colors">
                 <Linkedin className="w-5 h-5" />
@@ -81,9 +78,9 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/owner-login" className="hover:text-emerald-400 transition-colors">
+                <a href="/owner-login" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-400 transition-colors">
                   Admin
-                </Link>
+                </a>
               </li>
             </ul>
           </div>

@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Filter } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { Spinner } from "@/components/ui/spinner"
 
 // Status typings
 export type InterviewStatus = "Completed" | "Scheduled" | "Pending" | "Cancelled"
@@ -190,7 +191,9 @@ export default function InterviewsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">Loading...</TableCell>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      <Spinner size="md" text="Loading interviews..." className="mx-auto" />
+                    </TableCell>
                   </TableRow>
                 ) : error ? (
                   <TableRow>

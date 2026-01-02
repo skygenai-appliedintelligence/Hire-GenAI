@@ -66,6 +66,77 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// PATCH endpoint to update contact message status (admin only)
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { id, status, adminNotes } = body
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Message ID is required' },
+        { status: 400 }
+      )
+    }
+
+    const validStatuses = ['new', 'read', 'responded', 'spam', 'archived']
+    if (status && !validStatuses.includes(status)) {
+      return NextResponse.json(
+        { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
+    const updates: string[] = []
+    const params: any[] = []
+    let paramIndex = 1
+
+    if (status) {
+      updates.push(`status = $${paramIndex}`)
+      params.push(status)
+      paramIndex++
+    }
+
+    if (adminNotes !== undefined) {
+      updates.push(`admin_notes = $${paramIndex}`)
+      params.push(adminNotes)
+      paramIndex++
+    }
+
+    updates.push(`updated_at = NOW()`)
+
+    if (updates.length === 1) {
+      return NextResponse.json(
+        { error: 'No fields to update' },
+        { status: 400 }
+      )
+    }
+
+    params.push(id)
+    const sql = `UPDATE contact_messages SET ${updates.join(', ')} WHERE id = CAST($${paramIndex} AS UUID) RETURNING *`
+    
+    const result = await DatabaseService.query(sql, params)
+
+    if (!result || result.length === 0) {
+      return NextResponse.json(
+        { error: 'Message not found' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: result[0]
+    })
+  } catch (error) {
+    console.error('Error updating contact message:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
 // GET endpoint to retrieve contact messages (admin only)
 export async function GET(request: NextRequest) {
   try {

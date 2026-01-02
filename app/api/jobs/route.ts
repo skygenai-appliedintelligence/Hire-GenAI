@@ -531,6 +531,9 @@ export async function GET(req: Request) {
       const companyId = await DatabaseService.getCompanyIdByName(companyName)
       if (!companyId) return NextResponse.json({ ok: true, jobs: [] })
       const data = await DatabaseService.listJobsByCompanyId(companyId, 200)
+      
+      // Debug: Log raw data from database
+      console.log('📋 [JOBS API] Raw data from DB:', data?.map((r: any) => ({ id: r.id, title: r.title, auto_schedule_interview: r.auto_schedule_interview })))
 
       // Attach per-job interview_rounds by fetching rounds for each job
       const jobsOut = [] as any[]

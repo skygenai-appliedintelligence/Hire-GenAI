@@ -142,6 +142,9 @@ export default function JobsPage() {
       const res = await fetch(url)
       const data = await res.json()
       if (!res.ok || !data?.ok) throw new Error(data?.error || 'Failed to load jobs')
+      // Debug: Log raw API response for auto_schedule_interview
+      console.log('📋 [FETCH JOBS] Raw API data auto_schedule values:', (data.jobs || []).map((j: any) => ({ id: j.id, title: j.title, auto_schedule_interview: j.auto_schedule_interview })))
+      
       const mappedJobs = (data.jobs || []).map((j: any) => ({
         id: j.id,
         company_id: j.company_id || '',
@@ -160,6 +163,7 @@ export default function JobsPage() {
         created_by_email: j.created_by_email || '',
         created_at: j.created_at,
         updated_at: j.updated_at,
+        auto_schedule_interview: j.auto_schedule_interview === true,
         total_applications: 0,
         qualified_candidates: 0,
         in_progress: 0,

@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Filter } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import SendEmailModal from "@/components/ui/send-email-modal"
+import { Spinner } from "@/components/ui/spinner"
 
 // Status and Bucket typings
 export type InterviewStatus = "Unqualified" | "Qualified" | "Pending" | "Expired"
@@ -272,7 +273,9 @@ export default function QualifiedCandidatesInterviewFlowPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">Loading...</TableCell>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      <Spinner size="md" text="Loading qualified candidates..." className="mx-auto" />
+                    </TableCell>
                   </TableRow>
                 ) : error ? (
                   <TableRow>

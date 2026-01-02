@@ -22,6 +22,8 @@ export async function GET(req: Request) {
     console.log('🔍 Company data from database:', {
       id: company.id,
       name: company.name,
+      size_band: company.size_band,
+      industry: company.industry,
       street: company.street,
       street_address: company.street_address,
       city: company.city,

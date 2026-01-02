@@ -78,7 +78,6 @@ export default function PricingPage() {
       annualPrice: 100,
       features: [
         "Multiple job postings",
-        "500 candidate profiles/month",
         "Advanced AI screening & ranking",
         "Voice/Video AI interviews",
         "Detailed analytics & reports",

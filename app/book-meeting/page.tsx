@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Clock, Globe, MapPin, Zap, Facebook, Instagram, Youtube, Linkedin, Lock, Star, Loader2, ArrowRight, Calendar } from "lucide-react"
+import { Clock, Globe, MapPin, Zap, Facebook, Instagram, Youtube, Linkedin, Lock, Star, Loader2, ArrowRight, Calendar, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -18,7 +18,7 @@ export default function BookMeetingPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
-  const [step, setStep] = useState(1) // 1: Form, 2: Google Calendar
+  const [step, setStep] = useState(1) // 1: Form, 2: Google Calendar, 3: Confirmation
 
   useEffect(() => {
     const scrollTo = searchParams?.get('scroll')
@@ -75,7 +75,7 @@ export default function BookMeetingPage() {
         description: "Now select your preferred time slot from the calendar.",
       })
       
-      setStep(2) // Go to Google Calendar
+      setStep(2) // Go to Calendar Selection
       
     } catch (error: any) {
       console.error('❌ Failed to save details:', error)
@@ -148,18 +148,23 @@ export default function BookMeetingPage() {
 
               {/* Step Indicator */}
               <div className="mt-8 pt-6 border-t border-slate-200">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 1 ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-                    1
+                    {step > 1 ? <CheckCircle2 className="w-4 h-4" /> : '1'}
                   </div>
                   <div className={`flex-1 h-1 ${step >= 2 ? 'bg-blue-600' : 'bg-slate-200'}`}></div>
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 2 ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-                    2
+                    {step > 2 ? <CheckCircle2 className="w-4 h-4" /> : '2'}
+                  </div>
+                  <div className={`flex-1 h-1 ${step >= 3 ? 'bg-blue-600' : 'bg-slate-200'}`}></div>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= 3 ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                    {step >= 3 ? <CheckCircle2 className="w-4 h-4" /> : '3'}
                   </div>
                 </div>
                 <div className="flex justify-between mt-2 text-xs text-slate-500">
-                  <span>Your Details</span>
-                  <span>Select Time</span>
+                  <span>Details</span>
+                  <span>Time</span>
+                  <span>Done</span>
                 </div>
               </div>
             </div>
@@ -274,25 +279,75 @@ export default function BookMeetingPage() {
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                     <div className="flex items-center gap-2 text-blue-800">
                       <Calendar className="w-5 h-5" />
-                      <p className="text-sm font-medium">Your details have been saved! Now select your preferred time slot below.</p>
+                      <p className="text-sm font-medium">Your details have been saved! Select your preferred time slot and complete booking below.</p>
                     </div>
                   </div>
 
                   {/* Google Calendar Embed */}
-                  <div className="rounded-lg overflow-hidden border border-slate-200" style={{ minHeight: '500px' }}>
+                  <div className="rounded-lg overflow-hidden border border-slate-200" style={{ minHeight: '450px' }}>
                     <iframe 
                       src={GOOGLE_CALENDAR_URL}
-                      style={{ border: 0, width: '100%', height: '500px' }}
+                      style={{ border: 0, width: '100%', height: '450px' }}
                       frameBorder="0"
                       title="Schedule a Meeting"
                       allow="camera; microphone"
                     />
                   </div>
 
-                  <p className="text-sm text-slate-500 mt-4 text-center">
-                    Select your preferred date and time from the calendar above. You'll receive a confirmation email with the meeting details.
-                  </p>
+                  <div className="mt-6 pt-4 border-t border-slate-200">
+                    <p className="text-sm text-slate-600 mb-4 text-center">
+                      After completing your booking in the calendar above, click the button below:
+                    </p>
+                    <Button
+                      onClick={() => setStep(3)}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-6 text-lg"
+                    >
+                      <CheckCircle2 className="w-5 h-5 mr-2" />
+                      I've Booked My Slot
+                    </Button>
+                  </div>
                 </>
+              )}
+
+              {/* Step 3: Confirmation */}
+              {step === 3 && (
+                <div className="text-center py-12">
+                  <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+                  </div>
+                  
+                  <h2 className="text-2xl font-bold text-slate-800 mb-2">Your Meeting is Booked!</h2>
+                  <p className="text-slate-600 mb-6">A confirmation email with Google Meet link has been sent to <span className="font-medium">{formData.workEmail}</span></p>
+                  
+                  <div className="bg-slate-50 rounded-lg p-6 max-w-md mx-auto mb-8">
+                    <div className="space-y-3 text-left">
+                      <div className="flex items-center gap-3">
+                        <Clock className="w-5 h-5 text-blue-600" />
+                        <span className="text-slate-700">30 Minute Meeting</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <MapPin className="w-5 h-5 text-blue-600" />
+                        <span className="text-slate-700">Google Meet (link in your email)</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Globe className="w-5 h-5 text-blue-600" />
+                        <span className="text-slate-700">India Standard Time</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-slate-500 mb-6">
+                    Please check your inbox for the calendar invite with the Google Meet link.
+                  </p>
+
+                  <Button
+                    onClick={() => router.push('/')}
+                    variant="outline"
+                    className="px-8"
+                  >
+                    Back to Home
+                  </Button>
+                </div>
               )}
             </div>
           </div>
