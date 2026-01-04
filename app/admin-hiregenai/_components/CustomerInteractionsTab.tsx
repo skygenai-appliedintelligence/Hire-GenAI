@@ -93,7 +93,7 @@ export default function CustomerInteractionsTab() {
   const [meetingFilter, setMeetingFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [contactStats, setContactStats] = useState({ total: 0, new: 0, responded: 0 })
-  const [meetingStats, setMeetingStats] = useState({ total: 0, scheduled: 0, completed: 0 })
+  const [meetingStats, setMeetingStats] = useState({ total: 0, scheduled: 0, completed: 0, confirmed: 0, cancelled: 0, no_show: 0, rescheduled: 0 })
   const [replyMessages, setReplyMessages] = useState<Record<string, string>>({})
   const [sendingReply, setSendingReply] = useState<string | null>(null)
 
@@ -130,11 +130,23 @@ export default function CustomerInteractionsTab() {
       const data = await res.json()
       if (data.success) {
         setMeetings(data.bookings || [])
-        // Calculate stats
-        const total = data.bookings?.length || 0
-        const scheduledCount = data.bookings?.filter((m: MeetingBooking) => m.status === 'scheduled').length || 0
-        const completedCount = data.bookings?.filter((m: MeetingBooking) => m.status === 'completed').length || 0
-        setMeetingStats({ total, scheduled: scheduledCount, completed: completedCount })
+        // Calculate stats from API stats (not from filtered data)
+        const total = data.stats?.total || 0
+        const scheduledCount = data.stats?.scheduled || 0
+        const completedCount = data.stats?.completed || 0
+        const confirmedCount = data.stats?.confirmed || 0
+        const cancelledCount = data.stats?.cancelled || 0
+        const noShowCount = data.stats?.no_show || 0
+        const rescheduledCount = data.stats?.rescheduled || 0
+        setMeetingStats({ 
+          total, 
+          scheduled: scheduledCount, 
+          completed: completedCount,
+          confirmed: confirmedCount,
+          cancelled: cancelledCount,
+          no_show: noShowCount,
+          rescheduled: rescheduledCount
+        })
       }
     } catch (error) {
       console.error("Failed to load meetings:", error)
@@ -164,7 +176,8 @@ export default function CustomerInteractionsTab() {
         body: JSON.stringify({ id, status })
       })
       if (res.ok) {
-        loadMeetings()
+        // Reload meetings to update counts
+        await loadMeetings()
       }
     } catch (error) {
       console.error("Failed to update meeting:", error)
@@ -304,11 +317,15 @@ export default function CustomerInteractionsTab() {
                 >
                   <Calendar className="h-4 w-4 mr-2" />
                   Meeting Bookings
-                  {meetingStats.scheduled > 0 && (
-                    <Badge className="ml-2 bg-blue-500 text-white text-xs px-1.5 py-0">
-                      {meetingStats.scheduled}
-                    </Badge>
-                  )}
+                  {(() => {
+                    // Show count of pending meetings (not completed, cancelled, or no_show)
+                    const pendingCount = meetingStats.scheduled + meetingStats.confirmed + meetingStats.rescheduled
+                    return pendingCount > 0 && (
+                      <Badge className="ml-2 bg-blue-500 text-white text-xs px-1.5 py-0">
+                        {pendingCount}
+                      </Badge>
+                    )
+                  })()}
                 </TabsTrigger>
               </TabsList>
 
@@ -329,13 +346,13 @@ export default function CustomerInteractionsTab() {
                       <Filter className="h-4 w-4 mr-2" />
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-slate-800 border-slate-700">
-                      <SelectItem value="all">All</SelectItem>
-                      <SelectItem value="new">New</SelectItem>
-                      <SelectItem value="read">Read</SelectItem>
-                      <SelectItem value="responded">Responded</SelectItem>
-                      <SelectItem value="spam">Spam</SelectItem>
-                      <SelectItem value="archived">Archived</SelectItem>
+                    <SelectContent className="bg-slate-800 border-emerald-600">
+                      <SelectItem value="all" className="text-white hover:bg-emerald-600/20">All</SelectItem>
+                      <SelectItem value="new" className="text-white hover:bg-emerald-600/20">New</SelectItem>
+                      <SelectItem value="read" className="text-white hover:bg-emerald-600/20">Read</SelectItem>
+                      <SelectItem value="responded" className="text-white hover:bg-emerald-600/20">Responded</SelectItem>
+                      <SelectItem value="spam" className="text-white hover:bg-emerald-600/20">Spam</SelectItem>
+                      <SelectItem value="archived" className="text-white hover:bg-emerald-600/20">Archived</SelectItem>
                     </SelectContent>
                   </Select>
                 ) : (
@@ -344,13 +361,14 @@ export default function CustomerInteractionsTab() {
                       <Filter className="h-4 w-4 mr-2" />
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-slate-800 border-slate-700">
-                      <SelectItem value="all">All</SelectItem>
-                      <SelectItem value="scheduled">Scheduled</SelectItem>
-                      <SelectItem value="confirmed">Confirmed</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                      <SelectItem value="no_show">No Show</SelectItem>
+                    <SelectContent className="bg-slate-800 border-emerald-600">
+                      <SelectItem value="all" className="text-white hover:bg-emerald-600/20">All</SelectItem>
+                      <SelectItem value="scheduled" className="text-white hover:bg-emerald-600/20">Scheduled</SelectItem>
+                      <SelectItem value="confirmed" className="text-white hover:bg-emerald-600/20">Confirmed</SelectItem>
+                      <SelectItem value="completed" className="text-white hover:bg-emerald-600/20">Completed</SelectItem>
+                      <SelectItem value="cancelled" className="text-white hover:bg-emerald-600/20">Cancelled</SelectItem>
+                      <SelectItem value="no_show" className="text-white hover:bg-emerald-600/20">No Show</SelectItem>
+                      <SelectItem value="rescheduled" className="text-white hover:bg-emerald-600/20">Rescheduled</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
@@ -593,23 +611,23 @@ export default function CustomerInteractionsTab() {
                                   value={meeting.status} 
                                   onValueChange={(value) => updateMeetingStatus(meeting.id, value)}
                                 >
-                                  <SelectTrigger className="bg-slate-900 border-slate-700 text-white">
+                                  <SelectTrigger className="bg-slate-900 border-emerald-600 text-emerald-400 hover:border-emerald-500">
                                     <SelectValue placeholder="Update Status" />
                                   </SelectTrigger>
-                                  <SelectContent className="bg-slate-800 border-slate-700">
-                                    <SelectItem value="scheduled">Scheduled</SelectItem>
-                                    <SelectItem value="confirmed">Confirmed</SelectItem>
-                                    <SelectItem value="completed">Completed</SelectItem>
-                                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                                    <SelectItem value="no_show">No Show</SelectItem>
-                                    <SelectItem value="rescheduled">Rescheduled</SelectItem>
+                                  <SelectContent className="bg-slate-800 border-emerald-600">
+                                    <SelectItem value="scheduled" className="text-white hover:bg-emerald-600/20">Scheduled</SelectItem>
+                                    <SelectItem value="confirmed" className="text-white hover:bg-emerald-600/20">Confirmed</SelectItem>
+                                    <SelectItem value="completed" className="text-white hover:bg-emerald-600/20">Completed</SelectItem>
+                                    <SelectItem value="cancelled" className="text-white hover:bg-emerald-600/20">Cancelled</SelectItem>
+                                    <SelectItem value="no_show" className="text-white hover:bg-emerald-600/20">No Show</SelectItem>
+                                    <SelectItem value="rescheduled" className="text-white hover:bg-emerald-600/20">Rescheduled</SelectItem>
                                   </SelectContent>
                                 </Select>
                                 {meeting.meeting_link && (
                                   <Button 
                                     variant="outline" 
                                     size="sm" 
-                                    className="w-full border-slate-700 text-slate-300 hover:bg-slate-800"
+                                    className="w-full bg-emerald-600 text-white border-emerald-600"
                                     onClick={() => window.open(meeting.meeting_link!, '_blank')}
                                   >
                                     <ExternalLink className="h-4 w-4 mr-2" />
@@ -619,7 +637,7 @@ export default function CustomerInteractionsTab() {
                                 <Button 
                                   variant="outline" 
                                   size="sm" 
-                                  className="w-full border-slate-700 text-slate-300 hover:bg-slate-800"
+                                  className="w-full border-emerald-600 text-emerald-600 hover:bg-emerald-600 hover:text-white"
                                   onClick={() => window.open(`mailto:${meeting.work_email}?subject=Your Meeting with HireGenAI`, '_blank')}
                                 >
                                   <Mail className="h-4 w-4 mr-2" />

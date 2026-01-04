@@ -67,7 +67,7 @@ export default function AdminHeader() {
           <Button
             variant="outline"
             size="sm"
-            className="text-slate-300 border-slate-700 hover:bg-slate-800"
+            className="text-white border-emerald-600 bg-emerald-600 hover:bg-emerald-700"
             onClick={() => router.push("/")}
           >
             <LogOut className="w-4 h-4 mr-2" />

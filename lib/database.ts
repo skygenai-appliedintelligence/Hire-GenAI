@@ -4229,15 +4229,15 @@ export class DatabaseService {
 
     const query = `
       SELECT 
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE status = 'scheduled') as scheduled,
-        COUNT(*) FILTER (WHERE status = 'confirmed') as confirmed,
-        COUNT(*) FILTER (WHERE status = 'completed') as completed,
-        COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
-        COUNT(*) FILTER (WHERE status = 'no_show') as no_show,
-        COUNT(*) FILTER (WHERE meeting_date >= CURRENT_DATE) as upcoming,
-        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days') as last_7_days,
-        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') as last_30_days
+        COUNT(*)::integer as total,
+        COUNT(*) FILTER (WHERE status = 'scheduled')::integer as scheduled,
+        COUNT(*) FILTER (WHERE status = 'confirmed')::integer as confirmed,
+        COUNT(*) FILTER (WHERE status = 'completed')::integer as completed,
+        COUNT(*) FILTER (WHERE status = 'cancelled')::integer as cancelled,
+        COUNT(*) FILTER (WHERE status = 'no_show')::integer as no_show,
+        COUNT(*) FILTER (WHERE meeting_date >= CURRENT_DATE)::integer as upcoming,
+        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::integer as last_7_days,
+        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::integer as last_30_days
       FROM meeting_bookings
     `
 
