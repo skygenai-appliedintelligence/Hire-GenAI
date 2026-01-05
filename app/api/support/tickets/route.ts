@@ -83,7 +83,8 @@ export async function POST(request: NextRequest) {
       companyId, 
       userId, 
       userEmail, 
-      userName, 
+      userName,
+      type = "support",
       title, 
       category, 
       priority = "medium", 
@@ -122,17 +123,17 @@ export async function POST(request: NextRequest) {
       ticketNumber = `TKT${currentYear}${newNumeric}`;
     }
     
-    // Insert with explicit ticket_number
+    // Insert with explicit ticket_number and type
     const ticketResult = await DatabaseService.query(
       `INSERT INTO support_tickets 
-        (ticket_number, company_id, user_email, user_name, title, category, priority, status)
+        (ticket_number, company_id, user_email, user_name, title, category, priority, status, type)
        VALUES (
          $1, 
          CASE WHEN $2 IS NOT NULL AND $2 != '' THEN $2::uuid ELSE NULL END,
-         $3, $4, $5, $6, $7, 'open'
+         $3, $4, $5, $6, $7, 'open', $8
        )
        RETURNING *`,
-      [ticketNumber, companyId || null, userEmail, userName, title, category, priority]
+      [ticketNumber, companyId || null, userEmail, userName, title, category, priority, type]
     );
 
     const ticketRows = ticketResult as any[]
@@ -146,12 +147,16 @@ export async function POST(request: NextRequest) {
       [ticket.id, userName, userEmail, description, screenshot]
     )
 
-    // Add system message
+    // Add system message based on type
+    const systemMessage = type === "feedback" 
+      ? `Feedback ${ticket.ticket_number} submitted. Thank you for your valuable input!`
+      : `Ticket ${ticket.ticket_number} created. Our support team will respond within 24 hours.`
+    
     await DatabaseService.query(
       `INSERT INTO support_messages 
         (ticket_id, sender_type, message)
        VALUES ($1::uuid, 'system', $2)`,
-      [ticket.id, `Ticket ${ticket.ticket_number} created. Our support team will respond within 24 hours.`]
+      [ticket.id, systemMessage]
     )
 
     // Fetch the complete ticket with messages

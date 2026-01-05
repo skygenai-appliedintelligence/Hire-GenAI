@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { Header } from "@/components/dashboard/header"
@@ -22,7 +22,11 @@ import {
   Headphones,
   TicketIcon,
   Menu,
-  XIcon
+  XIcon,
+  Lightbulb,
+  Star,
+  ThumbsUp,
+  ThumbsDown
 } from "lucide-react"
 
 interface Message {
@@ -81,7 +85,9 @@ const STATUS_STYLES: Record<string, { bg: string, text: string, label: string }>
 export default function SupportPage() {
   const { user, company, loading } = useAuth()
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<"new" | "open" | "resolved">("new")
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get("tab") || "new"
+  const [activeTab, setActiveTab] = useState<"new" | "open" | "resolved" | "feedback">(tabParam as any)
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
   const [replyText, setReplyText] = useState("")
@@ -89,6 +95,7 @@ export default function SupportPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSending, setIsSending] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const replyFileInputRef = useRef<HTMLInputElement>(null)
@@ -96,6 +103,7 @@ export default function SupportPage() {
 
   // New ticket form state
   const [newTicket, setNewTicket] = useState({
+    type: "support" as "support" | "feedback",
     title: "",
     category: "",
     priority: "medium" as "low" | "medium" | "high" | "urgent",
@@ -119,6 +127,23 @@ export default function SupportPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Sync URL with tab changes and redirect base URL to ?tab=new
+  useEffect(() => {
+    if (!tabParam) {
+      // If no tab parameter, redirect to ?tab=new
+      router.replace('/support-hiregenai?tab=new')
+    } else {
+      setActiveTab(tabParam as any)
+    }
+  }, [tabParam])
+
+  // Update URL when tab changes
+  const handleTabChange = (tab: "new" | "open" | "resolved" | "feedback") => {
+    setActiveTab(tab)
+    router.push(`/support-hiregenai?tab=${tab}`)
+    setSelectedTicket(null)
   }
 
   // Load tickets on mount and when company changes
@@ -164,6 +189,7 @@ export default function SupportPage() {
     }
 
     // Upload to Vercel Blob
+    setIsUploading(true)
     try {
       const formData = new FormData()
       formData.append("file", file)
@@ -186,6 +212,8 @@ export default function SupportPage() {
     } catch (error) {
       console.error("Screenshot upload error:", error)
       alert("Failed to upload screenshot")
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -205,6 +233,7 @@ export default function SupportPage() {
           userId: user?.id,
           userEmail: user?.email,
           userName: (user as any)?.name || user?.email?.split("@")[0],
+          type: newTicket.type,
           title: newTicket.title.trim(),
           category: newTicket.category,
           priority: newTicket.priority,
@@ -215,16 +244,25 @@ export default function SupportPage() {
 
       const data = await res.json()
       if (data.success) {
-        setNewTicket({ title: "", category: "", priority: "medium", description: "", screenshot: null })
+        setNewTicket({ type: "support", title: "", category: "", priority: "medium", description: "", screenshot: null })
         await loadTickets()
-        setActiveTab("open")
+        // Redirect based on ticket type
+        if (newTicket.type === "feedback") {
+          handleTabChange("feedback")
+        } else {
+          handleTabChange("open")
+        }
+        // Keep spinner for a moment to show completion
+        setTimeout(() => {
+          setIsSubmitting(false)
+        }, 500)
       } else {
         alert(data.error || "Failed to create ticket")
+        setIsSubmitting(false)
       }
     } catch (error) {
       console.error("Error creating ticket:", error)
       alert("Failed to create ticket. Please try again.")
-    } finally {
       setIsSubmitting(false)
     }
   }
@@ -307,8 +345,9 @@ export default function SupportPage() {
     }
   }
 
-  const openTickets = tickets.filter(t => ["open", "in_progress", "waiting_customer"].includes(t.status))
-  const resolvedTickets = tickets.filter(t => ["resolved", "closed"].includes(t.status))
+  const openTickets = tickets.filter(t => ["open", "in_progress", "waiting_customer"].includes(t.status) && (t as any).type !== "feedback")
+  const resolvedTickets = tickets.filter(t => ["resolved", "closed"].includes(t.status) && (t as any).type !== "feedback")
+  const feedbackItems = tickets.filter(t => (t as any).type === "feedback")
 
   const getPriorityStyle = (priority: string) => {
     return PRIORITIES.find(p => p.value === priority)?.color || "bg-gray-100 text-gray-700"
@@ -370,7 +409,7 @@ export default function SupportPage() {
             {/* Tabs */}
             <div className="flex flex-wrap space-x-1 bg-gray-100 p-1 rounded-lg mb-6 w-fit">
               <button
-                onClick={() => { setActiveTab("new"); setSelectedTicket(null); }}
+                onClick={() => handleTabChange("new")}
                 className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-xs md:text-sm font-medium transition-colors ${
                   activeTab === "new" 
                     ? "bg-white text-emerald-700 shadow-sm" 
@@ -382,7 +421,7 @@ export default function SupportPage() {
                 <span className="sm:hidden">New</span>
               </button>
               <button
-                onClick={() => { setActiveTab("open"); setSelectedTicket(null); }}
+                onClick={() => handleTabChange("open")}
                 className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-xs md:text-sm font-medium transition-colors ${
                   activeTab === "open" 
                     ? "bg-white text-emerald-700 shadow-sm" 
@@ -398,7 +437,7 @@ export default function SupportPage() {
                 )}
               </button>
               <button
-                onClick={() => { setActiveTab("resolved"); setSelectedTicket(null); }}
+                onClick={() => handleTabChange("resolved")}
                 className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-xs md:text-sm font-medium transition-colors ${
                   activeTab === "resolved" 
                     ? "bg-white text-emerald-700 shadow-sm" 
@@ -413,23 +452,61 @@ export default function SupportPage() {
                   </span>
                 )}
               </button>
+              <button
+                onClick={() => handleTabChange("feedback")}
+                className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-xs md:text-sm font-medium transition-colors ${
+                  activeTab === "feedback" 
+                    ? "bg-white text-emerald-700 shadow-sm" 
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                <Lightbulb className="w-4 h-4" />
+                <span className="hidden sm:inline">Feedback</span>
+                {feedbackItems.filter(f => f.status === "open").length > 0 && (
+                  <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">
+                    {feedbackItems.filter(f => f.status === "open").length}
+                  </span>
+                )}
+              </button>
             </div>
 
             {/* New Ticket Form */}
             {activeTab === "new" && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">Create New Support Ticket</h2>
+                <h2 className="text-xl font-semibold text-gray-900 mb-6">
+                  {newTicket.type === "support" ? "Create New Support Ticket" : "Submit Product Feedback"}
+                </h2>
                 
                 <div className="space-y-5">
+                  {/* Type Selection */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Title <span className="text-red-500">*</span>
+                      Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={newTicket.type}
+                      onChange={(e) => setNewTicket(prev => ({ ...prev, type: e.target.value as "support" | "feedback" }))}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-colors bg-white"
+                    >
+                      <option value="support">Support Request</option>
+                      <option value="feedback">Product Feedback</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {newTicket.type === "support" 
+                        ? "Need help with an issue? Submit a support ticket." 
+                        : "Have ideas or suggestions? Share your product feedback."}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {newTicket.type === "support" ? "Title" : "Feedback Title"} <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={newTicket.title}
                       onChange={(e) => setNewTicket(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="Brief description of your issue"
+                      placeholder={newTicket.type === "support" ? "Brief description of your issue" : "What feature or improvement would you like to suggest?"}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-colors"
                     />
                   </div>
@@ -451,6 +528,7 @@ export default function SupportPage() {
                       </select>
                     </div>
 
+                    {newTicket.type === "support" && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Priority
@@ -465,16 +543,17 @@ export default function SupportPage() {
                         ))}
                       </select>
                     </div>
+                  )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Description <span className="text-red-500">*</span>
+                      {newTicket.type === "support" ? "Description" : "Feedback Details"} <span className="text-red-500">*</span>
                     </label>
                     <textarea
                       value={newTicket.description}
                       onChange={(e) => setNewTicket(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Please describe your issue in detail..."
+                      placeholder={newTicket.type === "support" ? "Please describe your issue in detail..." : "Tell us about your idea, suggestion, or feedback..."}
                       rows={5}
                       className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-colors resize-none"
                     />
@@ -494,10 +573,20 @@ export default function SupportPage() {
                       />
                       <button
                         onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700"
+                        disabled={isUploading}
+                        className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <Upload className="w-4 h-4" />
-                        Upload Screenshot
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            Upload Screenshot
+                          </>
+                        )}
                       </button>
                       <span className="text-sm text-gray-500">Max 1MB, images only</span>
                     </div>
@@ -521,10 +610,20 @@ export default function SupportPage() {
                   <div className="pt-4">
                     <button
                       onClick={handleCreateTicket}
-                      className="w-full bg-emerald-600 text-white py-3 rounded-lg font-medium hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+                      disabled={isSubmitting}
+                      className="w-full bg-emerald-600 text-white py-3 rounded-lg font-medium hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <Send className="w-4 h-4" />
-                      Submit Ticket
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          {newTicket.type === "support" ? "Submitting..." : "Submitting..."}
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" />
+                          {newTicket.type === "support" ? "Submit Ticket" : "Submit Feedback"}
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -738,6 +837,87 @@ export default function SupportPage() {
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+            {/* Feedback Tab Content */}
+            {activeTab === "feedback" && !selectedTicket && (
+              <div className="space-y-6">
+                {/* Feedback Header */}
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200 p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-amber-100 rounded-lg">
+                      <Lightbulb className="w-6 h-6 text-amber-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">Your Product Feedback</h2>
+                      <p className="text-gray-600 mt-1">
+                        Track all your submitted feedback and suggestions. We review every piece of feedback to improve HireGenAI.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Feedback List */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  {feedbackItems.length === 0 ? (
+                    <div className="p-12 text-center">
+                      <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Lightbulb className="w-8 h-8 text-amber-400" />
+                      </div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No feedback submitted yet</h3>
+                      <p className="text-gray-500 mb-4">
+                        Have ideas or suggestions? Share your product feedback with us!
+                      </p>
+                      <button
+                        onClick={() => {
+                          setNewTicket(prev => ({ ...prev, type: "feedback" }))
+                          setActiveTab("new")
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Submit Feedback
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {feedbackItems.map(feedback => (
+                        <div
+                          key={feedback.id}
+                          onClick={() => loadTicketDetail(feedback.id)}
+                          className="p-4 hover:bg-amber-50/50 cursor-pointer transition-colors"
+                        >
+                          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <span className="text-xs font-mono text-gray-500">{feedback.ticket_number}</span>
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                  Feedback
+                                </span>
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[feedback.status]?.bg || "bg-gray-100"} ${STATUS_STYLES[feedback.status]?.text || "text-gray-600"}`}>
+                                  {STATUS_STYLES[feedback.status]?.label || feedback.status}
+                                </span>
+                              </div>
+                              <h3 className="font-medium text-gray-900">{feedback.title}</h3>
+                              <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                                {feedback.first_message || feedback.category}
+                              </p>
+                            </div>
+                            <div className="text-right text-sm text-gray-500">
+                              <div className="flex items-center gap-1 justify-end">
+                                <Clock className="w-4 h-4" />
+                                {formatDate(feedback.created_at)}
+                              </div>
+                              <div className="text-xs text-gray-400 mt-1">
+                                {feedback.category}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

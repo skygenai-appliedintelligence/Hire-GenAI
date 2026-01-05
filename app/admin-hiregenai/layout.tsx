@@ -135,7 +135,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <Button
             variant="outline"
             size="sm"
-            className="w-full text-slate-300 border-slate-700 hover:bg-slate-800"
+            className="w-full text-white border-emerald-600 bg-emerald-600 hover:bg-emerald-700"
             onClick={handleLogout}
           >
             <LogOut className="w-4 h-4 mr-2" />

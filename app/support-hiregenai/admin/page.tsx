@@ -17,7 +17,8 @@ import {
   RefreshCw,
   Loader2,
   Building2,
-  Mail
+  Mail,
+  Lightbulb
 } from "lucide-react"
 
 interface Message {
@@ -66,9 +67,15 @@ const STATUS_STYLES: Record<string, { bg: string, text: string, label: string }>
 
 export default function SupportAdminPage() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<"open" | "resolved">("open")
+  const [activeTab, setActiveTab] = useState<"open" | "resolved" | "feedback">("open")
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
+  const [resolvedFilter, setResolvedFilter] = useState<"all" | "feedback" | "tickets">("all")
+  const [resolvedCounts, setResolvedCounts] = useState({
+    all: 0,
+    feedback: 0,
+    tickets: 0
+  })
   const [replyText, setReplyText] = useState("")
   const [replyScreenshot, setReplyScreenshot] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -208,8 +215,28 @@ export default function SupportAdminPage() {
     }
   }
 
-  const openTickets = tickets.filter(t => ["open", "in_progress", "waiting_customer"].includes(t.status))
-  const resolvedTickets = tickets.filter(t => ["resolved", "closed"].includes(t.status))
+  const openTickets = tickets.filter(t => ["open", "in_progress", "waiting_customer"].includes(t.status) && (t as any).type !== "feedback")
+  const allResolvedTickets = tickets.filter(t => ["resolved", "closed"].includes(t.status))
+  const feedbackItems = tickets.filter(t => (t as any).type === "feedback" && ["open", "in_progress", "waiting_customer"].includes(t.status))
+  
+  // Apply filter to resolved tickets
+  const resolvedTickets = resolvedFilter === "all" 
+    ? allResolvedTickets 
+    : resolvedFilter === "feedback"
+    ? allResolvedTickets.filter(t => (t as any).type === "feedback")
+    : allResolvedTickets.filter(t => (t as any).type !== "feedback")
+
+  // Update resolved counts when tickets change
+  useEffect(() => {
+    const allResolved = tickets.filter(t => ["resolved", "closed"].includes(t.status))
+    const feedbackCount = allResolved.filter(t => (t as any).type === "feedback").length
+    const ticketsCount = allResolved.filter(t => (t as any).type !== "feedback").length
+    setResolvedCounts({
+      all: allResolved.length,
+      feedback: feedbackCount,
+      tickets: ticketsCount
+    })
+  }, [tickets])
 
   const getPriorityStyle = (priority: string) => {
     return PRIORITIES.find(p => p.value === priority)?.color || "bg-gray-100 text-gray-700"
@@ -260,7 +287,7 @@ export default function SupportAdminPage() {
 
       <div className="max-w-7xl mx-auto px-6 py-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-5 gap-4 mb-6">
           <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
@@ -301,9 +328,20 @@ export default function SupportAdminPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-white">
-                  {tickets.filter(t => t.priority === "urgent" && t.status === "open").length}
+                  {tickets.filter(t => t.priority === "urgent" && t.status === "open" && (t as any).type !== "feedback").length}
                 </p>
                 <p className="text-sm text-slate-400">Urgent</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                <Lightbulb className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">{feedbackItems.length}</p>
+                <p className="text-sm text-slate-400">Feedback</p>
               </div>
             </div>
           </div>
@@ -312,7 +350,7 @@ export default function SupportAdminPage() {
         {/* Tabs */}
         <div className="flex space-x-1 bg-slate-800 p-1 rounded-lg mb-6 w-fit border border-slate-700">
           <button
-            onClick={() => { setActiveTab("open"); setSelectedTicket(null); }}
+            onClick={() => { setActiveTab("open"); setSelectedTicket(null); setResolvedFilter("all"); }}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === "open" 
                 ? "bg-emerald-600 text-white" 
@@ -347,6 +385,24 @@ export default function SupportAdminPage() {
               </span>
             )}
           </button>
+          <button
+            onClick={() => { setActiveTab("feedback"); setSelectedTicket(null); setResolvedFilter("all"); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "feedback" 
+                ? "bg-amber-600 text-white" 
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <Lightbulb className="w-4 h-4" />
+            Feedback
+            {feedbackItems.length > 0 && (
+              <span className={`px-2 py-0.5 rounded-full text-xs ${
+                activeTab === "feedback" ? "bg-amber-500" : "bg-slate-700"
+              }`}>
+                {feedbackItems.length}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Main Content */}
@@ -355,24 +411,62 @@ export default function SupportAdminPage() {
           <div className="col-span-1 bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
             <div className="p-4 border-b border-slate-700">
               <h2 className="font-semibold text-white">
-                {activeTab === "open" ? "Open Tickets" : "Resolved Tickets"}
+                {activeTab === "open" ? "Open Tickets" : activeTab === "resolved" ? "Resolved Tickets" : "Product Feedback"}
               </h2>
+              {activeTab === "resolved" && (
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => setResolvedFilter("all")}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                      resolvedFilter === "all"
+                        ? "bg-slate-600 text-white"
+                        : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                    }`}
+                  >
+                    All ({resolvedCounts.all})
+                  </button>
+                  <button
+                    onClick={() => setResolvedFilter("feedback")}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                      resolvedFilter === "feedback"
+                        ? "bg-amber-500 text-white"
+                        : "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30"
+                    }`}
+                  >
+                    Feedback ({resolvedCounts.feedback})
+                  </button>
+                  <button
+                    onClick={() => setResolvedFilter("tickets")}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                      resolvedFilter === "tickets"
+                        ? "bg-emerald-500 text-white"
+                        : "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
+                    }`}
+                  >
+                    Tickets ({resolvedCounts.tickets})
+                  </button>
+                </div>
+              )}
             </div>
             <div className="max-h-[calc(100vh-380px)] overflow-y-auto">
-              {(activeTab === "open" ? openTickets : resolvedTickets).length === 0 ? (
+              {(activeTab === "open" ? openTickets : activeTab === "resolved" ? resolvedTickets : feedbackItems).length === 0 ? (
                 <div className="p-8 text-center">
                   <div className="w-12 h-12 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-3">
                     {activeTab === "open" ? (
                       <MessageCircle className="w-6 h-6 text-slate-500" />
-                    ) : (
+                    ) : activeTab === "resolved" ? (
                       <CheckCircle className="w-6 h-6 text-slate-500" />
+                    ) : (
+                      <Lightbulb className="w-6 h-6 text-slate-500" />
                     )}
                   </div>
-                  <p className="text-slate-400 text-sm">No {activeTab} tickets</p>
+                  <p className="text-slate-400 text-sm">
+                    {activeTab === "open" ? "No open tickets" : activeTab === "resolved" ? "No resolved tickets" : "No feedback received"}
+                  </p>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-700">
-                  {(activeTab === "open" ? openTickets : resolvedTickets).map(ticket => (
+                  {(activeTab === "open" ? openTickets : activeTab === "resolved" ? resolvedTickets : feedbackItems).map(ticket => (
                     <div
                       key={ticket.id}
                       onClick={() => loadTicketDetail(ticket.id)}
@@ -383,9 +477,26 @@ export default function SupportAdminPage() {
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-2">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${getPriorityStyle(ticket.priority)}`}>
-                          {ticket.priority}
-                        </span>
+                        {activeTab === "feedback" ? (
+                          <>
+                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-400">
+                              Feedback
+                            </span>
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                              ticket.status === "open" 
+                                ? "bg-yellow-500/20 text-yellow-400" 
+                                : ticket.status === "in_progress"
+                                ? "bg-blue-500/20 text-blue-400"
+                                : "bg-emerald-500/20 text-emerald-400"
+                            }`}>
+                              {ticket.status === "open" ? "New" : ticket.status === "in_progress" ? "Reviewing" : "Reviewed"}
+                            </span>
+                          </>
+                        ) : (
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${getPriorityStyle(ticket.priority)}`}>
+                            {ticket.priority}
+                          </span>
+                        )}
                         <span className="text-xs text-slate-500 font-mono">{ticket.ticket_number}</span>
                       </div>
                       <h3 className="font-medium text-white text-sm line-clamp-1">{ticket.title}</h3>
