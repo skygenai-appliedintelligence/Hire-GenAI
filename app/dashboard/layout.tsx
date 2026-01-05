@@ -45,13 +45,13 @@ export default function DashboardLayout({
       {/* Mobile Sidebar Overlay */}
       {mobileMenuOpen && (
         <div
-          className="fixed top-0 left-64 right-0 bottom-0 bg-black bg-opacity-50 z-40 md:hidden"
+          className="fixed top-0 left-56 right-0 bottom-0 bg-black bg-opacity-50 z-40 md:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
 
       {/* Mobile Sidebar */}
-      <div className={`fixed top-0 left-0 h-screen w-64 bg-white z-50 md:hidden transform transition-transform duration-300 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className={`fixed top-0 left-0 h-screen w-56 bg-white z-50 md:hidden transform transition-transform duration-300 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <Sidebar isMobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
       </div>
 
