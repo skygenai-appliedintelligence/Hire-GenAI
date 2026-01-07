@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, status, adminNotes } = body
+    const { id, status, adminNotes, interactionSummary } = body
 
     if (!id) {
       return NextResponse.json(
@@ -128,7 +128,7 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const validStatuses = ['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show', 'rescheduled']
+    const validStatuses = ['new_lead', 'active_prospect', 'inactive_prospect', 'converted_to_customer', 'archived']
     if (status && !validStatuses.includes(status)) {
       return NextResponse.json(
         { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
@@ -156,6 +156,12 @@ export async function PATCH(request: NextRequest) {
     if (adminNotes !== undefined) {
       updates.push(`admin_notes = $${paramIndex}`)
       params.push(adminNotes)
+      paramIndex++
+    }
+
+    if (interactionSummary !== undefined) {
+      updates.push(`interaction_summary = $${paramIndex}`)
+      params.push(interactionSummary)
       paramIndex++
     }
 

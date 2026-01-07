@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       `INSERT INTO contact_messages (full_name, work_email, company_name, phone_number, subject, message, agreed_to_terms, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [fullName, workEmail, companyName, phoneNumber || null, subject, message, agreedToTerms, 'new']
+      [fullName, workEmail, companyName, phoneNumber || null, subject, message, agreedToTerms, 'new_lead']
     )
 
     // Send confirmation email to user
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, status, adminNotes } = body
+    const { id, status, adminNotes, interactionSummary, replied } = body
 
     if (!id) {
       return NextResponse.json(
@@ -79,7 +79,7 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const validStatuses = ['new', 'read', 'responded', 'spam', 'archived']
+    const validStatuses = ['new_lead', 'active_prospect', 'inactive_prospect', 'converted_to_customer', 'archived']
     if (status && !validStatuses.includes(status)) {
       return NextResponse.json(
         { error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
@@ -100,6 +100,18 @@ export async function PATCH(request: NextRequest) {
     if (adminNotes !== undefined) {
       updates.push(`admin_notes = $${paramIndex}`)
       params.push(adminNotes)
+      paramIndex++
+    }
+
+    if (interactionSummary !== undefined) {
+      updates.push(`interaction_summary = $${paramIndex}`)
+      params.push(interactionSummary)
+      paramIndex++
+    }
+
+    if (replied !== undefined) {
+      updates.push(`replied = $${paramIndex}`)
+      params.push(replied)
       paramIndex++
     }
 

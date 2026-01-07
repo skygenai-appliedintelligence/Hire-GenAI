@@ -26,7 +26,7 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname()
   const { signOut } = useAuth()
   const router = useRouter()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   
   // Desktop uses sidebarOpen state, Mobile uses isMobileOpen prop
   const isMobile = onMobileClose !== undefined

@@ -116,6 +116,7 @@ export async function sendContactMail({
   text,
   replyTo,
   from,
+  attachments,
 }: {
   to?: string;
   subject: string;
@@ -123,6 +124,7 @@ export async function sendContactMail({
   text?: string;
   replyTo?: string;
   from?: string;
+  attachments?: any[];
 }) {
   const senderFrom = from || FROM_CONTACT;
   
@@ -165,6 +167,7 @@ export async function sendContactMail({
       html,
       text,
       replyTo,
+      attachments,
     });
     
     console.log("✅ Contact email sent successfully:", {

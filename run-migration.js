@@ -35,8 +35,15 @@ async function runMigration() {
     await client.connect();
     console.log('✅ Connected to database');
 
-    // Read migration file
-    const migrationPath = path.join(__dirname, 'migrations', 'recreate_question_generation_usage.sql');
+    // Get migration filename from command line args or use default
+    const migrationFile = process.argv[2] || 'recreate_question_generation_usage.sql';
+    const migrationPath = path.join(__dirname, 'migrations', migrationFile);
+    
+    if (!fs.existsSync(migrationPath)) {
+      console.error(`❌ Migration file not found: ${migrationFile}`);
+      process.exit(1);
+    }
+    
     const migrationSql = fs.readFileSync(migrationPath, 'utf8');
 
     console.log('🔄 Running migration...');
@@ -44,12 +51,19 @@ async function runMigration() {
     console.log('✅ Migration completed successfully!');
 
     // Verify table structure
-    const result = await client.query(`
-      SELECT column_name, data_type, is_nullable 
-      FROM information_schema.columns 
-      WHERE table_name = 'question_generation_usage' 
-      ORDER BY ordinal_position
-    `);
+    // Extract table name from the migration file (simplistic approach)
+    const tableNameMatch = migrationSql.match(/CREATE TABLE IF NOT EXISTS (\w+)|CREATE TABLE (\w+)/i);
+    const tableName = tableNameMatch ? (tableNameMatch[1] || tableNameMatch[2]) : null;
+    
+    let result = { rows: [] };
+    if (tableName) {
+      result = await client.query(`
+        SELECT column_name, data_type, is_nullable 
+        FROM information_schema.columns 
+        WHERE table_name = '${tableName}' 
+        ORDER BY ordinal_position
+      `);
+    }
 
     console.log('\n📋 New table structure:');
     result.rows.forEach(row => {

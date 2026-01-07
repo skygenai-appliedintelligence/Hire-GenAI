@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import Link from "next/link"
-import { ArrowRight, Mail, MessageSquare, Zap, Facebook, Instagram, Youtube, Linkedin, Lock, Star } from "lucide-react"
+import { ArrowRight, Mail, MessageSquare, Zap, Facebook, Instagram, Youtube, Linkedin, Lock, Star, Loader2 } from "lucide-react"
 import Navbar from "@/components/layout/Navbar"
 
 export default function ContactPage() {
@@ -24,6 +24,7 @@ export default function ContactPage() {
   })
   const [agreed, setAgreed] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     const scrollTo = searchParams?.get('scroll')
@@ -41,8 +42,9 @@ export default function ContactPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!agreed) return
+    if (!agreed || isLoading) return
     
+    setIsLoading(true)
     try {
       const response = await fetch('/api/contact', {
         method: 'POST',
@@ -70,6 +72,8 @@ export default function ContactPage() {
     } catch (error) {
       console.error('Error submitting form:', error)
       alert('Failed to send message. Please try again.')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -220,10 +224,19 @@ export default function ContactPage() {
                   <Button 
                     type="submit"
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-6 text-lg"
-                    disabled={!agreed}
+                    disabled={!agreed || isLoading}
                   >
-                    Send Message
-                    <ArrowRight className="w-5 h-5 ml-2" />
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        Send Message
+                        <ArrowRight className="w-5 h-5 ml-2" />
+                      </>
+                    )}
                   </Button>
                 </form>
               </>
