@@ -637,26 +637,27 @@ export default function SettingsContent({ section }: { section?: string }) {
                 <CardDescription>Manage recruiter team members and roles</CardDescription>
               </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              {/* Add Member Form - Mobile Responsive */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <Input
                   placeholder="Member email"
                   value={newMember.email}
                   onChange={(e) => setNewMember((p) => ({ ...p, email: e.target.value }))}
                   disabled={!canEditSection}
-                  className="linkedin-input"
+                  className="linkedin-input w-full"
                 />
                 <Input
                   placeholder="Full name (optional)"
                   value={newMember.name}
                   onChange={(e) => setNewMember((p) => ({ ...p, name: e.target.value }))}
                   disabled={!canEditSection}
-                  className="linkedin-input"
+                  className="linkedin-input w-full"
                 />
                 <Select
                   value={newMember.role}
                   onValueChange={(v) => setNewMember((p) => ({ ...p, role: v as any }))}
                 >
-                  <SelectTrigger className="linkedin-input" disabled={!canEditSection}>
+                  <SelectTrigger className="linkedin-input w-full" disabled={!canEditSection}>
                     <SelectValue placeholder="Role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -664,11 +665,12 @@ export default function SettingsContent({ section }: { section?: string }) {
                     <SelectItem value="company_admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button onClick={addMember} disabled={!canEditSection || membersLoading} className="linkedin-button">
+                <Button onClick={addMember} disabled={!canEditSection || membersLoading} className="linkedin-button w-full">
                   <Plus className="h-4 w-4 mr-1" /> Add
                 </Button>
               </div>
 
+              {/* Members List - Mobile Responsive */}
               <div className="divide-y rounded border">
                 {membersLoading && (
                   <div className="p-4 text-sm text-gray-600">Loading members...</div>
@@ -677,14 +679,14 @@ export default function SettingsContent({ section }: { section?: string }) {
                   <div className="p-4 text-sm text-gray-600">No team members yet</div>
                 )}
                 {members.map((m) => (
-                  <div key={m.id} className="p-3 flex items-center justify-between">
-                    <div>
-                      <div className="font-medium">{m.name || m.email.split('@')[0]}</div>
-                      <div className="text-sm text-gray-600">{m.email}</div>
+                  <div key={m.id} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{m.name || m.email.split('@')[0]}</div>
+                      <div className="text-sm text-gray-600 truncate">{m.email}</div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                       <Select value={m.role} onValueChange={(v) => { if (canEditSection) updateRole(m.email, v as any) }}>
-                        <SelectTrigger className="w-40" disabled={!canEditSection || m.email === user?.email}>
+                        <SelectTrigger className="w-full sm:w-32 md:w-40 text-xs sm:text-sm" disabled={!canEditSection || m.email === user?.email}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -692,7 +694,7 @@ export default function SettingsContent({ section }: { section?: string }) {
                           <SelectItem value="company_admin">Admin</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Button variant="outline" onClick={() => removeMember(m.email)} disabled={!canEditSection}>
+                      <Button variant="outline" size="sm" onClick={() => removeMember(m.email)} disabled={!canEditSection} className="flex-shrink-0">
                         <Trash className="h-4 w-4" />
                       </Button>
                     </div>

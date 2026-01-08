@@ -3,7 +3,19 @@ import { Pool } from "pg"
 import crypto from "node:crypto"
 import nodemailer from "nodemailer"
 
-const OWNER_EMAIL = process.env.OWNER_EMAIL || "support@hire-genai.com"
+// Get allowed admin and support emails from environment variables
+// Format in .env.local:
+//   ADMIN_EMAILS=admin@example.com,admin2@example.com
+//   SUPPORT_EMAILS=support@example.com,support2@example.com
+const ADMIN_EMAILS = process.env.ADMIN_EMAILS
+  ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase())
+  : []
+const SUPPORT_EMAILS = process.env.SUPPORT_EMAILS
+  ? process.env.SUPPORT_EMAILS.split(',').map(e => e.trim().toLowerCase())
+  : []
+
+// Combine both for login access
+const ALLOWED_EMAILS = [...ADMIN_EMAILS, ...SUPPORT_EMAILS]
 
 // Create PostgreSQL connection pool
 const pool = new Pool({
@@ -39,13 +51,25 @@ export async function POST(req: NextRequest) {
     // Normalize email
     const normalizedEmail = email.toLowerCase().trim()
 
-    // Check if email is the owner email
-    if (normalizedEmail !== OWNER_EMAIL.toLowerCase()) {
+    // Check if email is in allowed emails list (admin or support)
+    if (ALLOWED_EMAILS.length === 0) {
+      console.error('❌ ADMIN_EMAILS and SUPPORT_EMAILS not configured in .env.local')
+      return NextResponse.json(
+        { error: "Admin access not configured. Please set ADMIN_EMAILS or SUPPORT_EMAILS in .env.local" },
+        { status: 500 }
+      )
+    }
+
+    if (!ALLOWED_EMAILS.includes(normalizedEmail)) {
       return NextResponse.json(
         { error: "Access restricted", restricted: true },
         { status: 403 }
       )
     }
+
+    // Log which type of user is logging in
+    const userType = ADMIN_EMAILS.includes(normalizedEmail) ? 'ADMIN' : 'SUPPORT'
+    console.log(`✅ ${userType} user attempting login: ${normalizedEmail}`)
 
     // Generate OTP
     const code = Math.floor(100000 + Math.random() * 900000).toString()

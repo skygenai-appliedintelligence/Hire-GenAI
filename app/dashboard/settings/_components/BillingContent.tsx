@@ -922,41 +922,44 @@ export default function BillingContent({ companyId }: BillingContentProps) {
               <CardDescription>Download and view your past invoices</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
                 <div className="text-sm text-gray-600">Generate an invoice from recent usage.</div>
-                <Button size="sm" onClick={generateInvoice} disabled={generating}>
+                <Button size="sm" onClick={generateInvoice} disabled={generating} className="w-full sm:w-auto">
                   {generating ? 'Generating…' : 'Generate Invoice'}
                 </Button>
               </div>
               <div className="space-y-3">
                 {invoices.length > 0 ? (
                   invoices.map((invoice) => (
-                    <div key={invoice.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                      <div className="flex items-center gap-4">
-                        <div className="p-2 bg-gray-100 rounded">
+                    <div key={invoice.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-gray-50 gap-4">
+                      {/* Invoice Info */}
+                      <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0">
+                        <div className="p-2 bg-gray-100 rounded flex-shrink-0">
                           <FileText className="h-5 w-5 text-gray-600" />
                         </div>
-                        <div>
-                          <p className="font-medium">{invoice.invoiceNumber}</p>
-                          <p className="text-sm text-gray-600">
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm sm:text-base truncate">{invoice.invoiceNumber}</p>
+                          <p className="text-xs sm:text-sm text-gray-600 truncate">
                             {new Date(invoice.createdAt).toLocaleDateString()} • {invoice.description}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="font-semibold">${invoice.total.toFixed(2)}</p>
-                          <Badge className={
+                      {/* Price & Actions */}
+                      <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 w-full sm:w-auto">
+                        <div className="text-left sm:text-right">
+                          <p className="font-semibold text-sm sm:text-base">${invoice.total.toFixed(2)}</p>
+                          <Badge className={`text-xs ${
                             invoice.status === 'paid' ? 'bg-green-100 text-green-800' :
                             invoice.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                             'bg-red-100 text-red-800'
-                          }>
+                          }`}>
                             {invoice.status}
                           </Badge>
                         </div>
                         <Button 
                           variant="outline" 
                           size="sm"
+                          className="flex-shrink-0"
                           onClick={async () => {
                             const { generateInvoicePDF } = await import('@/lib/invoice-pdf')
                             // Build full address with all available fields

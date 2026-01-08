@@ -32,6 +32,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const [authenticated, setAuthenticated] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [userRole, setUserRole] = useState<"admin" | "support" | "unknown">("unknown")
 
   const currentTab = pathname.split("/").pop() || "overview"
 
@@ -45,25 +46,35 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    // Check if user is authenticated and is admin
+    // Check if user is authenticated and determine role
     const checkAuth = async () => {
       try {
         const res = await fetch("/api/admin/auth-check-direct")
         if (!res.ok) {
-          console.log("Auth check failed, redirecting to home")
-          router.push("/")
+          console.log("Auth check failed, redirecting to login")
+          router.push("/owner-login")
           return
         }
+        
+        const data = await res.json()
+        const role = data.user?.role || "unknown"
+        setUserRole(role)
         setAuthenticated(true)
         setLoading(false)
+        
+        // If support user and not on settings page, redirect to settings
+        if (role === "support" && !pathname.includes("/settings")) {
+          console.log("Support user accessing restricted page, redirecting to settings")
+          router.push("/admin-hiregenai/settings")
+        }
       } catch (error) {
         console.error("Auth check failed:", error)
-        router.push("/")
+        router.push("/owner-login")
       }
     }
 
     checkAuth()
-  }, [router])
+  }, [router, pathname])
 
   if (loading) {
     return (
@@ -113,18 +124,40 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = currentTab === item.id
+            // Support users can only access settings page
+            const isDisabled = userRole === "support" && item.id !== "settings"
+            
             return (
               <button
                 key={item.id}
-                onClick={() => router.push(`/admin-hiregenai/${item.id}`)}
+                onClick={() => {
+                  // Only allow navigation if not disabled
+                  if (!isDisabled) {
+                    router.push(`/admin-hiregenai/${item.id}`)
+                  } else {
+                    console.log("Support user cannot access this page")
+                  }
+                }}
+                disabled={isDisabled}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium ${
                   isActive
                     ? "bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-600/50 border border-emerald-400"
-                    : "text-slate-400 hover:bg-slate-800 hover:text-emerald-400 border border-transparent"
+                    : isDisabled
+                      ? "text-slate-600 opacity-50 cursor-not-allowed border border-transparent"
+                      : "text-slate-400 hover:bg-slate-800 hover:text-emerald-400 border border-transparent"
                 }`}
               >
-                <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? "text-white" : ""}`} />
-                {sidebarOpen && <span className="text-sm">{item.label}</span>}
+                <Icon className={`w-5 h-5 flex-shrink-0 ${
+                  isActive ? "text-white" : isDisabled ? "text-slate-600" : ""
+                }`} />
+                {sidebarOpen && (
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-sm">{item.label}</span>
+                    {isDisabled && (
+                      <span className="text-xs bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">Restricted</span>
+                    )}
+                  </div>
+                )}
               </button>
             )
           })}
@@ -177,21 +210,39 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = currentTab === item.id
+            // Support users can only access settings page
+            const isDisabled = userRole === "support" && item.id !== "settings"
+            
             return (
               <button
                 key={item.id}
                 onClick={() => {
-                  router.push(`/admin-hiregenai/${item.id}`)
-                  setMobileMenuOpen(false)
+                  // Only allow navigation if not disabled
+                  if (!isDisabled) {
+                    router.push(`/admin-hiregenai/${item.id}`)
+                    setMobileMenuOpen(false)
+                  } else {
+                    console.log("Support user cannot access this page")
+                  }
                 }}
+                disabled={isDisabled}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium ${
                   isActive
                     ? "bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-600/50 border border-emerald-400"
-                    : "text-slate-400 hover:bg-slate-800 hover:text-emerald-400 border border-transparent"
+                    : isDisabled
+                      ? "text-slate-600 opacity-50 cursor-not-allowed border border-transparent"
+                      : "text-slate-400 hover:bg-slate-800 hover:text-emerald-400 border border-transparent"
                 }`}
               >
-                <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? "text-white" : ""}`} />
-                <span className="text-sm">{item.label}</span>
+                <Icon className={`w-5 h-5 flex-shrink-0 ${
+                  isActive ? "text-white" : isDisabled ? "text-slate-600" : ""
+                }`} />
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-sm">{item.label}</span>
+                  {isDisabled && (
+                    <span className="text-xs bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">Restricted</span>
+                  )}
+                </div>
               </button>
             )
           })}

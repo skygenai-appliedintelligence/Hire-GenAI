@@ -75,8 +75,8 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
         <Button
           variant="ghost"
           size="sm"
-          onClick={toggleSidebar}
-          className="text-gray-500 hover:text-gray-700"
+          onClick={isMobile ? (onMobileClose || (() => {})) : toggleSidebar}
+          className="text-gray-500 hover:text-gray-700 relative z-50"
         >
           {isOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
         </Button>
@@ -93,6 +93,12 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
             <Link
               key={item.name}
               href={item.href}
+              onClick={() => {
+                // Close mobile sidebar when navigation link is clicked
+                if (isMobile && onMobileClose) {
+                  onMobileClose()
+                }
+              }}
               className={cn(
                 "w-full flex items-center rounded-lg transition-all font-medium",
                 isOpen ? "gap-3 px-4 py-3 justify-start" : "gap-0 px-0 py-3 justify-center",

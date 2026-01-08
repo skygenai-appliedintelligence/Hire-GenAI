@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import { Pool } from "pg"
 import crypto from "node:crypto"
 
+// Get allowed admin and support emails from environment variables
+const ADMIN_EMAILS = process.env.ADMIN_EMAILS
+  ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase())
+  : []
+const SUPPORT_EMAILS = process.env.SUPPORT_EMAILS
+  ? process.env.SUPPORT_EMAILS.split(',').map(e => e.trim().toLowerCase())
+  : []
+
 // Create PostgreSQL connection pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -82,12 +90,20 @@ export async function GET(req: NextRequest) {
       [session.id]
     )
 
+    // Determine user role based on email
+    const normalizedEmail = session.owner_email.toLowerCase().trim()
+    const isAdmin = ADMIN_EMAILS.includes(normalizedEmail)
+    const isSupport = SUPPORT_EMAILS.includes(normalizedEmail)
+    const userRole = isAdmin ? "admin" : isSupport ? "support" : "unknown"
+    
+    console.log(`✅ Auth-check: User role determined as ${userRole} for ${normalizedEmail}`)
+
     return NextResponse.json({
       ok: true,
       user: {
         id: session.id,
         email: session.owner_email,
-        role: "admin",
+        role: userRole,
       },
     })
   } catch (error: any) {
