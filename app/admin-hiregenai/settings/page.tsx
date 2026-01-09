@@ -86,39 +86,39 @@ export default function SettingsPage() {
       </div>
       
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="bg-slate-800 border border-slate-700 mb-6">
+        <TabsList className="bg-slate-800 border border-slate-700 mb-6 flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger 
             value="interactions" 
-            className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+            className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
           >
-            <Users className="h-4 w-4 mr-2" />
-            Customer Interactions
+            <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Customer </span>Interactions
           </TabsTrigger>
           <TabsTrigger 
             value="support"
-            className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+            className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
           >
-            <Headphones className="h-4 w-4 mr-2" />
-            Support Center
+            <Headphones className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+            Support<span className="hidden sm:inline"> Center</span>
           </TabsTrigger>
           <TabsTrigger 
             value="feedback"
-            className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+            className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
           >
-            <Lightbulb className="h-4 w-4 mr-2" />
-            Product Feedback
+            <Lightbulb className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Product </span>Feedback
             {feedbackCount > 0 && (
-              <span className="ml-2 bg-amber-500 text-white px-1.5 py-0.5 rounded-full text-xs">
+              <span className="ml-1 sm:ml-2 bg-amber-500 text-white px-1 sm:px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs">
                 {feedbackCount}
               </span>
             )}
           </TabsTrigger>
           <TabsTrigger 
             value="settings"
-            className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white"
+            className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
           >
-            <Settings className="h-4 w-4 mr-2" />
-            System Settings
+            <Settings className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">System </span>Settings
           </TabsTrigger>
         </TabsList>
 
@@ -139,7 +139,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-slate-800 rounded-lg border border-slate-700">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 p-3 sm:p-4 bg-slate-800 rounded-lg border border-slate-700">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-emerald-500/20 rounded-lg">
                       <MessageCircle className="h-5 w-5 text-emerald-400" />
@@ -156,18 +156,18 @@ export default function SettingsPage() {
                     </Button>
                   </Link>
                 </div>
-                <div className="grid grid-cols-3 gap-4 mt-4">
-                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-                    <p className="text-2xl font-bold text-emerald-400">{loading ? "..." : openTickets}</p>
-                    <p className="text-xs text-slate-400">Open Tickets</p>
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-4">
+                  <div className="bg-slate-800/50 rounded-lg p-2 sm:p-3 border border-slate-700">
+                    <p className="text-lg sm:text-2xl font-bold text-emerald-400">{loading ? "..." : openTickets}</p>
+                    <p className="text-[10px] sm:text-xs text-slate-400">Open Tickets</p>
                   </div>
-                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-                    <p className="text-2xl font-bold text-blue-400">{loading ? "..." : inProgressTickets}</p>
-                    <p className="text-xs text-slate-400">In Progress</p>
+                  <div className="bg-slate-800/50 rounded-lg p-2 sm:p-3 border border-slate-700">
+                    <p className="text-lg sm:text-2xl font-bold text-blue-400">{loading ? "..." : inProgressTickets}</p>
+                    <p className="text-[10px] sm:text-xs text-slate-400">In Progress</p>
                   </div>
-                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-                    <p className="text-2xl font-bold text-emerald-400">{loading ? "..." : resolvedTodayTickets}</p>
-                    <p className="text-xs text-slate-400">Resolved Today</p>
+                  <div className="bg-slate-800/50 rounded-lg p-2 sm:p-3 border border-slate-700">
+                    <p className="text-lg sm:text-2xl font-bold text-emerald-400">{loading ? "..." : resolvedTodayTickets}</p>
+                    <p className="text-[10px] sm:text-xs text-slate-400">Resolved Today</p>
                   </div>
                 </div>
               </div>
@@ -188,22 +188,22 @@ export default function SettingsPage() {
             <CardContent>
               <div className="space-y-4">
                 {/* Stats Cards */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-                    <p className="text-2xl font-bold text-amber-400">{loading ? "..." : feedbackItems.length}</p>
-                    <p className="text-xs text-slate-400">Total Feedback</p>
+                <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                  <div className="bg-slate-800/50 rounded-lg p-2 sm:p-3 border border-slate-700">
+                    <p className="text-lg sm:text-2xl font-bold text-amber-400">{loading ? "..." : feedbackItems.length}</p>
+                    <p className="text-[10px] sm:text-xs text-slate-400">Total Feedback</p>
                   </div>
-                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-                    <p className="text-2xl font-bold text-emerald-400">
+                  <div className="bg-slate-800/50 rounded-lg p-2 sm:p-3 border border-slate-700">
+                    <p className="text-lg sm:text-2xl font-bold text-emerald-400">
                       {loading ? "..." : feedbackItems.filter(f => f.status === "open").length}
                     </p>
-                    <p className="text-xs text-slate-400">New / Unread</p>
+                    <p className="text-[10px] sm:text-xs text-slate-400">New / Unread</p>
                   </div>
-                  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-                    <p className="text-2xl font-bold text-blue-400">
+                  <div className="bg-slate-800/50 rounded-lg p-2 sm:p-3 border border-slate-700">
+                    <p className="text-lg sm:text-2xl font-bold text-blue-400">
                       {loading ? "..." : feedbackItems.filter(f => f.status === "resolved" || f.status === "closed").length}
                     </p>
-                    <p className="text-xs text-slate-400">Reviewed</p>
+                    <p className="text-[10px] sm:text-xs text-slate-400">Reviewed</p>
                   </div>
                 </div>
 

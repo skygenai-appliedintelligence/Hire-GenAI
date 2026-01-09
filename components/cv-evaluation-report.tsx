@@ -233,27 +233,30 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
   return (
     <div className="w-full">
       {/* Main Header with Company Logo */}
-      <div className="bg-white shadow-md rounded-lg overflow-hidden mb-6 border border-slate-200">
-        <div className="p-6 border-b border-slate-200">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center">
-              <div className="bg-emerald-600 rounded-full p-3 mr-4">
-                <FileText className="h-8 w-8 text-white" />
+      <div className="bg-white shadow-md rounded-lg overflow-hidden mb-4 sm:mb-6 border border-slate-200">
+        <div className="p-4 sm:p-6 border-b border-slate-200">
+          <div className="flex flex-col gap-4">
+            {/* Top row: Icon + Title */}
+            <div className="flex items-start sm:items-center gap-3 sm:gap-4">
+              <div className="bg-emerald-600 rounded-full p-2 sm:p-3 flex-shrink-0">
+                <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-slate-800">Resume Evaluation Report</h1>
-                <p className="text-slate-500 text-sm">Generated on {new Date().toISOString().split('T')[0]}</p>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg sm:text-2xl font-bold text-slate-800">Resume Evaluation Report</h1>
+                <p className="text-slate-500 text-xs sm:text-sm">Generated on {new Date().toISOString().split('T')[0]}</p>
               </div>
             </div>
-            <div className="flex flex-col items-end space-y-2">
-              <div className="inline-flex items-center mb-1">
+            
+            {/* Bottom row: Badge, Button, ID */}
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+              <div className="inline-flex items-center">
                 {data.qualified ? 
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 mr-2" /> : 
-                  <AlertTriangle className="w-5 h-5 text-amber-500 mr-2" />
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 mr-1.5 sm:mr-2" /> : 
+                  <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 mr-1.5 sm:mr-2" />
                 }
                 <Badge 
                   variant={data.qualified ? "default" : "destructive"}
-                  className={`px-3 py-1 text-sm ${data.qualified ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100' : 'bg-red-100 text-red-800 hover:bg-red-100'}`}
+                  className={`px-2 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm ${data.qualified ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100' : 'bg-red-100 text-red-800 hover:bg-red-100'}`}
                 >
                   {data.qualified ? "Qualified" : "Not Qualified"}
                 </Badge>
@@ -261,29 +264,29 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
               <Button 
                 variant="outline" 
                 size="sm"
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm h-8 sm:h-9"
                 onClick={() => window.open(data.resumeUrl, '_blank')}
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span>Download Resume</span>
               </Button>
-              <div className="flex items-center justify-end space-x-1 text-sm text-slate-500">
+              <div className="flex items-center space-x-1 text-xs sm:text-sm text-slate-500">
                 <span>ID:</span>
-                <span className="font-mono">CV-20251121-001</span>
+                <span className="font-mono text-xs">CV-20251121-001</span>
               </div>
             </div>
           </div>
         </div>
         
         {/* Candidate Overview */}
-        <div className="bg-slate-50 p-6 border-b border-slate-200">
+        <div className="bg-slate-50 p-4 sm:p-6 border-b border-slate-200">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="flex-1">
-              <div className="flex items-center space-x-4">
+            <div className="flex-1 w-full">
+              <div className="flex items-center space-x-3 sm:space-x-4">
                 <Dialog>
                   <DialogTrigger asChild>
-                    <div className="w-24 h-24 bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg flex items-center justify-center border-4 border-white shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200">
-                      <User className="h-12 w-12 text-slate-500" />
+                    <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg flex items-center justify-center border-2 sm:border-4 border-white shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200 flex-shrink-0">
+                      <User className="h-8 w-8 sm:h-12 sm:w-12 text-slate-500" />
                     </div>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md">
@@ -297,36 +300,36 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
                     </div>
                   </DialogContent>
                 </Dialog>
-                <div>
-                  <h2 className="text-xl font-bold text-slate-800">{data.candidateName}</h2>
+                <div className="min-w-0">
+                  <h2 className="text-base sm:text-xl font-bold text-slate-800 truncate">{data.candidateName}</h2>
                   <div className="flex items-center text-slate-600 mt-1">
-                    <Briefcase className="w-4 h-4 mr-2" />
-                    <span>{data.role}</span>
+                    <Briefcase className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                    <span className="text-sm sm:text-base truncate">{data.role}</span>
                   </div>
                 </div>
               </div>
             </div>
             
             <div className="md:border-l md:border-slate-300 md:pl-4 flex-1 w-full md:w-auto">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <p className="text-xs text-slate-500 uppercase font-medium tracking-wide mb-1">Resume Score</p>
+                  <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-medium tracking-wide mb-1">Resume Score</p>
                   <div className="flex items-center">
-                    <BarChart4 className="w-4 h-4 text-slate-400 mr-2" />
-                    <p className="font-bold text-lg">{data.overallScore}<span className="text-slate-400 text-xs">/100</span></p>
+                    <BarChart4 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 mr-1.5 sm:mr-2" />
+                    <p className="font-bold text-base sm:text-lg">{data.overallScore}<span className="text-slate-400 text-[10px] sm:text-xs">/100</span></p>
                   </div>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 uppercase font-medium tracking-wide mb-1">Interview Score</p>
+                  <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-medium tracking-wide mb-1">Interview Score</p>
                   {data.interviewScore > 0 ? (
                     <div className="flex items-center">
-                      <BarChart4 className="w-4 h-4 text-slate-400 mr-2" />
-                      <p className="font-bold text-lg">{data.interviewScore}<span className="text-slate-400 text-xs">/100</span></p>
+                      <BarChart4 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 mr-1.5 sm:mr-2" />
+                      <p className="font-bold text-base sm:text-lg">{data.interviewScore}<span className="text-slate-400 text-[10px] sm:text-xs">/100</span></p>
                     </div>
                   ) : (
                     <div className="flex items-center">
-                      <BarChart4 className="w-4 h-4 text-slate-400 mr-2" />
-                      <p className="font-bold text-lg text-slate-400">—</p>
+                      <BarChart4 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 mr-1.5 sm:mr-2" />
+                      <p className="font-bold text-base sm:text-lg text-slate-400">—</p>
                     </div>
                   )}
                 </div>
@@ -395,15 +398,15 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
               {/* Profile Criteria */}
               <div className="mb-6">
                 <h4 className="text-sm uppercase tracking-wider text-slate-500 font-medium mb-3">Candidate Profile Attributes</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                   <Card className="overflow-hidden">
-                    <CardHeader className="p-4 bg-gradient-to-b from-blue-50 to-white">
-                      <CardTitle className="text-base flex items-center">
-                        <GraduationCap className="w-5 h-5 mr-2 text-blue-600" />
+                    <CardHeader className="p-3 sm:p-4 bg-gradient-to-b from-blue-50 to-white">
+                      <CardTitle className="text-sm sm:text-base flex items-center">
+                        <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-blue-600" />
                         University
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-4 pt-2">
+                    <CardContent className="p-3 sm:p-4 pt-2">
                       {data.candidateProfile.educationList && data.candidateProfile.educationList.length > 0 ? (
                         <div className="space-y-2 mb-2">
                           {data.candidateProfile.educationList.map((edu, idx) => (
@@ -423,13 +426,13 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
                   </Card>
                   
                   <Card className="overflow-hidden">
-                    <CardHeader className="p-4 bg-gradient-to-b from-purple-50 to-white">
-                      <CardTitle className="text-base flex items-center">
-                        <Building className="w-5 h-5 mr-2 text-purple-600" />
+                    <CardHeader className="p-3 sm:p-4 bg-gradient-to-b from-purple-50 to-white">
+                      <CardTitle className="text-sm sm:text-base flex items-center">
+                        <Building className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-purple-600" />
                         Employer History
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-4 pt-2">
+                    <CardContent className="p-3 sm:p-4 pt-2">
                       {data.extractedInfo.workExperience && data.extractedInfo.workExperience.length > 0 ? (
                         <div className="space-y-2">
                           {data.extractedInfo.workExperience.map((exp, idx) => (
@@ -465,15 +468,19 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
                   </Card>
                   
                   <Card className="overflow-hidden">
-                    <CardHeader className="p-4 bg-gradient-to-b from-amber-50 to-white">
-                      <CardTitle className="text-base flex items-center">
-                        <Clock className="w-5 h-5 mr-2 text-amber-600" />
+                    <CardHeader className="p-3 sm:p-4 bg-gradient-to-b from-amber-50 to-white">
+                      <CardTitle className="text-sm sm:text-base flex items-center">
+                        <Clock className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-amber-600" />
                         Experience
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-4 pt-2">
-                      <div className="flex items-center gap-3">
-                        <Badge variant="outline">{data.candidateProfile.experience} years</Badge>
+                    <CardContent className="p-3 sm:p-4 pt-2">
+                      <div className="flex flex-col items-center justify-center py-2">
+                        <div className="text-2xl sm:text-3xl font-bold text-amber-600">{data.candidateProfile.experience}</div>
+                        <div className="text-xs sm:text-sm text-slate-500">Years of Experience</div>
+                      </div>
+                      <div className="flex items-center justify-center gap-2 mt-2">
+                        <Badge variant="outline" className="text-xs">{data.candidateProfile.experience} years</Badge>
                         {data.candidateProfile.hasRelevantExperience && (
                           <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
                             Relevant
@@ -797,9 +804,9 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
                   onClick={isSkillSetMatch ? handleToggleSkillSetMatch : undefined}
                 >
                   {/* Category Header */}
-                  <div className="flex justify-between items-center px-6 py-5 bg-gradient-to-r from-slate-50 to-white border-b-2 border-slate-200">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg shadow-md ${
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center px-3 sm:px-6 py-3 sm:py-5 bg-gradient-to-r from-slate-50 to-white border-b-2 border-slate-200 gap-3 sm:gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                      <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-full flex items-center justify-center font-bold text-sm sm:text-lg shadow-md flex-shrink-0 ${
                         category.score >= 80 ? 'bg-emerald-100 text-emerald-700' : 
                         category.score >= 70 ? 'bg-blue-100 text-blue-700' : 
                         category.score >= 60 ? 'bg-amber-100 text-amber-700' : 
@@ -807,19 +814,27 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
                       }`}>
                         {index + 1}
                       </div>
-                      <div>
-                        <h4 className="font-bold text-lg text-slate-900 leading-tight flex items-center gap-2">
-                          {category.category}
+                      <div className="min-w-0 flex-1">
+                        <h4 className="font-bold text-sm sm:text-lg text-slate-900 leading-tight flex items-center gap-1 sm:gap-2 flex-wrap">
+                          <span className="truncate">{category.category}</span>
                           {isSkillSetMatch && (
-                            <ChevronDown className={`w-5 h-5 text-slate-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                            <ChevronDown className={`w-4 h-4 sm:w-5 sm:h-5 text-slate-500 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
                           )}
                         </h4>
-                        <div className="flex items-center gap-3 mt-1">
-                          <span className="text-sm font-semibold text-slate-600">Weight: <span className="text-slate-800">{category.weight}%</span></span>
+                        <div className="flex items-center gap-2 sm:gap-3 mt-0.5 sm:mt-1">
+                          <span className="text-xs sm:text-sm font-semibold text-slate-600">Weight: <span className="text-slate-800">{category.weight}%</span></span>
                         </div>
                       </div>
+                      {/* Mobile score badge - inline with header */}
+                      <Badge 
+                        variant="outline"
+                        className={`px-2 sm:px-5 py-1 sm:py-2 text-xs sm:text-base font-bold sm:hidden flex-shrink-0 ${getScoreColor(category.score)}`}
+                      >
+                        {category.score}/100
+                      </Badge>
                     </div>
-                    <div className="text-right">
+                    {/* Desktop score badge */}
+                    <div className="text-right hidden sm:block">
                       <Badge 
                         variant="outline"
                         className={`px-5 py-2 text-base font-bold ${getScoreColor(category.score)}`}
@@ -830,10 +845,10 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
                   </div>
                   
                   {/* Category Details - Grid Only */}
-                  <div className={`px-6 py-6 bg-white/80 transition-all duration-300 ${isExpanded ? 'max-h-none' : 'max-h-96'} overflow-hidden`}>
+                  <div className={`px-3 sm:px-6 py-4 sm:py-6 bg-white/80 transition-all duration-300 ${isExpanded ? 'max-h-none' : 'max-h-96'} overflow-hidden`}>
                     {/* Grid Format (2x2 for all grid categories) */}
                     {(category as any).isGrid && (category as any).gridData ? (
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
                         {(category as any).gridData.map((item: any, idx: number) => {
                           // For Skill Set Match, show full skills when expanded
                           if (isSkillSetMatch && isExpanded && (item.label.includes('Matched Skills') || item.label.includes('Missing Skills'))) {
@@ -862,11 +877,11 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
                           }
                           
                           return (
-                            <div key={idx} className="bg-white border border-slate-200 rounded-lg p-4">
-                              <div className="text-sm font-medium text-slate-600 mb-2">
+                            <div key={idx} className="bg-white border border-slate-200 rounded-lg p-2.5 sm:p-4">
+                              <div className="text-xs sm:text-sm font-medium text-slate-600 mb-1 sm:mb-2">
                                 {item.label}
                               </div>
-                              <p className="text-sm text-slate-800">
+                              <p className="text-xs sm:text-sm text-slate-800 break-words">
                                 {item.value}
                               </p>
                             </div>
@@ -936,59 +951,59 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
           </CardDescription>
         </CardHeader>
         
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <CardContent className="p-3 sm:p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-6">
             <Card className="overflow-hidden">
-              <CardHeader className="p-4 bg-gradient-to-b from-blue-50 to-white">
-                <CardTitle className="text-base flex items-center">
-                  <User className="w-4 h-4 mr-2 text-blue-600" />
+              <CardHeader className="p-3 sm:p-4 bg-gradient-to-b from-blue-50 to-white">
+                <CardTitle className="text-sm sm:text-base flex items-center">
+                  <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 text-blue-600" />
                   Contact Details
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-4">
-                <div className="space-y-3">
+              <CardContent className="p-3 sm:p-4">
+                <div className="space-y-2 sm:space-y-3">
                   <div className="flex items-center">
-                    <User className="w-4 h-4 text-slate-400 mr-2" />
-                    <span className="text-sm text-slate-600">{data.extractedInfo.name}</span>
+                    <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 mr-2 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm text-slate-600 truncate">{data.extractedInfo.name}</span>
                   </div>
                   <div className="flex items-center">
-                    <Mail className="w-4 h-4 text-slate-400 mr-2" />
-                    <span className="text-sm text-slate-600">{data.extractedInfo.email}</span>
+                    <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 mr-2 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm text-slate-600 truncate">{data.extractedInfo.email}</span>
                   </div>
                   <div className="flex items-center">
-                    <Phone className="w-4 h-4 text-slate-400 mr-2" />
-                    <span className="text-sm text-slate-600">{data.extractedInfo.phone}</span>
+                    <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 mr-2 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm text-slate-600">{data.extractedInfo.phone}</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
             
             <Card className="overflow-hidden">
-              <CardHeader className="p-4 bg-gradient-to-b from-amber-50 to-white">
-                <CardTitle className="text-base flex items-center">
-                  <Clock className="w-4 h-4 mr-2 text-amber-600" />
+              <CardHeader className="p-3 sm:p-4 bg-gradient-to-b from-amber-50 to-white">
+                <CardTitle className="text-sm sm:text-base flex items-center">
+                  <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 text-amber-600" />
                   Experience
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-4 flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-amber-600">{data.extractedInfo.totalExperience.split(' ')[0]}</div>
-                  <div className="text-sm text-slate-500">Years of Experience</div>
+              <CardContent className="p-3 sm:p-4 flex items-center justify-center">
+                <div className="text-center py-2">
+                  <div className="text-2xl sm:text-3xl font-bold text-amber-600">{data.extractedInfo.totalExperience.split(' ')[0]}</div>
+                  <div className="text-xs sm:text-sm text-slate-500">Years of Experience</div>
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="overflow-hidden md:col-span-1">
-              <CardHeader className="p-4 bg-gradient-to-b from-purple-50 to-white">
-                <CardTitle className="text-base flex items-center">
-                  <Tag className="w-4 h-4 mr-2 text-purple-600" />
+            <Card className="overflow-hidden sm:col-span-2 md:col-span-1">
+              <CardHeader className="p-3 sm:p-4 bg-gradient-to-b from-purple-50 to-white">
+                <CardTitle className="text-sm sm:text-base flex items-center">
+                  <Tag className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 text-purple-600" />
                   Skills
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-4">
-                <div className="flex flex-wrap gap-2">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
                   {data.extractedInfo.skills.map((skill, index) => (
-                    <Badge key={index} variant="outline" className="text-xs bg-slate-50">
+                    <Badge key={index} variant="outline" className="text-[10px] sm:text-xs bg-slate-50">
                       {skill}
                     </Badge>
                   ))}

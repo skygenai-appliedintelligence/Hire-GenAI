@@ -258,155 +258,164 @@ export default function SupportAdminPage() {
     <div className="min-h-screen bg-slate-900">
       {/* Admin Header */}
       <header className="bg-slate-800 border-b border-slate-700 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center">
-                <Shield className="w-6 h-6 text-white" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-600 rounded-lg flex items-center justify-center">
+                <Shield className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">Support Admin</h1>
-                <p className="text-sm text-slate-400">Manage customer tickets</p>
+                <h1 className="text-base sm:text-xl font-bold text-white">Support Admin</h1>
+                <p className="text-xs sm:text-sm text-slate-400 hidden sm:block">Manage customer tickets</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-slate-400">
-                <Inbox className="w-5 h-5" />
-                <span className="text-sm">{openTickets.length} open</span>
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="flex items-center gap-1 sm:gap-2 text-slate-400">
+                <Inbox className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-xs sm:text-sm">{openTickets.length} open</span>
               </div>
               <button
                 onClick={() => router.push("/support-hiregenai")}
-                className="px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors text-sm"
+                className="px-2 sm:px-4 py-1.5 sm:py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors text-xs sm:text-sm"
               >
-                Customer View
+                <span className="hidden sm:inline">Customer View</span>
+                <span className="sm:hidden">Back</span>
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-5 gap-4 mb-6">
-          <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <Users className="w-5 h-5 text-blue-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">{tickets.length}</p>
-                <p className="text-sm text-slate-400">Total Tickets</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                <MessageCircle className="w-5 h-5 text-orange-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">{openTickets.length}</p>
-                <p className="text-sm text-slate-400">Open Tickets</p>
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
+        {/* Stats Cards - Horizontal scroll on mobile to show all 5 */}
+        <div className="overflow-x-auto scrollbar-hide -mx-3 px-3 sm:mx-0 sm:px-0 mb-4 sm:mb-6">
+          <div className="flex sm:grid sm:grid-cols-5 gap-2 sm:gap-4 w-max sm:w-auto">
+            <div className="bg-slate-800 rounded-lg sm:rounded-xl p-2 sm:p-4 border border-slate-700 min-w-[80px] sm:min-w-0">
+              <div className="flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                  <Users className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+                </div>
+                <div className="text-center sm:text-left">
+                  <p className="text-lg sm:text-2xl font-bold text-white">{tickets.length}</p>
+                  <p className="text-[10px] sm:text-sm text-slate-400">Total</p>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">{resolvedTickets.length}</p>
-                <p className="text-sm text-slate-400">Resolved</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
-                <AlertCircle className="w-5 h-5 text-red-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">
-                  {tickets.filter(t => t.priority === "urgent" && t.status === "open" && (t as any).type !== "feedback").length}
-                </p>
-                <p className="text-sm text-slate-400">Urgent</p>
+            <div className="bg-slate-800 rounded-lg sm:rounded-xl p-2 sm:p-4 border border-slate-700 min-w-[80px] sm:min-w-0">
+              <div className="flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                  <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 text-orange-400" />
+                </div>
+                <div className="text-center sm:text-left">
+                  <p className="text-lg sm:text-2xl font-bold text-white">{openTickets.length}</p>
+                  <p className="text-[10px] sm:text-sm text-slate-400">Open</p>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
-                <Lightbulb className="w-5 h-5 text-amber-400" />
+            <div className="bg-slate-800 rounded-lg sm:rounded-xl p-2 sm:p-4 border border-slate-700 min-w-[80px] sm:min-w-0">
+              <div className="flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+                </div>
+                <div className="text-center sm:text-left">
+                  <p className="text-lg sm:text-2xl font-bold text-white">{resolvedTickets.length}</p>
+                  <p className="text-[10px] sm:text-sm text-slate-400">Resolved</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-white">{feedbackItems.length}</p>
-                <p className="text-sm text-slate-400">Feedback</p>
+            </div>
+            <div className="bg-slate-800 rounded-lg sm:rounded-xl p-2 sm:p-4 border border-slate-700 min-w-[80px] sm:min-w-0">
+              <div className="flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
+                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
+                </div>
+                <div className="text-center sm:text-left">
+                  <p className="text-lg sm:text-2xl font-bold text-white">
+                    {tickets.filter(t => t.priority === "urgent" && t.status === "open" && (t as any).type !== "feedback").length}
+                  </p>
+                  <p className="text-[10px] sm:text-sm text-slate-400">Urgent</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-slate-800 rounded-lg sm:rounded-xl p-2 sm:p-4 border border-slate-700 min-w-[80px] sm:min-w-0">
+              <div className="flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-amber-500/20 rounded-lg flex items-center justify-center">
+                  <Lightbulb className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+                </div>
+                <div className="text-center sm:text-left">
+                  <p className="text-lg sm:text-2xl font-bold text-white">{feedbackItems.length}</p>
+                  <p className="text-[10px] sm:text-sm text-slate-400">Feedback</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex space-x-1 bg-slate-800 p-1 rounded-lg mb-6 w-fit border border-slate-700">
-          <button
-            onClick={() => { setActiveTab("open"); setSelectedTicket(null); setResolvedFilter("all"); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === "open" 
-                ? "bg-emerald-600 text-white" 
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <MessageCircle className="w-4 h-4" />
-            Open Tickets
-            {openTickets.length > 0 && (
-              <span className={`px-2 py-0.5 rounded-full text-xs ${
-                activeTab === "open" ? "bg-emerald-500" : "bg-slate-700"
-              }`}>
-                {openTickets.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => { setActiveTab("resolved"); setSelectedTicket(null); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === "resolved" 
-                ? "bg-emerald-600 text-white" 
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <CheckCircle className="w-4 h-4" />
-            Resolved
-            {resolvedTickets.length > 0 && (
-              <span className={`px-2 py-0.5 rounded-full text-xs ${
-                activeTab === "resolved" ? "bg-emerald-500" : "bg-slate-700"
-              }`}>
-                {resolvedTickets.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => { setActiveTab("feedback"); setSelectedTicket(null); setResolvedFilter("all"); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === "feedback" 
-                ? "bg-amber-600 text-white" 
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <Lightbulb className="w-4 h-4" />
-            Feedback
-            {feedbackItems.length > 0 && (
-              <span className={`px-2 py-0.5 rounded-full text-xs ${
-                activeTab === "feedback" ? "bg-amber-500" : "bg-slate-700"
-              }`}>
-                {feedbackItems.length}
-              </span>
-            )}
-          </button>
+        {/* Tabs - Horizontal scroll on mobile */}
+        <div className="overflow-x-auto scrollbar-hide mb-4 sm:mb-6 -mx-3 px-3 sm:mx-0 sm:px-0">
+          <div className="flex gap-1 bg-slate-800 p-1 rounded-lg w-max sm:w-fit border border-slate-700" style={{ scrollSnapType: 'x mandatory' }}>
+            <button
+              onClick={() => { setActiveTab("open"); setSelectedTicket(null); setResolvedFilter("all"); }}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === "open" 
+                  ? "bg-emerald-600 text-white" 
+                  : "text-slate-400 hover:text-white"
+              }`}
+              style={{ scrollSnapAlign: 'start' }}
+            >
+              <MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Open Tickets</span>
+              <span className="sm:hidden">Open</span>
+              {openTickets.length > 0 && (
+                <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs ${
+                  activeTab === "open" ? "bg-emerald-500" : "bg-slate-700"
+                }`}>
+                  {openTickets.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => { setActiveTab("resolved"); setSelectedTicket(null); }}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === "resolved" 
+                  ? "bg-emerald-600 text-white" 
+                  : "text-slate-400 hover:text-white"
+              }`}
+              style={{ scrollSnapAlign: 'start' }}
+            >
+              <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              Resolved
+              {resolvedTickets.length > 0 && (
+                <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs ${
+                  activeTab === "resolved" ? "bg-emerald-500" : "bg-slate-700"
+                }`}>
+                  {resolvedTickets.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => { setActiveTab("feedback"); setSelectedTicket(null); setResolvedFilter("all"); }}
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                activeTab === "feedback" 
+                  ? "bg-amber-600 text-white" 
+                  : "text-slate-400 hover:text-white"
+              }`}
+              style={{ scrollSnapAlign: 'start' }}
+            >
+              <Lightbulb className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              Feedback
+              {feedbackItems.length > 0 && (
+                <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs ${
+                  activeTab === "feedback" ? "bg-amber-500" : "bg-slate-700"
+                }`}>
+                  {feedbackItems.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Main Content */}
-        <div className="grid grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-6">
           {/* Tickets List */}
           <div className="col-span-1 bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
             <div className="p-4 border-b border-slate-700">
@@ -448,7 +457,7 @@ export default function SupportAdminPage() {
                 </div>
               )}
             </div>
-            <div className="max-h-[calc(100vh-380px)] overflow-y-auto">
+            <div className="max-h-[200px] sm:max-h-[calc(100vh-380px)] overflow-y-auto">
               {(activeTab === "open" ? openTickets : activeTab === "resolved" ? resolvedTickets : feedbackItems).length === 0 ? (
                 <div className="p-8 text-center">
                   <div className="w-12 h-12 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -516,7 +525,7 @@ export default function SupportAdminPage() {
           </div>
 
           {/* Ticket Detail */}
-          <div className="col-span-3 bg-slate-800 rounded-xl border border-slate-700 flex flex-col overflow-hidden" style={{ height: "calc(100vh - 280px)" }}>
+          <div className="col-span-1 md:col-span-3 bg-slate-800 rounded-xl border border-slate-700 flex flex-col overflow-hidden" style={{ height: "calc(100vh - 350px)", minHeight: "300px" }}>
             {!selectedTicket ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center">
