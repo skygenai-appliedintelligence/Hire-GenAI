@@ -5,20 +5,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
-import { X, Send, Loader2 } from "lucide-react"
+import { X, Send, Loader2, Users } from "lucide-react"
 import { toast } from "sonner"
 
-interface SendEmailModalProps {
+interface CandidateData {
+  id: string
+  candidateName: string
+  email: string
+  appliedJD: string
+  jobId: string
+  jobTitle?: string
+}
+
+interface SendBulkEmailModalProps {
   isOpen: boolean
   onClose: () => void
-  candidate: {
-    id: string
-    candidateName: string
-    email: string
-    appliedJD: string
-    jobId: string
-    jobTitle?: string
-  }
+  candidates: CandidateData[]
   company?: {
     id: string
     name: string
@@ -28,10 +30,17 @@ interface SendEmailModalProps {
     full_name: string
     email: string
   } | null
-  onSendEmail: (message: string, category: 'interview' | 'new_job') => Promise<void>
+  onSendBulkEmail: (candidates: CandidateData[], message: string, category: 'interview' | 'new_job') => Promise<void>
 }
 
-export default function SendEmailModal({ isOpen, onClose, candidate, company, user, onSendEmail }: SendEmailModalProps) {
+export default function SendBulkEmailModal({ 
+  isOpen, 
+  onClose, 
+  candidates, 
+  company, 
+  user, 
+  onSendBulkEmail 
+}: SendBulkEmailModalProps) {
   const [selectedCategory, setSelectedCategory] = useState<'interview' | 'new_job'>('interview')
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
@@ -47,12 +56,10 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, us
   const [companyData, setCompanyData] = useState<{
     companyName: string
     userJobTitle: string
-    interviewLink: string
     recruiterName: string
   }>({
     companyName: "",
     userJobTitle: "",
-    interviewLink: "",
     recruiterName: ""
   })
   const [availableJobs, setAvailableJobs] = useState<{ id: string; title: string; status: string }[]>([])
@@ -80,8 +87,8 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, us
   // Update message when category changes
   useEffect(() => {
     if (isOpen && savedMessages[selectedCategory]) {
-      const processedMessage = replacePlaceholders(savedMessages[selectedCategory])
-      setMessage(processedMessage)
+      // For bulk email, we show template with placeholders that will be replaced per-candidate
+      setMessage(savedMessages[selectedCategory])
     }
   }, [selectedCategory, savedMessages, companyData])
 
@@ -131,10 +138,6 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, us
 
   const loadCompanyData = async () => {
     try {
-      // Generate the actual interview link using the same format as the API
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-      const interviewLink = `${baseUrl}/interview/${encodeURIComponent(candidate.id)}/start`
-      
       // Prefer company prop, then enhance from localStorage if available
       const savedCompanyData = localStorage.getItem('companyData')
       let companyName = (company as any)?.name || ""
@@ -154,17 +157,13 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, us
       setCompanyData({
         companyName,
         userJobTitle,
-        interviewLink,
         recruiterName
       })
     } catch (error) {
       console.error('Error loading company data:', error)
-      // Fallback to defaults with correct company name
-      const baseUrl = "http://localhost:3000"
       setCompanyData({
         companyName: (company as any)?.name || "",
         userJobTitle: "HR Manager", 
-        interviewLink: `${baseUrl}/interview/${encodeURIComponent(candidate.id)}/start`,
         recruiterName: user?.full_name || ""
       })
     }
@@ -215,28 +214,10 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, us
     setSearchingJob(false)
   }
 
-  const replacePlaceholders = (text: string): string => {
-    if (!text) return ""
-    
-    const jobTitle = candidate.jobTitle || candidate.appliedJD || "N/A"
-    
-    return text
-      .replace(/\[Job Title\]/g, jobTitle)
-      .replace(/\[Role Name\]/g, jobTitle)
-      .replace(/\[Company Name\]/g, companyData.companyName)
-      .replace(/\[Candidate Name\]/g, candidate.candidateName)
-      .replace(/\[Insert Meeting Link\]/g, companyData.interviewLink)
-      .replace(/\[Your Job Title\]/g, companyData.userJobTitle)
-      .replace(/\[Date\]/g, "Valid for 48 hours")
-      .replace(/\[Your Name\]/g, companyData.recruiterName || "Recruitment Team")
-      .replace(/\[Your Designation\]/g, companyData.userJobTitle)
-  }
-
   const handleCategorySelect = (category: 'interview' | 'new_job') => {
     setSelectedCategory(category)
     const rawMessage = savedMessages[category] || ""
-    const processedMessage = replacePlaceholders(rawMessage)
-    setMessage(processedMessage)
+    setMessage(rawMessage)
     // Clear job title error when switching tabs
     setJobTitleError(false)
   }
@@ -259,10 +240,13 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, us
       // Get user's first name from email or full name
       let userName = ""
       if (user?.full_name) {
+        // Extract first name from full name
         userName = user.full_name.split(' ')[0]
       } else if (user?.email) {
+        // Try to extract name from email (before the +)
         const emailParts = user.email.split('@')[0].split('+')
         const emailName = emailParts[0]
+        // Convert first letter to uppercase and remove numbers
         userName = emailName.replace(/[0-9]/g, '').replace(/^\w/, c => c.toUpperCase())
       }
 
@@ -283,12 +267,12 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, us
             .replace(/\[Application Link\]/g, matchedJob.applyLink)
         }
       }
-
-      await onSendEmail(finalMessage, selectedCategory)
+      
+      await onSendBulkEmail(candidates, finalMessage, selectedCategory)
       onClose()
-      toast.success('Email sent successfully!')
+      toast.success(`Emails sent successfully to ${candidates.length} candidates!`)
     } catch (error) {
-      toast.error('Failed to send email')
+      toast.error('Failed to send emails')
     } finally {
       setSending(false)
     }
@@ -308,7 +292,10 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, us
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
-            <span>Send Email to {candidate.candidateName}</span>
+            <span className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-emerald-600" />
+              Send Email to {candidates.length} Candidates
+            </span>
             <Button variant="ghost" size="sm" onClick={handleClose}>
               <X className="h-4 w-4" />
             </Button>
@@ -316,11 +303,17 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, us
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Candidate Info */}
+          {/* Selected Candidates Info */}
           <div className="bg-gray-50 p-3 rounded-lg">
             <div className="text-sm text-gray-600">
-              <p><strong>Email:</strong> {candidate.email}</p>
-              <p><strong>Position:</strong> {candidate.jobTitle || candidate.appliedJD || 'N/A'}</p>
+              <p className="font-medium mb-2">Selected Candidates ({candidates.length}):</p>
+              <div className="max-h-24 overflow-y-auto space-y-1">
+                {candidates.map((c) => (
+                  <p key={c.id} className="text-xs">
+                    • {c.candidateName} ({c.email})
+                  </p>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -411,7 +404,7 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, us
 
           {/* Message Input */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">Message</label>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">Message Template</label>
             <Textarea
               placeholder={savedMessages[selectedCategory] ? "Message loaded from drafts..." : "No saved message found for this category"}
               value={message}
@@ -425,11 +418,11 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, us
                 {savedMessages[selectedCategory] && (
                   <span className="text-xs text-green-600">✓ Message loaded from drafts</span>
                 )}
-                {message.includes(candidate.candidateName) && (
-                  <span className="text-xs text-blue-600">✓ Placeholders replaced</span>
-                )}
               </div>
             </div>
+            <p className="text-xs text-amber-600 mt-2">
+              Note: Placeholders like [Candidate Name], [Job Title], [Insert Meeting Link] will be replaced individually for each candidate.
+            </p>
           </div>
 
           {/* Action Buttons */}
@@ -445,12 +438,12 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, us
               {sending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Sending...
+                  Sending to {candidates.length}...
                 </>
               ) : (
                 <>
                   <Send className="h-4 w-4 mr-2" />
-                  Send Email
+                  Send to All ({candidates.length})
                 </>
               )}
             </Button>

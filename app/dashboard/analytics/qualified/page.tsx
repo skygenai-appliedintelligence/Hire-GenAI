@@ -12,7 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Filter } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import SendEmailModal from "@/components/ui/send-email-modal"
+import SendBulkEmailModal from "@/components/ui/send-bulk-email-modal"
 import { Spinner } from "@/components/ui/spinner"
+import { Mail } from "lucide-react"
 
 // Status and Bucket typings
 export type InterviewStatus = "Unqualified" | "Qualified" | "Pending" | "Expired"
@@ -50,6 +52,7 @@ export default function QualifiedCandidatesInterviewFlowPage() {
   const [selectAll, setSelectAll] = useState(false)
   const [emailModalOpen, setEmailModalOpen] = useState(false)
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateRow | null>(null)
+  const [bulkEmailModalOpen, setBulkEmailModalOpen] = useState(false)
   const [jobs, setJobs] = useState<{ id: string; title: string }[]>([])
   const [selectedJobId, setSelectedJobId] = useState<string>(jobId || 'all')
   const { toast } = useToast()
@@ -218,6 +221,86 @@ export default function QualifiedCandidatesInterviewFlowPage() {
     }
   }
 
+  // Get selected candidates for bulk email
+  const getSelectedCandidates = (): CandidateRow[] => {
+    return rows.filter(row => selectedRows.has(row.id))
+  }
+
+  // Handle bulk email sending
+  const handleSendBulkEmail = async (candidates: CandidateRow[], messageTemplate: string, category: 'interview' | 'new_job') => {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    const companyName = (company as any)?.name || ''
+    const recruiterName = user?.full_name || "Recruitment Team"
+    const userJobTitle = "HR Manager"
+
+    let successCount = 0
+    let failCount = 0
+
+    for (const candidate of candidates) {
+      try {
+        // Generate interview link for this candidate
+        const interviewLink = `${baseUrl}/interview/${encodeURIComponent(candidate.id)}/start`
+        const jobTitle = candidate.jobTitle || candidate.appliedJD || "N/A"
+
+        // Replace placeholders for this specific candidate
+        const personalizedMessage = messageTemplate
+          .replace(/\[Job Title\]/g, jobTitle)
+          .replace(/\[Role Name\]/g, jobTitle)
+          .replace(/\[Company Name\]/g, companyName)
+          .replace(/\[Candidate Name\]/g, candidate.candidateName)
+          .replace(/\[Insert Meeting Link\]/g, interviewLink)
+          .replace(/\[Your Job Title\]/g, userJobTitle)
+          .replace(/\[Date\]/g, "Valid for 48 hours")
+          .replace(/\[Your Name\]/g, recruiterName)
+          .replace(/\[Your Designation\]/g, userJobTitle)
+
+        const res = await fetch('/api/emails/send-custom', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            candidateName: candidate.candidateName,
+            candidateEmail: candidate.email,
+            jobTitle: jobTitle,
+            companyName: companyName,
+            messageContent: personalizedMessage,
+            category: category,
+            applicationId: candidate.id
+          }),
+        })
+        const json = await res.json()
+        
+        if (res.ok && json?.ok) {
+          setSentMap(prev => ({ ...prev, [candidate.id]: true }))
+          successCount++
+          console.log('✅ Email sent to:', candidate.email)
+        } else {
+          failCount++
+          console.error('❌ Failed to send to:', candidate.email, json?.error)
+        }
+      } catch (e: any) {
+        failCount++
+        console.error('❌ Error sending to:', candidate.email, e?.message)
+      }
+    }
+
+    // Clear selection after sending
+    setSelectedRows(new Set())
+    setSelectAll(false)
+
+    if (failCount > 0) {
+      toast({
+        title: 'Bulk Email Completed',
+        description: `Sent: ${successCount}, Failed: ${failCount}`,
+        variant: failCount === candidates.length ? 'destructive' : 'default'
+      })
+    } else {
+      toast({
+        title: 'All Emails Sent',
+        description: `Successfully sent emails to ${successCount} candidates`
+      })
+    }
+  }
+
   return (
     <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
       <div className="flex items-center justify-between">
@@ -246,8 +329,20 @@ export default function QualifiedCandidatesInterviewFlowPage() {
       </div>
 
       <Card className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>All Qualified Candidates</CardTitle>
+          <Button
+            onClick={() => setBulkEmailModalOpen(true)}
+            disabled={selectedRows.size < 2}
+            className={`flex items-center gap-2 ${
+              selectedRows.size >= 2
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
+          >
+            <Mail className="h-4 w-4" />
+            Send Email to All ({selectedRows.size})
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="overflow-hidden rounded-lg border border-gray-200">
@@ -357,6 +452,16 @@ export default function QualifiedCandidatesInterviewFlowPage() {
           onSendEmail={handleSendEmail}
         />
       )}
+
+      {/* Bulk Email Modal */}
+      <SendBulkEmailModal
+        isOpen={bulkEmailModalOpen}
+        onClose={() => setBulkEmailModalOpen(false)}
+        candidates={getSelectedCandidates()}
+        company={company}
+        user={user}
+        onSendBulkEmail={handleSendBulkEmail}
+      />
     </div>
   )
 }

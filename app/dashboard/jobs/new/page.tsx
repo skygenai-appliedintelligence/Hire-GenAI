@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Building2, Users, Briefcase, Target, CheckCircle, Clock, Bot, ChevronDown, ChevronUp, Trash2, Plus, RefreshCw } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Building2, Users, Briefcase, Target, CheckCircle, Clock, Bot, ChevronDown, ChevronUp, Trash2, Plus, RefreshCw } from 'lucide-react'
 import { useAuth } from "@/contexts/auth-context"
 import { parseJobDescription, renderLinkedInJobDescription } from "@/lib/job-description-parser"
 
@@ -633,6 +633,11 @@ export default function CreateJobPage() {
     }
   }
 
+  // Handle next button click
+  const handleNext = () => {
+    goToNextTab()
+  }
+
   // Generate interview questions using AI
   const handleGenerateQuestions = async (round: string) => {
     setGeneratingQuestions(true)
@@ -954,32 +959,32 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
   ]
 
   return (
-    <div className="w-full min-h-screen bg-gray-50/50">
-      <div className="w-full py-4 sm:py-6 px-4 sm:px-6 lg:px-8 xl:px-12">
-      <div className="mb-4 sm:mb-6">
+    <div className="w-full min-h-screen bg-gray-50">
+      <div className="w-full max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6">
+      <div className="mb-5 sm:mb-6">
         <Button 
           variant="ghost" 
           onClick={() => router.back()}
-          className="mb-3 sm:mb-4"
+          className="mb-3 sm:mb-4 hover:bg-gray-200"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
-        <h1 className="text-2xl sm:text-3xl font-bold">{searchParams.get('jobId') ? 'Edit Job' : 'Create New Job'}</h1>
-        <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">{searchParams.get('jobId') ? 'Review and update the job details' : 'Fill out the details to create a comprehensive job posting'}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{searchParams.get('jobId') ? 'Edit Job' : 'Create New Job'}</h1>
+        <p className="text-sm sm:text-base text-gray-600 mt-1">{searchParams.get('jobId') ? 'Review and update the job details' : 'Fill out the details to create a comprehensive job posting'}</p>
 
         {/* Top bar Job Status selector */}
-        <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 rounded-md border border-gray-200 bg-white px-3 sm:px-4 py-3">
-          <div className="text-sm">
-            <div className="font-medium">Job Status</div>
-            <div className="text-gray-500">Set whether the job is open, on hold, or closed</div>
+        <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-4 shadow-sm">
+          <div>
+            <div className="font-semibold text-gray-900">Job Status</div>
+            <div className="text-sm text-gray-600">Set whether the job is open, on hold, or closed</div>
           </div>
-          <div className="flex items-center gap-3 w-full sm:w-auto sm:min-w-[220px]">
+          <div className="w-full sm:w-auto">
             <Select
               value={formData.status}
               onValueChange={(val) => handleInputChange('status', val)}
             >
-              <SelectTrigger className="w-full sm:w-[220px]">
+              <SelectTrigger className="w-full sm:w-[200px] bg-white border-gray-300">
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
@@ -1008,26 +1013,29 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
           }}
           className="space-y-6"
         >
-          <TabsList className="w-full flex items-center gap-1 sm:gap-2 p-1 rounded-lg border bg-muted/40 text-muted-foreground my-2 min-h-[48px] sm:h-[56px] overflow-x-auto no-scrollbar">
-            <div className="flex items-center gap-1 sm:gap-2 flex-nowrap">
-              <TabsTrigger value="basic" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Basic Info</TabsTrigger>
-              <TabsTrigger value="requirements" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Requirements</TabsTrigger>
-              <TabsTrigger value="responsibilities" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Responsibilities</TabsTrigger>
-              <TabsTrigger value="compensation" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Compensation</TabsTrigger>
-              <TabsTrigger value="logistics" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Visa & Others</TabsTrigger>
-              <TabsTrigger value="resume-screening" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Resume Screening</TabsTrigger>
-              <TabsTrigger value="interview" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-600 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-md whitespace-nowrap shrink-0">Interview Process</TabsTrigger>
-            </div>
-          </TabsList>
+          {/* Mobile scrollable container */}
+          <div className="w-full overflow-x-auto pb-2 -mx-1 px-1 sm:overflow-visible sm:mx-0 sm:px-0">
+            <TabsList className="inline-flex w-max sm:w-full sm:grid sm:grid-cols-7 gap-1 p-0.5 rounded-xl border border-gray-200 bg-transparent shadow-none">
+              <TabsTrigger value="basic" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Basic Info</TabsTrigger>
+              <TabsTrigger value="requirements" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Requirements</TabsTrigger>
+              <TabsTrigger value="responsibilities" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Responsibilities</TabsTrigger>
+              <TabsTrigger value="compensation" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Compensation</TabsTrigger>
+              <TabsTrigger value="logistics" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Visa & Others</TabsTrigger>
+              <TabsTrigger value="resume-screening" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Resume Screening</TabsTrigger>
+              <TabsTrigger value="interview" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Interview Process</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="basic" className="space-y-6">
-            <Card className="shadow-sm border-gray-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Briefcase className="h-5 w-5" />
+            <Card className="shadow-sm border-gray-200 rounded-xl bg-white">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                  <div className="p-2 bg-emerald-100 rounded-lg">
+                    <Briefcase className="h-5 w-5 text-emerald-600" />
+                  </div>
                   Basic Information
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-gray-500">
                   Enter the fundamental details about the job position
                 </CardDescription>
               </CardHeader>
@@ -1279,7 +1287,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
           <TabsContent value="interview" className="space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <Users className="h-5 w-5" />
@@ -1315,8 +1323,8 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                               setExpandedAgent(isExpanded ? null : round)
                             }}
                           >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                              <div className="flex items-start sm:items-center space-x-3">
                                 <input
                                   type="checkbox"
                                   checked={checked}
@@ -1326,19 +1334,19 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                   }}
                                   disabled={isEditing}
                                   onClick={(e) => e.stopPropagation()}
-                                  className="h-4 w-4 rounded border border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  className="h-4 w-4 rounded border border-gray-300 text-blue-600 focus:ring-blue-500 mt-1 sm:mt-0"
                                 />
-                                <Bot className="w-5 h-5 text-blue-500" />
-                                <div>
-                                  <CardTitle className="text-base">{cfg.name}</CardTitle>
-                                  <CardDescription className="text-xs mt-1">
+                                <Bot className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                                <div className="min-w-0">
+                                  <CardTitle className="text-base truncate">{cfg.name}</CardTitle>
+                                  <CardDescription className="text-xs mt-1 line-clamp-2">
                                     {cfg.description}
                                   </CardDescription>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-500">Phone/Video • {cfg.duration} • Pass/Fail + notes</span>
-                                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                              <div className="flex items-center justify-between sm:justify-end gap-2">
+                                <span className="text-xs text-gray-500 truncate">Phone/Video • {cfg.duration} • Pass/Fail + notes</span>
+                                {isExpanded ? <ChevronUp className="w-4 h-4 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 flex-shrink-0" />}
                               </div>
                             </div>
                           </CardHeader>
@@ -1347,13 +1355,13 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                             <CardContent className="pt-4 space-y-6 border-t bg-white">
                               {/* Interview Questions Section */}
                               <div className="space-y-3">
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                   <Label className="text-sm font-semibold">Interview Questions ({questions.length})</Label>
                                   <Button
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="h-7 text-xs"
+                                    className="h-7 text-xs w-full sm:w-auto"
                                     disabled={generatingQuestions || isEditing}
                                     onClick={() => handleGenerateQuestions(round)}
                                     title={isEditing ? "Cannot generate questions in edit mode" : "Generate questions"}
@@ -1377,7 +1385,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                     <div className="space-y-2">
                                       {questions.map((question, idx) => (
                                         <div key={idx} className="flex items-start gap-2 group">
-                                          <span className="text-sm text-gray-500 mt-2">{idx + 1}.</span>
+                                          <span className="text-sm text-gray-500 mt-2 flex-shrink-0">{idx + 1}.</span>
                                           <Input
                                             value={question}
                                             onChange={(e) => {
@@ -1387,7 +1395,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                                 setAgentQuestions({ ...agentQuestions, [round]: newQuestions })
                                               }
                                             }}
-                                            className="flex-1 text-sm"
+                                            className="flex-1 text-sm min-w-0"
                                             placeholder={isEditing ? "Questions are not editable in view mode" : "Enter question..."}
                                             readOnly={isEditing}
                                           />
@@ -1395,7 +1403,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            className="h-9 w-9 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            className="h-9 w-9 p-0 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                                             onClick={() => {
                                               const newQuestions = questions.filter((_, i) => i !== idx)
                                               setAgentQuestions({ ...agentQuestions, [round]: newQuestions })
@@ -1480,10 +1488,10 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                 </div>
                                 
                                 {!isEditing ? (
-                                  <div className="flex gap-2">
+                                  <div className="flex flex-col sm:flex-row gap-2">
                                     <Input
                                       placeholder="Add evaluation criteria..."
-                                      className="text-sm h-8"
+                                      className="text-sm h-8 w-full sm:flex-1"
                                       onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                           e.preventDefault()
@@ -1502,7 +1510,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                       type="button"
                                       variant="outline"
                                       size="sm"
-                                      className="h-8 px-3"
+                                      className="h-8 px-3 w-full sm:w-auto"
                                       onClick={(e) => {
                                         const input = e.currentTarget.previousElementSibling as HTMLInputElement
                                         if (input?.value.trim()) {
@@ -1571,12 +1579,12 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
 
         <Separator className="my-6" />
 
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div className="text-sm text-gray-500">
             * Required fields
           </div>
-          <div className="flex gap-3">
-            <Button type="button" variant="outline" onClick={() => router.back()}>
+          <div className="flex gap-3 w-full sm:w-auto">
+            <Button type="button" variant="outline" onClick={() => router.back()} className="flex-1 sm:flex-none">
               Cancel
             </Button>
             {isEditing ? (
@@ -1584,7 +1592,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
               <Button 
                 type="submit" 
                 disabled={isSubmitting}
-                className="min-w-[150px]"
+                className="flex-1 sm:flex-none min-w-[150px]"
               >
                 {isSubmitting ? (
                   <>
@@ -1605,30 +1613,29 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                   <Button 
                     type="submit" 
                     disabled={isSubmitting || !isCurrentTabValid()}
-                    className="min-w-[200px]"
+                    className="flex-1 sm:flex-none min-w-[200px]"
                   >
                     {isSubmitting ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        {createdJobId ? 'Updating Job...' : 'Creating Job...'}
+                        Creating Job...
                       </>
                     ) : (
                       <>
                         <CheckCircle className="mr-2 h-4 w-4" />
-                        Create Job & Setup Agents
+                        Create Job
                       </>
                     )}
                   </Button>
                 ) : (
                   <Button 
                     type="button"
+                    onClick={handleNext}
                     disabled={!isCurrentTabValid()}
-                    onClick={async () => {
-                      goToNextTab()
-                    }}
-                    className="min-w-[120px]"
+                    className="flex-1 sm:flex-none min-w-[150px]"
                   >
                     Next
+                    <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 )}
               </>

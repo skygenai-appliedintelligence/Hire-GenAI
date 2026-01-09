@@ -2,7 +2,19 @@ import { NextRequest, NextResponse } from "next/server"
 import { Pool } from "pg"
 import crypto from "node:crypto"
 
-const OWNER_EMAIL = process.env.OWNER_EMAIL || "support@hire-genai.com"
+// Get allowed admin and support emails from environment variables
+// Format in .env.local:
+//   ADMIN_EMAILS=admin@example.com,admin2@example.com
+//   SUPPORT_EMAILS=support@example.com,support2@example.com
+const ADMIN_EMAILS = process.env.ADMIN_EMAILS
+  ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase())
+  : []
+const SUPPORT_EMAILS = process.env.SUPPORT_EMAILS
+  ? process.env.SUPPORT_EMAILS.split(',').map(e => e.trim().toLowerCase())
+  : []
+
+// Combine both for login access
+const ALLOWED_EMAILS = [...ADMIN_EMAILS, ...SUPPORT_EMAILS]
 const SESSION_DURATION = 24 * 60 * 60 * 1000 // 24 hours
 
 // Create PostgreSQL connection pool
@@ -27,12 +39,24 @@ export async function POST(req: NextRequest) {
 
     const normalizedEmail = email.toLowerCase().trim()
 
-    console.log(`🔍 Verifying OTP for: ${normalizedEmail}, Code: ${code}`)
-    console.log(`🔍 OWNER_EMAIL: ${OWNER_EMAIL}`)
-    console.log(`🔍 Email matches: ${normalizedEmail === OWNER_EMAIL.toLowerCase()}`)
+    // Determine user type
+    const isAdmin = ADMIN_EMAILS.includes(normalizedEmail)
+    const isSupport = SUPPORT_EMAILS.includes(normalizedEmail)
+    const userType = isAdmin ? 'ADMIN' : isSupport ? 'SUPPORT' : null
 
-    // Verify email is owner
-    if (normalizedEmail !== OWNER_EMAIL.toLowerCase()) {
+    console.log(`🔍 Verifying OTP for: ${normalizedEmail}, Code: ${code}`)
+    console.log(`🔍 User type: ${userType || 'UNAUTHORIZED'}`)
+
+    // Check if email is in allowed emails list (admin or support)
+    if (ALLOWED_EMAILS.length === 0) {
+      console.error('❌ ADMIN_EMAILS and SUPPORT_EMAILS not configured in .env.local')
+      return NextResponse.json(
+        { error: "Admin access not configured" },
+        { status: 500 }
+      )
+    }
+
+    if (!ALLOWED_EMAILS.includes(normalizedEmail)) {
       return NextResponse.json(
         { error: "Access restricted", restricted: true },
         { status: 403 }

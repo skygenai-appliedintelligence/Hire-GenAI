@@ -129,12 +129,15 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="space-y-4 md:space-y-6 px-3 sm:px-4 md:px-6 py-4 md:py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
       {/* Demo banner removed */}
 
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">Welcome back! Here's what's happening with your recruitment.</p>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600">Welcome back! Here's what's happening with your recruitment.</p>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -143,7 +146,7 @@ export default function DashboardPage() {
           <Spinner size="lg" text="Loading dashboard data..." className="mx-auto" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => window.location.href = '/dashboard/jobs'}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
@@ -216,20 +219,20 @@ export default function DashboardPage() {
           <CardDescription>End-to-end journey from job creation to hiring manager handoff</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="hidden lg:block">
-            <div className="relative overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-r from-white via-emerald-50 to-white px-12 py-8">
+          <div className="hidden md:block">
+            <div className="relative overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-r from-white via-emerald-50 to-white px-4 sm:px-8 lg:px-12 py-6 sm:py-8">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.22),_transparent_75%)] opacity-30" aria-hidden="true" />
-              <div className="absolute left-14 right-14 top-[62px] h-[2px] bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.25)]" />
-              <div className="relative flex justify-between gap-4">
+              <div className="absolute left-8 sm:left-14 right-8 sm:right-14 top-[50px] sm:top-[62px] h-[2px] bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.25)]" />
+              <div className="relative flex justify-between gap-2 sm:gap-4">
                 {processFlowSteps.map((step, index) => (
-                  <div key={step.title} className="flex flex-col items-center text-center w-[120px]">
-                    <div className="flex items-center justify-center h-12 w-12 rounded-full border-2 border-emerald-500 bg-white text-emerald-600 text-base font-semibold shadow-[0_8px_18px_-12px_rgba(16,185,129,0.6)]">
+                  <div key={step.title} className="flex flex-col items-center text-center w-[80px] sm:w-[100px] lg:w-[120px]">
+                    <div className="flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full border-2 border-emerald-500 bg-white text-emerald-600 text-sm sm:text-base font-semibold shadow-[0_8px_18px_-12px_rgba(16,185,129,0.6)]">
                       {index + 1}
                     </div>
-                    <div className="mt-4 text-sm font-semibold text-gray-900 leading-tight">
+                    <div className="mt-2 sm:mt-4 text-xs sm:text-sm font-semibold text-gray-900 leading-tight">
                       {step.title}
                     </div>
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600/90 mt-1">
+                    <div className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-emerald-600/90 mt-1">
                       {step.role}
                     </div>
                   </div>
@@ -238,17 +241,17 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="lg:hidden rounded-2xl border border-emerald-100 bg-white/95 p-6 shadow-sm">
-            <div className="flex flex-wrap items-center justify-center gap-6">
+          <div className="md:hidden rounded-2xl border border-emerald-100 bg-white/95 p-4 sm:p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6">
               {processFlowSteps.map((step, index) => (
-                <div key={step.title} className="flex flex-col items-center text-center w-[130px]">
-                  <div className="flex items-center justify-center h-11 w-11 rounded-full border-2 border-emerald-500 bg-white text-emerald-600 font-semibold">
+                <div key={step.title} className="flex flex-col items-center text-center w-[100px] sm:w-[130px]">
+                  <div className="flex items-center justify-center h-10 w-10 sm:h-11 sm:w-11 rounded-full border-2 border-emerald-500 bg-white text-emerald-600 font-semibold">
                     {index + 1}
                   </div>
-                  <div className="mt-3 text-sm font-semibold text-gray-900 leading-tight">
+                  <div className="mt-2 sm:mt-3 text-xs sm:text-sm font-semibold text-gray-900 leading-tight">
                     {step.title}
                   </div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600/90 mt-1">
+                  <div className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide text-emerald-600/90 mt-1">
                     {step.role}
                   </div>
                 </div>
