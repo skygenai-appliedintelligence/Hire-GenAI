@@ -194,8 +194,8 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 px-3 sm:px-4 md:px-6 py-4 sm:py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-3 sm:space-y-0 mb-2 sm:mb-0">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
           <p className="text-gray-600">Track your recruitment performance and insights</p>
@@ -205,7 +205,7 @@ export default function AnalyticsPage() {
         <div className="flex items-center space-x-2">
           <Filter className="h-4 w-4 text-gray-500" />
           <Select value={selectedJobId} onValueChange={setSelectedJobId}>
-            <SelectTrigger className="w-64">
+            <SelectTrigger className="w-36 sm:w-48 md:w-64">
               <SelectValue placeholder="Filter by job title" />
             </SelectTrigger>
             <SelectContent>
@@ -227,7 +227,7 @@ export default function AnalyticsPage() {
       ) : (
       <>
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <Card
           className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow cursor-pointer emerald-glow"
           role="button"
@@ -356,7 +356,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Additional Analytics */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <Card className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
           <CardHeader>
             <CardTitle>Top Candidate Sources</CardTitle>
@@ -365,16 +365,16 @@ export default function AnalyticsPage() {
           <CardContent>
             <div className="space-y-4">
               {(analytics?.topSources ?? []).map((source, index) => (
-                <div key={index} className="flex items-center justify-between">
+                <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0">
                   <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-xs font-medium text-blue-600">
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-blue-100 rounded-full flex items-center justify-center text-xs font-medium text-blue-600">
                       {index + 1}
                     </div>
-                    <span className="font-medium">{source.platform}</span>
+                    <span className="font-medium text-sm sm:text-base">{source.platform}</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-600">{source.count} candidates</span>
-                    <Badge variant="outline">{source.percentage}%</Badge>
+                  <div className="flex items-center space-x-2 ml-9 sm:ml-0">
+                    <span className="text-xs sm:text-sm text-gray-600">{source.count} candidates</span>
+                    <Badge variant="outline" className="text-xs">{source.percentage}%</Badge>
                   </div>
                 </div>
               ))}
@@ -390,9 +390,9 @@ export default function AnalyticsPage() {
           <CardContent>
             <div className="space-y-6">
               <div>
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 space-y-1 sm:space-y-0">
                   <span className="text-sm font-medium">Average Time to Hire</span>
-                  <span className="text-2xl font-bold text-blue-600">{analytics?.averageTimeToHire ?? 0} days</span>
+                  <span className="text-xl sm:text-2xl font-bold text-blue-600">{analytics?.averageTimeToHire ?? 0} days</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${Math.min((analytics?.averageTimeToHire ?? 0) / 30 * 100, 100)}%` }}></div>
@@ -400,9 +400,9 @@ export default function AnalyticsPage() {
               </div>
 
               <div>
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 space-y-1 sm:space-y-0">
                   <span className="text-sm font-medium">Interview Success Rate</span>
-                  <span className="text-2xl font-bold text-green-600">
+                  <span className="text-xl sm:text-2xl font-bold text-green-600">
                     {analytics && analytics.interviewsCompleted ? Math.round((analytics.successfulHires / analytics.interviewsCompleted) * 100) : 0}%
                   </span>
                 </div>
@@ -412,9 +412,9 @@ export default function AnalyticsPage() {
               </div>
 
               <div>
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 space-y-1 sm:space-y-0">
                   <span className="text-sm font-medium">Application to Interview Rate</span>
-                  <span className="text-2xl font-bold text-purple-600">
+                  <span className="text-xl sm:text-2xl font-bold text-purple-600">
                     {analytics && analytics.totalApplications ? Math.round((analytics.interviewsCompleted / analytics.totalApplications) * 100) : 0}%
                   </span>
                 </div>

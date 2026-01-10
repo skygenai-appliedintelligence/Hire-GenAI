@@ -26,9 +26,9 @@ type CandidateRow = {
   appliedJD: string
   jobTitle?: string
   email: string
-  phone: string
-  cvUrl: string
-  status: InterviewStatus
+  phone?: string
+  cvUrl?: string
+  status?: InterviewStatus
   interviewEmailSent?: boolean
   interviewEmailSentAt?: string
 }
@@ -303,13 +303,13 @@ export default function QualifiedCandidatesInterviewFlowPage() {
 
   return (
     <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
         <h1 className="text-2xl font-bold text-gray-900">Qualified Candidates</h1>
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-col xs:flex-row items-start xs:items-center gap-3 xs:space-x-4 w-full sm:w-auto">
           <div className="flex items-center space-x-2">
             <Filter className="h-4 w-4 text-gray-500" />
             <Select value={selectedJobId} onValueChange={setSelectedJobId}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-36 sm:w-48">
                 <SelectValue placeholder="Filter by job title" />
               </SelectTrigger>
               <SelectContent>
@@ -329,23 +329,24 @@ export default function QualifiedCandidatesInterviewFlowPage() {
       </div>
 
       <Card className="border border-gray-200 bg-white rounded-2xl shadow-lg hover:shadow-2xl ring-1 ring-transparent hover:ring-emerald-300 ring-offset-1 ring-offset-white motion-safe:transition-shadow emerald-glow">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
           <CardTitle>All Qualified Candidates</CardTitle>
           <Button
             onClick={() => setBulkEmailModalOpen(true)}
             disabled={selectedRows.size < 2}
-            className={`flex items-center gap-2 ${
+            size="sm"
+            className={`flex items-center gap-2 whitespace-nowrap ${
               selectedRows.size >= 2
                 ? "bg-emerald-600 hover:bg-emerald-700 text-white"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
             }`}
           >
             <Mail className="h-4 w-4" />
-            Send Email to All ({selectedRows.size})
+            Send Email ({selectedRows.size})
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="overflow-hidden rounded-lg border border-gray-200">
+          <div className="overflow-x-auto overflow-y-hidden rounded-lg border border-gray-200">
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50">
@@ -393,10 +394,10 @@ export default function QualifiedCandidatesInterviewFlowPage() {
                         aria-label={`Select ${row.candidateName}`}
                       />
                     </TableCell>
-                    <TableCell className="font-medium">{row.candidateName}</TableCell>
-                    <TableCell>{row.appliedJD}</TableCell>
-                    <TableCell>{row.email}</TableCell>
-                    <TableCell>{row.phone}</TableCell>
+                    <TableCell className="font-medium whitespace-nowrap">{row.candidateName}</TableCell>
+                    <TableCell className="whitespace-nowrap">{row.appliedJD}</TableCell>
+                    <TableCell className="whitespace-nowrap">{row.email}</TableCell>
+                    <TableCell className="whitespace-nowrap">{row.phone}</TableCell>
                     <TableCell>
                       <span
                         className={

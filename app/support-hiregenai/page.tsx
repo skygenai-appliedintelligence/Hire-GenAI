@@ -28,6 +28,13 @@ import {
   ThumbsUp,
   ThumbsDown
 } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface Message {
   id: string
@@ -406,68 +413,69 @@ export default function SupportPage() {
               </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex flex-wrap space-x-1 bg-gray-100 p-1 rounded-lg mb-6 w-fit">
-              <button
-                onClick={() => handleTabChange("new")}
-                className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-xs md:text-sm font-medium transition-colors ${
-                  activeTab === "new" 
-                    ? "bg-white text-emerald-700 shadow-sm" 
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">New Ticket</span>
-                <span className="sm:hidden">New</span>
-              </button>
-              <button
-                onClick={() => handleTabChange("open")}
-                className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-xs md:text-sm font-medium transition-colors ${
-                  activeTab === "open" 
-                    ? "bg-white text-emerald-700 shadow-sm" 
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span className="hidden sm:inline">Open</span>
-                {openTickets.length > 0 && (
-                  <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-xs">
-                    {openTickets.length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => handleTabChange("resolved")}
-                className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-xs md:text-sm font-medium transition-colors ${
-                  activeTab === "resolved" 
-                    ? "bg-white text-emerald-700 shadow-sm" 
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                <CheckCircle className="w-4 h-4" />
-                <span className="hidden sm:inline">Resolved</span>
-                {resolvedTickets.length > 0 && (
-                  <span className="bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full text-xs">
-                    {resolvedTickets.length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => handleTabChange("feedback")}
-                className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-md text-xs md:text-sm font-medium transition-colors ${
-                  activeTab === "feedback" 
-                    ? "bg-white text-emerald-700 shadow-sm" 
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                <Lightbulb className="w-4 h-4" />
-                <span className="hidden sm:inline">Feedback</span>
-                {feedbackItems.filter(f => f.status === "open").length > 0 && (
-                  <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full text-xs">
-                    {feedbackItems.filter(f => f.status === "open").length}
-                  </span>
-                )}
-              </button>
+            {/* Tabs - Horizontal scroll on mobile */}
+            <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 mb-6">
+              <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg w-max sm:w-fit">
+                <button
+                  onClick={() => handleTabChange("new")}
+                  className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                    activeTab === "new" 
+                      ? "bg-white text-emerald-700 shadow-sm" 
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  New
+                </button>
+                <button
+                  onClick={() => handleTabChange("open")}
+                  className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                    activeTab === "open" 
+                      ? "bg-white text-emerald-700 shadow-sm" 
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <MessageCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  Open
+                  {openTickets.length > 0 && (
+                    <span className="bg-emerald-100 text-emerald-700 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs">
+                      {openTickets.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => handleTabChange("resolved")}
+                  className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                    activeTab === "resolved" 
+                      ? "bg-white text-emerald-700 shadow-sm" 
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  Resolved
+                  {resolvedTickets.length > 0 && (
+                    <span className="bg-gray-200 text-gray-600 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs">
+                      {resolvedTickets.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => handleTabChange("feedback")}
+                  className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                    activeTab === "feedback" 
+                      ? "bg-white text-emerald-700 shadow-sm" 
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <Lightbulb className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  Feedback
+                  {feedbackItems.filter(f => f.status === "open").length > 0 && (
+                    <span className="bg-amber-100 text-amber-700 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs">
+                      {feedbackItems.filter(f => f.status === "open").length}
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* New Ticket Form */}
@@ -483,14 +491,18 @@ export default function SupportPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Type <span className="text-red-500">*</span>
                     </label>
-                    <select
+                    <Select
                       value={newTicket.type}
-                      onChange={(e) => setNewTicket(prev => ({ ...prev, type: e.target.value as "support" | "feedback" }))}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-colors bg-white"
+                      onValueChange={(value) => setNewTicket(prev => ({ ...prev, type: value as "support" | "feedback" }))}
                     >
-                      <option value="support">Support Request</option>
-                      <option value="feedback">Product Feedback</option>
-                    </select>
+                      <SelectTrigger className="w-full px-3 sm:px-4 py-2.5 h-auto border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-sm sm:text-base">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-lg z-[100]">
+                        <SelectItem value="support" className="cursor-pointer hover:bg-gray-100">Support Request</SelectItem>
+                        <SelectItem value="feedback" className="cursor-pointer hover:bg-gray-100">Product Feedback</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <p className="text-xs text-gray-500 mt-1">
                       {newTicket.type === "support" 
                         ? "Need help with an issue? Submit a support ticket." 
@@ -516,16 +528,19 @@ export default function SupportPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Category <span className="text-red-500">*</span>
                       </label>
-                      <select
+                      <Select
                         value={newTicket.category}
-                        onChange={(e) => setNewTicket(prev => ({ ...prev, category: e.target.value }))}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-colors bg-white"
+                        onValueChange={(value) => setNewTicket(prev => ({ ...prev, category: value }))}
                       >
-                        <option value="">Select category</option>
-                        {CATEGORIES.map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                      </select>
+                        <SelectTrigger className="w-full px-3 sm:px-4 py-2.5 h-auto border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-sm sm:text-base">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-lg z-[100] max-h-[200px]">
+                          {CATEGORIES.map(cat => (
+                            <SelectItem key={cat} value={cat} className="cursor-pointer hover:bg-gray-100">{cat}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     {newTicket.type === "support" && (
@@ -533,15 +548,19 @@ export default function SupportPage() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Priority
                       </label>
-                      <select
+                      <Select
                         value={newTicket.priority}
-                        onChange={(e) => setNewTicket(prev => ({ ...prev, priority: e.target.value as any }))}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-colors bg-white"
+                        onValueChange={(value) => setNewTicket(prev => ({ ...prev, priority: value as any }))}
                       >
-                        {PRIORITIES.map(p => (
-                          <option key={p.value} value={p.value}>{p.label}</option>
-                        ))}
-                      </select>
+                        <SelectTrigger className="w-full px-3 sm:px-4 py-2.5 h-auto border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-sm sm:text-base">
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border border-gray-200 shadow-lg rounded-lg z-[100]">
+                          {PRIORITIES.map(p => (
+                            <SelectItem key={p.value} value={p.value} className="cursor-pointer hover:bg-gray-100">{p.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   )}
                   </div>

@@ -589,13 +589,14 @@ export default function CandidateReportPage() {
           </div>
 
           {/* Title and Download Report Button */}
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl md:text-4xl font-bold text-purple-600">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-purple-600 break-words">
               Report of {candidateData.name} for {jobTitle || 'Position'}
             </h1>
             <Button 
               onClick={downloadReport}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 whitespace-nowrap"
+              size="sm"
             >
               <Download className="h-4 w-4" />
               Download Report
@@ -603,10 +604,10 @@ export default function CandidateReportPage() {
           </div>
 
           {/* Tabs Navigation */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-4 md:gap-6 lg:gap-8 border-b border-gray-200 -mb-px">
+          <div className="flex flex-wrap items-center gap-1 xs:gap-2 sm:gap-4 md:gap-6 lg:gap-8 border-b border-gray-200 -mb-px overflow-x-auto pb-1">
             <button
               onClick={() => changeTab("candidate")}
-              className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
+              className={`pb-3 px-1 text-xs sm:text-sm font-medium transition-colors relative whitespace-nowrap ${
                 activeTab === "candidate"
                   ? "text-purple-600"
                   : "text-gray-500 hover:text-gray-700"
@@ -619,7 +620,7 @@ export default function CandidateReportPage() {
             </button>
             <button
               onClick={() => changeTab("evaluation")}
-              className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
+              className={`pb-3 px-1 text-xs sm:text-sm font-medium transition-colors relative whitespace-nowrap ${
                 activeTab === "evaluation"
                   ? "text-purple-600"
                   : "text-gray-500 hover:text-gray-700"
@@ -632,7 +633,7 @@ export default function CandidateReportPage() {
             </button>
             <button
               onClick={() => changeTab("transcript")}
-              className={`pb-3 px-1 text-sm font-medium transition-colors relative ${
+              className={`pb-3 px-1 text-xs sm:text-sm font-medium transition-colors relative whitespace-nowrap ${
                 activeTab === "transcript"
                   ? "text-purple-600"
                   : "text-gray-500 hover:text-gray-700"
@@ -648,7 +649,7 @@ export default function CandidateReportPage() {
       </div>
 
       {/* Content Area */}
-      <div className="px-2 md:px-4 lg:px-6 py-6 bg-gradient-to-b from-gray-50/60 via-white to-gray-50/40 max-w-full" ref={reportRef}>
+      <div className="px-2 sm:px-3 md:px-4 lg:px-6 py-4 sm:py-6 bg-gradient-to-b from-gray-50/60 via-white to-gray-50/40 max-w-full" ref={reportRef}>
         
         {/* Application Details - Always at top for candidate tab */}
         {activeTab === "candidate" && (
@@ -683,7 +684,7 @@ export default function CandidateReportPage() {
                   {/* Row 1: Contact Information */}
                   <div>
                     <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Contact Information</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                       <div className="flex items-start gap-3">
                         <div className="text-slate-400 mt-0.5">
                           <User className="h-4 w-4" />
@@ -726,7 +727,7 @@ export default function CandidateReportPage() {
                   {/* Row 2: Compensation & Availability */}
                   <div className="pt-2 border-t border-slate-200">
                     <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Compensation & Availability</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                       <div className="flex items-start gap-3">
                         <div className="text-emerald-600 mt-0.5">
                           <DollarSign className="h-4 w-4" />
@@ -1864,44 +1865,44 @@ export default function CandidateReportPage() {
               <>
                 {/* ===== SECTION 1: Overall Score Hero Card ===== */}
                 <Card className="border-0 shadow-xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-emerald-800 text-white overflow-hidden">
-                  <CardContent className="p-8">
+                  <CardContent className="p-4 sm:p-6 md:p-8">
                     <div className="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-6">
-                      <div className="flex flex-col sm:flex-row items-center gap-4 md:gap-6">
+                      <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 md:gap-6 w-full sm:w-auto">
                         <div className="relative">
-                          <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-4 border-white/30">
+                          <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 sm:border-4 border-white/30">
                             <div className="text-center">
-                              <div className="text-2xl md:text-4xl font-bold">{overallScoreDisplay.split('/')[0]}</div>
-                              <div className="text-xs md:text-sm opacity-80">out of 100</div>
+                              <div className="text-xl sm:text-2xl md:text-4xl font-bold">{overallScoreDisplay.split('/')[0]}</div>
+                              <div className="text-[10px] sm:text-xs md:text-sm opacity-80">out of 100</div>
                             </div>
                           </div>
-                          <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-2 shadow-lg">
+                          <div className="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 bg-white rounded-full p-1.5 sm:p-2 shadow-lg">
                             {(evaluation as any).overallScore >= 65 ? (
-                              <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                              <CheckCircle2 className="h-4 w-4 sm:h-6 sm:w-6 text-emerald-600" />
                             ) : (
-                              <AlertTriangle className="h-6 w-6 text-orange-500" />
+                              <AlertTriangle className="h-4 w-4 sm:h-6 sm:w-6 text-orange-500" />
                             )}
                           </div>
                         </div>
-                        <div>
-                          <h2 className="text-2xl font-bold mb-2">Interview Evaluation</h2>
-                          <p className="text-emerald-100 text-sm max-w-md">
+                        <div className="text-center sm:text-left">
+                          <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-1 sm:mb-2">Interview Evaluation</h2>
+                          <p className="text-emerald-100 text-xs sm:text-sm max-w-md">
                             Score calculated based on all {(evaluation as any).marks_summary?.total_interview_questions || (evaluation as any).questions?.length || 10} configured questions
                           </p>
                           {(evaluation as any).marks_summary && (
-                            <div className="flex gap-4 mt-2 text-xs text-emerald-200">
-                              <span>Questions Asked: {(evaluation as any).marks_summary.questions_asked || (evaluation as any).questions?.length || 0}</span>
-                              <span>|</span>
+                            <div className="flex flex-wrap justify-center sm:justify-start gap-2 sm:gap-4 mt-2 text-[10px] sm:text-xs text-emerald-200">
+                              <span>Questions: {(evaluation as any).marks_summary.questions_asked || (evaluation as any).questions?.length || 0}</span>
+                              <span className="hidden sm:inline">|</span>
                               <span>Answered: {(evaluation as any).marks_summary.questions_answered || 0}</span>
                             </div>
                           )}
-                          <div className="mt-3">
+                          <div className="mt-2 sm:mt-3">
                             {getDecisionBadge(evaluationData!.decision)}
                           </div>
                         </div>
                       </div>
                       <div className="text-center md:text-right">
-                        <div className="text-sm opacity-80 mb-1">Recommendation</div>
-                        <div className="text-xl font-semibold">
+                        <div className="text-xs sm:text-sm opacity-80 mb-1">Recommendation</div>
+                        <div className="text-lg sm:text-xl font-semibold">
                           {(evaluation as any).overallScore >= 60 ? 'Hire' : 'Not Hire'}
                         </div>
                       </div>
@@ -2034,23 +2035,23 @@ export default function CandidateReportPage() {
                         const hasNoQuestions = questionCount === 0
                         
                         return (
-                          <div key={idx} className={`p-5 rounded-2xl border-2 transition-all hover:shadow-lg hover:scale-[1.02] ${colors.border} ${colors.bg}`}>
-                            <div className="flex items-start justify-between mb-4">
-                              <div className="flex items-center gap-3">
-                                <div className={`p-2.5 rounded-xl bg-white shadow-sm ${colors.text}`}>
+                          <div key={idx} className={`p-3 sm:p-5 rounded-xl sm:rounded-2xl border-2 transition-all hover:shadow-lg hover:scale-[1.02] ${colors.border} ${colors.bg}`}>
+                            <div className="flex items-start justify-between mb-3 sm:mb-4">
+                              <div className="flex items-center gap-2 sm:gap-3">
+                                <div className={`p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl bg-white shadow-sm ${colors.text}`}>
                                   {getCriteriaIcon(criteria)}
                                 </div>
                                 <div>
-                                  <h4 className={`font-bold text-base ${colors.text}`}>{criteria}</h4>
-                                  <p className="text-xs mt-0.5 text-gray-500">
-                                    {questionCount} question{questionCount !== 1 ? 's' : ''}
-                                    {hasNoQuestions && ' • Not evaluated'}
+                                  <h4 className={`font-bold text-sm sm:text-base ${colors.text}`}>{criteria}</h4>
+                                  <p className="text-[10px] sm:text-xs mt-0.5 text-gray-500">
+                                    {questionCount} Q{questionCount !== 1 ? 's' : ''}
+                                    {hasNoQuestions && ' • N/A'}
                                   </p>
                                 </div>
                               </div>
                               <div className="text-right">
-                                <div className={`text-3xl font-bold ${colors.text}`}>{avgScore}</div>
-                                <div className="text-xs text-gray-400 font-medium">score</div>
+                                <div className={`text-xl sm:text-3xl font-bold ${colors.text}`}>{avgScore}</div>
+                                <div className="text-[10px] sm:text-xs text-gray-400 font-medium">score</div>
                               </div>
                             </div>
                             
@@ -2065,7 +2066,7 @@ export default function CandidateReportPage() {
                             </div>
                             
                             {/* Weight & Contribution */}
-                            <div className="flex justify-between text-xs pt-2 border-t border-white/50">
+                            <div className="flex justify-between text-[10px] sm:text-xs pt-2 border-t border-white/50">
                               <span className="font-medium text-gray-600">
                                 Weight: {weightPct}%
                               </span>
@@ -2087,7 +2088,7 @@ export default function CandidateReportPage() {
                       return (
                         <div className="space-y-6">
                           {/* Criteria Cards - 2x2 Grid */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5">
                             {sortedCriteriaList.map((criteria: string, idx: number) => renderCriteriaCard(criteria, idx))}
                           </div>
                         </div>
@@ -2217,19 +2218,19 @@ export default function CandidateReportPage() {
                                 {/* Question Header with colored top border */}
                                 <div className={`h-1 ${criteria ? colors.bar : 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500'}`} />
                                 
-                                <div className="p-6">
+                                <div className="p-3 sm:p-6">
                                   {/* Top Row: Question Number, Title, Badges */}
-                                  <div className="flex items-start gap-4 mb-5">
+                                  <div className="flex items-start gap-2 sm:gap-4 mb-3 sm:mb-5">
                                     {/* Question Number Circle */}
-                                    <div className={`flex-shrink-0 w-10 h-10 rounded-full ${criteria ? colors.bg : 'bg-gray-100'} flex items-center justify-center`}>
-                                      <span className={`text-lg font-bold ${criteria ? colors.text : 'text-gray-700'}`}>
+                                    <div className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full ${criteria ? colors.bg : 'bg-gray-100'} flex items-center justify-center`}>
+                                      <span className={`text-sm sm:text-lg font-bold ${criteria ? colors.text : 'text-gray-700'}`}>
                                         {questionNum}
                                       </span>
                                     </div>
                                     
                                     {/* Question Text & Badges */}
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-base font-semibold text-gray-900 leading-relaxed mb-3">
+                                      <p className="text-sm sm:text-base font-semibold text-gray-900 leading-relaxed mb-2 sm:mb-3">
                                         {/* Extract the full question text, preserving the original format */}
                                         {(() => {
                                           // First, try to get the full question from question_number
@@ -2286,11 +2287,11 @@ export default function CandidateReportPage() {
                                     
                                     {/* Score Display (Right Side) */}
                                     <div className="flex-shrink-0 text-right">
-                                      <div className={`text-3xl font-bold ${answered ? (score >= 70 ? 'text-emerald-600' : score >= 50 ? 'text-amber-600' : 'text-red-500') : 'text-gray-300'}`}>
+                                      <div className={`text-xl sm:text-3xl font-bold ${answered ? (score >= 70 ? 'text-emerald-600' : score >= 50 ? 'text-amber-600' : 'text-red-500') : 'text-gray-300'}`}>
                                         {score}
                                       </div>
-                                      <div className="text-xs text-gray-400 font-medium">/ {maxScore} pts</div>
-                                      <Badge className={`mt-1 ${status.bg} ${status.color} text-xs`}>
+                                      <div className="text-[10px] sm:text-xs text-gray-400 font-medium">/ {maxScore} pts</div>
+                                      <Badge className={`mt-1 ${status.bg} ${status.color} text-[10px] sm:text-xs`}>
                                         {status.label}
                                       </Badge>
                                     </div>
