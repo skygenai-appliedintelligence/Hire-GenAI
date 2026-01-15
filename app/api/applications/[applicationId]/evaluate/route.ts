@@ -93,9 +93,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ applicationId:
     `
     const roundsRows = await DatabaseService.query(roundsQuery, [jobId]) as any[]
 
-    // Extract criteria and total questions from all rounds
+    // Extract criteria and actual questions from all rounds
     const allCriteria = new Set<string>()
-    let totalConfiguredQuestions = 0
+    const dbQuestions: { text: string; criterion: string; questionNumber: number }[] = []
+    let questionNumber = 1
     
     roundsRows.forEach(round => {
       try {
@@ -106,14 +107,22 @@ export async function POST(req: Request, ctx: { params: Promise<{ applicationId:
           const criteria = config.criteria || []
           criteria.forEach((c: string) => allCriteria.add(c))
           
-          // Count total questions from configuration
+          // Extract actual questions from configuration
           const questions = config.questions || []
-          totalConfiguredQuestions += questions.length
+          questions.forEach((q: any) => {
+            dbQuestions.push({
+              text: q.text || q.question || q,
+              criterion: q.criterion || q.criteria || criteria[0] || 'General',
+              questionNumber: questionNumber++
+            })
+          })
         }
       } catch (e) {
         console.error('Error parsing round configuration:', e)
       }
     })
+    
+    const totalConfiguredQuestions = dbQuestions.length
 
     const criteriaList = Array.from(allCriteria)
     // Use configured questions count, or default to 10 if not configured
@@ -121,63 +130,74 @@ export async function POST(req: Request, ctx: { params: Promise<{ applicationId:
     
     console.log('📊 Evaluation criteria:', criteriaList)
     console.log('📊 Total configured questions:', totalInterviewQuestions)
+    console.log('📊 DB Questions:', dbQuestions.map(q => q.text.substring(0, 50)))
 
     // DYNAMIC CRITERIA-BASED EVALUATION
-    // The system identifies the correct criteria for EACH question
-    // Final score is calculated ONLY from criteria actually used
-    // No unused criteria (like Cultural Fit) if no questions asked for it
+    // Use DB questions directly - do NOT infer from transcript
+    // This ensures closing messages are NOT evaluated as questions
     
-    console.log('📊 Starting dynamic criteria-based evaluation...')
+    console.log('📊 Starting DB-question-based evaluation...')
 
-    // Call OpenAI API for evaluation with DYNAMIC CRITERIA
-    const evaluationPrompt = `You are an expert HR evaluator. Analyze this interview transcript and provide detailed, criteria-based scoring.
+    // Build the list of DB questions for the prompt
+    const dbQuestionsForPrompt = dbQuestions.length > 0 
+      ? dbQuestions.map(q => `Q${q.questionNumber}. [${q.criterion}] ${q.text}`).join('\n')
+      : `Q1. [Technical] Tell me about yourself and your relevant experience.
+Q2. [Technical] Why are you interested in this position?
+Q3. [Communication] What motivates you in your work?
+Q4. [Problem Solving] Describe a challenging situation you faced and how you handled it.
+Q5. [Communication] How do you handle feedback and criticism?
+Q6. [Team Player] Tell me about a time you worked in a team to achieve a goal.
+Q7. [Technical] What technical skills do you bring to this role?
+Q8. [Technical] How do you stay updated with the latest technologies in your field?
+Q9. [Problem Solving] Describe a technical problem you solved recently.
+Q10. [Culture Fit] What are your salary expectations?`
 
-**CRITICAL EVALUATION PRINCIPLE - FIXED WEIGHTAGES:**
-The final score uses FIXED weightages regardless of how many questions were asked:
+    // Call OpenAI API for evaluation with DB QUESTIONS
+    const evaluationPrompt = `You are an expert HR evaluator. Evaluate the candidate's answers to the SPECIFIC questions listed below.
+
+**CRITICAL: USE ONLY THE DATABASE QUESTIONS BELOW**
+You MUST evaluate ONLY the ${totalInterviewQuestions} questions listed below.
+- Do NOT evaluate any other questions from the transcript
+- Do NOT evaluate closing messages like "Do you have any questions for me?"
+- Do NOT evaluate thank-you messages or interview wrap-up
+- ONLY evaluate answers to the specific questions listed below
+
+**FIXED WEIGHTAGES:**
 - Technical Skills: 50% (ALWAYS)
 - Communication: 20% (ALWAYS)
 - Other criteria: 30% (distributed equally among remaining criteria)
-
-Even if NO Technical or Communication questions were asked, they still contribute 0 to their fixed 50% and 20% weightages respectively.
 
 **Job Details:**
 - Position: ${application.job_title}
 - Company: ${application.company_name}
 - Candidate: ${application.first_name} ${application.last_name}
-- Total Interview Questions Configured: ${totalInterviewQuestions}
 
-**Original Evaluation Criteria from Job:**
-${criteriaList.map(c => `- ${c}`).join('\n')}
+**THE ${totalInterviewQuestions} INTERVIEW QUESTIONS TO EVALUATE (from database):**
+${dbQuestionsForPrompt}
 
 **Interview Transcript:**
 ${transcript}
 
 **STEP-BY-STEP EVALUATION PROCESS:**
 
-**STEP 1: EXTRACT ALL QUESTIONS**
-Identify EVERY question asked in the transcript. The interview was configured with ${totalInterviewQuestions} questions total.
-- If fewer questions were asked than configured, the candidate loses marks for questions not asked.
-- If a question was asked but not answered properly, score it as 0.
+**STEP 1: FIND ANSWERS TO DATABASE QUESTIONS ONLY**
+For EACH of the ${totalInterviewQuestions} questions listed above:
+1. Find where the interviewer asked this question (or similar wording) in the transcript
+2. Find the candidate's answer that follows
+3. If the question was not asked or no answer was given, score it as 0
 
-**STEP 2: CATEGORIZE EACH QUESTION - USE ONLY THESE CRITERIA:**
-You MUST categorize each question into ONE of these criteria ONLY (as defined in the job configuration):
-${criteriaList.length > 0 ? criteriaList.map(c => {
-  const description = CRITERIA_DESCRIPTIONS[c] || `Questions related to ${c.toLowerCase()}`
-  return `- **${c}**: ${description}`
-}).join('\n') : `- **Technical**: Programming skills, frameworks, tools, technical accuracy
-- **Communication**: Clarity of expression, presenting ideas
-- **Cultural Fit**: Company values, motivation, career goals
-- **Team Player**: Collaboration, teamwork experience`}
+**CRITICAL: IGNORE THESE TRANSCRIPT ELEMENTS:**
+- "Do you have any questions for me?" → NOT a database question, do NOT evaluate
+- "Thank you for your time" → closing message, do NOT evaluate
+- "Our team will respond soon" → closing message, do NOT evaluate
+- Any question not in the ${totalInterviewQuestions} database questions above → do NOT evaluate
 
-**IMPORTANT MAPPING RULES:**
-- If a question asks about tools/technologies/coding → map to Technical (or Technical Skills)
-- If a question asks about teamwork/collaboration → map to Team Player (or Teamwork)
-- If a question asks about company/motivation/values → map to Cultural Fit (or Culture Fit)
-- If a question asks about explaining/presenting → map to Communication
-- If a question asks about salary/location/availability → map to Cultural Fit
+**STEP 2: USE THE PRE-ASSIGNED CRITERIA**
+Each question already has its criterion assigned in brackets [Technical], [Communication], etc.
+Use the criterion exactly as specified - do NOT re-categorize.
 
 **STEP 3: EVALUATE EACH ANSWER**
-For each question-answer pair:
+For each of the ${totalInterviewQuestions} database questions:
 - Score from 0-100 based on answer quality
 - Document WHY this score was given (specific evidence from transcript)
 - Note if answer was complete, partial, or missing
@@ -299,7 +319,11 @@ For each question, evaluate the candidate's answer based on the assigned criteri
 13. "I don't know" or skipped questions = 0 points
 14. Off-topic or irrelevant answers: below 30 points
 15. IMPORTANT: candidate_response MUST contain the COMPLETE answer - do NOT summarize, truncate, or shorten
-16. Default mindset: Assume average performance (50-60) unless candidate proves exceptional ability`
+16. Default mindset: Assume average performance (50-60) unless candidate proves exceptional ability
+17. **CRITICAL: Return EXACTLY ${totalInterviewQuestions} questions in the response - no more, no less**
+18. **Do NOT evaluate "Do you have any questions for me?" - this is a closing message, NOT a database question**
+19. **Do NOT evaluate "Thank you for your time" or any thank-you messages**
+20. **The questions array must contain ONLY the ${totalInterviewQuestions} database questions listed above**`
 
     // Fetch company's OpenAI service account key from database (like CV parsing and video interviews)
     let openaiApiKey: string | undefined = undefined
@@ -381,6 +405,32 @@ For each question, evaluate the candidate's answer based on the assigned criteri
     if (hasRealTimeEvaluations) {
       console.log('✅ [INTERVIEW EVAL] Using real-time OpenAI evaluations (no mock scores)')
       console.log('📊 [INTERVIEW EVAL] Processing', realTimeEvaluations.length, 'real-time evaluations')
+      console.log('📊 [INTERVIEW EVAL] DB question count:', totalInterviewQuestions)
+      
+      // CRITICAL: Filter out closing message evaluations and limit to DB question count
+      // This prevents evaluating "Do you have any questions for me?" and thank-you messages
+      const closingMessagePatterns = [
+        'do you have any questions',
+        'questions for me',
+        'thank you for your time',
+        'thank you for interviewing',
+        'recruitment team will respond',
+        'we will get back to you',
+        'that concludes'
+      ]
+      
+      const filteredEvaluations = realTimeEvaluations
+        .filter((rtEval: any) => {
+          const questionText = (rtEval.question_text || '').toLowerCase()
+          const isClosingMessage = closingMessagePatterns.some(pattern => questionText.includes(pattern))
+          if (isClosingMessage) {
+            console.log('⚠️ [INTERVIEW EVAL] Filtered out closing message:', questionText.substring(0, 50))
+          }
+          return !isClosingMessage
+        })
+        .slice(0, totalInterviewQuestions) // Limit to DB question count
+      
+      console.log('📊 [INTERVIEW EVAL] After filtering:', filteredEvaluations.length, 'evaluations (limit:', totalInterviewQuestions, ')')
       
       // Helper function to map question to criterion using ChatGPT
       const mapQuestionToCriterion = async (questionText: string, availableCriteria: string[]): Promise<string> => {
@@ -438,9 +488,10 @@ Respond with ONLY the criterion name.`
         return availableCriteria[0] || 'Technical'
       }
 
-      // Convert real-time evaluations to the expected format
+      // Convert FILTERED real-time evaluations to the expected format
       // Re-map any "General" criteria to correct configured criteria
-      const questionsPromises = realTimeEvaluations.map(async (rtEval: any, index: number) => {
+      // CRITICAL: Use filteredEvaluations (not realTimeEvaluations) to exclude closing messages
+      const questionsPromises = filteredEvaluations.map(async (rtEval: any, index: number) => {
         let criterion = rtEval.criterion || 'General'
         
         // If criterion is still "General", re-map it using ChatGPT

@@ -203,6 +203,16 @@ export default function CreateJobPage() {
 
       // Platform Selection
       platforms: [] as string[],
+
+      // Screening Questions
+      screeningEnabled: false,
+      screeningOverallExp: "",
+      screeningPrimarySkill: "",
+      screeningCurrentLocation: "",
+      screeningNationality: "",
+      screeningVisaRequired: "no",
+      screeningLanguageProficiency: "intermediate",
+      screeningCurrentSalary: "",
     }
   })
 
@@ -1021,7 +1031,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
               <TabsTrigger value="responsibilities" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Responsibilities</TabsTrigger>
               <TabsTrigger value="compensation" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Compensation</TabsTrigger>
               <TabsTrigger value="logistics" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Visa & Others</TabsTrigger>
-              <TabsTrigger value="resume-screening" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Resume Screening</TabsTrigger>
+              <TabsTrigger value="resume-screening" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Screening Questions</TabsTrigger>
               <TabsTrigger value="interview" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Interview Process</TabsTrigger>
             </TabsList>
           </div>
@@ -1542,36 +1552,181 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
           </TabsContent>
 
           <TabsContent value="resume-screening" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14,2 14,8 20,8"></polyline>
-                  </svg>
-                  Resume Screening Configuration
-                </CardTitle>
+            <Card className="shadow-sm border-gray-200 rounded-xl bg-white">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Screening Questions</CardTitle>
+                <CardDescription>Use this section only to check candidate eligibility before applying.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center space-x-3">
+              <CardContent className="space-y-5">
+                {/* Enable Toggle */}
+                <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
                   <Checkbox 
-                    id="enable-resume-screening" 
-                    defaultChecked={true}
-                    className="h-5 w-5"
+                    id="enable-screening" 
+                    checked={!!formData.screeningEnabled}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, screeningEnabled: checked === true }))}
+                    className="h-5 w-5 data-[state=checked]:bg-emerald-600"
                   />
-                  <Label htmlFor="enable-resume-screening" className="text-base font-medium">
-                    Enable Resume Screening
-                  </Label>
-                </div>
-                
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <span>Resume screening will run first, followed by your selected interview agents for qualified candidates.</span>
+                  <div>
+                    <Label htmlFor="enable-screening" className="font-medium cursor-pointer">
+                      Enable Screening for this Job
+                    </Label>
+                    <p className="text-xs text-gray-500 mt-1">Turn this on to allow only eligible candidates to continue.</p>
                   </div>
                 </div>
+
+                {formData.screeningEnabled && (
+                  <div className="space-y-5">
+                    {/* Experience Section */}
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium text-gray-700">Experience</Label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="screeningOverallExp" className="text-sm text-gray-600">Total Years of Experience</Label>
+                          <Input
+                            id="screeningOverallExp"
+                            type="number"
+                            min="0"
+                            placeholder="e.g., 5"
+                            value={formData.screeningOverallExp}
+                            onChange={(e) => handleInputChange('screeningOverallExp', e.target.value)}
+                            className="mt-1"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Enter the minimum total experience required for this role.
+                          </p>
+                        </div>
+                        <div>
+                          <Label htmlFor="screeningPrimarySkill" className="text-sm text-gray-600">Primary Skill Experience</Label>
+                          <Input
+                            id="screeningPrimarySkill"
+                            placeholder="UiPath - 3 years"
+                            value={formData.screeningPrimarySkill}
+                            onChange={(e) => handleInputChange('screeningPrimarySkill', e.target.value)}
+                            className="mt-1"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Enter the main skill and required years of experience.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Location */}
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium text-gray-700">Location</Label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="screeningCurrentLocation" className="text-sm text-gray-600">Preferred Location</Label>
+                          <Input
+                            id="screeningCurrentLocation"
+                            placeholder="e.g., Bangalore, India"
+                            value={formData.screeningCurrentLocation}
+                            onChange={(e) => handleInputChange('screeningCurrentLocation', e.target.value)}
+                            className="mt-1"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Enter preferred current working location (optional).<br />
+                            Example: Bangalore, India
+                          </p>
+                        </div>
+                        <div>
+                          <Label htmlFor="screeningNationality" className="text-sm text-gray-600">Nationality</Label>
+                          <Select 
+                            value={formData.screeningNationality} 
+                            onValueChange={(value) => handleInputChange('screeningNationality', value)}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="Any" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="any">Any</SelectItem>
+                              <SelectItem value="indian">Indian</SelectItem>
+                              <SelectItem value="us">US Citizen</SelectItem>
+                              <SelectItem value="uk">UK Citizen</SelectItem>
+                              <SelectItem value="eu">EU Citizen</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Select nationality if required, otherwise keep Any.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Work Authorization */}
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium text-gray-700">Work Authorization</Label>
+                      <p className="text-xs text-gray-500">Select one option:</p>
+                      <div className="flex gap-6">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="visaRequired"
+                            value="yes"
+                            checked={formData.screeningVisaRequired === 'yes'}
+                            onChange={(e) => handleInputChange('screeningVisaRequired', e.target.value)}
+                            className="h-4 w-4 text-emerald-600"
+                          />
+                          <span className="text-sm">Visa sponsorship available</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="visaRequired"
+                            value="no"
+                            checked={formData.screeningVisaRequired === 'no'}
+                            onChange={(e) => handleInputChange('screeningVisaRequired', e.target.value)}
+                            className="h-4 w-4 text-emerald-600"
+                          />
+                          <span className="text-sm">Must already have work authorization</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Language & Salary */}
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium text-gray-700">Other Requirements</Label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="screeningLanguage" className="text-sm text-gray-600">English Proficiency</Label>
+                          <Select 
+                            value={formData.screeningLanguageProficiency} 
+                            onValueChange={(value) => handleInputChange('screeningLanguageProficiency', value)}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="Select level" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="basic">Basic</SelectItem>
+                              <SelectItem value="intermediate">Intermediate</SelectItem>
+                              <SelectItem value="fluent">Fluent</SelectItem>
+                              <SelectItem value="native">Native</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Select the minimum required level.<br />
+                            Example: Intermediate
+                          </p>
+                        </div>
+                        <div>
+                          <Label htmlFor="screeningCurrentSalary" className="text-sm text-gray-600">Max Current Salary (Budget)</Label>
+                          <Input
+                            id="screeningCurrentSalary"
+                            type="number"
+                            min="0"
+                            placeholder="e.g., 150000"
+                            value={formData.screeningCurrentSalary}
+                            onChange={(e) => handleInputChange('screeningCurrentSalary', e.target.value)}
+                            className="mt-1"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Enter the maximum current salary allowed for this role.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

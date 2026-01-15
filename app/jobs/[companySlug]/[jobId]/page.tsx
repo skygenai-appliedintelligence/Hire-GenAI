@@ -147,7 +147,7 @@ export default async function JobDetailPage(
             <div>
               {isJobOpen ? (
                 <Link
-                  href={`/apply/${company}/${jobId}`}
+                  href={`/jobs/${company}/${jobId}/screening`}
                   aria-label="Apply to this job"
                   data-testid="apply-btn-inline"
                   className="inline-flex items-center justify-center rounded-xl bg-emerald-600 text-white px-4 py-2 font-semibold shadow-md ring-1 ring-emerald-600/20 hover:bg-emerald-600/90 motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-105 hover:shadow-2xl emerald-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
@@ -205,7 +205,7 @@ export default async function JobDetailPage(
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-2.5">
           {isJobOpen ? (
             <Link
-              href={`/apply/${company}/${jobId}`}
+              href={`/jobs/${company}/${jobId}/screening`}
               aria-label="Apply to this job"
               data-testid="apply-btn-sticky"
               className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 text-white px-5 py-3 font-semibold shadow-md ring-1 ring-emerald-600/20 hover:bg-emerald-600/90 motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-105 hover:shadow-2xl emerald-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
@@ -329,7 +329,7 @@ export default async function JobDetailPage(
               <div className="mt-7 space-y-3">
                 {isJobOpen ? (
                   <Link
-                    href={`/apply/${company}/${jobId}`}
+                    href={`/jobs/${company}/${jobId}/screening`}
                     aria-label="Apply to this job"
                     data-testid="apply-btn-summary"
                     className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 text-white px-5 py-2.5 font-semibold shadow-lg ring-1 ring-emerald-600/20 hover:bg-emerald-600/90 motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-105 hover:shadow-2xl emerald-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"

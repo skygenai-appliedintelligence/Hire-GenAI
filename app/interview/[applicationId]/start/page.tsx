@@ -170,7 +170,7 @@ export default function InterviewStartPage() {
                   }
                 }}
               >
-                <Link href={`/interview/${applicationId}`} className={disclaimerAccepted ? '' : 'pointer-events-none'}>
+                <Link href={`/interview/${applicationId}/verify`} className={disclaimerAccepted ? '' : 'pointer-events-none'}>
                   <span className="flex items-center gap-2">
                     <Video className="h-5 w-5" /> Start Video Interview
                   </span>

@@ -10,11 +10,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast'
 import { AIInterviewService, type CandidateApplication } from '@/lib/ai-interview-service'
 import { Loader2, Send, Plus, X } from 'lucide-react'
+import WebcamCapture from '@/components/webcam-capture'
 
 export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOpen?: boolean }) {
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
+  const [loadingCandidate, setLoadingCandidate] = useState(false)
+  const [candidateId, setCandidateId] = useState<string | null>(null)
+  const [hasCandidateDetails, setHasCandidateDetails] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const appRootRef = useRef<HTMLDivElement | null>(null)
   const [resumeMeta, setResumeMeta] = useState<{ name: string; size: number; type: string; url?: string } | null>(null)
@@ -24,6 +28,9 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
   const [isDragging, setIsDragging] = useState(false)
   const [parsingOpen, setParsingOpen] = useState(false)
   const [parseStep, setParseStep] = useState<'idle' | 'uploading' | 'parsing' | 'evaluating' | 'finalizing'>('idle')
+  // Webcam photo capture state
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null)
+  const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     // General info
     firstName: '',
@@ -49,6 +56,42 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
     impactfulProject: '',
     availability: '',
   })
+  
+  // Get candidate ID from URL query parameter
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const id = searchParams.get('candidateId')
+    if (id) {
+      setCandidateId(id)
+      fetchCandidateDetails(id)
+    }
+  }, [])
+  
+  // Fetch candidate details if we have a candidate ID
+  const fetchCandidateDetails = async (id: string) => {
+    try {
+      setLoadingCandidate(true)
+      const res = await fetch(`/api/candidates/${id}`)
+      const data = await res.json()
+      
+      if (res.ok && data.ok && data.candidate) {
+        // Update form data with candidate details
+        setFormData(prev => ({
+          ...prev,
+          firstName: data.candidate.first_name || '',
+          lastName: data.candidate.last_name || '',
+          email: data.candidate.email || '',
+          phone: data.candidate.phone || '',
+          fullName: `${data.candidate.first_name || ''} ${data.candidate.last_name || ''}`.trim()
+        }))
+        setHasCandidateDetails(true)
+      }
+    } catch (error) {
+      console.error('Failed to fetch candidate details:', error)
+    } finally {
+      setLoadingCandidate(false)
+    }
+  }
 
   // Language and proficiency state
   const [languages, setLanguages] = useState<Array<{ language: string; proficiency: string }>>([{ language: '', proficiency: '' }])
@@ -110,6 +153,8 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
       if (!formData.availableStartDate.trim()) missing.push('Available start date')
       // Resume required
       if (!resumeFile && !resumeMeta) missing.push('Resume')
+      // Photo required
+      if (!capturedPhoto) missing.push('Photo (webcam capture)')
 
       if (!fullName) missing.push('Full name')
 
@@ -161,6 +206,37 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
 
       // Use the candidate ID from resume upload
       const candidateId = resumeUploadResult?.candidateId || `candidate_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      // Upload photo if captured
+      let photoUploadUrl: string | null = null
+      if (capturedPhoto) {
+        try {
+          const photoRes = await fetch('/api/photos/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageData: capturedPhoto,
+              candidateId,
+            }),
+          })
+
+          if (photoRes.ok) {
+            const photoData = await photoRes.json()
+            photoUploadUrl = photoData.photoUrl
+            setUploadedPhotoUrl(photoData.photoUrl)
+            toast({
+              title: 'Photo uploaded successfully!',
+              description: 'Your photo has been securely stored.',
+            })
+          } else {
+            const errData = await photoRes.json().catch(() => ({}))
+            console.warn('Photo upload failed:', errData)
+            // Non-fatal - continue with application
+          }
+        } catch (photoErr) {
+          console.warn('Photo upload error (non-fatal):', photoErr)
+        }
+      }
       
       const application: CandidateApplication = {
         id: candidateId,
@@ -212,6 +288,7 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
                     size: resumeMeta.size,
                   }
                 : null),
+          photoUrl: photoUploadUrl, // Webcam captured photo URL
           source: 'direct_application',
           meta: {
             timestamp: new Date().toISOString(),
@@ -396,19 +473,61 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="firstName">First name *</Label>
-              <Input id="firstName" value={formData.firstName} onChange={(e) => setFormData((p) => ({ ...p, firstName: e.target.value }))} placeholder="John" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" required disabled={loading} />
+              <Input 
+                id="firstName" 
+                value={formData.firstName} 
+                onChange={(e) => setFormData((p) => ({ ...p, firstName: e.target.value, fullName: `${e.target.value} ${formData.lastName}`.trim() }))} 
+                placeholder="John" 
+                className={`border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 ${hasCandidateDetails ? 'bg-gray-100' : 'hover:border-emerald-400'}`} 
+                required 
+                disabled={loading || hasCandidateDetails} 
+                readOnly={hasCandidateDetails}
+              />
+              {hasCandidateDetails && <p className="text-xs text-gray-500 mt-1">Pre-filled from screening details</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="lastName">Last name *</Label>
-              <Input id="lastName" value={formData.lastName} onChange={(e) => setFormData((p) => ({ ...p, lastName: e.target.value }))} placeholder="Doe" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" required disabled={loading} />
+              <Input 
+                id="lastName" 
+                value={formData.lastName} 
+                onChange={(e) => setFormData((p) => ({ ...p, lastName: e.target.value, fullName: `${formData.firstName} ${e.target.value}`.trim() }))} 
+                placeholder="Doe" 
+                className={`border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 ${hasCandidateDetails ? 'bg-gray-100' : 'hover:border-emerald-400'}`} 
+                required 
+                disabled={loading || hasCandidateDetails} 
+                readOnly={hasCandidateDetails}
+              />
+              {hasCandidateDetails && <p className="text-xs text-gray-500 mt-1">Pre-filled from screening details</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email *</Label>
-              <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))} placeholder="you@example.com" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" required disabled={loading} />
+              <Input 
+                id="email" 
+                type="email" 
+                value={formData.email} 
+                onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))} 
+                placeholder="you@example.com" 
+                className={`border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 ${hasCandidateDetails ? 'bg-gray-100' : 'hover:border-emerald-400'}`} 
+                required 
+                disabled={loading || hasCandidateDetails} 
+                readOnly={hasCandidateDetails}
+              />
+              {hasCandidateDetails && <p className="text-xs text-gray-500 mt-1">Pre-filled from screening details</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone *</Label>
-              <Input id="phone" type="tel" value={formData.phone} onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value }))} placeholder="+1 555 000 1111" className="border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 hover:border-emerald-400" required disabled={loading} />
+              <Input 
+                id="phone" 
+                type="tel" 
+                value={formData.phone} 
+                onChange={(e) => setFormData((p) => ({ ...p, phone: e.target.value }))} 
+                placeholder="+1 555 000 1111" 
+                className={`border-slate-300 focus:border-emerald-600 focus:ring-emerald-600 transition-colors duration-200 ${hasCandidateDetails ? 'bg-gray-100' : 'hover:border-emerald-400'}`} 
+                required 
+                disabled={loading || hasCandidateDetails} 
+                readOnly={hasCandidateDetails}
+              />
+              {hasCandidateDetails && <p className="text-xs text-gray-500 mt-1">Pre-filled from screening details</p>}
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label>Expected salary *</Label>
@@ -530,6 +649,19 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
               </div>
             )}
           </div>
+        </section>
+
+        {/* Webcam Photo Capture */}
+        <section>
+          <WebcamCapture
+            onCapture={(imageData) => setCapturedPhoto(imageData)}
+            capturedImage={capturedPhoto}
+            onClear={() => {
+              setCapturedPhoto(null)
+              setUploadedPhotoUrl(null)
+            }}
+            disabled={loading}
+          />
         </section>
 
         {/* Cover Letter */}

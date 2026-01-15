@@ -50,6 +50,15 @@ type CreateJobBody = {
   joining?: string
   travel?: string
   visa?: string
+  // Screening questions
+  screeningEnabled?: boolean
+  screeningOverallExp?: string
+  screeningPrimarySkill?: string
+  screeningCurrentLocation?: string
+  screeningNationality?: string
+  screeningVisaRequired?: string
+  screeningLanguageProficiency?: string
+  screeningCurrentSalary?: string
 }
 
 function normalizeJobType(value?: string | null): 'full_time' | 'part_time' | 'contract' | null {
@@ -249,6 +258,21 @@ Work Authorization: ${raw.visa || 'Work authorization required'}`
 
     const generatedDescription = generateJobDescription()
 
+    // Build screening_questions JSON if enabled
+    // Field mapping:
+    // - overall_experience = Total years of experience
+    // - primary_skill = Primary skill requirement text (e.g., "3 years in UI Path")
+    const screeningQuestions = raw.screeningEnabled ? {
+      enabled: true,
+      overall_experience: raw.screeningOverallExp ? Number(raw.screeningOverallExp) : null,
+      primary_skill: raw.screeningPrimarySkill || null,
+      current_location: raw.screeningCurrentLocation || null,
+      nationality: raw.screeningNationality || null,
+      visa_required: raw.screeningVisaRequired === 'yes',
+      language_proficiency: raw.screeningLanguageProficiency || 'intermediate',
+      current_monthly_salary: raw.screeningCurrentSalary ? Number(raw.screeningCurrentSalary) : null,
+    } : null
+
     // Resolve company: prefer companyId, but fall back to looking up by company name if needed
     if (!body.companyId && !body.company) {
       return NextResponse.json({ ok: false, error: 'Company is required' }, { status: 400 })
@@ -333,6 +357,7 @@ Work Authorization: ${raw.visa || 'Work authorization required'}`
           visa_requirements: raw.visa || null,
           is_public: true,
           created_by_email: body.createdBy || null,
+          screening_questions: screeningQuestions,
         })
       } catch (e: any) {
         const msg = String(e?.message || '')
@@ -373,6 +398,7 @@ Work Authorization: ${raw.visa || 'Work authorization required'}`
           visa_requirements: raw.visa || null,
           is_public: true,
           created_by_email: null,
+          screening_questions: screeningQuestions,
         })
       }
 
