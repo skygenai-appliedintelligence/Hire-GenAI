@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
       jobId,
       candidate,
       resume, // { url, name, type, size }
+      photoUrl, // Webcam captured photo URL
       source = 'direct_application',
       meta, // { timestamp, ip, userAgent }
     } = body || {}
@@ -265,6 +266,10 @@ export async function POST(req: NextRequest) {
         // Languages and proficiency levels
         if (candidate.languages && Array.isArray(candidate.languages) && candidate.languages.length > 0) {
           cols.push('languages'); vals.push(`$${p++}::jsonb`); params.push(JSON.stringify(candidate.languages))
+        }
+        // Photo URL (webcam captured)
+        if (photoUrl) {
+          cols.push('photo_url'); vals.push(`$${p++}`); params.push(String(photoUrl))
         }
 
       if (cols.length === 0) throw new Error('applications table not compatible')

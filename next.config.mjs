@@ -19,6 +19,17 @@ const nextConfig = {
       })
     }
     
+    // Fix for face-api.js - ignore 'fs' module on client-side
+    if (!isServer) {
+      config.resolve = config.resolve || {}
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        crypto: false,
+      }
+    }
+    
     // Ignore pdf-parse test directory
     config.module = config.module || {}
     config.module.rules = config.module.rules || []

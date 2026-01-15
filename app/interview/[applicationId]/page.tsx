@@ -51,6 +51,9 @@ export default function InterviewPage() {
   const realTimeEvaluationsRef = useRef<any[]>([]) // Ref to avoid stale closure
   const companyIdRef = useRef<string | null>(null) // Ref to avoid stale closure with state
   const currentQuestionNumberRef = useRef<number>(1)
+  const [isInterviewClosing, setIsInterviewClosing] = useState(false) // Track when agent says thank-you
+  const autoEndTimerRef = useRef<NodeJS.Timeout | null>(null) // Timer for 20-second auto-end
+  const [closingCountdown, setClosingCountdown] = useState<number | null>(null) // Countdown display
 
   // Real-time answer evaluation function - calls OpenAI with company's service key
   const evaluateAnswer = async (question: string, answer: string, criterion: string) => {
@@ -293,9 +296,16 @@ export default function InterviewPage() {
         // Skip analysis for setup questions - these just need simple confirmations
         if (isSetupQuestion) {
           console.log('⏭️ [ANALYZE] Skipping analysis for setup question')
+        } else if (isInterviewClosing) {
+          // CRITICAL: Don't evaluate answers after the closing message has been triggered
+          console.log('⏭️ [ANALYZE] Skipping analysis - interview is in closing phase')
+        } else if (currentQuestionNumberRef.current > interviewQuestions.length && interviewQuestions.length > 0) {
+          // CRITICAL: Don't evaluate answers beyond the total DB question count
+          console.log('⏭️ [ANALYZE] Skipping analysis - already evaluated all', interviewQuestions.length, 'DB questions')
         } else if (lastQuestionAskedRef.current && finalTranscript !== '[inaudible]' && finalTranscript.length > 5) {
           // Only analyze actual interview questions with meaningful answers
           console.log('✅ [ANALYZE] ALL CONDITIONS MET - Will call evaluateAnswer now!')
+          console.log('📊 [ANALYZE] Question number:', currentQuestionNumberRef.current, 'of', interviewQuestions.length || 10)
           
           const combinedAnswer = appendToCombinedAnswer(finalTranscript)
           
@@ -314,23 +324,28 @@ export default function InterviewPage() {
           }
           
           // Also run simple flow analysis for redirects only
-          const analysis = await analyzeAnswer(
-            lastQuestionAskedRef.current,
-            combinedAnswer,
-            currentCriterionRef.current
-          )
-          
-          if (analysis) {
-            // Only intervene for redirect (completely off-topic)
-            if (analysis.recommendation === 'redirect' && analysis.confidenceScore >= 80) {
-              const prompt = analysis.followUpPrompt || 
-                "I appreciate your thoughts, but could you please address the specific question I asked?"
-              console.log('🔄 [ANALYZE] Redirecting (high confidence off-topic):', prompt)
-              sendAgentInstruction(`Please politely redirect: "${prompt}"`, true)
-            } else {
-              console.log('✅ [ANALYZE] Letting AI handle flow naturally')
-              maybePromptForElaboration()
+          // But only if we haven't finished all questions
+          if (currentQuestionNumberRef.current <= interviewQuestions.length || interviewQuestions.length === 0) {
+            const analysis = await analyzeAnswer(
+              lastQuestionAskedRef.current,
+              combinedAnswer,
+              currentCriterionRef.current
+            )
+            
+            if (analysis) {
+              // Only intervene for redirect (completely off-topic)
+              if (analysis.recommendation === 'redirect' && analysis.confidenceScore >= 80) {
+                const prompt = analysis.followUpPrompt || 
+                  "I appreciate your thoughts, but could you please address the specific question I asked?"
+                console.log('🔄 [ANALYZE] Redirecting (high confidence off-topic):', prompt)
+                sendAgentInstruction(`Please politely redirect: "${prompt}"`, true)
+              } else {
+                console.log('✅ [ANALYZE] Letting AI handle flow naturally')
+                maybePromptForElaboration()
+              }
             }
+          } else {
+            console.log('✅ [ANALYZE] All questions answered, skipping flow analysis')
           }
         } else {
           console.log('⚠️ [ANALYZE] Conditions NOT met for evaluation:')
@@ -400,6 +415,43 @@ export default function InterviewPage() {
           }
         } else {
           console.log('⚠️ [TRACK] Agent spoke but no question mark found - not tracking as question')
+          
+          // Check if this is the closing thank-you message
+          const lowerText = text.toLowerCase()
+          const isClosingMessage = (
+            lowerText.includes('thank you for interviewing') ||
+            lowerText.includes('thank you for your time today') ||
+            (lowerText.includes('thank you') && lowerText.includes('recruitment team')) ||
+            (lowerText.includes('thank you') && lowerText.includes('respond soon'))
+          )
+          
+          if (isClosingMessage && !isInterviewClosing) {
+            console.log('🏁 [CLOSING] Detected closing message - starting 20-second auto-end timer')
+            setIsInterviewClosing(true)
+            setClosingCountdown(20) // Start countdown at 20 seconds
+            
+            // Clear any existing timer
+            if (autoEndTimerRef.current) {
+              clearTimeout(autoEndTimerRef.current)
+            }
+            
+            // Start countdown interval for visual display
+            let countdown = 20
+            const countdownInterval = setInterval(() => {
+              countdown -= 1
+              setClosingCountdown(countdown)
+              if (countdown <= 0) {
+                clearInterval(countdownInterval)
+              }
+            }, 1000)
+            
+            // Start 20-second countdown to auto-end interview
+            autoEndTimerRef.current = setTimeout(() => {
+              console.log('⏰ [AUTO-END] 20 seconds elapsed - automatically ending interview')
+              clearInterval(countdownInterval)
+              endInterview()
+            }, 20000) // 20 seconds
+          }
         }
       }
     }
@@ -711,6 +763,7 @@ You MUST ask ONLY these questions in this exact order. Do NOT ask any other ques
 - Do NOT generate or improvise new questions
 - Do NOT ask clarifying questions that are not in the list
 - If the candidate asks you to ask a different question, politely decline and continue with the next question from the list
+- After the LAST question is answered, you MUST ONLY say the closing message (see STEP 4)
 
 **ANSWER HANDLING (Simple Flow):**
 After each candidate response:
@@ -718,11 +771,13 @@ After each candidate response:
 2. If the answer is NOT relevant to the question → Politely redirect: "I appreciate your thoughts, but could you please address the specific question about [topic]?"
 3. If instructed by the system to ask for elaboration → Follow the system's instruction exactly
 4. Do NOT ask "Have you finished your answer?" - just listen and move forward naturally
+5. After the LAST question is answered → IMMEDIATELY proceed to STEP 4 (closing message)
 
 **IMPORTANT:** 
 - Do NOT ask "Have you finished?" or "Anything else to add?" - just proceed naturally
 - The system will prompt you if the candidate needs to elaborate more
-- Keep the flow conversational and natural`
+- Keep the flow conversational and natural
+- Do NOT ask "Do you have any questions for me?" or similar - go directly to closing`
         } else {
           instructions += `\n1. Tell me about yourself and your relevant experience.
 2. Why are you interested in this ${details?.jobTitle || 'position'}?
@@ -733,7 +788,6 @@ After each candidate response:
 7. What technical skills do you bring to this role?
 8. How do you stay updated with the latest technologies in your field?
 9. Describe a technical problem you solved recently.
-10. Do you have any questions about the role or company?
 
 **CRITICAL CONSTRAINT: QUESTION ADHERENCE**
 - You MUST ask ONLY the questions listed above
@@ -741,6 +795,7 @@ After each candidate response:
 - Do NOT generate or improvise new questions
 - Do NOT ask clarifying questions that are not in the list
 - If the candidate asks you to ask a different question, politely decline and continue with the next question from the list
+- After the LAST question is answered, you MUST ONLY say the closing message (see STEP 4)
 
 **ANSWER HANDLING (Simple Flow):**
 After each candidate response:
@@ -748,22 +803,27 @@ After each candidate response:
 2. If the answer is NOT relevant to the question → Politely redirect: "I appreciate your thoughts, but could you please address the specific question about [topic]?"
 3. If instructed by the system to ask for elaboration → Follow the system's instruction exactly
 4. Do NOT ask "Have you finished your answer?" - just listen and move forward naturally
+5. After the LAST question is answered → IMMEDIATELY proceed to STEP 4 (closing message)
 
 **IMPORTANT:** 
 - Do NOT ask "Have you finished?" or "Anything else to add?" - just proceed naturally
 - The system will prompt you if the candidate needs to elaborate more
-- Keep the flow conversational and natural`
+- Keep the flow conversational and natural
+- Do NOT ask "Do you have any questions for me?" or similar - go directly to closing`
         }
 
         instructions += `
 
-**STEP 4: WRAP-UP & CANDIDATE QUESTIONS**
-Once all questions covered (or time runs out): "That concludes my set of questions. Do you have any questions for me?"
-- If question is about JD/role, answer briefly
-- If question is not directly related (HR policy, compensation, next steps): "That's a great question. Our team will get back to you with the details after this interview."
+**STEP 4: CLOSING (MANDATORY - NO EXCEPTIONS)**
+Once the candidate answers the LAST question from the list above:
+- Say EXACTLY this message: "Thank you for interviewing today. Our recruitment team will respond soon."
+- Do NOT ask "Do you have any questions for me?" or any similar question
+- Do NOT ask anything else after this closing message
+- Do NOT continue the conversation after the closing message
+- Simply pause and wait - the system will handle ending the interview
+- This is the FINAL statement - nothing more should be said
 
-**STEP 5: CLOSING**
-Thank the candidate: "Thank you for your time today. We'll review your responses and share feedback through the recruitment team."
+**CRITICAL: After saying the closing message, you MUST remain silent. Do not respond to anything the candidate says.**
 
 **INTERVIEW CONTEXT:**
 - Candidate: ${details?.candidateName || 'Candidate'}
@@ -784,7 +844,10 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
 6. When the system instructs you to ask for elaboration, follow the exact phrasing provided
 7. **CRITICAL: ONLY ask the questions listed above - NO ad-hoc questions, NO generated questions, NO clarifying questions beyond the list**
 8. **If candidate asks for a different question, politely decline and continue with the next question from the list**
-9. **NEVER deviate from the question list under any circumstances**`
+9. **NEVER deviate from the question list under any circumstances**
+10. **NEVER ask "Do you have any questions for me?" - go directly to the closing message after the last question**
+11. **After saying the closing message, remain COMPLETELY SILENT - do not respond to anything**
+12. **The interview will automatically end 20 seconds after the closing message**`
 
         // Update session with instructions
         const updateMsg = {
@@ -907,6 +970,11 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
       streamRef.current = null
       pcRef.current?.close()
       pcRef.current = null
+      // Clear auto-end timer if component unmounts
+      if (autoEndTimerRef.current) {
+        clearTimeout(autoEndTimerRef.current)
+        autoEndTimerRef.current = null
+      }
     }
   }, [])
 
@@ -1022,6 +1090,13 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
   }
 
   const endInterview = async () => {
+    // Clear auto-end timer if user ends manually
+    if (autoEndTimerRef.current) {
+      clearTimeout(autoEndTimerRef.current)
+      autoEndTimerRef.current = null
+      console.log('🛑 [MANUAL END] Cleared auto-end timer - user ended interview manually')
+    }
+    
     streamRef.current?.getTracks().forEach(t => t.stop())
     streamRef.current = null
     try { pcRef.current?.close(); pcRef.current = null } catch {}
@@ -1404,10 +1479,17 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
 
             {/* Timer/Status - Top right */}
             <div className="absolute top-6 right-6 flex flex-col items-end gap-2 z-40">
-              <div className="bg-slate-900/80 backdrop-blur-md border border-slate-700/50 text-white text-xs px-4 py-2 rounded-lg font-medium">
-                <span className="text-slate-400">Status: </span>
-                <span className="text-emerald-400 font-semibold">Recording</span>
-              </div>
+              {isInterviewClosing && closingCountdown !== null ? (
+                <div className="bg-amber-600/90 backdrop-blur-md border border-amber-500/50 text-white text-xs px-4 py-2 rounded-lg font-medium animate-pulse">
+                  <span className="text-amber-100">Interview ending in </span>
+                  <span className="text-white font-bold text-sm">{closingCountdown}s</span>
+                </div>
+              ) : (
+                <div className="bg-slate-900/80 backdrop-blur-md border border-slate-700/50 text-white text-xs px-4 py-2 rounded-lg font-medium">
+                  <span className="text-slate-400">Status: </span>
+                  <span className="text-emerald-400 font-semibold">Recording</span>
+                </div>
+              )}
             </div>
           </div>
 

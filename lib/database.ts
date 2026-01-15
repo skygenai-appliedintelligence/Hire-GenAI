@@ -1253,6 +1253,7 @@ export class DatabaseService {
     visa_requirements?: string | null
     is_public?: boolean | null
     created_by_email?: string | null
+    screening_questions?: Record<string, any> | null
   }) {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
@@ -1286,7 +1287,7 @@ export class DatabaseService {
         duties_day_to_day, duties_strategic, stakeholders,
         decision_scope, salary_min, salary_max, salary_period, bonus_incentives,
         perks_benefits, time_off_policy, joining_timeline, travel_requirements, visa_requirements,
-        status, is_public, created_by_email
+        status, is_public, created_by_email, screening_questions
       )
       VALUES (
         $1::uuid, $2, $3, $4, $5, $6::employment_type, $7::job_level, $8,
@@ -1296,7 +1297,7 @@ export class DatabaseService {
         $17::text[], $18::text[], $19::text[],
         $20, $21, $22, $23::salary_period, $24,
         $25::text[], $26, $27, $28, $29,
-        'open', COALESCE($30, true), $31
+        'open', COALESCE($30, true), $31, $32::jsonb
       )
       RETURNING id
     `
@@ -1333,6 +1334,7 @@ export class DatabaseService {
       input.visa_requirements ?? null,
       input.is_public ?? true,
       input.created_by_email ?? null,
+      input.screening_questions ? JSON.stringify(input.screening_questions) : null,
     ]
 
     const rows = (await this.query(q, params)) as any[]
