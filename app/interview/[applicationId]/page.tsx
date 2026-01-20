@@ -54,6 +54,58 @@ export default function InterviewPage() {
   const [isInterviewClosing, setIsInterviewClosing] = useState(false) // Track when agent says thank-you
   const autoEndTimerRef = useRef<NodeJS.Timeout | null>(null) // Timer for 20-second auto-end
   const [closingCountdown, setClosingCountdown] = useState<number | null>(null) // Countdown display
+  const screenshotCapturedRef = useRef<boolean>(false) // Track if screenshot has been captured
+  const screenshotDataRef = useRef<string | null>(null) // Store screenshot data to send after interview is created
+
+  // Silent screenshot capture function - captures from user's video and stores in ref
+  const captureScreenshotSilently = async () => {
+    console.log('📸 [SCREENSHOT] captureScreenshotSilently called')
+    
+    // Only capture once
+    if (screenshotCapturedRef.current) {
+      console.log('📸 [SCREENSHOT] Already captured, skipping')
+      return
+    }
+    screenshotCapturedRef.current = true
+    
+    try {
+      const videoElement = userVideoRef.current
+      console.log('📸 [SCREENSHOT] Video element:', videoElement ? 'exists' : 'null')
+      console.log('📸 [SCREENSHOT] Video srcObject:', videoElement?.srcObject ? 'exists' : 'null')
+      
+      if (!videoElement || !videoElement.srcObject) {
+        console.log('📸 [SCREENSHOT] No video element or srcObject - aborting')
+        screenshotCapturedRef.current = false // Reset so we can try again
+        return
+      }
+      
+      // Create a canvas to capture the video frame
+      const canvas = document.createElement('canvas')
+      canvas.width = videoElement.videoWidth || 1280
+      canvas.height = videoElement.videoHeight || 720
+      console.log('📸 [SCREENSHOT] Canvas size:', canvas.width, 'x', canvas.height)
+      
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        console.log('📸 [SCREENSHOT] Failed to get canvas context')
+        return
+      }
+      
+      // Draw the current video frame to canvas (mirror it back since video is mirrored)
+      ctx.save()
+      ctx.scale(-1, 1)
+      ctx.drawImage(videoElement, -canvas.width, 0, canvas.width, canvas.height)
+      ctx.restore()
+      
+      // Convert to base64 and store in ref (will be sent after interview is created)
+      const screenshot = canvas.toDataURL('image/jpeg', 0.8)
+      screenshotDataRef.current = screenshot
+      console.log('📸 [SCREENSHOT] Screenshot captured and stored, size:', screenshot.length, 'bytes')
+      
+    } catch (err) {
+      console.error('📸 [SCREENSHOT] Capture error:', err)
+    }
+  }
 
   // Real-time answer evaluation function - calls OpenAI with company's service key
   const evaluateAnswer = async (question: string, answer: string, criterion: string) => {
@@ -302,6 +354,10 @@ export default function InterviewPage() {
         } else if (currentQuestionNumberRef.current > interviewQuestions.length && interviewQuestions.length > 0) {
           // CRITICAL: Don't evaluate answers beyond the total DB question count
           console.log('⏭️ [ANALYZE] Skipping analysis - already evaluated all', interviewQuestions.length, 'DB questions')
+          console.log('📸 [SCREENSHOT TRIGGER] All questions asked - triggering screenshot')
+          
+          // All questions have been asked - capture screenshot silently
+          captureScreenshotSilently()
         } else if (lastQuestionAskedRef.current && finalTranscript !== '[inaudible]' && finalTranscript.length > 5) {
           // Only analyze actual interview questions with meaningful answers
           console.log('✅ [ANALYZE] ALL CONDITIONS MET - Will call evaluateAnswer now!')
@@ -428,6 +484,14 @@ export default function InterviewPage() {
           if (isClosingMessage && !isInterviewClosing) {
             console.log('🏁 [CLOSING] Detected closing message - starting 20-second auto-end timer')
             setIsInterviewClosing(true)
+            
+            // Also capture screenshot when closing message is detected (backup trigger)
+            const captureStartTime = performance.now()
+            captureScreenshotSilently().then(() => {
+              const captureDuration = performance.now() - captureStartTime
+              console.log(`📸 [SCREENSHOT] Capture time: ${captureDuration.toFixed(2)}ms`)
+            })
+            
             setClosingCountdown(20) // Start countdown at 20 seconds
             
             // Clear any existing timer
@@ -440,6 +504,19 @@ export default function InterviewPage() {
             const countdownInterval = setInterval(() => {
               countdown -= 1
               setClosingCountdown(countdown)
+              
+              // Add countdown message to transcript at 15, 10, and 5 seconds
+              if (countdown === 15 || countdown === 10 || countdown === 5) {
+                setConversation(prev => {
+                  // Add agent message showing countdown (using agent role instead of system to match type)
+                  return [...prev, { 
+                    role: 'agent', 
+                    text: `⏱️ Interview will end after ${countdown} seconds`, 
+                    t: Date.now() 
+                  }]
+                })
+              }
+              
               if (countdown <= 0) {
                 clearInterval(countdownInterval)
               }
@@ -1130,6 +1207,10 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
       // Include real-time evaluations if available
       console.log('📊 [END INTERVIEW] Real-time evaluations collected:', realTimeEvaluations.length)
       
+      // CRITICAL: Capture screenshot before interview ends (most reliable trigger)
+      console.log('📸 [SCREENSHOT TRIGGER] End interview - capturing screenshot now')
+      await captureScreenshotSilently()
+      
       const response = await fetch(`/api/applications/${encodeURIComponent(applicationId)}/interview-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1146,6 +1227,24 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
       if (response) {
         const result = await response.json()
         console.log('✅ Interview marked as completed:', result)
+        
+        // NOW send the screenshot (interview record exists now)
+        if (screenshotDataRef.current) {
+          console.log('📸 [SCREENSHOT] Sending stored screenshot to server...')
+          try {
+            const screenshotResponse = await fetch(`/api/applications/${encodeURIComponent(applicationId)}/interview-screenshot`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ screenshot: screenshotDataRef.current })
+            })
+            const screenshotResult = await screenshotResponse.json()
+            console.log('📸 [SCREENSHOT] Server response:', screenshotResult)
+          } catch (err) {
+            console.error('📸 [SCREENSHOT] Failed to save screenshot:', err)
+          }
+        } else {
+          console.log('📸 [SCREENSHOT] No screenshot data stored')
+        }
         
         // Trigger evaluation pipeline with real-time evaluations
         // Use ref to get current evaluations (avoids stale closure)
@@ -1186,8 +1285,8 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
         }
       }
       
-      // Navigate to interview success page
-      router.push(`/interview/${encodeURIComponent(applicationId)}/success`)
+      // Navigate to post-interview photo verification page
+      router.push(`/interview/${encodeURIComponent(applicationId)}/post-verify`)
       return
     } catch {}
     

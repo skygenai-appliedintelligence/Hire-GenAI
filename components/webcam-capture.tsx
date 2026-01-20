@@ -22,7 +22,7 @@ export default function WebcamCapture({ onCapture, capturedImage, onClear, disab
   const [tempCapture, setTempCapture] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
-  const [faceStatus, setFaceStatus] = useState<'loading' | 'no_face' | 'too_far' | 'not_centered' | 'ready'>('loading')
+  const [faceStatus, setFaceStatus] = useState<'loading' | 'no_face' | 'too_far' | 'not_centered' | 'poor_lighting' | 'ready'>('loading')
   const [modelsLoaded, setModelsLoaded] = useState(false)
   const [loadingModels, setLoadingModels] = useState(false)
 
@@ -39,13 +39,46 @@ export default function WebcamCapture({ onCapture, capturedImage, onClear, disab
     setLoadingModels(false)
   }, [modelsLoaded, loadingModels])
 
-  // Real face detection using face-api.js
+  // Real face detection using face-api.js with lighting check
   const detectFace = useCallback(async () => {
-    if (!videoRef.current || !isCameraReady || !modelsLoaded) return
+    if (!videoRef.current || !isCameraReady || !modelsLoaded || !canvasRef.current) return
 
     try {
+      const video = videoRef.current
+      const videoWidth = video.videoWidth
+      const videoHeight = video.videoHeight
+      
+      // REAL-TIME BRIGHTNESS CHECK - Check lighting before allowing capture
+      const tempCanvas = canvasRef.current
+      tempCanvas.width = videoWidth
+      tempCanvas.height = videoHeight
+      const ctx = tempCanvas.getContext('2d')
+      
+      if (ctx) {
+        ctx.drawImage(video, 0, 0)
+        const imageData = ctx.getImageData(0, 0, videoWidth, videoHeight)
+        const data = imageData.data
+        
+        // Calculate average brightness of the frame
+        let totalBrightness = 0
+        for (let i = 0; i < data.length; i += 16) {
+          const r = data[i]
+          const g = data[i + 1]
+          const b = data[i + 2]
+          totalBrightness += (r + g + b) / 3
+        }
+        const avgBrightness = totalBrightness / (data.length / 16)
+        
+        // Block capture if lighting is poor (brightness < 110)
+        if (avgBrightness < 110) {
+          console.log(`[Lighting] Too dark: ${avgBrightness.toFixed(1)} (min: 110)`)
+          setFaceStatus('poor_lighting')
+          return
+        }
+      }
+      
       const detections = await faceapi.detectAllFaces(
-        videoRef.current,
+        video,
         new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
       )
 
@@ -55,14 +88,14 @@ export default function WebcamCapture({ onCapture, capturedImage, onClear, disab
       }
 
       const face = detections[0]
-      const videoWidth = videoRef.current.videoWidth
-      const videoHeight = videoRef.current.videoHeight
       
-      // Check face size (must be at least 35% of frame height - user must be close)
+      // Check face size (must be at least 50% of frame height - user must be CLOSE)
       const faceHeight = face.box.height
       const faceSizeRatio = faceHeight / videoHeight
       
-      if (faceSizeRatio < 0.35) {
+      console.log(`[FaceSize] Ratio: ${(faceSizeRatio * 100).toFixed(1)}% (min: 50%)`)
+      
+      if (faceSizeRatio < 0.50) {
         setFaceStatus('too_far')
         return
       }
@@ -240,13 +273,15 @@ export default function WebcamCapture({ onCapture, capturedImage, onClear, disab
             <div className={`w-full max-w-xs mb-3 p-2 rounded-lg text-center text-sm font-medium ${
               faceStatus === 'ready' ? 'bg-emerald-100 text-emerald-700' :
               faceStatus === 'loading' ? 'bg-slate-100 text-slate-600' :
-              'bg-red-100 text-red-700'
+              faceStatus === 'poor_lighting' ? 'bg-red-100 text-red-700' :
+              'bg-amber-100 text-amber-700'
             }`}>
               {faceStatus === 'loading' && <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading face detection...</span>}
-              {faceStatus === 'no_face' && '❌ No face detected - look at camera'}
-              {faceStatus === 'too_far' && '⚠️ Move closer to camera'}
-              {faceStatus === 'not_centered' && '↔️ Center your face in the circle'}
-              {faceStatus === 'ready' && '✓ Face detected - Ready to capture!'}
+              {faceStatus === 'no_face' && '👀 Look directly at the camera'}
+              {faceStatus === 'too_far' && '📏 Move CLOSER to fill the oval'}
+              {faceStatus === 'not_centered' && '↔️ Center your face in the oval'}
+              {faceStatus === 'poor_lighting' && '💡 Lighting too dark! Turn on lights'}
+              {faceStatus === 'ready' && '✅ Perfect! Ready to capture'}
             </div>
 
             {/* Camera with Face Guide */}
@@ -254,7 +289,8 @@ export default function WebcamCapture({ onCapture, capturedImage, onClear, disab
               {/* Face Oval Guide */}
               <div 
                 className={`relative overflow-hidden bg-black transition-all duration-300 ${
-                  faceStatus === 'ready' ? 'ring-4 ring-emerald-500' : 'ring-4 ring-red-400'
+                  faceStatus === 'ready' ? 'ring-4 ring-emerald-500' : 
+                  faceStatus === 'poor_lighting' ? 'ring-4 ring-red-500' : 'ring-4 ring-amber-400'
                 }`} 
                 style={{ width: '240px', height: '300px', borderRadius: '50%' }}
               >

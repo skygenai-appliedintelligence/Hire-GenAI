@@ -72,6 +72,7 @@ interface EvaluationData {
   overallScore: number
   interviewScore: number
   resumeUrl: string
+  photoUrl?: string | null
   qualified: boolean
   keyMetrics: {
     skillsMatch: number
@@ -285,8 +286,16 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
               <div className="flex items-center space-x-3 sm:space-x-4">
                 <Dialog>
                   <DialogTrigger asChild>
-                    <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg flex items-center justify-center border-2 sm:border-4 border-white shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200 flex-shrink-0">
-                      <User className="h-8 w-8 sm:h-12 sm:w-12 text-slate-500" />
+                    <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg flex items-center justify-center border-2 sm:border-4 border-white shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200 flex-shrink-0 overflow-hidden">
+                      {data.photoUrl ? (
+                        <img 
+                          src={data.photoUrl} 
+                          alt={data.candidateName} 
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User className="h-8 w-8 sm:h-12 sm:w-12 text-slate-500" />
+                      )}
                     </div>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md">
@@ -294,8 +303,16 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
                       <DialogTitle className="text-center">{data.candidateName}</DialogTitle>
                     </DialogHeader>
                     <div className="flex justify-center p-4">
-                      <div className="w-64 h-64 bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg flex items-center justify-center border-4 border-white shadow-lg">
-                        <User className="h-32 w-32 text-slate-500" />
+                      <div className="w-64 h-64 bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg flex items-center justify-center border-4 border-white shadow-lg overflow-hidden">
+                        {data.photoUrl ? (
+                          <img 
+                            src={data.photoUrl} 
+                            alt={data.candidateName} 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <User className="h-32 w-32 text-slate-500" />
+                        )}
                       </div>
                     </div>
                   </DialogContent>
@@ -1022,12 +1039,17 @@ export function CVEvaluationReport({ data, isGeneratingPDF = false, expandedSkil
               </CardHeader>
               <CardContent className="p-4 pt-2">
                 <ul className="space-y-2">
-                  {data.extractedInfo.notes.map((note, index) => (
+                  {Array.isArray(data.extractedInfo.notes) ? data.extractedInfo.notes.map((note, index) => (
                     <li key={index} className="text-sm text-slate-600 flex items-start p-2 rounded-lg bg-slate-50 border border-slate-200">
                       <AlertTriangle className="w-4 h-4 text-amber-500 mr-2 mt-0.5 flex-shrink-0" />
                       <span>{note}</span>
                     </li>
-                  ))}
+                  )) : (
+                    <li className="text-sm text-slate-600 flex items-start p-2 rounded-lg bg-slate-50 border border-slate-200">
+                      <AlertTriangle className="w-4 h-4 text-amber-500 mr-2 mt-0.5 flex-shrink-0" />
+                      <span>No additional notes available</span>
+                    </li>
+                  )}
                 </ul>
               </CardContent>
             </Card>

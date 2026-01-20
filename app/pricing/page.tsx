@@ -72,15 +72,17 @@ export default function PricingPage() {
       cta: "Start Free Trial",
     },
     {
-      name: "$100 Pro",
-      description: "Full platform access for growing teams",
+      name: "Pro",
+      description: "Complete hiring solution for growing teams",
       monthlyPrice: 100,
       annualPrice: 100,
       features: [
-        "Multiple job postings",
-        "Advanced AI screening & ranking",
-        "Voice/Video AI interviews",
-        "Detailed analytics & reports",
+        "Unlimited job postings",
+        "AI-powered candidate matching & ranking",
+        "Voice/Video AI interviews with real-time evaluation",
+        "Advanced analytics & hiring insights",
+        "Automated interview scheduling",
+        "Priority support 24/7",
         "Usage rates: CV Parsing $0.50 per CV",
         "Usage rates: AI Interview $0.50 per minute",
         "Usage rates: Question Generation $0.10 per 10 questions",
@@ -88,6 +90,25 @@ export default function PricingPage() {
       limitations: [],
       popular: true,
       cta: "Choose Pro",
+    },
+    {
+      name: "Enterprise",
+      description: "Custom solutions for large organizations",
+      monthlyPrice: null,
+      annualPrice: null,
+      features: [
+        "Everything in Pro, plus:",
+        "Unlimited recruiters & team members",
+        "Dedicated account manager",
+        "Custom integrations & white-labeling",
+        "Advanced security (SSO, audit logs)",
+        "SLA guarantee & priority support",
+        "Custom pricing & billing options",
+        "On-premise deployment option",
+      ],
+      limitations: [],
+      popular: false,
+      cta: "Contact Sales",
     },
   ]
 
@@ -111,10 +132,48 @@ export default function PricingPage() {
         </div>
       </section>
 
+      {/* Value Proposition Section */}
+      <section className="py-16 bg-slate-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-slate-800 mb-4">Why HireGenAI is the Smart Choice</h2>
+            <p className="text-slate-600 max-w-2xl mx-auto">
+              Save time, reduce costs, and hire better candidates with our AI-powered platform
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl font-bold text-emerald-600">20x</span>
+              </div>
+              <h3 className="text-xl font-semibold text-slate-800 mb-2">Faster Hiring</h3>
+              <p className="text-slate-600">Screen and interview candidates 20 times faster than traditional methods</p>
+            </div>
+            
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl font-bold text-blue-600">80%</span>
+              </div>
+              <h3 className="text-xl font-semibold text-slate-800 mb-2">Cost Reduction</h3>
+              <p className="text-slate-600">Reduce recruitment costs by up to 80% with automated screening</p>
+            </div>
+            
+            <div className="text-center">
+              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl font-bold text-purple-600">95%</span>
+              </div>
+              <h3 className="text-xl font-semibold text-slate-800 mb-2">Better Matches</h3>
+              <p className="text-slate-600">AI-powered matching ensures 95% better candidate-job fit</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Cards */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {plans.map((plan, index) => (
               <Card
                 key={index}
@@ -129,14 +188,18 @@ export default function PricingPage() {
                   </div>
                 )}
                 <CardHeader className="text-center pb-8">
-                  {plan.name !== "$100 Pro" && (
-                    <CardTitle className="text-2xl font-bold text-slate-800">{plan.name}</CardTitle>
-                  )}
+                  <CardTitle className="text-2xl font-bold text-slate-800">{plan.name}</CardTitle>
                   <CardDescription className="text-slate-600 mt-2">{plan.description}</CardDescription>
                   <div className="mt-6">
                     <div className="flex items-center justify-center">
-                      <span className="text-5xl font-bold text-slate-800">${plan.monthlyPrice}</span>
-                      <span className="text-slate-600 ml-2">/month</span>
+                      {plan.monthlyPrice !== null ? (
+                        <>
+                          <span className="text-5xl font-bold text-slate-800">${plan.monthlyPrice}</span>
+                          <span className="text-slate-600 ml-2">{plan.monthlyPrice === 0 ? '' : 'flexible billing'}</span>
+                        </>
+                      ) : (
+                        <span className="text-3xl font-bold text-slate-800">Custom</span>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -158,8 +221,10 @@ export default function PricingPage() {
                   {plan.cta === "Contact Sales" ? (
                     <Button
                       className={`w-full ${plan.popular ? "sr-button-primary" : "sr-button-secondary"}`}
+                      onClick={() => window.location.href = '/contact'}
                     >
                       {plan.cta}
+                      <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
                   ) : (
                     <Button

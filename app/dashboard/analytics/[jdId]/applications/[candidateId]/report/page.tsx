@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, User, FileText, MessageSquare, Download, Mail, Phone, Calendar, ExternalLink, Star, Briefcase, ChevronDown, CheckCircle2, TrendingUp, Target, Award, BarChart3, HelpCircle, Lightbulb, AlertTriangle, Zap, Brain, Users, MessageCircle, Code, Globe, DollarSign, Link as LinkIcon, XCircle, CheckCircle, MapPin, Clock } from "lucide-react"
+import { ArrowLeft, User, FileText, MessageSquare, Download, Mail, Phone, Calendar, ExternalLink, Star, Briefcase, ChevronDown, CheckCircle2, TrendingUp, Target, Award, BarChart3, HelpCircle, Lightbulb, AlertTriangle, Zap, Brain, Users, MessageCircle, Code, Globe, DollarSign, Link as LinkIcon, XCircle, CheckCircle, MapPin, Clock, Camera } from "lucide-react"
 import { CVEvaluationReport } from "@/components/cv-evaluation-report"
 import { generateReportPDFHTML, openReportPDF, type ReportPDFData } from "@/lib/report-pdf-generator"
 // Dynamic import for html2pdf to avoid TypeScript issues
@@ -29,6 +29,7 @@ type CandidateData = {
   availableStartDate?: string | null
   willingToRelocate?: boolean
   languages?: Array<{ language: string; proficiency: string }>
+  photoUrl?: string | null
 }
 
 type EvaluationData = {
@@ -219,6 +220,7 @@ export default function CandidateReportPage() {
   const [sectionPointers, setSectionPointers] = useState<SectionPointers | null>(null)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [expandedSkillSetMatch, setExpandedSkillSetMatch] = useState(false)
+  const [verificationPhotos, setVerificationPhotos] = useState<{ appliedPhoto: string | null; preInterviewPhoto: string | null; duringInterviewPhoto: string | null; postInterviewPhoto: string | null }>({ appliedPhoto: null, preInterviewPhoto: null, duringInterviewPhoto: null, postInterviewPhoto: null })
 
   // Download report as PDF
   const downloadReport = async () => {
@@ -263,6 +265,7 @@ export default function CandidateReportPage() {
         jobTitle: jobTitle,
         resumeScore: resumeScore,
         interviewScore: evaluation?.overallScore ? (typeof evaluation.overallScore === 'number' && evaluation.overallScore <= 10 ? Math.round(evaluation.overallScore * 10) : Math.round(evaluation.overallScore as number)) : 0,
+        verificationPhotos: verificationPhotos,
         qualificationDetails: qualificationDetails ? {
           ...qualificationDetails,
           // Add CV evaluation data for PDF - Generate strengths and gaps dynamically
@@ -373,6 +376,7 @@ export default function CandidateReportPage() {
         setResumeText(typeof json.resumeText === 'string' ? json.resumeText : null)
         setQualificationDetails(json.qualificationDetails || null)
         setSectionPointers(json.sectionPointers || null)
+        if (json.verificationPhotos) setVerificationPhotos(json.verificationPhotos)
         if (json.qualificationScore) setDbScore(json.qualificationScore)
         if (typeof json.isQualified === 'boolean') setDbQualified(json.isQualified)
 
@@ -650,7 +654,7 @@ export default function CandidateReportPage() {
 
       {/* Content Area */}
       <div className="px-2 sm:px-3 md:px-4 lg:px-6 py-4 sm:py-6 bg-gradient-to-b from-gray-50/60 via-white to-gray-50/40 max-w-full" ref={reportRef}>
-        
+
         {/* Application Details - Always at top for candidate tab */}
         {activeTab === "candidate" && (
           <Card className="border-0 bg-white shadow-md mb-6 overflow-hidden">
@@ -868,6 +872,7 @@ export default function CandidateReportPage() {
                 overallScore: resumeScore,
                 interviewScore: evaluation?.overallScore ? (evaluation.overallScore as number) : 0,
                 resumeUrl: candidateData.resumeUrl,
+                photoUrl: candidateData.photoUrl,
                 qualified: resumeScore >= 60,
                 keyMetrics: {
                   skillsMatch: qualificationDetails.breakdown?.skill_set_match?.score || 75,
@@ -1852,6 +1857,101 @@ export default function CandidateReportPage() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Verification Photos Card - In Candidate Tab */}
+                {(verificationPhotos.appliedPhoto || verificationPhotos.preInterviewPhoto || verificationPhotos.duringInterviewPhoto || verificationPhotos.postInterviewPhoto) && (
+                  <Card className="border-0 bg-white shadow-md mb-6 overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-purple-600 to-purple-700 border-b-0 py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-white/10 rounded-lg">
+                          <Camera className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-white text-sm font-semibold">Verification Photos</CardTitle>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                      <div className="grid grid-cols-4 gap-3">
+                        {/* Applied Photo */}
+                        <div className="text-center">
+                          <div className="w-16 h-16 mx-auto rounded-full overflow-hidden bg-slate-100 border-2 border-slate-200 cursor-pointer hover:border-slate-400 transition-all duration-200"
+                               onClick={() => verificationPhotos.appliedPhoto && window.open(verificationPhotos.appliedPhoto, '_blank')}>
+                            {verificationPhotos.appliedPhoto ? (
+                              <img 
+                                src={verificationPhotos.appliedPhoto} 
+                                alt="Application photo" 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                <Camera className="h-5 w-5 opacity-50" />
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-600 mt-1.5 font-medium">Applied</p>
+                        </div>
+                        
+                        {/* Pre-Interview Photo */}
+                        <div className="text-center">
+                          <div className="w-16 h-16 mx-auto rounded-full overflow-hidden bg-slate-100 border-2 border-slate-200 cursor-pointer hover:border-slate-400 transition-all duration-200"
+                               onClick={() => verificationPhotos.preInterviewPhoto && window.open(verificationPhotos.preInterviewPhoto, '_blank')}>
+                            {verificationPhotos.preInterviewPhoto ? (
+                              <img 
+                                src={verificationPhotos.preInterviewPhoto} 
+                                alt="Pre-interview verification" 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                <Camera className="h-5 w-5 opacity-50" />
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-600 mt-1.5 font-medium">Pre-Interview</p>
+                        </div>
+                        
+                        {/* During Interview Photo */}
+                        <div className="text-center">
+                          <div className="w-16 h-16 mx-auto rounded-full overflow-hidden bg-slate-100 border-2 border-slate-200 cursor-pointer hover:border-slate-400 transition-all duration-200" 
+                               onClick={() => verificationPhotos.duringInterviewPhoto && window.open(verificationPhotos.duringInterviewPhoto, '_blank')}>
+                            {verificationPhotos.duringInterviewPhoto ? (
+                              <img 
+                                src={verificationPhotos.duringInterviewPhoto} 
+                                alt="During interview screenshot" 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                <Camera className="h-5 w-5 opacity-50" />
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-600 mt-1.5 font-medium">During Interview</p>
+                        </div>
+                        
+                        {/* Post-Interview Photo */}
+                        <div className="text-center">
+                          <div className="w-16 h-16 mx-auto rounded-full overflow-hidden bg-slate-100 border-2 border-slate-200 cursor-pointer hover:border-slate-400 transition-all duration-200"
+                               onClick={() => verificationPhotos.postInterviewPhoto && window.open(verificationPhotos.postInterviewPhoto, '_blank')}>
+                            {verificationPhotos.postInterviewPhoto ? (
+                              <img 
+                                src={verificationPhotos.postInterviewPhoto} 
+                                alt="Post-interview verification" 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                <Camera className="h-5 w-5 opacity-50" />
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-600 mt-1.5 font-medium">Post-Interview</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </div>
 
@@ -1861,6 +1961,100 @@ export default function CandidateReportPage() {
         {/* Evaluation Tab Content - Redesigned with Criteria-Based Flow */}
         {activeTab === "evaluation" && (
           <div className="mt-6 space-y-6">
+            {/* Verification Photos Card - In Evaluation Tab */}
+            {(verificationPhotos.appliedPhoto || verificationPhotos.preInterviewPhoto || verificationPhotos.duringInterviewPhoto || verificationPhotos.postInterviewPhoto) && (
+              <Card className="border-0 bg-white shadow-md mb-6 overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-purple-600 to-purple-700 border-b-0 py-3 px-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-white/10 rounded-lg">
+                      <Camera className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-white text-sm font-semibold">Verification Photos</CardTitle>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-4 gap-3">
+                    {/* Applied Photo */}
+                    <div className="text-center">
+                      <div className="w-16 h-16 mx-auto rounded-full overflow-hidden bg-slate-100 border-2 border-slate-200 cursor-pointer hover:border-slate-400 transition-all duration-200"
+                           onClick={() => verificationPhotos.appliedPhoto && window.open(verificationPhotos.appliedPhoto, '_blank')}>
+                        {verificationPhotos.appliedPhoto ? (
+                          <img 
+                            src={verificationPhotos.appliedPhoto} 
+                            alt="Application photo" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400">
+                            <Camera className="h-5 w-5 opacity-50" />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1.5 font-medium">Applied</p>
+                    </div>
+                    
+                    {/* Pre-Interview Photo */}
+                    <div className="text-center">
+                      <div className="w-16 h-16 mx-auto rounded-full overflow-hidden bg-slate-100 border-2 border-slate-200 cursor-pointer hover:border-slate-400 transition-all duration-200"
+                           onClick={() => verificationPhotos.preInterviewPhoto && window.open(verificationPhotos.preInterviewPhoto, '_blank')}>
+                        {verificationPhotos.preInterviewPhoto ? (
+                          <img 
+                            src={verificationPhotos.preInterviewPhoto} 
+                            alt="Pre-interview verification" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400">
+                            <Camera className="h-5 w-5 opacity-50" />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1.5 font-medium">Pre-Interview</p>
+                    </div>
+                    
+                    {/* During Interview Photo */}
+                    <div className="text-center">
+                      <div className="w-16 h-16 mx-auto rounded-full overflow-hidden bg-slate-100 border-2 border-slate-200 cursor-pointer hover:border-slate-400 transition-all duration-200" 
+                           onClick={() => verificationPhotos.duringInterviewPhoto && window.open(verificationPhotos.duringInterviewPhoto, '_blank')}>
+                        {verificationPhotos.duringInterviewPhoto ? (
+                          <img 
+                            src={verificationPhotos.duringInterviewPhoto} 
+                            alt="During interview screenshot" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400">
+                            <Camera className="h-5 w-5 opacity-50" />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1.5 font-medium">During Interview</p>
+                    </div>
+                    
+                    {/* Post-Interview Photo */}
+                    <div className="text-center">
+                      <div className="w-16 h-16 mx-auto rounded-full overflow-hidden bg-slate-100 border-2 border-slate-200 cursor-pointer hover:border-slate-400 transition-all duration-200"
+                           onClick={() => verificationPhotos.postInterviewPhoto && window.open(verificationPhotos.postInterviewPhoto, '_blank')}>
+                        {verificationPhotos.postInterviewPhoto ? (
+                          <img 
+                            src={verificationPhotos.postInterviewPhoto} 
+                            alt="Post-interview verification" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400">
+                            <Camera className="h-5 w-5 opacity-50" />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1.5 font-medium">Post-Interview</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             {evaluation ? (
               <>
                 {/* ===== SECTION 1: Overall Score Hero Card ===== */}
@@ -2540,9 +2734,19 @@ export default function CandidateReportPage() {
                   const generatedStrengths: string[] = []
                   const generatedWeaknesses: string[] = []
                   
+                  // Collect criteria-based performance
+                  const criteriaScores: Record<string, { total: number, count: number }> = {}
+                  
                   questions.forEach((q: any) => {
                     const score = q.score || 0
                     const criteria = q.criteria || q.category || 'General'
+                    
+                    // Track criteria scores
+                    if (!criteriaScores[criteria]) {
+                      criteriaScores[criteria] = { total: 0, count: 0 }
+                    }
+                    criteriaScores[criteria].total += score
+                    criteriaScores[criteria].count += 1
                     
                     // Collect strengths from high-scoring answers
                     if (score >= 70 && q.strengths_in_answer && q.strengths_in_answer.length > 0) {
@@ -2558,6 +2762,38 @@ export default function CandidateReportPage() {
                       })
                     }
                   })
+                  
+                  // Generate additional strengths based on criteria performance
+                  Object.entries(criteriaScores).forEach(([criteria, data]) => {
+                    const avgScore = data.total / data.count
+                    if (avgScore >= 70 && criteria !== 'General') {
+                      const strengthText = `Strong performance in ${criteria} (${Math.round(avgScore)}% avg)`
+                      if (!generatedStrengths.some(s => s.includes(criteria))) {
+                        generatedStrengths.push(strengthText)
+                      }
+                    }
+                    if (avgScore < 50 && criteria !== 'General') {
+                      const weaknessText = `Needs improvement in ${criteria} (${Math.round(avgScore)}% avg)`
+                      if (!generatedWeaknesses.some(w => w.includes(criteria))) {
+                        generatedWeaknesses.push(weaknessText)
+                      }
+                    }
+                  })
+                  
+                  // Add overall performance-based strengths
+                  if (overallScore >= 70) {
+                    if (!generatedStrengths.some(s => s.toLowerCase().includes('overall'))) {
+                      generatedStrengths.push('Demonstrated strong overall interview performance')
+                    }
+                  }
+                  
+                  const answeredCount = questions.filter((q: any) => q.answered !== false).length
+                  const totalQuestions = questions.length
+                  if (answeredCount === totalQuestions && totalQuestions > 0) {
+                    if (!generatedStrengths.some(s => s.toLowerCase().includes('all questions'))) {
+                      generatedStrengths.push('Successfully answered all interview questions')
+                    }
+                  }
                   
                   // Use evaluation strengths/weaknesses if available, otherwise use generated
                   const strengths = (evalAny.strengths && evalAny.strengths.length > 0) 
