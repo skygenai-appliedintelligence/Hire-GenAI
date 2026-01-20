@@ -51,19 +51,77 @@ export default function InterviewVerifyPage() {
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [photoSkipped, setPhotoSkipped] = useState(false)
   const [countdown, setCountdown] = useState<number | null>(null)
-  const [faceStatus, setFaceStatus] = useState<'loading' | 'no_face' | 'too_far' | 'not_centered' | 'ready'>('loading')
+  const [faceStatus, setFaceStatus] = useState<'loading' | 'no_face' | 'too_far' | 'not_centered' | 'poor_lighting' | 'ready'>('loading')
   const [modelsLoaded, setModelsLoaded] = useState(false)
   const [loadingModels, setLoadingModels] = useState(false)
   
-  // Face comparison state
+  // Face comparison state - BINARY only (no score/percentage)
   const [storedPhotoUrl, setStoredPhotoUrl] = useState<string | null>(null)
-  const [faceMatchScore, setFaceMatchScore] = useState<number | null>(null)
   const [faceMatchStatus, setFaceMatchStatus] = useState<'pending' | 'comparing' | 'matched' | 'not_matched' | 'no_stored_photo'>('pending')
+  const [verificationAttempts, setVerificationAttempts] = useState(0)
+  const MAX_VERIFICATION_ATTEMPTS = 10
+  
+  // Liveness detection state
+  const [livenessChecks, setLivenessChecks] = useState<{
+    blinkDetected: boolean;
+    headMovementDetected: boolean;
+    multipleFacesDetected: boolean;
+    lastFacePositions: Array<{x: number, y: number}>;
+  }>({
+    blinkDetected: false, 
+    headMovementDetected: false,
+    multipleFacesDetected: false,
+    lastFacePositions: [] 
+  })
 
-  // Auto-send OTP on page load
+  // Camera stabilization state
+  const [cameraStabilizing, setCameraStabilizing] = useState(false)
+  const [stabilizationCountdown, setStabilizationCountdown] = useState<number | null>(null)
+  const [qualityCheck, setQualityCheck] = useState<{
+    passed: boolean;
+    faceCount: number;
+    confidence: number;
+    faceSize: number;
+    centered: boolean;
+    brightness: number;
+    message: string;
+  } | null>(null)
+
+  // Reference photo descriptor (cached)
+  const referenceDescriptorRef = useRef<Float32Array | null>(null)
+
+  // Standardized detector options - SAME for both reference and live photo
+  const DETECTOR_OPTIONS = {
+    inputSize: 416,
+    scoreThreshold: 0.5
+  }
+
+  // Verification thresholds
+  const VERIFICATION_THRESHOLD = 0.45
+  const MIN_CONFIDENCE = 0.6
+  const MIN_FACE_SIZE_RATIO = 0.35
+  const MAX_CENTER_DEVIATION = 0.10
+
+  // Auto-send OTP on page load - only once (using sessionStorage to survive React Strict Mode double-mount)
+  const otpSentRef = useRef(false)
   useEffect(() => {
-    if (applicationId && !otpSent && !otpSending) {
+    if (!applicationId) return
+    
+    // Check sessionStorage to prevent duplicate OTP sends in React Strict Mode
+    const otpSentKey = `otp_sent_${applicationId}`
+    const alreadySent = sessionStorage.getItem(otpSentKey)
+    
+    if (!otpSentRef.current && !alreadySent) {
+      otpSentRef.current = true
+      sessionStorage.setItem(otpSentKey, 'true')
       sendOtp()
+    }
+    
+    // Cleanup on unmount - remove the flag after 30 seconds to allow resend on page refresh
+    return () => {
+      setTimeout(() => {
+        sessionStorage.removeItem(otpSentKey)
+      }, 30000)
     }
   }, [applicationId])
 
@@ -200,154 +258,345 @@ export default function InterviewVerifyPage() {
     setLoadingModels(false)
   }, [modelsLoaded, loadingModels])
 
-  // Compare captured photo with stored photo using face-api.js
-  const compareFaces = useCallback(async (capturedImageData: string): Promise<{ matched: boolean; score: number; error?: string }> => {
-    if (!storedPhotoUrl) {
-      console.log('[FaceCompare] No stored photo URL, skipping comparison')
-      return { matched: true, score: 100 }
+  // Load and cache reference photo descriptor
+  const loadReferenceDescriptor = useCallback(async (): Promise<Float32Array | null> => {
+    if (referenceDescriptorRef.current) {
+      console.log('[Reference] Using cached descriptor')
+      return referenceDescriptorRef.current
     }
-
+    
+    if (!storedPhotoUrl) {
+      console.log('[Reference] No stored photo URL')
+      return null
+    }
+    
     try {
-      setFaceMatchStatus('comparing')
-      console.log('[FaceCompare] Starting face comparison...')
-      console.log('[FaceCompare] Stored photo URL:', storedPhotoUrl)
-
-      // Load captured image (base64)
-      const capturedImg = new Image()
-      await new Promise<void>((resolve, reject) => {
-        capturedImg.onload = () => {
-          console.log('[FaceCompare] Captured image loaded:', capturedImg.width, 'x', capturedImg.height)
-          resolve()
-        }
-        capturedImg.onerror = (e) => {
-          console.error('[FaceCompare] Failed to load captured image:', e)
-          reject(new Error('Failed to load captured image'))
-        }
-        capturedImg.src = capturedImageData
-      })
-
-      // Load stored image - use fetch to handle CORS properly
-      console.log('[FaceCompare] Fetching stored image...')
+      console.log('[Reference] Loading reference photo...')
+      
+      // Load stored image
       let storedImg: HTMLImageElement
       try {
         const response = await fetch(storedPhotoUrl)
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`)
-        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
         const blob = await response.blob()
         const blobUrl = URL.createObjectURL(blob)
         
         storedImg = new Image()
         await new Promise<void>((resolve, reject) => {
-          storedImg.onload = () => {
-            console.log('[FaceCompare] Stored image loaded:', storedImg.width, 'x', storedImg.height)
-            resolve()
-          }
-          storedImg.onerror = (e) => {
-            console.error('[FaceCompare] Failed to load stored image from blob:', e)
-            reject(new Error('Failed to load stored image'))
-          }
+          storedImg.onload = () => resolve()
+          storedImg.onerror = () => reject(new Error('Failed to load'))
           storedImg.src = blobUrl
         })
-      } catch (fetchErr) {
-        console.error('[FaceCompare] Failed to fetch stored image:', fetchErr)
-        // Fallback: try direct image load
+      } catch {
         storedImg = new Image()
         storedImg.crossOrigin = 'anonymous'
         await new Promise<void>((resolve, reject) => {
-          storedImg.onload = () => {
-            console.log('[FaceCompare] Stored image loaded (fallback):', storedImg.width, 'x', storedImg.height)
-            resolve()
-          }
-          storedImg.onerror = (e) => {
-            console.error('[FaceCompare] Failed to load stored image (fallback):', e)
-            reject(new Error('Failed to load stored image'))
-          }
+          storedImg.onload = () => resolve()
+          storedImg.onerror = () => reject(new Error('Failed to load'))
           storedImg.src = storedPhotoUrl
         })
       }
-
-      // Detect face in captured image
-      console.log('[FaceCompare] Detecting face in captured image...')
-      const capturedDetection = await faceapi
-        .detectSingleFace(capturedImg, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
+      
+      console.log('[Reference] Image loaded:', storedImg.width, 'x', storedImg.height)
+      
+      // Detect face with SAME detector options
+      const detection = await faceapi
+        .detectSingleFace(storedImg, new faceapi.TinyFaceDetectorOptions(DETECTOR_OPTIONS))
         .withFaceLandmarks()
         .withFaceDescriptor()
-
-      if (!capturedDetection) {
-        console.error('[FaceCompare] No face detected in captured image')
-        return { matched: false, score: 0, error: 'No face detected in current photo' }
+      
+      if (!detection) {
+        console.error('[Reference] No face detected in reference photo')
+        return null
       }
-      console.log('[FaceCompare] Captured face detected, confidence:', capturedDetection.detection.score.toFixed(3))
-
-      // Detect face in stored image
-      console.log('[FaceCompare] Detecting face in stored image...')
-      const storedDetection = await faceapi
-        .detectSingleFace(storedImg, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
-        .withFaceLandmarks()
-        .withFaceDescriptor()
-
-      if (!storedDetection) {
-        console.error('[FaceCompare] No face detected in stored image')
-        return { matched: false, score: 0, error: 'No face detected in application photo' }
-      }
-      console.log('[FaceCompare] Stored face detected, confidence:', storedDetection.detection.score.toFixed(3))
-
-      // Compare face descriptors using Euclidean distance
-      const distance = faceapi.euclideanDistance(
-        capturedDetection.descriptor,
-        storedDetection.descriptor
-      )
-
-      // Convert distance to similarity score (0-100)
-      // Euclidean distance typically ranges from 0 (identical) to ~1.5 (very different)
-      // Distance < 0.6 is typically considered a match
-      const normalizedScore = Math.max(0, Math.min(1, 1 - (distance / 1.0)))
-      const score = Math.round(normalizedScore * 100)
-      const matched = distance < 0.6
-
-      console.log(`[FaceCompare] Result: distance=${distance.toFixed(4)}, score=${score}%, matched=${matched}`)
-      console.log(`[FaceCompare] Captured descriptor sample:`, Array.from(capturedDetection.descriptor).slice(0, 5))
-      console.log(`[FaceCompare] Stored descriptor sample:`, Array.from(storedDetection.descriptor).slice(0, 5))
-
-      return { matched, score }
-    } catch (err: any) {
-      console.error('[FaceCompare] Error:', err)
-      return { matched: false, score: 0, error: err?.message || 'Face comparison failed' }
+      
+      console.log('[Reference] Face detected, confidence:', detection.detection.score.toFixed(3))
+      referenceDescriptorRef.current = detection.descriptor
+      return detection.descriptor
+      
+    } catch (err) {
+      console.error('[Reference] Error loading reference:', err)
+      return null
     }
   }, [storedPhotoUrl])
 
-  // Real face detection using face-api.js
-  const detectFace = useCallback(async () => {
-    if (!videoRef.current || !isCameraReady || !modelsLoaded) return
+  // Check image quality (blur, brightness)
+  const checkImageQuality = useCallback((canvas: HTMLCanvasElement): { brightness: number; isBlurry: boolean } => {
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return { brightness: 0, isBlurry: true }
+    
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    const data = imageData.data
+    
+    // Calculate average brightness
+    let totalBrightness = 0
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i]
+      const g = data[i + 1]
+      const b = data[i + 2]
+      totalBrightness += (r + g + b) / 3
+    }
+    const brightness = totalBrightness / (data.length / 4)
+    
+    // Simple blur detection using Laplacian variance
+    let laplacianSum = 0
+    const width = canvas.width
+    const height = canvas.height
+    
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        const idx = (y * width + x) * 4
+        const center = (data[idx] + data[idx + 1] + data[idx + 2]) / 3
+        
+        const top = (data[((y - 1) * width + x) * 4] + data[((y - 1) * width + x) * 4 + 1] + data[((y - 1) * width + x) * 4 + 2]) / 3
+        const bottom = (data[((y + 1) * width + x) * 4] + data[((y + 1) * width + x) * 4 + 1] + data[((y + 1) * width + x) * 4 + 2]) / 3
+        const left = (data[(y * width + x - 1) * 4] + data[(y * width + x - 1) * 4 + 1] + data[(y * width + x - 1) * 4 + 2]) / 3
+        const right = (data[(y * width + x + 1) * 4] + data[(y * width + x + 1) * 4 + 1] + data[(y * width + x + 1) * 4 + 2]) / 3
+        
+        const laplacian = Math.abs(4 * center - top - bottom - left - right)
+        laplacianSum += laplacian * laplacian
+      }
+    }
+    
+    const variance = laplacianSum / ((width - 2) * (height - 2))
+    console.log(`[BlurCheck] Laplacian variance: ${variance.toFixed(2)}`)
+    const isBlurry = variance < 20 // Reduced threshold - 100 was too strict
+    
+    return { brightness, isBlurry }
+  }, [])
+
+  // Quality gate - validate captured photo before verification
+  const runQualityGate = useCallback(async (imageData: string): Promise<{ passed: boolean; error?: string; detection?: any }> => {
+    console.log('[QualityGate] Starting quality checks...')
+    
+    try {
+      // Load image
+      const img = new Image()
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve()
+        img.onerror = () => reject(new Error('Failed to load image'))
+        img.src = imageData
+      })
+      
+      // Check brightness using canvas
+      const tempCanvas = document.createElement('canvas')
+      tempCanvas.width = img.width
+      tempCanvas.height = img.height
+      const tempCtx = tempCanvas.getContext('2d')
+      if (tempCtx) {
+        tempCtx.drawImage(img, 0, 0)
+        const { brightness, isBlurry } = checkImageQuality(tempCanvas)
+        
+        console.log(`[QualityGate] Brightness: ${brightness.toFixed(1)}, Blurry: ${isBlurry}`)
+        
+        if (brightness < 50) {
+          setQualityCheck({ passed: false, faceCount: 0, confidence: 0, faceSize: 0, centered: false, brightness, message: 'Image too dark. Please improve lighting.' })
+          return { passed: false, error: '📷 Image too dark. Please improve lighting.' }
+        }
+        
+        if (brightness > 220) {
+          setQualityCheck({ passed: false, faceCount: 0, confidence: 0, faceSize: 0, centered: false, brightness, message: 'Image too bright. Reduce lighting glare.' })
+          return { passed: false, error: '📷 Image too bright. Reduce lighting glare.' }
+        }
+        
+        if (isBlurry) {
+          setQualityCheck({ passed: false, faceCount: 0, confidence: 0, faceSize: 0, centered: false, brightness, message: 'Image is blurry. Hold still and try again.' })
+          return { passed: false, error: '📷 Image is blurry. Hold still and try again.' }
+        }
+      }
+      
+      // Detect all faces
+      const detections = await faceapi.detectAllFaces(
+        img, 
+        new faceapi.TinyFaceDetectorOptions(DETECTOR_OPTIONS)
+      ).withFaceLandmarks().withFaceDescriptors()
+      
+      console.log(`[QualityGate] Faces detected: ${detections.length}`)
+      
+      // Check face count
+      if (detections.length === 0) {
+        setQualityCheck({ passed: false, faceCount: 0, confidence: 0, faceSize: 0, centered: false, brightness: 0, message: 'No face detected. Face the camera directly.' })
+        return { passed: false, error: '❌ No face detected. Please face the camera directly.' }
+      }
+      
+      if (detections.length > 1) {
+        setQualityCheck({ passed: false, faceCount: detections.length, confidence: 0, faceSize: 0, centered: false, brightness: 0, message: 'Multiple faces detected. Only you should be in frame.' })
+        return { passed: false, error: '❌ Multiple faces detected. Only you should be in frame.' }
+      }
+      
+      const detection = detections[0]
+      const confidence = detection.detection.score
+      const faceBox = detection.detection.box
+      const faceHeight = faceBox.height
+      const faceSizeRatio = faceHeight / img.height
+      
+      // Check confidence
+      if (confidence < MIN_CONFIDENCE) {
+        setQualityCheck({ passed: false, faceCount: 1, confidence, faceSize: faceSizeRatio, centered: false, brightness: 0, message: `Low confidence (${(confidence * 100).toFixed(0)}%). Face the camera clearly.` })
+        return { passed: false, error: `⚠️ Face not clear (${(confidence * 100).toFixed(0)}% confidence). Please face the camera directly.` }
+      }
+      
+      // Check face size (must be at least 35% of frame)
+      if (faceSizeRatio < MIN_FACE_SIZE_RATIO) {
+        setQualityCheck({ passed: false, faceCount: 1, confidence, faceSize: faceSizeRatio, centered: false, brightness: 0, message: 'Face too small. Move closer to camera.' })
+        return { passed: false, error: '📏 Face too small. Please move closer to the camera.' }
+      }
+      
+      // Check centering (face center should be within ±10% of image center)
+      const faceCenterX = faceBox.x + faceBox.width / 2
+      const imageCenterX = img.width / 2
+      const horizontalDeviation = Math.abs(faceCenterX - imageCenterX) / img.width
+      
+      if (horizontalDeviation > MAX_CENTER_DEVIATION) {
+        setQualityCheck({ passed: false, faceCount: 1, confidence, faceSize: faceSizeRatio, centered: false, brightness: 0, message: 'Face not centered. Align with oval guide.' })
+        return { passed: false, error: '↔️ Face not centered. Please align your face with the oval guide.' }
+      }
+      
+      console.log(`[QualityGate] ✅ All checks passed - Confidence: ${(confidence * 100).toFixed(1)}%, Size: ${(faceSizeRatio * 100).toFixed(1)}%, Deviation: ${(horizontalDeviation * 100).toFixed(1)}%`)
+      
+      setQualityCheck({ passed: true, faceCount: 1, confidence, faceSize: faceSizeRatio, centered: true, brightness: 128, message: 'Quality check passed!' })
+      return { passed: true, detection }
+      
+    } catch (err: any) {
+      console.error('[QualityGate] Error:', err)
+      return { passed: false, error: err?.message || 'Quality check failed' }
+    }
+  }, [checkImageQuality])
+
+  // Compare captured photo with reference descriptor - BINARY result only
+  const compareFaces = useCallback(async (capturedImageData: string): Promise<{ matched: boolean; distance: number; error?: string }> => {
+    if (!storedPhotoUrl) {
+      console.log('[FaceCompare] No stored photo URL, skipping comparison')
+      return { matched: true, distance: 0 }
+    }
 
     try {
+      setFaceMatchStatus('comparing')
+      console.log('[FaceCompare] Starting face comparison...')
+      
+      // Get reference descriptor (cached or load fresh)
+      const referenceDescriptor = await loadReferenceDescriptor()
+      if (!referenceDescriptor) {
+        return { matched: false, distance: 1, error: 'Could not load reference photo. Please contact support.' }
+      }
+      
+      // Load captured image
+      const capturedImg = new Image()
+      await new Promise<void>((resolve, reject) => {
+        capturedImg.onload = () => resolve()
+        capturedImg.onerror = () => reject(new Error('Failed to load captured image'))
+        capturedImg.src = capturedImageData
+      })
+      
+      // Detect face with SAME detector options as reference
+      const capturedDetection = await faceapi
+        .detectSingleFace(capturedImg, new faceapi.TinyFaceDetectorOptions(DETECTOR_OPTIONS))
+        .withFaceLandmarks()
+        .withFaceDescriptor()
+      
+      if (!capturedDetection) {
+        return { matched: false, distance: 1, error: 'No face detected in captured photo. Please retake.' }
+      }
+      
+      const capturedConfidence = capturedDetection.detection.score
+      console.log(`[FaceCompare] Captured face confidence: ${capturedConfidence.toFixed(3)}`)
+      
+      // Check confidence
+      if (capturedConfidence < MIN_CONFIDENCE) {
+        return { matched: false, distance: 1, error: 'Face not clear enough. Please ensure good lighting and face the camera directly.' }
+      }
+      
+      // Compare using Euclidean distance - BINARY decision only
+      const distance = faceapi.euclideanDistance(capturedDetection.descriptor, referenceDescriptor)
+      const matched = distance < VERIFICATION_THRESHOLD
+      
+      // Log for debugging (distance stored in DB but NEVER shown to user)
+      console.log(`[FaceCompare] ========== RESULT ==========`)
+      console.log(`[FaceCompare] Distance: ${distance.toFixed(4)} (threshold: ${VERIFICATION_THRESHOLD})`)
+      console.log(`[FaceCompare] Decision: ${matched ? '✅ VERIFIED' : '❌ NOT VERIFIED'}`)
+      console.log(`[FaceCompare] ==============================`)
+      
+      return { matched, distance }
+      
+    } catch (err: any) {
+      console.error('[FaceCompare] Error:', err)
+      return { matched: false, distance: 1, error: err?.message || 'Face comparison failed' }
+    }
+  }, [storedPhotoUrl, loadReferenceDescriptor])
+
+  // Real face detection using face-api.js with lighting check
+  const detectFace = useCallback(async () => {
+    if (!videoRef.current || !isCameraReady || !modelsLoaded || !canvasRef.current) return
+
+    try {
+      const video = videoRef.current
+      const videoWidth = video.videoWidth
+      const videoHeight = video.videoHeight
+      
+      // REAL-TIME BRIGHTNESS CHECK - Check lighting before allowing capture
+      const tempCanvas = canvasRef.current
+      tempCanvas.width = videoWidth
+      tempCanvas.height = videoHeight
+      const ctx = tempCanvas.getContext('2d')
+      
+      if (ctx) {
+        ctx.drawImage(video, 0, 0)
+        const imageData = ctx.getImageData(0, 0, videoWidth, videoHeight)
+        const data = imageData.data
+        
+        // Calculate average brightness of the frame
+        let totalBrightness = 0
+        for (let i = 0; i < data.length; i += 16) { // Sample every 4th pixel for speed
+          const r = data[i]
+          const g = data[i + 1]
+          const b = data[i + 2]
+          totalBrightness += (r + g + b) / 3
+        }
+        const avgBrightness = totalBrightness / (data.length / 16)
+        
+        // Block capture if lighting is poor (brightness < 110)
+        // Image 1 showed ~90-100 brightness still looked dark
+        if (avgBrightness < 110) {
+          console.log(`[Lighting] Too dark: ${avgBrightness.toFixed(1)} (min: 110)`)
+          setFaceStatus('poor_lighting')
+          return
+        }
+      }
+      
+      // Detect faces with landmarks
       const detections = await faceapi.detectAllFaces(
-        videoRef.current,
+        video,
         new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
-      )
+      ).withFaceLandmarks()
 
       if (detections.length === 0) {
         setFaceStatus('no_face')
         return
       }
+      
+      // Check for multiple faces (potential spoofing attempt)
+      if (detections.length > 1) {
+        console.warn('[SECURITY] Multiple faces detected during verification!')
+        setLivenessChecks(prev => ({ ...prev, multipleFacesDetected: true }))
+      }
 
       const face = detections[0]
-      const videoWidth = videoRef.current.videoWidth
-      const videoHeight = videoRef.current.videoHeight
       
-      // Check face size (must be at least 35% of frame height - user must be close)
-      const faceHeight = face.box.height
+      // Check face size (must be at least 50% of frame height - user must be CLOSE)
+      // Image 2 showed ~40% still looked too far
+      const faceHeight = face.detection.box.height
       const faceSizeRatio = faceHeight / videoHeight
       
-      if (faceSizeRatio < 0.35) {
+      console.log(`[FaceSize] Ratio: ${(faceSizeRatio * 100).toFixed(1)}% (min: 50%)`)
+      
+      if (faceSizeRatio < 0.50) {
         setFaceStatus('too_far')
         return
       }
 
-      // Check if face is centered (within middle 60% of frame)
-      const faceCenterX = face.box.x + face.box.width / 2
-      const faceCenterY = face.box.y + face.box.height / 2
+      // Check if face is centered
+      const faceCenterX = face.detection.box.x + face.detection.box.width / 2
+      const faceCenterY = face.detection.box.y + face.detection.box.height / 2
       const marginX = videoWidth * 0.2
       const marginY = videoHeight * 0.2
       
@@ -399,19 +648,25 @@ export default function InterviewVerifyPage() {
     return () => clearTimeout(timer)
   }, [countdown])
 
-  // Start camera
+  // Start camera with stabilization period
   const startCamera = useCallback(async () => {
     setCapturedPhoto(null)
     setPhotoError(null)
     setFaceStatus('loading')
     setFaceMatchStatus('pending')
+    setQualityCheck(null)
     setIsCameraOpen(true)
+    setCameraStabilizing(true)
+    setStabilizationCountdown(2) // 2 second stabilization
     
     // Load models and fetch stored photo in parallel
     await Promise.all([
       loadModels(),
       fetchStoredPhoto()
     ])
+    
+    // Pre-load reference descriptor
+    await loadReferenceDescriptor()
     
     await new Promise(resolve => setTimeout(resolve, 100))
     
@@ -427,7 +682,18 @@ export default function InterviewVerifyPage() {
         videoRef.current.onloadedmetadata = async () => {
           try {
             await videoRef.current?.play()
+            // Start stabilization countdown after camera is ready
+            console.log('[Camera] Starting 2 second stabilization period...')
+            
+            // Wait 2 seconds for camera to stabilize
+            for (let i = 2; i >= 0; i--) {
+              setStabilizationCountdown(i)
+              if (i > 0) await new Promise(r => setTimeout(r, 1000))
+            }
+            
+            setCameraStabilizing(false)
             setIsCameraReady(true)
+            console.log('[Camera] Stabilization complete, ready for capture')
           } catch (playErr) {
             console.error('Video play error:', playErr)
           }
@@ -436,9 +702,10 @@ export default function InterviewVerifyPage() {
       }
     } catch (err: any) {
       setIsCameraOpen(false)
+      setCameraStabilizing(false)
       setPhotoError('Camera access denied. Please allow camera permissions.')
     }
-  }, [])
+  }, [loadModels, fetchStoredPhoto, loadReferenceDescriptor])
 
   // Stop camera
   const stopCamera = useCallback(() => {
@@ -474,51 +741,109 @@ export default function InterviewVerifyPage() {
   const retakePhoto = () => {
     setCapturedPhoto(null)
     setPhotoError(null)
+    setQualityCheck(null)
+    setFaceMatchStatus('pending')
     startCamera()
   }
 
-  // Verify photo with face comparison
+  // Calculate eye aspect ratio for blink detection
+  const calculateEyeAspectRatio = (eyePoints: any[]) => {
+    // Ensure we have enough points
+    if (eyePoints.length < 6) return 1.0
+    
+    // Calculate vertical distances
+    const v1 = Math.sqrt(
+      Math.pow(eyePoints[1].x - eyePoints[5].x, 2) + 
+      Math.pow(eyePoints[1].y - eyePoints[5].y, 2)
+    )
+    const v2 = Math.sqrt(
+      Math.pow(eyePoints[2].x - eyePoints[4].x, 2) + 
+      Math.pow(eyePoints[2].y - eyePoints[4].y, 2)
+    )
+    
+    // Calculate horizontal distance
+    const h = Math.sqrt(
+      Math.pow(eyePoints[0].x - eyePoints[3].x, 2) + 
+      Math.pow(eyePoints[0].y - eyePoints[3].y, 2)
+    )
+    
+    // Return eye aspect ratio
+    return (v1 + v2) / (2.0 * h)
+  }
+
+  // Verify photo with quality gate and face comparison
   const verifyPhoto = async () => {
     if (!capturedPhoto) return
     
+    // Check if max attempts exceeded
+    if (verificationAttempts >= MAX_VERIFICATION_ATTEMPTS) {
+      setPhotoError(`Maximum verification attempts (${MAX_VERIFICATION_ATTEMPTS}) exceeded. Please contact support for assistance.`)
+      return
+    }
+    
     setPhotoVerifying(true)
     setPhotoError(null)
+    setVerificationAttempts(prev => prev + 1)
     
     try {
-      // If no stored photo, skip comparison
+      // STEP 1: Run Quality Gate first
+      console.log('[Verify] Step 1: Running quality gate...')
+      const qualityResult = await runQualityGate(capturedPhoto)
+      
+      if (!qualityResult.passed) {
+        setPhotoError(qualityResult.error || 'Quality check failed. Please recapture.')
+        setPhotoVerifying(false)
+        return
+      }
+      
+      console.log('[Verify] Quality gate passed, proceeding to face comparison...')
+      
+      // STEP 2: Check if reference photo exists
       if (faceMatchStatus === 'no_stored_photo' || !storedPhotoUrl) {
-        setPhotoVerified(true)
-        setPhotoSkipped(true)
-        setFaceMatchStatus('matched')
-        setTimeout(() => {
-          router.push(`/interview/${applicationId}`)
-        }, 1500)
+        setFaceMatchStatus('not_matched')
+        setPhotoError('No application photo found for verification. Please contact support for manual verification.')
+        console.warn(`[SECURITY] Verification attempted without stored photo for applicationId: ${applicationId}`)
+        
+        await fetch('/api/interview/verify/security-alert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            applicationId,
+            alertType: 'missing_photo',
+            timestamp: new Date().toISOString()
+          })
+        }).catch(err => console.error('Failed to send security alert:', err))
+        
         return
       }
 
-      // Compare faces using face-api.js
+      // STEP 3: Compare faces using cached reference descriptor - BINARY result
+      console.log('[Verify] Step 2: Comparing faces...')
       const result = await compareFaces(capturedPhoto)
-      setFaceMatchScore(result.score)
       
       // Handle specific errors
       if (result.error) {
         setFaceMatchStatus('not_matched')
-        setPhotoError(result.error)
+        const attemptsLeft = MAX_VERIFICATION_ATTEMPTS - verificationAttempts
+        setPhotoError(`${result.error} (${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining)`)
         return
       }
       
       if (result.matched) {
+        // VERIFIED - face matches
         setFaceMatchStatus('matched')
         setPhotoVerified(true)
         
-        // Save verification result to database
+        // Save verification result to database (distance for logs, NEVER shown to user)
         await fetch('/api/interview/verify/compare-photo', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             applicationId, 
             verified: true, 
-            score: result.score 
+            distance: result.distance, // Store distance for internal logs only
+            attempts: verificationAttempts,
+            capturedPhotoUrl: capturedPhoto
           })
         })
         
@@ -527,12 +852,14 @@ export default function InterviewVerifyPage() {
           router.push(`/interview/${applicationId}`)
         }, 1500)
       } else {
-        // Low match but not an error - allow retry or manual review
+        // NOT VERIFIED - face does not match (BINARY decision, no percentages)
         setFaceMatchStatus('not_matched')
-        if (result.score > 30) {
-          setPhotoError(`Face match score is low: ${result.score}%. Try again with better lighting or position.`)
+        const attemptsLeft = MAX_VERIFICATION_ATTEMPTS - verificationAttempts
+        
+        if (attemptsLeft <= 0) {
+          setPhotoError(`Verification failed. Face does not match the application photo. Maximum attempts exceeded. Please contact support.`)
         } else {
-          setPhotoError(`Face does not match! Match score: ${result.score}%. Please ensure you are the same person who applied.`)
+          setPhotoError(`Face does not match the application photo. Please ensure you are the same person who applied. (${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining)`)
         }
       }
     } catch (err: any) {
@@ -694,26 +1021,37 @@ export default function InterviewVerifyPage() {
                 {/* Camera View */}
                 {isCameraOpen && !capturedPhoto && (
                   <div className="flex flex-col items-center">
-                    {/* Face Detection Status */}
+                    {/* Camera Stabilization / Face Detection Status */}
                     <div className={`w-full max-w-xs mb-3 p-2 rounded-lg text-center text-sm font-medium ${
+                      cameraStabilizing ? 'bg-blue-100 text-blue-700' :
                       faceStatus === 'ready' ? 'bg-emerald-100 text-emerald-700' :
                       faceStatus === 'loading' ? 'bg-slate-100 text-slate-600' :
-                      'bg-red-100 text-red-700'
+                      faceStatus === 'poor_lighting' ? 'bg-red-100 text-red-700' :
+                      'bg-amber-100 text-amber-700'
                     }`}>
-                      {faceStatus === 'loading' && <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Loading face detection...</span>}
-                      {faceStatus === 'no_face' && '❌ No face detected - look at camera'}
-                      {faceStatus === 'too_far' && '⚠️ Move closer to camera'}
-                      {faceStatus === 'not_centered' && '↔️ Center your face in the circle'}
-                      {faceStatus === 'ready' && '✓ Face detected - Ready to capture!'}
+                      {cameraStabilizing && (
+                        <span className="flex items-center justify-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Camera stabilizing... {stabilizationCountdown}s
+                        </span>
+                      )}
+                      {!cameraStabilizing && faceStatus === 'loading' && <span className="flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Detecting face...</span>}
+                      {!cameraStabilizing && faceStatus === 'no_face' && '👀 Look directly at the camera'}
+                      {!cameraStabilizing && faceStatus === 'too_far' && '📏 Move CLOSER to fill the oval'}
+                      {!cameraStabilizing && faceStatus === 'not_centered' && '↔️ Center your face in the oval'}
+                      {!cameraStabilizing && faceStatus === 'poor_lighting' && '💡 Lighting too dark! Turn on lights or move to brighter area'}
+                      {!cameraStabilizing && faceStatus === 'ready' && '✅ Perfect! Ready to capture'}
                     </div>
 
-                    {/* Camera with Face Guide */}
+                    {/* Camera with Face Guide - Oval shape */}
                     <div className="relative">
                       <div 
                         className={`relative overflow-hidden bg-black transition-all duration-300 ${
-                          faceStatus === 'ready' ? 'ring-4 ring-emerald-500' : 'ring-4 ring-red-400'
+                          cameraStabilizing ? 'ring-4 ring-blue-400' :
+                          faceStatus === 'ready' ? 'ring-4 ring-emerald-500' : 
+                          faceStatus === 'poor_lighting' ? 'ring-4 ring-red-500' : 'ring-4 ring-amber-400'
                         }`} 
-                        style={{ width: '240px', height: '300px', borderRadius: '50%' }}
+                        style={{ width: '220px', height: '280px', borderRadius: '50%' }}
                       >
                         <video
                           ref={videoRef}
@@ -723,27 +1061,47 @@ export default function InterviewVerifyPage() {
                           style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
                         />
                         
-                        {/* Countdown Overlay */}
+                        {/* Stabilization Overlay */}
+                        {cameraStabilizing && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                            <div className="text-center">
+                              <Loader2 className="w-8 h-8 text-white animate-spin mx-auto mb-2" />
+                              <span className="text-white text-sm">Stabilizing...</span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Capture Countdown Overlay */}
                         {countdown !== null && (
                           <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                             <span className="text-6xl font-bold text-white animate-pulse">{countdown}</span>
                           </div>
                         )}
                       </div>
+                      
+                      {/* Face positioning guide text */}
+                      {!cameraStabilizing && faceStatus !== 'ready' && (
+                        <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">
+                          Fill the oval with your face
+                        </div>
+                      )}
                     </div>
 
                     {/* Capture Instructions */}
-                    <div className="mt-3 text-xs text-slate-500 text-center max-w-xs">
-                      Position your face inside the oval. Ensure good lighting and plain background.
+                    <div className="mt-4 text-xs text-slate-500 text-center max-w-xs space-y-1">
+                      <p className="font-medium">📸 For best results:</p>
+                      <p>• Move close so your face fills the oval</p>
+                      <p>• Ensure good lighting on your face</p>
+                      <p>• Look directly at the camera</p>
                     </div>
 
                     <Button
                       onClick={() => setCountdown(3)}
-                      disabled={!isCameraReady || countdown !== null || faceStatus !== 'ready'}
-                      className={`mt-3 ${faceStatus === 'ready' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-400 cursor-not-allowed'} text-white gap-2`}
+                      disabled={!isCameraReady || cameraStabilizing || countdown !== null || faceStatus !== 'ready'}
+                      className={`mt-4 ${!cameraStabilizing && faceStatus === 'ready' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-400 cursor-not-allowed'} text-white gap-2`}
                     >
                       <Camera className="w-4 h-4" />
-                      {countdown !== null ? 'Capturing...' : 'Capture Photo'}
+                      {cameraStabilizing ? 'Stabilizing...' : countdown !== null ? 'Capturing...' : 'Capture Photo'}
                     </Button>
                   </div>
                 )}
@@ -762,21 +1120,18 @@ export default function InterviewVerifyPage() {
                           </div>
                         </div>
 
-                        {/* VS indicator */}
+                        {/* VS indicator - NO percentages shown */}
                         <div className="flex flex-col items-center">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold ${
                             faceMatchStatus === 'matched' ? 'bg-emerald-500 text-white' :
                             faceMatchStatus === 'not_matched' ? 'bg-red-500 text-white' :
                             faceMatchStatus === 'comparing' ? 'bg-blue-500 text-white' :
                             'bg-slate-200 text-slate-600'
                           }`}>
-                            {faceMatchStatus === 'comparing' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'VS'}
+                            {faceMatchStatus === 'comparing' ? <Loader2 className="w-4 h-4 animate-spin" /> : 
+                             faceMatchStatus === 'matched' ? <Check className="w-5 h-5" /> :
+                             faceMatchStatus === 'not_matched' ? <AlertTriangle className="w-5 h-5" /> : 'VS'}
                           </div>
-                          {faceMatchScore !== null && (
-                            <p className={`text-xs mt-1 font-medium ${faceMatchStatus === 'matched' ? 'text-emerald-600' : 'text-red-600'}`}>
-                              {faceMatchScore}%
-                            </p>
-                          )}
                         </div>
 
                         {/* Captured Photo (current) */}
@@ -807,14 +1162,14 @@ export default function InterviewVerifyPage() {
                     {faceMatchStatus === 'matched' && (
                       <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg mb-3">
                         <Check className="w-4 h-4 text-emerald-500" />
-                        <p className="text-sm text-emerald-700">Face matched! Score: {faceMatchScore}%</p>
+                        <p className="text-sm text-emerald-700 font-medium">Face verified successfully!</p>
                       </div>
                     )}
 
                     {faceMatchStatus === 'not_matched' && (
                       <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg mb-3">
                         <AlertTriangle className="w-4 h-4 text-red-500" />
-                        <p className="text-sm text-red-700">Face does not match! Score: {faceMatchScore}%</p>
+                        <p className="text-sm text-red-700">Face does not match the application photo</p>
                       </div>
                     )}
 

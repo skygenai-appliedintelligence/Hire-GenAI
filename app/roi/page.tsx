@@ -265,59 +265,59 @@ export default function ROIPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white overflow-x-hidden">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-16">
         {/* Hero Header */}
-        <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-12 mb-12 text-white overflow-hidden border border-emerald-500/20">
-          <div className="absolute top-6 right-6 bg-emerald-500 text-white px-4 py-2 rounded-full font-bold flex items-center gap-2 shadow-lg">
+        <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl sm:rounded-3xl p-6 sm:p-12 mb-8 sm:mb-12 text-white overflow-hidden border border-emerald-500/20">
+          <div className="absolute top-4 right-4 sm:top-6 sm:right-6 bg-emerald-500 text-white px-3 py-1 sm:px-4 sm:py-2 rounded-full font-bold flex items-center gap-1 sm:gap-2 shadow-lg text-sm sm:text-base">
             <ChartLine className="w-5 h-5" />
             ROI: Up to {calculations.totalROI}%
           </div>
           
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 flex items-center gap-3">
-            <Bot className="w-12 h-12 text-emerald-400" />
-            <span>AI Recruiter <span className="text-emerald-400">ROI Calculator</span></span>
+          <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold mb-4 flex flex-wrap items-center gap-2 sm:gap-3 pr-16 sm:pr-20">
+            <Bot className="w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 text-emerald-400 flex-shrink-0" />
+            <span className="break-words">AI Recruiter <span className="text-emerald-400">ROI Calculator</span></span>
           </h1>
-          <p className="text-xl opacity-90 max-w-3xl mb-8 text-slate-200">
+          <p className="text-base sm:text-lg md:text-xl opacity-90 max-w-3xl mb-4 sm:mb-8 text-slate-200">
             Your Permanent Hiring Expert That Scales With Your Needs & Retains Institutional Knowledge
           </p>
 
           {/* AI Permanent Banner */}
-          <div className="bg-emerald-500/10 backdrop-blur-sm rounded-2xl p-8 border-2 border-emerald-500/30 max-w-4xl mb-8">
-            <h3 className="text-2xl font-bold mb-4 flex items-center gap-3 text-emerald-300">
-              <Infinity className="w-7 h-7" />
-              AI Recruiter: Your Permanent Scalable Resource
+          <div className="bg-emerald-500/10 backdrop-blur-sm rounded-xl sm:rounded-2xl p-4 sm:p-8 border-2 border-emerald-500/30 max-w-4xl mb-4 sm:mb-8">
+            <h3 className="text-base sm:text-lg md:text-xl font-bold mb-2 sm:mb-4 flex flex-wrap items-center gap-2 text-emerald-300">
+              <Infinity className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
+              <span className="break-words">AI Recruiter: Your Permanent Scalable Resource</span>
             </h3>
-            <p className="opacity-90 mb-6 text-slate-200">
+            <p className="opacity-90 mb-4 sm:mb-6 text-slate-200 text-sm sm:text-base">
               Unlike human recruiters who leave, our AI becomes a permanent asset that grows smarter over time, retaining all organizational knowledge and scaling instantly with your hiring demands.
             </p>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-emerald-500/10 backdrop-blur-sm rounded-lg p-4 text-center border border-emerald-500/20">
-                <Brain className="w-8 h-8 mx-auto mb-2 text-emerald-300" />
-                <div className="font-medium text-slate-200">Knowledge Retention</div>
+            <div className="grid grid-cols-1 gap-3">
+              <div className="bg-emerald-500/10 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-emerald-500/20">
+                <Brain className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-emerald-300" />
+                <div className="font-medium text-slate-200 text-sm sm:text-base">Knowledge Retention</div>
               </div>
-              <div className="bg-emerald-500/10 backdrop-blur-sm rounded-lg p-4 text-center border border-emerald-500/20">
-                <Expand className="w-8 h-8 mx-auto mb-2 text-emerald-300" />
-                <div className="font-medium text-slate-200">Instant Scalability</div>
+              <div className="bg-emerald-500/10 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-emerald-500/20">
+                <Expand className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-emerald-300" />
+                <div className="font-medium text-slate-200 text-sm sm:text-base">Instant Scalability</div>
               </div>
-              <div className="bg-emerald-500/10 backdrop-blur-sm rounded-lg p-4 text-center border border-emerald-500/20">
-                <GraduationCap className="w-8 h-8 mx-auto mb-2 text-emerald-300" />
-                <div className="font-medium text-slate-200">Continuous Learning</div>
+              <div className="bg-emerald-500/10 backdrop-blur-sm rounded-lg p-3 sm:p-4 text-center border border-emerald-500/20">
+                <GraduationCap className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 text-emerald-300" />
+                <div className="font-medium text-slate-200 text-sm sm:text-base">Continuous Learning</div>
               </div>
             </div>
           </div>
 
           {/* Currency Selector */}
-          <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-6">
             <Globe className="w-5 h-5 text-emerald-300" />
             <span className="text-slate-300 text-sm">Currency:</span>
             <select
               value={userCountry}
               onChange={(e) => handleCurrencyChange(e.target.value)}
-              className="bg-emerald-500/20 border border-emerald-500/30 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className="bg-emerald-500/20 border border-emerald-500/30 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 max-w-[120px] sm:max-w-none"
             >
               <option value="US" className="bg-slate-800">🇺🇸 USD ($)</option>
               <option value="IN" className="bg-slate-800">🇮🇳 INR (₹)</option>
@@ -346,37 +346,37 @@ export default function ROIPage() {
           </div>
 
           {/* Benefits */}
-          <div className="flex flex-wrap gap-4">
-            <div className="bg-emerald-500/10 backdrop-blur-sm rounded-lg px-4 py-3 flex items-center gap-2 border border-emerald-500/20">
-              <Zap className="w-5 h-5 text-emerald-300" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+            <div className="bg-emerald-500/10 backdrop-blur-sm rounded-lg px-3 py-2 flex items-center gap-2 border border-emerald-500/20 text-xs sm:text-sm">
+              <Zap className="w-4 h-4 text-emerald-300 flex-shrink-0" />
               <span className="text-slate-200">Process CVs 10x faster</span>
             </div>
-            <div className="bg-emerald-500/10 backdrop-blur-sm rounded-lg px-4 py-3 flex items-center gap-2 border border-emerald-500/20">
-              <DollarSign className="w-5 h-5 text-emerald-300" />
-              <span className="text-slate-200">Pay only {formatSmallCurrency(0.50)} per CV + {formatSmallCurrency(0.50)}/min interview</span>
+            <div className="bg-emerald-500/10 backdrop-blur-sm rounded-lg px-3 py-2 flex items-center gap-2 border border-emerald-500/20 text-xs sm:text-sm">
+              <DollarSign className="w-4 h-4 text-emerald-300 flex-shrink-0" />
+              <span className="text-slate-200 break-words">{formatSmallCurrency(0.50)}/CV + {formatSmallCurrency(0.50)}/min</span>
             </div>
-            <div className="bg-emerald-500/10 backdrop-blur-sm rounded-lg px-4 py-3 flex items-center gap-2 border border-emerald-500/20">
-              <Clock className="w-5 h-5 text-emerald-300" />
-              <span className="text-slate-200">24/7 availability, zero downtime</span>
+            <div className="bg-emerald-500/10 backdrop-blur-sm rounded-lg px-3 py-2 flex items-center gap-2 border border-emerald-500/20 text-xs sm:text-sm">
+              <Clock className="w-4 h-4 text-emerald-300 flex-shrink-0" />
+              <span className="text-slate-200">24/7 availability</span>
             </div>
-            <div className="bg-emerald-500/10 backdrop-blur-sm rounded-lg px-4 py-3 flex items-center gap-2 border border-emerald-500/20">
-              <BarChart3 className="w-5 h-5 text-emerald-300" />
-              <span className="text-slate-200">Knowledge stays with your firm forever</span>
+            <div className="bg-emerald-500/10 backdrop-blur-sm rounded-lg px-3 py-2 flex items-center gap-2 border border-emerald-500/20 text-xs sm:text-sm">
+              <BarChart3 className="w-4 h-4 text-emerald-300 flex-shrink-0" />
+              <span className="text-slate-200">Knowledge stays forever</span>
             </div>
           </div>
         </div>
 
         {/* Calculator Container */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 mb-8">
           {/* Input Section */}
-          <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
-            <h2 className="text-xl font-bold text-emerald-600 mb-6 pb-4 border-b-2 border-emerald-100 flex items-center gap-3">
-              <SlidersHorizontal className="w-6 h-6 bg-emerald-50 p-1 rounded-lg" />
+          <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-8 shadow-lg border border-gray-100">
+            <h2 className="text-lg sm:text-xl font-bold text-emerald-600 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b-2 border-emerald-100 flex items-center gap-3">
+              <SlidersHorizontal className="w-5 sm:w-6 h-5 sm:h-6 bg-emerald-50 p-1 rounded-lg" />
               Job & Recruitment Parameters
             </h2>
 
             {/* Scalability Section */}
-            <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-xl p-4 mb-6 border-2 border-dashed border-emerald-300">
+            <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-lg sm:rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 border-2 border-dashed border-emerald-300">
               <h4 className="font-bold text-emerald-600 mb-2 flex items-center gap-2">
                 <ChartLine className="w-5 h-5" />
                 Scalability Simulation
@@ -387,11 +387,11 @@ export default function ROIPage() {
             </div>
 
             {/* Job Postings Slider */}
-            <div className="mb-6">
-              <label className="block font-semibold text-gray-700 mb-2">
+            <div className="mb-4 sm:mb-6">
+              <label className="block font-semibold text-gray-700 mb-2 text-sm sm:text-base">
                 Number of Job Postings per Month
               </label>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4">
                 <input
                   type="range"
                   min="1"
@@ -400,16 +400,16 @@ export default function ROIPage() {
                   onChange={(e) => setJobPostings(parseInt(e.target.value))}
                   className="flex-1 h-2 bg-emerald-100 rounded-lg appearance-none cursor-pointer accent-emerald-600"
                 />
-                <span className="min-w-[50px] font-bold text-emerald-600 text-lg">{jobPostings}</span>
+                <span className="min-w-[40px] sm:min-w-[50px] font-bold text-emerald-600 text-base sm:text-lg">{jobPostings}</span>
               </div>
             </div>
 
             {/* CVs per Job Slider */}
-            <div className="mb-6">
-              <label className="block font-semibold text-gray-700 mb-2">
+            <div className="mb-4 sm:mb-6">
+              <label className="block font-semibold text-gray-700 mb-2 text-sm sm:text-base">
                 Average CVs Received per Job Posting
               </label>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4">
                 <input
                   type="range"
                   min="10"
@@ -418,22 +418,22 @@ export default function ROIPage() {
                   onChange={(e) => setCvsPerJob(parseInt(e.target.value))}
                   className="flex-1 h-2 bg-emerald-100 rounded-lg appearance-none cursor-pointer accent-emerald-600"
                 />
-                <span className="min-w-[50px] font-bold text-emerald-600 text-lg">{cvsPerJob}</span>
+                <span className="min-w-[40px] sm:min-w-[50px] font-bold text-emerald-600 text-base sm:text-lg">{cvsPerJob}</span>
               </div>
             </div>
 
             {/* Human Recruiter Section */}
-            <h3 className="text-lg font-bold text-emerald-600 mt-8 mb-4 pb-3 border-b-2 border-emerald-50 flex items-center gap-3">
-              <UserCheck className="w-6 h-6 bg-emerald-50 p-1 rounded-lg" />
+            <h3 className="text-base sm:text-lg font-bold text-emerald-600 mt-6 sm:mt-8 mb-3 sm:mb-4 pb-2 sm:pb-3 border-b-2 border-emerald-50 flex items-center gap-2 sm:gap-3">
+              <UserCheck className="w-5 sm:w-6 h-5 sm:h-6 bg-emerald-50 p-1 rounded-lg" />
               Human Recruiter Limitations
             </h3>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block font-semibold text-gray-700 mb-2 text-sm">
                   Minutes to Review 1 CV
                 </label>
-                <div className="flex">
+                <div className="flex w-full">
                   <input
                     type="number"
                     min="1"
@@ -449,7 +449,7 @@ export default function ROIPage() {
                 <label className="block font-semibold text-gray-700 mb-2 text-sm">
                   Hourly Rate + Benefits
                 </label>
-                <div className="flex">
+                <div className="flex w-full">
                   <input
                     type="number"
                     min="15"
@@ -464,42 +464,42 @@ export default function ROIPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block font-semibold text-gray-700 mb-2 text-sm">
+                <label className="block font-semibold text-gray-700 mb-2 text-xs sm:text-sm">
                   % CVs Shortlisted for Interview
                 </label>
-                <div className="flex">
+                <div className="flex w-full">
                   <input
                     type="number"
                     min="1"
                     max="50"
                     value={humanShortlistRate}
                     onChange={(e) => setHumanShortlistRate(parseInt(e.target.value) || 1)}
-                    className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-l-lg focus:border-emerald-500 focus:outline-none"
+                    className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-l-lg focus:border-emerald-500 focus:outline-none text-sm"
                   />
-                  <span className="bg-gray-100 px-3 py-2 border-2 border-l-0 border-gray-200 rounded-r-lg text-gray-600">%</span>
+                  <span className="bg-gray-100 px-2 sm:px-3 py-2 border-2 border-l-0 border-gray-200 rounded-r-lg text-gray-600 text-sm">%</span>
                 </div>
               </div>
               <div>
-                <label className="block font-semibold text-gray-700 mb-2 text-sm">
+                <label className="block font-semibold text-gray-700 mb-2 text-xs sm:text-sm">
                   Interview Time per Candidate
                 </label>
-                <div className="flex">
+                <div className="flex w-full">
                   <input
                     type="number"
                     min="10"
                     max="120"
                     value={humanInterviewTime}
                     onChange={(e) => setHumanInterviewTime(parseInt(e.target.value) || 10)}
-                    className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-l-lg focus:border-emerald-500 focus:outline-none"
+                    className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-l-lg focus:border-emerald-500 focus:outline-none text-sm"
                   />
-                  <span className="bg-gray-100 px-3 py-2 border-2 border-l-0 border-gray-200 rounded-r-lg text-gray-600">min</span>
+                  <span className="bg-gray-100 px-2 sm:px-3 py-2 border-2 border-l-0 border-gray-200 rounded-r-lg text-gray-600 text-sm">min</span>
                 </div>
               </div>
             </div>
 
-            <div className="mb-6">
+            <div className="mb-4 sm:mb-6">
               <label className="block font-semibold text-gray-700 mb-2 text-sm">
                 % Candidates Qualified After Interview
               </label>
@@ -517,17 +517,17 @@ export default function ROIPage() {
             </div>
 
             {/* AI Recruiter Section */}
-            <h3 className="text-lg font-bold text-emerald-600 mt-8 mb-4 pb-3 border-b-2 border-emerald-50 flex items-center gap-3">
-              <Bot className="w-6 h-6 bg-emerald-50 p-1 rounded-lg" />
+            <h3 className="text-base sm:text-lg font-bold text-emerald-600 mt-6 sm:mt-8 mb-3 sm:mb-4 pb-2 sm:pb-3 border-b-2 border-emerald-50 flex items-center gap-2 sm:gap-3">
+              <Bot className="w-5 sm:w-6 h-5 sm:h-6 bg-emerald-50 p-1 rounded-lg" />
               AI Recruiter Advantages
             </h3>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block font-semibold text-gray-700 mb-2 text-sm">
                   Cost per CV Evaluation
                 </label>
-                <div className="flex">
+                <div className="flex w-full">
                   <input
                     type="text"
                     value={formatSmallCurrency(aiCvCost)}
@@ -540,7 +540,7 @@ export default function ROIPage() {
                 <label className="block font-semibold text-gray-700 mb-2 text-sm">
                   Cost per Interview Minute
                 </label>
-                <div className="flex">
+                <div className="flex w-full">
                   <input
                     type="text"
                     value={`${formatSmallCurrency(aiInterviewCost)}/min`}
@@ -551,40 +551,40 @@ export default function ROIPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block font-semibold text-gray-700 mb-2 text-sm">
+                <label className="block font-semibold text-gray-700 mb-2 text-xs sm:text-sm">
                   % CVs Shortlisted for Interview
                 </label>
-                <div className="flex">
+                <div className="flex w-full">
                   <input
                     type="number"
                     min="1"
                     max="50"
                     value={aiShortlistRate}
                     onChange={(e) => setAiShortlistRate(parseInt(e.target.value) || 1)}
-                    className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-l-lg focus:border-emerald-500 focus:outline-none"
+                    className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-l-lg focus:border-emerald-500 focus:outline-none text-sm"
                   />
-                  <span className="bg-gray-100 px-3 py-2 border-2 border-l-0 border-gray-200 rounded-r-lg text-gray-600">%</span>
+                  <span className="bg-gray-100 px-2 sm:px-3 py-2 border-2 border-l-0 border-gray-200 rounded-r-lg text-gray-600 text-sm">%</span>
                 </div>
               </div>
               <div>
-                <label className="block font-semibold text-gray-700 mb-2 text-sm">
+                <label className="block font-semibold text-gray-700 mb-2 text-xs sm:text-sm">
                   AI Interview Time per Candidate
                 </label>
-                <div className="flex">
+                <div className="flex w-full">
                   <input
                     type="number"
                     value={aiInterviewTime}
                     disabled
-                    className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-l-lg bg-gray-50 text-gray-500"
+                    className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-l-lg bg-gray-50 text-gray-500 text-sm"
                   />
-                  <span className="bg-gray-100 px-3 py-2 border-2 border-l-0 border-gray-200 rounded-r-lg text-gray-600">min</span>
+                  <span className="bg-gray-100 px-2 sm:px-3 py-2 border-2 border-l-0 border-gray-200 rounded-r-lg text-gray-600 text-sm">min</span>
                 </div>
               </div>
             </div>
 
-            <div className="mb-6">
+            <div className="mb-4 sm:mb-6">
               <label className="block font-semibold text-gray-700 mb-2 text-sm">
                 % Candidates Qualified After Interview
               </label>
@@ -602,11 +602,11 @@ export default function ROIPage() {
             </div>
 
             {/* Time Period Slider */}
-            <div className="mb-6">
-              <label className="block font-semibold text-gray-700 mb-2">
+            <div className="mb-4 sm:mb-6">
+              <label className="block font-semibold text-gray-700 mb-2 text-sm sm:text-base">
                 Time Period for Calculation
               </label>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4">
                 <input
                   type="range"
                   min="1"
@@ -615,14 +615,14 @@ export default function ROIPage() {
                   onChange={(e) => setMonths(parseInt(e.target.value))}
                   className="flex-1 h-2 bg-emerald-100 rounded-lg appearance-none cursor-pointer accent-emerald-600"
                 />
-                <span className="min-w-[80px] font-bold text-emerald-600 text-lg">{months} months</span>
+                <span className="min-w-[60px] sm:min-w-[80px] font-bold text-emerald-600 text-base sm:text-lg">{months} months</span>
               </div>
             </div>
 
             {/* Reset Button */}
             <button
               onClick={resetToDefaults}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-all"
+              className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-all text-sm sm:text-base"
             >
               <RotateCcw className="w-4 h-4" />
               Reset to Default Values
@@ -630,25 +630,25 @@ export default function ROIPage() {
           </div>
 
           {/* Results Section */}
-          <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
-            <h2 className="text-xl font-bold text-emerald-600 mb-6 pb-4 border-b-2 border-emerald-100 flex items-center gap-3">
-              <PieChart className="w-6 h-6 bg-emerald-50 p-1 rounded-lg" />
+          <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-8 shadow-lg border border-gray-100">
+            <h2 className="text-lg sm:text-xl font-bold text-emerald-600 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b-2 border-emerald-100 flex items-center gap-3">
+              <PieChart className="w-5 sm:w-6 h-5 sm:h-6 bg-emerald-50 p-1 rounded-lg" />
               Cost Analysis & Results
             </h2>
 
             {/* Metrics */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="bg-emerald-50 rounded-xl p-4 text-center border border-emerald-100">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+              <div className="bg-emerald-50 rounded-lg sm:rounded-xl p-3 sm:p-4 text-center border border-emerald-100">
                 <div className="text-sm text-gray-600 mb-1">Total CVs Processed</div>
                 <div className="text-2xl font-bold text-emerald-600">{calculations.totalCvsOverall.toLocaleString()}</div>
                 <div className="text-xs text-gray-500">in {months} months</div>
               </div>
-              <div className="bg-emerald-50 rounded-xl p-4 text-center border border-emerald-100">
+              <div className="bg-emerald-50 rounded-lg sm:rounded-xl p-3 sm:p-4 text-center border border-emerald-100">
                 <div className="text-sm text-gray-600 mb-1">Interviews Conducted</div>
                 <div className="text-2xl font-bold text-emerald-600">{calculations.totalInterviews.toLocaleString()}</div>
                 <div className="text-xs text-gray-500">in {months} months</div>
               </div>
-              <div className="bg-emerald-50 rounded-xl p-4 text-center border border-emerald-100">
+              <div className="bg-emerald-50 rounded-lg sm:rounded-xl p-3 sm:p-4 text-center border border-emerald-100">
                 <div className="text-sm text-gray-600 mb-1">Qualified Candidates</div>
                 <div className="text-2xl font-bold text-emerald-600">{calculations.totalQualified.toLocaleString()}</div>
                 <div className="text-xs text-gray-500">in {months} months</div>
@@ -656,88 +656,99 @@ export default function ROIPage() {
             </div>
 
             {/* Comparison */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
               {/* Human Cost */}
               <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-5 border-2 border-red-200">
-                <div className="text-lg font-bold text-gray-700 mb-2">Human Recruiter</div>
-                <div className="text-3xl font-bold text-red-500 mb-2">{formatCurrency(calculations.humanTotalOverall)}</div>
-                <div className="text-sm text-gray-600 mb-4">~{formatCurrency(calculations.humanPerCandidate)} per qualified candidate</div>
+                <div className="text-base sm:text-lg font-bold text-gray-700 mb-1 sm:mb-2">Human Recruiter</div>
+                <div className="text-xl sm:text-2xl md:text-3xl font-bold text-red-500 mb-1 sm:mb-2">{formatCurrency(calculations.humanTotalOverall)}</div>
+                <div className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-4">~{formatCurrency(calculations.humanPerCandidate)} per qualified candidate</div>
                 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between py-2 border-b border-red-200">
-                    <span>CV Screening Cost</span>
-                    <span>{formatCurrency(calculations.humanCvCostTotal)}</span>
+                    <span className="text-xs sm:text-sm">CV Screening Cost</span>
+                    <span className="text-xs sm:text-sm">{formatCurrency(calculations.humanCvCostTotal)}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-red-200">
-                    <span>Interview Cost</span>
-                    <span>{formatCurrency(calculations.humanInterviewCostTotal)}</span>
+                    <span className="text-xs sm:text-sm">Interview Cost</span>
+                    <span className="text-xs sm:text-sm">{formatCurrency(calculations.humanInterviewCostTotal)}</span>
                   </div>
                   <div className="flex justify-between py-2 font-bold text-red-500 border-t-2 border-red-300 mt-2">
-                    <span>Total Cost</span>
-                    <span>{formatCurrency(calculations.humanTotalOverall)}</span>
+                    <span className="text-xs sm:text-sm">Total Cost</span>
+                    <span className="text-xs sm:text-sm">{formatCurrency(calculations.humanTotalOverall)}</span>
                   </div>
                 </div>
               </div>
 
               {/* AI Cost */}
               <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-5 border-2 border-green-200 relative overflow-hidden">
-                <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-3 py-1 rounded-full font-bold">
+                <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 sm:px-3 py-0.5 sm:py-1 rounded-full font-bold">
                   Permanent Resource
                 </div>
-                <div className="text-lg font-bold text-gray-700 mb-2">AI Recruiter</div>
-                <div className="text-3xl font-bold text-green-500 mb-2">{formatCurrency(calculations.aiTotalOverall)}</div>
-                <div className="text-sm text-gray-600 mb-4">~${calculations.aiPerCandidate.toFixed(1)} per qualified candidate</div>
+                <div className="text-base sm:text-lg font-bold text-gray-700 mb-1 sm:mb-2">AI Recruiter</div>
+                <div className="text-xl sm:text-2xl md:text-3xl font-bold text-green-500 mb-1 sm:mb-2">{formatCurrency(calculations.aiTotalOverall)}</div>
+                <div className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-4">~${calculations.aiPerCandidate.toFixed(1)} per qualified candidate</div>
                 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between py-2 border-b border-green-200">
-                    <span>CV Screening Cost</span>
-                    <span>{formatCurrency(calculations.aiCvCostTotal)}</span>
+                    <span className="text-xs sm:text-sm">CV Screening Cost</span>
+                    <span className="text-xs sm:text-sm">{formatCurrency(calculations.aiCvCostTotal)}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-green-200">
-                    <span>Interview Cost</span>
-                    <span>{formatCurrency(calculations.aiInterviewCostTotal)}</span>
+                    <span className="text-xs sm:text-sm">Interview Cost</span>
+                    <span className="text-xs sm:text-sm">{formatCurrency(calculations.aiInterviewCostTotal)}</span>
                   </div>
                   <div className="flex justify-between py-2 font-bold text-green-500 border-t-2 border-green-300 mt-2">
-                    <span>Total Cost</span>
-                    <span>{formatCurrency(calculations.aiTotalOverall)}</span>
+                    <span className="text-xs sm:text-sm">Total Cost</span>
+                    <span className="text-xs sm:text-sm">{formatCurrency(calculations.aiTotalOverall)}</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Savings Container */}
-            <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl p-8 text-white text-center shadow-lg">
-              <div className="text-lg font-semibold mb-3 flex items-center justify-center gap-2">
-                <PiggyBank className="w-7 h-7" />
+            <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-xl sm:rounded-2xl p-5 sm:p-8 text-white text-center shadow-lg">
+              <div className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 flex items-center justify-center gap-2">
+                <PiggyBank className="w-5 h-5 sm:w-7 sm:h-7" />
                 Your Potential Savings with AI
               </div>
-              <div className="text-5xl font-bold mb-3">{formatCurrency(calculations.savings)}</div>
-              <div className="text-lg mb-4 text-emerald-100">Over {months} months</div>
-              <div className="inline-block bg-white/20 px-6 py-2 rounded-full text-xl font-bold backdrop-blur-sm">
-                {calculations.savingsPercentage}% SAVINGS
+
+              <div className="text-2xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2">
+                {formatCurrency(calculations.savings)}
               </div>
-              <div className="mt-5 text-lg">
-                That's <span className="font-bold bg-emerald-500/40 px-3 py-1 rounded-lg backdrop-blur-sm">{formatCurrency(calculations.monthlySavingsValue)}</span> saved every month!
+              <div className="text-base sm:text-xl mb-4 sm:mb-6 opacity-90">
+                ({calculations.savingsPercentage}% cost reduction)
               </div>
+
+              <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-6 mb-4 sm:mb-6 max-w-lg mx-auto">
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg sm:rounded-xl p-3 sm:p-4 border border-white/20">
+                  <div className="text-xs sm:text-sm mb-1 opacity-75">Monthly Savings</div>
+                  <div className="text-xl sm:text-2xl font-bold">{formatCurrency(calculations.monthlySavingsValue)}</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg sm:rounded-xl p-3 sm:p-4 border border-white/20">
+                  <div className="text-xs sm:text-sm mb-1 opacity-75">Scalability Factor</div>
+                  <div className="text-xl sm:text-2xl font-bold">{calculations.scalabilityFactor}</div>
+                </div>
+              </div>
+
             </div>
 
             {/* AI Permanent Resource Advantages */}
             <div className="mt-8">
               <h3 className="text-lg font-bold text-emerald-600 text-center mb-6">AI Permanent Resource Advantages</h3>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-emerald-50 rounded-xl p-4 text-center border border-emerald-100 hover:shadow-md transition-shadow">
-                  <div className="text-sm text-gray-600 mb-2">Knowledge Retention</div>
-                  <div className="text-3xl font-bold text-emerald-600">100%</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                <div className="bg-emerald-50 rounded-lg sm:rounded-xl p-3 sm:p-4 text-center border border-emerald-100 hover:shadow-md transition-shadow">
+                  <div className="text-xs sm:text-sm text-gray-600 mb-1 sm:mb-2">Knowledge Retention</div>
+                  <div className="text-xl sm:text-2xl md:text-3xl font-bold text-emerald-600">100%</div>
                   <div className="text-xs text-gray-500">Zero knowledge loss</div>
                 </div>
-                <div className="bg-emerald-50 rounded-xl p-4 text-center border border-emerald-100 hover:shadow-md transition-shadow">
-                  <div className="text-sm text-gray-600 mb-2">Scalability Factor</div>
-                  <div className="text-3xl font-bold text-emerald-600">{calculations.scalabilityFactor}</div>
+                <div className="bg-emerald-50 rounded-lg sm:rounded-xl p-3 sm:p-4 text-center border border-emerald-100 hover:shadow-md transition-shadow">
+                  <div className="text-xs sm:text-sm text-gray-600 mb-1 sm:mb-2">Scalability Factor</div>
+                  <div className="text-xl sm:text-2xl md:text-3xl font-bold text-emerald-600">{calculations.scalabilityFactor}</div>
                   <div className="text-xs text-gray-500">Instant capacity increase</div>
                 </div>
-                <div className="bg-emerald-50 rounded-xl p-4 text-center border border-emerald-100 hover:shadow-md transition-shadow">
-                  <div className="text-sm text-gray-600 mb-2">Uptime</div>
-                  <div className="text-3xl font-bold text-emerald-600">99.9%</div>
+                <div className="bg-emerald-50 rounded-lg sm:rounded-xl p-3 sm:p-4 text-center border border-emerald-100 hover:shadow-md transition-shadow">
+                  <div className="text-xs sm:text-sm text-gray-600 mb-1 sm:mb-2">Uptime</div>
+                  <div className="text-xl sm:text-2xl md:text-3xl font-bold text-emerald-600">99.9%</div>
                   <div className="text-xs text-gray-500">Always available</div>
                 </div>
               </div>
@@ -746,19 +757,19 @@ export default function ROIPage() {
         </div>
 
         {/* AI Advantages Section */}
-        <div className="bg-white rounded-2xl p-8 shadow-lg mb-8 border border-gray-100">
-          <h3 className="text-2xl font-bold text-emerald-600 mb-8 flex items-center gap-3">
-            <Crown className="w-8 h-8 text-emerald-500" />
-            Why AI is Your Permanent Hiring Asset
+        <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-8 shadow-lg mb-6 sm:mb-8 border border-gray-100">
+          <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-emerald-600 mb-4 sm:mb-8 flex items-center gap-2 sm:gap-3">
+            <Crown className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-500 flex-shrink-0" />
+            <span>Why AI is Your Permanent Hiring Asset</span>
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-gradient-to-br from-emerald-50 to-blue-50 p-6 rounded-xl border-l-4 border-emerald-500 hover:shadow-md transition-shadow">
-              <h4 className="text-lg font-bold text-emerald-600 mb-4 flex items-center gap-2">
-                <Brain className="w-5 h-5" />
+          <div className="grid grid-cols-1 gap-4 sm:gap-6">
+            <div className="bg-gradient-to-br from-emerald-50 to-blue-50 p-4 sm:p-6 rounded-xl border-l-4 border-emerald-500 hover:shadow-md transition-shadow">
+              <h4 className="text-sm sm:text-base md:text-lg font-bold text-emerald-600 mb-2 sm:mb-4 flex items-center gap-2">
+                <Brain className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
                 Institutional Knowledge Retention
               </h4>
-              <ul className="space-y-2 text-gray-700">
+              <ul className="space-y-1 sm:space-y-2 text-gray-700 text-xs sm:text-sm">
                 <li><strong>Never loses expertise:</strong> Unlike human recruiters who leave, AI retains all hiring knowledge permanently</li>
                 <li><strong>Continuous learning:</strong> Gets smarter with every hire, understanding your company culture better over time</li>
                 <li><strong>Consistent standards:</strong> Maintains uniform evaluation criteria across all hiring cycles</li>
@@ -766,12 +777,12 @@ export default function ROIPage() {
               </ul>
             </div>
 
-            <div className="bg-gradient-to-br from-emerald-50 to-blue-50 p-6 rounded-xl border-l-4 border-emerald-500 hover:shadow-md transition-shadow">
-              <h4 className="text-lg font-bold text-emerald-600 mb-4 flex items-center gap-2">
-                <Expand className="w-5 h-5" />
+            <div className="bg-gradient-to-br from-emerald-50 to-blue-50 p-4 sm:p-6 rounded-xl border-l-4 border-emerald-500 hover:shadow-md transition-shadow">
+              <h4 className="text-sm sm:text-base md:text-lg font-bold text-emerald-600 mb-2 sm:mb-4 flex items-center gap-2">
+                <Expand className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
                 Instant Scalability
               </h4>
-              <ul className="space-y-2 text-gray-700">
+              <ul className="space-y-1 sm:space-y-2 text-gray-700 text-xs sm:text-sm">
                 <li><strong>Handles volume spikes:</strong> Process 10 or 10,000 CVs with equal efficiency</li>
                 <li><strong>No hiring delays:</strong> No need to recruit and train additional human recruiters</li>
                 <li><strong>24/7 availability:</strong> Works nights, weekends, holidays without overtime pay</li>
@@ -779,12 +790,12 @@ export default function ROIPage() {
               </ul>
             </div>
 
-            <div className="bg-gradient-to-br from-emerald-50 to-blue-50 p-6 rounded-xl border-l-4 border-emerald-500 hover:shadow-md transition-shadow">
-              <h4 className="text-lg font-bold text-emerald-600 mb-4 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5" />
+            <div className="bg-gradient-to-br from-emerald-50 to-blue-50 p-4 sm:p-6 rounded-xl border-l-4 border-emerald-500 hover:shadow-md transition-shadow">
+              <h4 className="text-sm sm:text-base md:text-lg font-bold text-emerald-600 mb-2 sm:mb-4 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
                 Continuous Cost Efficiency
               </h4>
-              <ul className="space-y-2 text-gray-700">
+              <ul className="space-y-1 sm:space-y-2 text-gray-700 text-xs sm:text-sm">
                 <li><strong>Usage-based pricing:</strong> Pay only for what you use with no fixed overhead</li>
                 <li><strong>No turnover costs:</strong> Eliminates recruitment, training, and severance costs</li>
                 <li><strong>Predictable expenses:</strong> Simple per-CV and per-interview minute pricing</li>
@@ -792,12 +803,12 @@ export default function ROIPage() {
               </ul>
             </div>
 
-            <div className="bg-gradient-to-br from-emerald-50 to-blue-50 p-6 rounded-xl border-l-4 border-emerald-500 hover:shadow-md transition-shadow">
-              <h4 className="text-lg font-bold text-emerald-600 mb-4 flex items-center gap-2">
-                <Shield className="w-5 h-5" />
+            <div className="bg-gradient-to-br from-emerald-50 to-blue-50 p-4 sm:p-6 rounded-xl border-l-4 border-emerald-500 hover:shadow-md transition-shadow">
+              <h4 className="text-sm sm:text-base md:text-lg font-bold text-emerald-600 mb-2 sm:mb-4 flex items-center gap-2">
+                <Shield className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
                 Risk Mitigation & Compliance
               </h4>
-              <ul className="space-y-2 text-gray-700">
+              <ul className="space-y-1 sm:space-y-2 text-gray-700 text-xs sm:text-sm">
                 <li><strong>Reduced bias:</strong> Consistent, objective evaluations minimize discrimination risks</li>
                 <li><strong>Audit trail:</strong> Complete documentation of all hiring decisions</li>
                 <li><strong>Compliance adherence:</strong> Always follows configured hiring policies and regulations</li>
@@ -807,27 +818,27 @@ export default function ROIPage() {
           </div>
 
           {/* Scalability Demonstration */}
-          <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-xl p-6 mt-8 border-2 border-dashed border-emerald-300">
-            <h4 className="font-bold text-emerald-600 mb-3 flex items-center gap-2">
-              <Rocket className="w-5 h-5" />
+          <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-xl p-4 sm:p-6 mt-4 sm:mt-8 border-2 border-dashed border-emerald-300">
+            <h4 className="font-bold text-emerald-600 mb-2 sm:mb-3 flex items-center gap-2 text-sm sm:text-base">
+              <Rocket className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
               Scalability Demonstration
             </h4>
-            <p className="text-gray-600 mb-4">
-              Try adjusting the "Number of Job Postings" slider above to see how AI instantly scales with increased demand while maintaining cost efficiency. Human recruiters require months to hire/train for increased capacity.
+            <p className="text-gray-600 mb-3 sm:mb-4 text-xs sm:text-sm">
+              Try adjusting the "Number of Job Postings" slider above to see how AI instantly scales with increased demand while maintaining cost efficiency.
             </p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <strong className="text-emerald-600">AI Response to 10x Volume Increase:</strong>
-                <ul className="mt-2 text-sm text-gray-600">
+            <div className="grid grid-cols-1 gap-3 sm:gap-4">
+              <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm">
+                <strong className="text-emerald-600 text-xs sm:text-sm">AI Response to 10x Volume Increase:</strong>
+                <ul className="mt-1 sm:mt-2 text-xs text-gray-600">
                   <li>• Instant capacity adjustment</li>
                   <li>• No quality degradation</li>
                   <li>• Linear cost scaling only</li>
                 </ul>
               </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <strong className="text-red-500">Human Response to 10x Volume Increase:</strong>
-                <ul className="mt-2 text-sm text-gray-600">
+              <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm">
+                <strong className="text-red-500 text-xs sm:text-sm">Human Response to 10x Volume Increase:</strong>
+                <ul className="mt-1 sm:mt-2 text-xs text-gray-600">
                   <li>• 3-6 month hiring/training delay</li>
                   <li>• Quality consistency issues</li>
                   <li>• Exponential cost increases</li>
@@ -838,47 +849,47 @@ export default function ROIPage() {
         </div>
 
         {/* Explanation Section */}
-        <div className="bg-white rounded-2xl p-8 shadow-lg mb-8 border border-gray-100">
-          <h3 className="text-2xl font-bold text-emerald-600 mb-6 flex items-center gap-3">
-            <Info className="w-8 h-8 text-emerald-500" />
-            How This Calculator Works
+        <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-8 shadow-lg mb-6 sm:mb-8 border border-gray-100">
+          <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-emerald-600 mb-4 sm:mb-6 flex items-center gap-2 sm:gap-3">
+            <Info className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-500 flex-shrink-0" />
+            <span>How This Calculator Works</span>
           </h3>
           
-          <p className="text-gray-700 mb-4 leading-relaxed">
+          <p className="text-gray-700 mb-3 sm:mb-4 leading-relaxed text-xs sm:text-sm">
             This calculator compares the costs of using human recruiters versus an AI-powered recruitment system that becomes your permanent hiring asset.
           </p>
           
-          <p className="text-gray-700 mb-4 leading-relaxed">
-            <strong className="text-emerald-600">Key Value Proposition:</strong> The AI recruiter isn't just a tool - it's a permanent member of your team that never leaves, continuously improves, and instantly scales with your needs while retaining all institutional knowledge.
+          <p className="text-gray-700 mb-3 sm:mb-4 leading-relaxed text-xs sm:text-sm">
+            <strong className="text-emerald-600">Key Value Proposition:</strong> The AI recruiter isn't just a tool - it's a permanent member of your team that never leaves, continuously improves, and instantly scales with your needs.
           </p>
           
-          <p className="text-gray-700 mb-4 leading-relaxed">
-            <strong className="text-emerald-600">Human Recruiter Hidden Costs Included:</strong> The model accounts for full costs including salary, benefits (30% premium), training time, ramp-up period, turnover costs, and productivity variations.
+          <p className="text-gray-700 mb-3 sm:mb-4 leading-relaxed text-xs sm:text-sm">
+            <strong className="text-emerald-600">Human Recruiter Hidden Costs:</strong> The model accounts for full costs including salary, benefits, training time, and turnover costs.
           </p>
           
-          <p className="text-gray-700 mb-6 leading-relaxed">
-            <strong className="text-emerald-600">AI Permanent Advantages:</strong> Beyond direct cost savings, the AI provides continuous knowledge accumulation, instant scalability, 24/7 availability, and consistent quality that improves over time.
+          <p className="text-gray-700 mb-4 sm:mb-6 leading-relaxed text-xs sm:text-sm">
+            <strong className="text-emerald-600">AI Permanent Advantages:</strong> Beyond direct cost savings, the AI provides continuous knowledge accumulation, instant scalability, and 24/7 availability.
           </p>
           
-          <div className="bg-emerald-50 border-l-4 border-emerald-500 p-5 rounded-r-lg">
-            <p className="text-gray-700 italic">
-              <strong className="text-emerald-600">Strategic Insight:</strong> While human recruiters provide interpersonal skills for final interviews, AI handles the scalable, repetitive tasks of initial screening and interviewing. The optimal approach combines AI efficiency for volume processing with human judgment for final decisions, creating a hybrid model that maximizes both efficiency and quality.
+          <div className="bg-emerald-50 border-l-4 border-emerald-500 p-3 sm:p-5 rounded-r-lg">
+            <p className="text-gray-700 italic text-xs sm:text-sm">
+              <strong className="text-emerald-600">Strategic Insight:</strong> AI handles the scalable, repetitive tasks of initial screening and interviewing, while human recruiters provide interpersonal skills for final decisions.
             </p>
           </div>
         </div>
 
         {/* CTA Section */}
-        <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl p-12 text-center text-white mb-12 shadow-lg">
-          <h2 className="text-4xl font-bold mb-4">Ready to Transform Your Hiring?</h2>
-          <p className="text-xl mb-8 text-emerald-100">Start saving up to {calculations.savingsPercentage}% on your recruitment costs today</p>
+        <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-xl sm:rounded-2xl p-6 sm:p-12 text-center text-white mb-8 sm:mb-12 shadow-lg">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">Ready to Transform Your Hiring?</h2>
+          <p className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 text-emerald-100">Start saving up to {calculations.savingsPercentage}% on your recruitment costs today</p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Link href="/signup">
-              <Button size="lg" className="bg-white text-emerald-600 hover:bg-emerald-50 font-bold px-10 py-6 text-lg rounded-full shadow-lg">
+              <Button size="lg" className="bg-white text-emerald-600 hover:bg-emerald-50 font-bold px-6 sm:px-10 py-4 sm:py-6 text-base sm:text-lg rounded-full shadow-lg">
                 Get Started Free
               </Button>
             </Link>
             <Link href="/book-meeting">
-              <Button size="lg" className="bg-white/20 text-white hover:bg-white/30 font-bold px-10 py-6 text-lg rounded-full border-2 border-white backdrop-blur-sm">
+              <Button size="lg" className="bg-white/20 text-white hover:bg-white/30 font-bold px-6 sm:px-10 py-4 sm:py-6 text-base sm:text-lg rounded-full border-2 border-white backdrop-blur-sm">
                 Book a Demo
               </Button>
             </Link>
@@ -887,21 +898,21 @@ export default function ROIPage() {
       </div>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <footer className="bg-slate-900 text-white py-8 sm:py-16">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Main Footer Content */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-12">
+          <div className="grid grid-cols-2 md:grid-cols-12 gap-6 sm:gap-12 mb-8 sm:mb-12">
             {/* Left Section - Brand Block */}
-            <div className="md:col-span-3">
-              <h3 className="text-2xl font-bold mb-2">
+            <div className="col-span-2 md:col-span-3">
+              <h3 className="text-xl sm:text-2xl font-bold mb-2">
                 <span className="text-white">Hire</span>
                 <span className="text-emerald-400">GenAI</span>
               </h3>
-              <p className="text-sm text-slate-400 mb-4">By SKYGENAI</p>
-              <p className="text-slate-400 mb-6 text-sm leading-relaxed">
-                HireGenAI pre-screens and interviews candidates, helping you shortlist talent 20x faster and more efficiently.
+              <p className="text-xs sm:text-sm text-slate-400 mb-2 sm:mb-4">By SKYGENAI</p>
+              <p className="text-slate-400 mb-4 sm:mb-6 text-xs sm:text-sm leading-relaxed">
+                HireGenAI pre-screens and interviews candidates, helping you shortlist talent 20x faster.
               </p>
-              <p className="text-slate-400 mb-6 text-sm font-medium">
+              <p className="text-slate-400 mb-4 sm:mb-6 text-xs sm:text-sm font-medium break-all">
                 Email: <a href="mailto:support@hire-genai.com" className="text-emerald-400 hover:text-emerald-300 transition-colors">support@hire-genai.com</a>
               </p>
               {/* Social Icons */}

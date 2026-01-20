@@ -132,6 +132,11 @@ export interface ReportPDFData {
   resumeScore: number
   qualificationDetails: QualificationDetails | null
   interviewScore?: number
+  verificationPhotos?: {
+    appliedPhoto: string | null
+    preInterviewPhoto: string | null
+    postInterviewPhoto: string | null
+  }
 }
 
 function escapeHtml(text: string | undefined | null): string {
@@ -170,7 +175,7 @@ function getScoreBgColor(score: number): string {
 }
 
 export function generateReportPDFHTML(data: ReportPDFData): string {
-  const { candidate, evaluation, transcript, jobTitle, resumeScore, qualificationDetails, interviewScore } = data
+  const { candidate, evaluation, transcript, jobTitle, resumeScore, qualificationDetails, interviewScore, verificationPhotos } = data
   
   const overallScore = evaluation?.overallScore ?? 0
   const overallScoreDisplay = overallScore <= 10 ? Math.round(overallScore * 10) : Math.round(overallScore)
@@ -724,6 +729,52 @@ export function generateReportPDFHTML(data: ReportPDFData): string {
       </div>
     </div>
   </div>
+  
+  <!-- VERIFICATION PHOTOS SECTION -->
+  ${(verificationPhotos?.appliedPhoto || verificationPhotos?.preInterviewPhoto || verificationPhotos?.postInterviewPhoto) ? `
+  <div class="section avoid-break">
+    <div class="section-header purple">
+      <div class="section-title">📷 Verification Photos</div>
+      <div class="section-subtitle">Identity verification photos captured during the application process</div>
+    </div>
+    <div class="section-content">
+      <div style="display: flex; justify-content: center; gap: 40px;">
+        <!-- Applied Photo -->
+        <div style="text-align: center;">
+          <div style="width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background: #f1f5f9; border: 3px solid #e2e8f0; margin: 0 auto 8px auto; display: flex; align-items: center; justify-content: center;">
+            ${verificationPhotos?.appliedPhoto 
+              ? `<img src="${verificationPhotos.appliedPhoto}" alt="Applied Photo" style="width: 100%; height: 100%; object-fit: cover;" />`
+              : `<span style="color: #94a3b8; font-size: 24px;">📷</span>`
+            }
+          </div>
+          <p style="font-size: 11px; font-weight: 600; color: #475569;">Applied Photo</p>
+        </div>
+        
+        <!-- Pre-Interview Photo -->
+        <div style="text-align: center;">
+          <div style="width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background: #f1f5f9; border: 3px solid #e2e8f0; margin: 0 auto 8px auto; display: flex; align-items: center; justify-content: center;">
+            ${verificationPhotos?.preInterviewPhoto 
+              ? `<img src="${verificationPhotos.preInterviewPhoto}" alt="Pre-Interview Photo" style="width: 100%; height: 100%; object-fit: cover;" />`
+              : `<span style="color: #94a3b8; font-size: 24px;">📷</span>`
+            }
+          </div>
+          <p style="font-size: 11px; font-weight: 600; color: #475569;">Pre-Interview</p>
+        </div>
+        
+        <!-- Post-Interview Photo -->
+        <div style="text-align: center;">
+          <div style="width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background: #f1f5f9; border: 3px solid #e2e8f0; margin: 0 auto 8px auto; display: flex; align-items: center; justify-content: center;">
+            ${verificationPhotos?.postInterviewPhoto 
+              ? `<img src="${verificationPhotos.postInterviewPhoto}" alt="Post-Interview Photo" style="width: 100%; height: 100%; object-fit: cover;" />`
+              : `<span style="color: #94a3b8; font-size: 24px;">📷</span>`
+            }
+          </div>
+          <p style="font-size: 11px; font-weight: 600; color: #475569;">Post-Interview</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  ` : ''}
   
   <!-- SECTION 2: RESUME EVALUATION -->
   ${qualificationDetails ? generateResumeEvaluationSection(resumeScore, qualificationDetails, candidate, jobTitle, interviewScore || 0) : ''}
@@ -1304,8 +1355,20 @@ function generateInterviewEvaluationSection(evaluation: EvaluationData, overallS
   const generatedStrengths: string[] = []
   const generatedWeaknesses: string[] = []
   
+  // Collect criteria-based performance
+  const criteriaScores: Record<string, { total: number, count: number }> = {}
+  
   questions.forEach((q: any) => {
     const score = q.score || 0
+    const criteria = q.criteria || q.category || 'General'
+    
+    // Track criteria scores
+    if (!criteriaScores[criteria]) {
+      criteriaScores[criteria] = { total: 0, count: 0 }
+    }
+    criteriaScores[criteria].total += score
+    criteriaScores[criteria].count += 1
+    
     // Collect strengths from high-scoring answers
     if (score >= 70 && q.strengths_in_answer && q.strengths_in_answer.length > 0) {
       q.strengths_in_answer.forEach((s: string) => {
@@ -1319,6 +1382,38 @@ function generateInterviewEvaluationSection(evaluation: EvaluationData, overallS
       })
     }
   })
+  
+  // Generate additional strengths based on criteria performance
+  Object.entries(criteriaScores).forEach(([criteria, data]) => {
+    const avgScore = data.total / data.count
+    if (avgScore >= 70 && criteria !== 'General') {
+      const strengthText = `Strong performance in ${criteria} (${Math.round(avgScore)}% avg)`
+      if (!generatedStrengths.some(s => s.includes(criteria))) {
+        generatedStrengths.push(strengthText)
+      }
+    }
+    if (avgScore < 50 && criteria !== 'General') {
+      const weaknessText = `Needs improvement in ${criteria} (${Math.round(avgScore)}% avg)`
+      if (!generatedWeaknesses.some(w => w.includes(criteria))) {
+        generatedWeaknesses.push(weaknessText)
+      }
+    }
+  })
+  
+  // Add overall performance-based strengths
+  if (overallScoreDisplay >= 70) {
+    if (!generatedStrengths.some(s => s.toLowerCase().includes('overall'))) {
+      generatedStrengths.push('Demonstrated strong overall interview performance')
+    }
+  }
+  
+  const answeredCount = questions.filter((q: any) => q.answered !== false).length
+  const totalQuestions = questions.length
+  if (answeredCount === totalQuestions && totalQuestions > 0) {
+    if (!generatedStrengths.some(s => s.toLowerCase().includes('all questions'))) {
+      generatedStrengths.push('Successfully answered all interview questions')
+    }
+  }
   
   // Use evaluation strengths/weaknesses if available, otherwise use generated
   const strengths = (evaluation.strengths && evaluation.strengths.length > 0) 

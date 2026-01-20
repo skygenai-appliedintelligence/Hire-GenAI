@@ -51,16 +51,17 @@ export async function GET(req: Request) {
   }
 }
 
-// POST: Save verification result
+// POST: Save verification result (BINARY - stores distance for internal logs only)
 export async function POST(req: Request) {
   try {
-    const { applicationId, verified, score, capturedPhotoUrl } = await req.json()
+    const { applicationId, verified, distance, capturedPhotoUrl } = await req.json()
 
     if (!applicationId) {
       return NextResponse.json({ ok: false, error: 'Application ID is required' }, { status: 400 })
     }
 
     // Update application with verification status
+    // Distance is stored for internal logging only, NEVER shown to users
     const updateQuery = `
       UPDATE applications 
       SET 
@@ -77,19 +78,18 @@ export async function POST(req: Request) {
         applicationId, 
         capturedPhotoUrl || null,
         verified,
-        score || 0
+        distance || 0 // Store raw distance (0-1 scale) for internal logs
       ])
     } catch (dbErr: any) {
       // Columns might not exist - try simpler update
       console.warn('[Photo Compare] Full update failed, trying simple update:', dbErr?.message)
     }
 
-    console.log(`[Photo Compare] Application ${applicationId}: verified=${verified}, score=${score}`)
+    console.log(`[Photo Compare] Application ${applicationId}: verified=${verified}, distance=${distance}`)
 
     return NextResponse.json({ 
       ok: true, 
       verified,
-      score,
       message: verified ? 'Photo verification successful' : 'Photo verification failed'
     })
 

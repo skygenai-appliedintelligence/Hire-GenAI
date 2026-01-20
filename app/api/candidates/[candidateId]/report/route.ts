@@ -124,6 +124,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
         a.available_start_date,
         a.willing_to_relocate,
         a.languages,
+        a.photo_url,
         c.email as candidate_email,
         c.phone as candidate_phone,
         c.first_name as c_first_name,
@@ -179,7 +180,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       portfolioUrl: row.portfolio_url || null,
       availableStartDate: row.available_start_date || null,
       willingToRelocate: row.willing_to_relocate || false,
-      languages: parsedLanguages
+      languages: parsedLanguages,
+      photoUrl: row.photo_url || null
     }
 
     // Primary source: evaluation from interviews.metadata->evaluation
@@ -479,6 +481,44 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       }
     }
 
+    // Fetch all 4 photos: applied photo, pre-interview, during-interview (silent), post-interview
+    let verificationPhotos = { 
+      appliedPhoto: null as string | null, 
+      preInterviewPhoto: null as string | null,
+      duringInterviewPhoto: null as string | null,
+      postInterviewPhoto: null as string | null 
+    }
+    try {
+      const photosQuery = `
+        SELECT 
+          a.photo_url as applied_photo,
+          a.verification_photo_url as pre_interview_photo,
+          i.during_interview_screenshot as during_interview_photo,
+          i.post_interview_photo_url as post_interview_photo
+        FROM applications a
+        LEFT JOIN application_rounds ar ON ar.application_id = a.id
+        LEFT JOIN interviews i ON i.application_round_id = ar.id
+        WHERE a.id = $1::uuid
+        ORDER BY i.id DESC
+        LIMIT 1
+      `
+      const photoRows = await DatabaseService.query(photosQuery, [candidateId]) as any[]
+      if (photoRows && photoRows.length > 0) {
+        verificationPhotos.appliedPhoto = photoRows[0].applied_photo || null
+        verificationPhotos.preInterviewPhoto = photoRows[0].pre_interview_photo || null
+        verificationPhotos.duringInterviewPhoto = photoRows[0].during_interview_photo || null
+        verificationPhotos.postInterviewPhoto = photoRows[0].post_interview_photo || null
+        console.log('📸 Verification photos loaded:', {
+          applied: verificationPhotos.appliedPhoto ? 'Present' : 'None',
+          preInterview: verificationPhotos.preInterviewPhoto ? 'Present' : 'None',
+          duringInterview: verificationPhotos.duringInterviewPhoto ? 'Present' : 'None',
+          postInterview: verificationPhotos.postInterviewPhoto ? 'Present' : 'None'
+        })
+      }
+    } catch (e) {
+      console.log('Failed to fetch verification photos:', e)
+    }
+
     // Try to fetch transcript data from interviews table
     let transcript = null
     try {
@@ -665,7 +705,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       qualificationScore: row.qualification_score || null,
       isQualified: row.is_qualified || null,
       qualificationDetails,
-      sectionPointers
+      sectionPointers,
+      verificationPhotos
     })
   } catch (e: any) {
     console.error('Failed to load candidate report:', e)
