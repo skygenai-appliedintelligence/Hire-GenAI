@@ -5,7 +5,7 @@ export async function POST() {
   const resource = process.env.AZURE_OPENAI_RESOURCE!;
   const version = process.env.AZURE_OPENAI_API_VERSION!;
   const deployment = process.env.NEXT_PUBLIC_AZURE_REALTIME_DEPLOYMENT!;
-  const voice = process.env.AZURE_REALTIME_VOICE || "verse";
+  const voice = process.env.AZURE_REALTIME_VOICE || "shimmer";
 
   if (!apiKey || !resource || !version || !deployment) {
     return NextResponse.json(

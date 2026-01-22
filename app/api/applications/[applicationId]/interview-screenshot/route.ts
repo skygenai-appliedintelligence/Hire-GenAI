@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { DatabaseService } from '@/lib/database'
+import { put } from '@vercel/blob'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -54,8 +55,31 @@ export async function POST(
     const interviewId = existingRows[0].id
     console.log('📸 [API] Found interview:', interviewId)
 
-    // Update the interview with the during-interview screenshot
-    // This is captured silently when all questions have been asked
+    // Convert base64 to buffer for blob storage
+    const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, '')
+    const buffer = Buffer.from(base64Data, 'base64')
+
+    // Generate unique filename for blob storage
+    const timestamp = Date.now()
+    const filename = `during-interview-photos/${applicationId}/${timestamp}.jpg`
+
+    let photoUrl: string
+
+    // Try to upload to Vercel Blob if available
+    try {
+      const blob = await put(filename, buffer, {
+        access: 'public',
+        contentType: 'image/jpeg'
+      })
+      photoUrl = blob.url
+      console.log(`📸 [API] Uploaded to Vercel Blob: ${photoUrl}`)
+    } catch (blobError) {
+      // Fallback: Store as base64 in database
+      console.log('📸 [API] Vercel Blob not available, storing as base64')
+      photoUrl = screenshot // Store the base64 data URL directly
+    }
+
+    // Update the interview with the during-interview screenshot URL
     const updateQuery = `
       UPDATE interviews
       SET 
@@ -65,13 +89,13 @@ export async function POST(
       RETURNING id, during_interview_screenshot IS NOT NULL as saved
     `
 
-    console.log('📸 [API] Saving screenshot to database...')
+    console.log('📸 [API] Saving screenshot URL to database...')
     console.log('📸 [API] Interview ID for update:', interviewId)
-    console.log('📸 [API] Screenshot data length:', screenshot.length)
+    console.log('📸 [API] Photo URL:', photoUrl.substring(0, 100) + '...')
     
     const updateResult = await DatabaseService.query(
       updateQuery,
-      [interviewId, screenshot]
+      [interviewId, photoUrl]
     ) as any[]
 
     console.log('📸 [API] Update result:', updateResult)
@@ -90,7 +114,8 @@ export async function POST(
     console.log('📸 [API] Screenshot saved successfully!')
     return NextResponse.json({
       ok: true,
-      interviewId
+      interviewId,
+      photoUrl
     })
 
   } catch (err: any) {

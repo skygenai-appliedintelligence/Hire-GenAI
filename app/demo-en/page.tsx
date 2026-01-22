@@ -98,6 +98,13 @@ export default function DemoEnPage() {
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const avatarVideoRef = useRef<HTMLVideoElement | null>(null);
+  const isFirstPlayRef = useRef<boolean>(true);
+  const [agentSpeaking, setAgentSpeaking] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const speakingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [pc, setPc] = useState<RTCPeerConnection | null>(null);
   const [dc, setDc] = useState<RTCDataChannel | null>(null);
@@ -168,6 +175,25 @@ export default function DemoEnPage() {
       router.push("/dashboard");
     }
   }, [user, loading, router]);
+
+  // Control avatar video based on agent speaking state (only after first loop completes)
+  useEffect(() => {
+    const avatarVideo = avatarVideoRef.current;
+    // Only control after Start AND after first loop has completed
+    if (!avatarVideo || !running || isFirstPlayRef.current) return;
+    
+    if (agentSpeaking) {
+      // Play video when agent is speaking
+      avatarVideo.play().catch((err) => {
+        if (err?.name !== 'AbortError') {
+          console.warn('Avatar video play error:', err);
+        }
+      });
+    } else {
+      // Pause video when agent is silent
+      avatarVideo.pause();
+    }
+  }, [agentSpeaking, running]);
 
   // Early returns after all hooks are called
   if (loading) {
@@ -324,6 +350,62 @@ export default function DemoEnPage() {
         if (!stream) return;
         if (remoteVideoRef.current) remoteVideoRef.current.srcObject = stream;
         if (remoteAudioRef.current) remoteAudioRef.current.srcObject = stream;
+        
+        // Set up audio analysis for agent speaking detection
+        const audioTracks = stream.getAudioTracks();
+        if (audioTracks.length > 0) {
+          try {
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            analyser.smoothingTimeConstant = 0.8;
+            
+            const source = audioContext.createMediaStreamSource(stream);
+            source.connect(analyser);
+            
+            audioContextRef.current = audioContext;
+            analyserRef.current = analyser;
+            
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            const threshold = 10; // Audio level threshold for speaking detection
+            
+            const detectSpeaking = () => {
+              if (!analyserRef.current) return;
+              
+              analyserRef.current.getByteFrequencyData(dataArray);
+              
+              // Calculate average audio level
+              let sum = 0;
+              for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+              }
+              const average = sum / dataArray.length;
+              
+              if (average > threshold) {
+                // Agent is speaking
+                if (speakingTimeoutRef.current) {
+                  clearTimeout(speakingTimeoutRef.current);
+                  speakingTimeoutRef.current = null;
+                }
+                setAgentSpeaking(true);
+              } else {
+                // Debounce: wait a bit before marking as not speaking
+                if (!speakingTimeoutRef.current) {
+                  speakingTimeoutRef.current = setTimeout(() => {
+                    setAgentSpeaking(false);
+                    speakingTimeoutRef.current = null;
+                  }, 300); // 300ms debounce
+                }
+              }
+              
+              animationFrameRef.current = requestAnimationFrame(detectSpeaking);
+            };
+            
+            detectSpeaking();
+          } catch (err) {
+            console.error('Failed to set up audio analysis:', err);
+          }
+        }
       };
 
       const local = await navigator.mediaDevices.getUserMedia({
@@ -360,6 +442,12 @@ export default function DemoEnPage() {
 
       setScreen("interview");
       resetInterview();
+      
+      // Reset avatar video to start from 0 seconds
+      if (avatarVideoRef.current) {
+        avatarVideoRef.current.currentTime = 0;
+        isFirstPlayRef.current = true;
+      }
     } catch (e: any) {
       console.error(e);
       alert(e?.message || "Failed to start interview");
@@ -393,6 +481,32 @@ export default function DemoEnPage() {
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
+    
+    // Clean up audio analysis
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    if (speakingTimeoutRef.current) {
+      clearTimeout(speakingTimeoutRef.current);
+      speakingTimeoutRef.current = null;
+    }
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close();
+      } catch {}
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    setAgentSpeaking(false);
+    
+    // Pause and reset avatar video
+    if (avatarVideoRef.current) {
+      avatarVideoRef.current.pause();
+      avatarVideoRef.current.currentTime = 0;
+    }
+    isFirstPlayRef.current = true;
+    
     setDc(null);
     setPc(null);
     setLocalStream(null);
@@ -1462,16 +1576,30 @@ export default function DemoEnPage() {
               zIndex: 10
             }}>
               <video
+                ref={avatarVideoRef}
                 autoPlay
-                loop
                 muted
                 playsInline
+                loop={!running}
                 style={{
                   width: '100%',
                   height: '100%',
                   objectFit: 'cover'
                 }}
                 src="https://storage.googleapis.com/ai_recruiter_bucket_prod/assets/videos/olivia_character_no_audio.mp4"
+                onEnded={() => {
+                  if (avatarVideoRef.current && running) {
+                    // After first play (post-Start), loop from 5 seconds
+                    if (isFirstPlayRef.current) {
+                      isFirstPlayRef.current = false;
+                    }
+                    avatarVideoRef.current.currentTime = 5;
+                    // Only continue playing if agent is still speaking
+                    if (agentSpeaking) {
+                      avatarVideoRef.current.play().catch(() => {});
+                    }
+                  }
+                }}
               />
             </div>
 
