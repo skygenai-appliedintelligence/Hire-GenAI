@@ -79,7 +79,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 
 ## 🗄️ Database Setup
 
-This project supports PostgreSQL via Prisma. To enable DB features:
+This project supports PostgreSQL via Prisma with Neon database integration for PR previews. To enable DB features:
 
 1. Create `.env.local` with your Postgres URLs:
 ```env
