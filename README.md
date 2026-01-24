@@ -156,7 +156,7 @@ pnpm lint         # Run ESLint
 # Setup
 pnpm setup        # Set up environment variables
 ```
-
+# nijdie
 ### Key Technologies
 
 - **Framework**: Next.js 15 with App Router
