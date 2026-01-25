@@ -23,15 +23,16 @@ export default function JobsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const { toast } = useToast()
   const [applyEnabledByJob, setApplyEnabledByJob] = useState<Record<string, boolean>>({})
-  const [tab, setTab] = useState<'open' | 'on_hold' | 'closed' | 'cancelled'>('open')
-  const [statusByJob, setStatusByJob] = useState<Record<string, 'open' | 'on_hold' | 'closed' | 'cancelled'>>({})
+  const [tab, setTab] = useState<'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled'>('open')
+  const [statusByJob, setStatusByJob] = useState<Record<string, 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled'>>({})
   const [users, setUsers] = useState<{ id: string; email: string; fullName: string }[]>([])
   const [selectedUserEmail, setSelectedUserEmail] = useState<string>('all')
   const [autoScheduleByJob, setAutoScheduleByJob] = useState<Record<string, boolean>>({})
   const [togglingJobId, setTogglingJobId] = useState<string | null>(null)
 
-  const normalizeStatus = (s: string | undefined | null): 'open' | 'on_hold' | 'closed' | 'cancelled' => {
+  const normalizeStatus = (s: string | undefined | null): 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled' => {
     const v = String(s || '').trim().toLowerCase()
+    if (v === 'draft') return 'draft'
     if (v === 'closed') return 'closed'
     if (v === 'on hold' || v === 'on_hold' || v === 'on-hold' || v === 'onhold' || v === 'hold' || v === 'paused' || v === 'pause') return 'on_hold'
     if (v === 'cancelled' || v === 'canceled' || v === 'cancel') return 'cancelled'
@@ -105,7 +106,7 @@ export default function JobsPage() {
   useEffect(() => {
     const loadStatuses = () => {
       setStatusByJob((prev) => {
-        const next: Record<string, 'open' | 'on_hold' | 'closed' | 'cancelled'> = { ...prev }
+        const next: Record<string, 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled'> = { ...prev }
         for (const j of jobs) {
           try {
             const saved = localStorage.getItem(`jobStatus:${j.id}`)
@@ -282,8 +283,10 @@ export default function JobsPage() {
     }
   }
 
-  const getStatusColor = (status: 'open' | 'on_hold' | 'closed' | 'cancelled') => {
+  const getStatusColor = (status: 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled') => {
     switch (status) {
+      case 'draft':
+        return 'bg-amber-100 text-amber-800'
       case 'open':
         return 'bg-green-100 text-green-800'
       case 'on_hold':
@@ -359,12 +362,13 @@ export default function JobsPage() {
       </div>
 
       {/* Status Tabs and Filter Section */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as 'open' | 'on_hold' | 'closed' | 'cancelled')} className="space-y-4">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled')} className="space-y-4">
         {/* Stack tabs and filter on mobile */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           {/* Scrollable tabs on mobile */}
           <div className="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
             <TabsList className="inline-flex w-max sm:w-auto">
+              <TabsTrigger value="draft" className="text-xs sm:text-sm px-2 sm:px-3">Drafts</TabsTrigger>
               <TabsTrigger value="open" className="text-xs sm:text-sm px-2 sm:px-3">Open</TabsTrigger>
               <TabsTrigger value="on_hold" className="text-xs sm:text-sm px-2 sm:px-3">On Hold</TabsTrigger>
               <TabsTrigger value="closed" className="text-xs sm:text-sm px-2 sm:px-3">Closed</TabsTrigger>
@@ -391,6 +395,97 @@ export default function JobsPage() {
           </div>
         </div>
         
+
+        {/* Draft tab: show jobs with status === draft */}
+        <TabsContent value="draft">
+          <div className="grid gap-5">
+            {jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'draft').length > 0 ? (
+              jobs.filter(j => (statusByJob[j.id] ?? normalizeStatus((j as any).status)) === 'draft').map((job) => (
+                <Card
+                  key={job.id}
+                  className="group border border-amber-200 bg-amber-50/30 rounded-xl shadow-sm transition-all duration-300 overflow-hidden"
+                >
+                  <CardHeader className="pb-4 pt-5 px-6">
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-2xl font-bold text-gray-900 mb-1 leading-tight">{job.title || 'Untitled Draft'}</CardTitle>
+                      </div>
+                      <Badge className="bg-amber-100 text-amber-800 shrink-0 px-3 py-1 text-xs font-semibold uppercase tracking-wide">Draft</Badge>
+                    </div>
+                    
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600">
+                      {job.location && (
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="w-4 h-4 text-gray-400" />
+                          <span className="font-medium">{job.location}</span>
+                        </span>
+                      )}
+                      {job.employment_type && (
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="w-4 h-4 text-gray-400" />
+                          <span>{job.employment_type}</span>
+                        </span>
+                      )}
+                    </div>
+                    
+                    {(job as any).created_by_email && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-2">
+                        <User className="w-3.5 h-3.5" />
+                        <span>Created by <span className="font-medium text-gray-700">{(job as any).created_by_email}</span></span>
+                      </div>
+                    )}
+                  </CardHeader>
+                  
+                  <CardContent className="px-6 pb-5">
+                    <p className="text-sm text-gray-500 italic mb-4">This job is saved as a draft. Continue editing to publish it.</p>
+                    
+                    <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                        onClick={() => router.push(`/dashboard/jobs/new?jobId=${encodeURIComponent(job.id)}&draft=true`)}
+                      >
+                        <Briefcase className="w-4 h-4 mr-1.5" />
+                        Continue Editing
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 border-red-200 hover:bg-red-50"
+                        onClick={() => handleDeleteJob(job.id)}
+                        disabled={deletingId === job.id}
+                      >
+                        {deletingId === job.id ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-1.5"></div>
+                        ) : (
+                          <Trash2 className="w-4 h-4 mr-1.5" />
+                        )}
+                        Delete
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card className="border-dashed border-2 border-gray-200 bg-gray-50/50">
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="p-4 bg-amber-100 rounded-full mb-4">
+                    <Briefcase className="w-8 h-8 text-amber-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-700 mb-2">No Draft Jobs</h3>
+                  <p className="text-gray-500 mb-4 max-w-sm">You don't have any saved drafts. Start creating a job and save it as a draft to continue later.</p>
+                  <Link href="/dashboard/jobs/new">
+                    <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create New Job
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
 
         {/* Open tab: show jobs with status === open */}
         <TabsContent value="open">

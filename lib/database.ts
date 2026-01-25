@@ -1093,7 +1093,7 @@ export class DatabaseService {
     title?: string | null
     description_md?: string | null
     location_text?: string | null
-    status?: 'open' | 'on_hold' | 'closed' | 'cancelled' | null
+    status?: 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled' | null
     employment_type?: 'full_time' | 'part_time' | 'contract' | null
     level?: 'intern' | 'junior' | 'mid' | 'senior' | 'lead' | 'principal' | null
     education?: string | null
@@ -1254,6 +1254,8 @@ export class DatabaseService {
     is_public?: boolean | null
     created_by_email?: string | null
     screening_questions?: Record<string, any> | null
+    status?: 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled' | null
+    auto_schedule_interview?: boolean | null
   }) {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
@@ -1287,7 +1289,7 @@ export class DatabaseService {
         duties_day_to_day, duties_strategic, stakeholders,
         decision_scope, salary_min, salary_max, salary_period, bonus_incentives,
         perks_benefits, time_off_policy, joining_timeline, travel_requirements, visa_requirements,
-        status, is_public, created_by_email, screening_questions
+        status, auto_schedule_interview, is_public, created_by_email, screening_questions
       )
       VALUES (
         $1::uuid, $2, $3, $4, $5, $6::employment_type, $7::job_level, $8,
@@ -1297,7 +1299,7 @@ export class DatabaseService {
         $17::text[], $18::text[], $19::text[],
         $20, $21, $22, $23::salary_period, $24,
         $25::text[], $26, $27, $28, $29,
-        'open', COALESCE($30, true), $31, $32::jsonb
+        COALESCE($30, 'open'), COALESCE($31, true), COALESCE($32, true), $33, $34::jsonb
       )
       RETURNING id
     `
@@ -1332,9 +1334,11 @@ export class DatabaseService {
       input.joining_timeline ?? null,
       input.travel_requirements ?? null,
       input.visa_requirements ?? null,
-      input.is_public ?? true,
-      input.created_by_email ?? null,
-      input.screening_questions ? JSON.stringify(input.screening_questions) : null,
+      input.status ?? 'open', // $30 - status (defaults to 'open')
+      input.auto_schedule_interview ?? true, // $31
+      input.is_public ?? true, // $32
+      input.created_by_email ?? null, // $33
+      input.screening_questions ? JSON.stringify(input.screening_questions) : null, // $34
     ]
 
     const rows = (await this.query(q, params)) as any[]
