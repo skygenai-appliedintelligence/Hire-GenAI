@@ -59,6 +59,8 @@ type CreateJobBody = {
   screeningVisaRequired?: string
   screeningLanguageProficiency?: string
   screeningCurrentSalary?: string
+  status?: string // 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled'
+  auto_schedule_interview?: boolean
 }
 
 function normalizeJobType(value?: string | null): 'full_time' | 'part_time' | 'contract' | null {
@@ -355,9 +357,11 @@ Work Authorization: ${raw.visa || 'Work authorization required'}`
           joining_timeline: raw.joining || null,
           travel_requirements: raw.travel || null,
           visa_requirements: raw.visa || null,
+          auto_schedule_interview: raw.auto_schedule_interview ?? true,
           is_public: true,
           created_by_email: body.createdBy || null,
           screening_questions: screeningQuestions,
+          status: (raw.status === 'draft' ? 'draft' : 'open') as any,
         })
       } catch (e: any) {
         const msg = String(e?.message || '')
@@ -396,9 +400,11 @@ Work Authorization: ${raw.visa || 'Work authorization required'}`
           joining_timeline: raw.joining || null,
           travel_requirements: raw.travel || null,
           visa_requirements: raw.visa || null,
+          auto_schedule_interview: raw.auto_schedule_interview ?? true,
           is_public: true,
           created_by_email: null,
           screening_questions: screeningQuestions,
+          status: (raw.status === 'draft' ? 'draft' : 'open') as any,
         })
       }
 
@@ -469,7 +475,8 @@ Work Authorization: ${raw.visa || 'Work authorization required'}`
         title: body.jobTitle,
         location: raw.location?.trim() || null,
         description_md: body.description,
-        status: 'open',
+        status: (raw.status === 'draft' ? 'draft' : 'open') as any,
+        auto_schedule_interview: raw.auto_schedule_interview ?? true,
         is_public: true,
         employment_type: employment || 'full_time',
         experience_level: expLevel,
