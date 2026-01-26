@@ -3,6 +3,7 @@ import { CVEvaluator } from '@/lib/cv-evaluator'
 import { DatabaseService } from '@/lib/database'
 import { checkOpenAIPermissions } from '@/lib/config'
 import { decrypt } from '@/lib/encryption'
+import { getAppUrl } from '@/lib/utils/url'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -223,7 +224,7 @@ export async function POST(request: NextRequest) {
                 console.log(`🎯 [CV EVALUATOR] Candidate qualified, triggering auto-email check...`)
                 
                 // Call the auto-send-interview-email API with 1 minute delay (60000ms)
-                const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+                const baseUrl = getAppUrl()
                 fetch(`${baseUrl}/api/applications/auto-send-interview-email`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },

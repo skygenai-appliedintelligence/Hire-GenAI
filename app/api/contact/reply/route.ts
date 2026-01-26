@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendContactMail } from '@/lib/smtp'
 import { DatabaseService } from '@/lib/database'
+import { getAppUrl } from '@/lib/utils/url'
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,10 +75,11 @@ export async function POST(request: NextRequest) {
       // Now replace all image references in htmlMessage with CID
       for (const [imgId, cid] of Object.entries(cidMap)) {
         // Replace various URL patterns
+        const dynamicBaseUrl = getAppUrl()
         const patterns = [
           `/api/email-templates/image/${imgId}`,
           `${baseUrl}/api/email-templates/image/${imgId}`,
-          `http://localhost:3000/api/email-templates/image/${imgId}`,
+          `${dynamicBaseUrl}/api/email-templates/image/${imgId}`,
         ]
         
         for (const pattern of patterns) {

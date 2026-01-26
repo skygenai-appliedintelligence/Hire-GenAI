@@ -15,6 +15,7 @@ import SendEmailModal from "@/components/ui/send-email-modal"
 import SendBulkEmailModal from "@/components/ui/send-bulk-email-modal"
 import { Spinner } from "@/components/ui/spinner"
 import { Mail } from "lucide-react"
+import { getAppUrl, getInterviewStartLink } from "@/lib/utils/url"
 
 // Status and Bucket typings
 export type InterviewStatus = "Unqualified" | "Qualified" | "Pending" | "Expired"
@@ -228,7 +229,6 @@ export default function QualifiedCandidatesInterviewFlowPage() {
 
   // Handle bulk email sending
   const handleSendBulkEmail = async (candidates: CandidateRow[], messageTemplate: string, category: 'interview' | 'new_job') => {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
     const companyName = (company as any)?.name || ''
     const recruiterName = user?.full_name || "Recruitment Team"
     const userJobTitle = "HR Manager"
@@ -238,8 +238,8 @@ export default function QualifiedCandidatesInterviewFlowPage() {
 
     for (const candidate of candidates) {
       try {
-        // Generate interview link for this candidate
-        const interviewLink = `${baseUrl}/interview/${encodeURIComponent(candidate.id)}/start`
+        // Generate interview link for this candidate using dynamic URL
+        const interviewLink = getInterviewStartLink(candidate.id)
         const jobTitle = candidate.jobTitle || candidate.appliedJD || "N/A"
 
         // Replace placeholders for this specific candidate

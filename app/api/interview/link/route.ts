@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getInterviewStartLink } from "@/lib/utils/url"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -15,8 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "applicationId and email are required" }, { status: 400 })
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-    const interviewUrl = `${baseUrl}/interview/${encodeURIComponent(applicationId)}/start`
+    const interviewUrl = getInterviewStartLink(applicationId)
 
     // In a real implementation, send an email using your provider (Resend, SES, SendGrid, etc.)
     // For now, log to the server console for testing (like OTP logs during login)
