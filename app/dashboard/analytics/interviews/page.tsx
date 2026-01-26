@@ -19,6 +19,7 @@ export type InterviewStatus = "Completed" | "Scheduled" | "Pending" | "Cancelled
 type InterviewRow = {
   id: string
   jobId: string
+  applicationId?: string
   candidateName: string
   appliedJD: string
   email: string
@@ -241,7 +242,7 @@ export default function InterviewsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Link href={`/dashboard/analytics/${row.jobId}/applications/${row.id}/report`}>
+                      <Link href={`/dashboard/analytics/${row.jobId}/applications/${encodeURIComponent(row.applicationId || row.id)}/report`}>
                         <Button variant="outline" size="sm">Show Report</Button>
                       </Link>
                     </TableCell>

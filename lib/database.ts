@@ -2033,6 +2033,7 @@ export class DatabaseService {
       return {
         id: row.id,
         jobId: row.job_id,
+        applicationId: row.application_id,
         candidateName,
         appliedJD: row.job_title || 'Unknown Position',
         email,
@@ -2046,6 +2047,72 @@ export class DatabaseService {
     })
   }
 
+  // Get hiring bucket counts for recommended candidates
+  static async getHiringBucketCounts(companyId: string, jobId?: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    let query = `
+      SELECT 
+        COUNT(*) FILTER (WHERE a.hiring_status = 'sent_to_manager') as sent_to_manager,
+        COUNT(*) FILTER (WHERE a.hiring_status = 'offer_extended') as offer_extended,
+        COUNT(*) FILTER (WHERE a.hiring_status = 'offer_accepted') as offer_accepted,
+        COUNT(*) FILTER (WHERE a.hiring_status IN ('rejected_withdraw', 'rejected', 'withdrawn')) as rejected_withdraw,
+        COUNT(*) FILTER (WHERE a.hiring_status = 'hired') as hired,
+        COUNT(*) as total
+      FROM applications a
+      JOIN application_rounds ar ON ar.application_id = a.id
+      JOIN interviews i ON i.application_round_id = ar.id
+      LEFT JOIN evaluations e ON e.interview_id = i.id
+      JOIN jobs j ON a.job_id = j.id
+      WHERE j.company_id = $1::uuid
+        AND i.status = 'success'
+        AND (e.status = 'Pass' OR e.overall_score >= 65)
+    `
+
+    const params: any[] = [companyId]
+    
+    if (jobId && jobId !== 'all') {
+      query += ` AND a.job_id = $2::uuid`
+      params.push(jobId)
+    }
+
+    const result = await this.query(query, params) as any[]
+    const row = result[0] || {}
+
+    return {
+      total: parseInt(row.total) || 0,
+      sentToManager: parseInt(row.sent_to_manager) || 0,
+      offerExtended: parseInt(row.offer_extended) || 0,
+      offerAccepted: parseInt(row.offer_accepted) || 0,
+      rejectedWithdraw: parseInt(row.rejected_withdraw) || 0,
+      hired: parseInt(row.hired) || 0
+    }
+  }
+
+  // Update hiring status for an application
+  static async updateHiringStatus(applicationId: string, hiringStatus: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const validStatuses = ['sent_to_manager', 'offer_extended', 'offer_accepted', 'rejected_withdraw', 'hired']
+    if (!validStatuses.includes(hiringStatus)) {
+      throw new Error(`Invalid hiring status. Must be one of: ${validStatuses.join(', ')}`)
+    }
+
+    const query = `
+      UPDATE applications 
+      SET hiring_status = $1
+      WHERE id = $2::uuid
+      RETURNING id, hiring_status
+    `
+    
+    const result = await this.query(query, [hiringStatus, applicationId]) as any[]
+    return result[0] || null
+  }
+  
   // =========================
   // BILLING & USAGE TRACKING
   // ALL PRICING FROM .env FILE ONLY - NO OpenAI API, NO external sources
