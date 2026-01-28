@@ -42,7 +42,21 @@ export default async function JobDetailPage(
              NULL AS salary_range,
              CASE 
                WHEN j.salary_min IS NOT NULL AND j.salary_max IS NOT NULL 
-               THEN CONCAT(j.salary_min, ' - ', j.salary_max, ' ', COALESCE(j.salary_period::text, ''))
+               THEN CONCAT(
+                 CASE j.salary_currency 
+                   WHEN 'USD' THEN '$'
+                   WHEN 'EUR' THEN '€'
+                   WHEN 'GBP' THEN '£'
+                   ELSE '₹'
+                 END,
+                 j.salary_min, ' - ',
+                 CASE j.salary_currency 
+                   WHEN 'USD' THEN '$'
+                   WHEN 'EUR' THEN '€'
+                   WHEN 'GBP' THEN '£'
+                   ELSE '₹'
+                 END,
+                 j.salary_max, ' ', COALESCE(j.salary_period::text, ''))
                WHEN j.salary_min IS NOT NULL 
                THEN CONCAT('From ', j.salary_min, ' ', COALESCE(j.salary_period::text, ''))
                WHEN j.salary_max IS NOT NULL 
@@ -71,6 +85,8 @@ export default async function JobDetailPage(
              j.joining_timeline,
              j.travel_requirements,
              j.visa_requirements,
+             j.salary_currency,
+             COALESCE(j.resume_screening_enabled, false) AS resume_screening_enabled,
              COALESCE(c.name, j.company_name) AS company_name,
              c.description_md AS company_description,
              c.website_url AS company_website,
@@ -143,11 +159,11 @@ export default async function JobDetailPage(
               {title}
             </h1>
 
-            {/* Inline Apply - conditional based on job status */}
+            {/* Inline Apply - conditional based on job status and resume_screening_enabled */}
             <div>
               {isJobOpen ? (
                 <Link
-                  href={`/jobs/${company}/${jobId}/screening`}
+                  href={job.resume_screening_enabled ? `/jobs/${company}/${jobId}/screening` : `/apply/${company}/${jobId}`}
                   aria-label="Apply to this job"
                   data-testid="apply-btn-inline"
                   className="inline-flex items-center justify-center rounded-xl bg-emerald-600 text-white px-4 py-2 font-semibold shadow-md ring-1 ring-emerald-600/20 hover:bg-emerald-600/90 motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-105 hover:shadow-2xl emerald-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
@@ -205,7 +221,7 @@ export default async function JobDetailPage(
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-2.5">
           {isJobOpen ? (
             <Link
-              href={`/jobs/${company}/${jobId}/screening`}
+              href={job.resume_screening_enabled ? `/jobs/${company}/${jobId}/screening` : `/apply/${company}/${jobId}`}
               aria-label="Apply to this job"
               data-testid="apply-btn-sticky"
               className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 text-white px-5 py-3 font-semibold shadow-md ring-1 ring-emerald-600/20 hover:bg-emerald-600/90 motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-105 hover:shadow-2xl emerald-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
@@ -329,7 +345,7 @@ export default async function JobDetailPage(
               <div className="mt-7 space-y-3">
                 {isJobOpen ? (
                   <Link
-                    href={`/jobs/${company}/${jobId}/screening`}
+                    href={job.resume_screening_enabled ? `/jobs/${company}/${jobId}/screening` : `/apply/${company}/${jobId}`}
                     aria-label="Apply to this job"
                     data-testid="apply-btn-summary"
                     className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 text-white px-5 py-2.5 font-semibold shadow-lg ring-1 ring-emerald-600/20 hover:bg-emerald-600/90 motion-safe:transform motion-safe:transition-all motion-safe:duration-300 hover:scale-105 hover:shadow-2xl emerald-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"

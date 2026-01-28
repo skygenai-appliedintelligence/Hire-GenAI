@@ -13,9 +13,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, ArrowRight, Building2, Users, Briefcase, Target, CheckCircle, Clock, Bot, ChevronDown, ChevronUp, Trash2, Plus, RefreshCw, Save } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Building2, Users, Briefcase, Target, CheckCircle, Clock, Bot, ChevronDown, ChevronUp, Trash2, Plus, RefreshCw, Save, AlertCircle } from 'lucide-react'
 import { useAuth } from "@/contexts/auth-context"
 import { parseJobDescription, renderLinkedInJobDescription } from "@/lib/job-description-parser"
+import { EVALUATION_CRITERIA, MAX_CRITERIA_SELECTION, TOTAL_AI_QUESTIONS } from "@/lib/evaluation-criteria"
 
 export default function CreateJobPage() {
   const router = useRouter()
@@ -62,7 +63,7 @@ export default function CreateJobPage() {
     "Phone Screening": []
   })
   const [agentCriteria, setAgentCriteria] = useState<Record<string, string[]>>({
-    "Phone Screening": ["Communication", "Culture fit", "Technical", "Team player"]
+    "Phone Screening": ["Technical Skills", "Communication", "Experience"]
   })
   const [createdJobId, setCreatedJobId] = useState<string | null>(null)
   const [draftJobId, setDraftJobId] = useState<string | null>(null)
@@ -79,7 +80,7 @@ export default function CreateJobPage() {
         ]
       });
       setAgentCriteria({
-        "Phone Screening": ["Communication", "Technical Skills", "Relevant Experience", "Problem Solving"]
+        "Phone Screening": ["Communication", "Technical Skills", "Experience", "Problem Solving"]
       });
     }
   }, [isEditing]);
@@ -205,6 +206,7 @@ export default function CreateJobPage() {
       salaryMin: "",
       salaryMax: "",
       period: "Monthly",
+      salaryCurrency: "INR",
       bonus: "",
       perks: "",
       timeOff: "",
@@ -236,8 +238,9 @@ export default function CreateJobPage() {
       // Platform Selection
       platforms: [] as string[],
 
-      // Screening Questions
+      // Screening Questions - Resume Screening Feature Toggle
       screeningEnabled: false,
+      resumeScreeningEnabled: false,
       screeningOverallExp: "",
       screeningPrimarySkill: "",
       screeningCurrentLocation: "",
@@ -693,13 +696,12 @@ export default function CreateJobPage() {
     // If screening is not enabled, it's valid
     if (!formData.screeningEnabled) return true
     
-    // All screening fields are mandatory when enabled
+    // All screening fields are mandatory when enabled (except Language Proficiency)
     return formData.screeningOverallExp.trim() !== '' &&
            formData.screeningPrimarySkill.trim() !== '' &&
            formData.screeningCurrentLocation.trim() !== '' &&
            formData.screeningNationality.trim() !== '' &&
            formData.screeningVisaRequired.trim() !== '' &&
-           formData.screeningLanguageProficiency.trim() !== '' &&
            formData.screeningCurrentSalary.trim() !== '' &&
            formData.noticePeriodMonths.trim() !== '' &&
            formData.noticePeriodNegotiable.trim() !== ''
@@ -762,92 +764,97 @@ export default function CreateJobPage() {
     goToNextTab()
   }
 
-  // Generate interview questions using AI
+  // Generate interview questions using AI (NEW: Criteria-based approach)
   const handleGenerateQuestions = async (round: string) => {
+    const selectedCriteria = agentCriteria[round] || []
+    
+    // Validate criteria selection
+    if (selectedCriteria.length === 0) {
+      alert('Please select at least one evaluation criterion before generating questions.')
+      return
+    }
+    if (selectedCriteria.length > MAX_CRITERIA_SELECTION) {
+      alert(`Maximum ${MAX_CRITERIA_SELECTION} criteria can be selected. Please remove some criteria.`)
+      return
+    }
+
     setGeneratingQuestions(true)
     try {
       const jobDescription = generateStructuredDescription()
-      // Use actual jobId if exists, otherwise use draft UUID for billing
       const jobIdForUsage = createdJobId || searchParams.get('jobId') || draftJobId
-      // Billing-style logs: indicate OpenAI usage API reference
-      try {
-        console.log('\n' + '='.repeat(70))
-        console.log('💰 [QUESTION GENERATION] Starting usage calculation & question generation...')
-        console.log('🔗 OpenAI Platform Usage API:', 'https://platform.openai.com/settings/organization/usage')
-        console.log('📋 Company ID:', company?.id || 'N/A')
-        console.log('💼 Job ID:', jobIdForUsage || 'N/A (draft)')
-        console.log('🧠 Agent Type:', 'Screening Agent')
-        console.log('❓ Requested Questions:', 10)
-        console.log('🏷️ Source: OpenAI Platform (org-wide usage, see Billing ➜ Usage)')
-        console.log('='.repeat(70))
-      } catch {}
+      
+      console.log('\n' + '='.repeat(70))
+      console.log('💰 [QUESTION GENERATION] Starting CRITERIA-BASED question generation...')
+      console.log('📋 Company ID:', company?.id || 'N/A')
+      console.log('💼 Job ID:', jobIdForUsage || 'N/A (draft)')
+      console.log('🎯 Selected Criteria:', selectedCriteria.join(', '))
+      console.log('❓ Total Questions:', TOTAL_AI_QUESTIONS)
+      console.log('='.repeat(70))
 
       const res = await fetch('/api/ai/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          jobTitle: formData.jobTitle,
           jobDescription,
-          agentType: 'Screening Agent',
-          numberOfQuestions: 10,
-          skills: agentCriteria[round] || [],
+          selectedCriteria,
+          useCriteriaBased: true,
           companyId: company?.id || null,
           jobId: jobIdForUsage || null
         })
       })
 
-      if (!res.ok) {
-        throw new Error('Failed to generate questions')
-      }
-
       const data = await res.json()
 
-      // Mirror billing page logs based on returned usage
-      try {
-        const usage = data?.usage
-        if (usage && typeof usage.promptTokens === 'number') {
-          // Real OpenAI usage data received (even if counts are 0)
-          console.log('\n' + '-'.repeat(60))
-          console.log('✅ [QUESTION GENERATION] Using REAL OpenAI token data!')
-          console.log('🤖 Prompt Tokens:', usage.promptTokens)
-          console.log('✍️  Completion Tokens:', usage.completionTokens)
-          console.log('📝 Total Tokens:', (usage.promptTokens || 0) + (usage.completionTokens || 0))
-          console.log('🏷️  Source: OpenAI API (Real Usage)')
-          if (usage.promptTokens === 0 && usage.completionTokens === 0) {
-            console.log('🔍 Note: Token counts are 0 - this can happen with very short/simple requests')
-          }
-          console.log('-'.repeat(60) + '\n')
-        } else {
-          console.log('\n' + '-'.repeat(60))
-          console.log('⚠️  [QUESTION GENERATION] Using ESTIMATED token data (No real usage from API)')
-          console.log('🏷️  Source: Estimation / No API usage payload')
-          console.log('-'.repeat(60) + '\n')
+      // Handle pre-condition failure
+      if (!res.ok) {
+        if (data.preConditionFailed) {
+          alert(data.error)
+          return
         }
-      } catch {}
+        throw new Error(data.error || 'Failed to generate questions')
+      }
+
+      // Log usage data
+      const usage = data?.usage
+      if (usage && typeof usage.promptTokens === 'number') {
+        console.log('\n' + '-'.repeat(60))
+        console.log('✅ [QUESTION GENERATION] Using REAL OpenAI token data!')
+        console.log('🤖 Prompt Tokens:', usage.promptTokens)
+        console.log('✍️  Completion Tokens:', usage.completionTokens)
+        console.log('📝 Total Tokens:', (usage.promptTokens || 0) + (usage.completionTokens || 0))
+        console.log('🎯 Mode:', data.mode || 'criteria-based')
+        console.log('-'.repeat(60) + '\n')
+      }
+
+      // Use mapped questions if available, otherwise use plain questions
+      const mappedQuestions = data.mappedQuestions
       const generatedQuestions = data.questions || []
       
-      // Categorize questions: 2 intro, 3 behavioral, 5 technical
-      const categorizedQuestions = [
-        ...generatedQuestions.slice(0, 2), // 2 intro
-        ...generatedQuestions.slice(2, 5), // 3 behavioral  
-        ...generatedQuestions.slice(5, 10) // 5 technical
-      ]
+      if (mappedQuestions && mappedQuestions.length > 0) {
+        // Store questions with their criterion and importance metadata
+        console.log('📊 [QUESTION MAPPING] Questions mapped with criteria and importance:')
+        mappedQuestions.forEach((q: any, i: number) => {
+          console.log(`  Q${i + 1}: [${q.criterion}] (${q.importance}) ${q.question_text.substring(0, 50)}...`)
+        })
+        
+        // For now, store just the question text (UI can be enhanced later to show criterion/importance)
+        setAgentQuestions({
+          ...agentQuestions,
+          [round]: mappedQuestions.map((q: any) => q.question_text)
+        })
+      } else {
+        setAgentQuestions({
+          ...agentQuestions,
+          [round]: generatedQuestions
+        })
+      }
 
-      setAgentQuestions({
-        ...agentQuestions,
-        [round]: categorizedQuestions
-      })
-
-      try {
-        console.log('🎉 [QUESTION GENERATION] Billing tracking invoked. OpenAI Platform usage reflected on Billing ➜ Usage tab.')
-      } catch {}
-
-      alert(`Generated ${categorizedQuestions.length} questions successfully!`)
+      console.log('🎉 [QUESTION GENERATION] Generated', generatedQuestions.length, 'questions successfully!')
+      alert(`Generated ${generatedQuestions.length} questions successfully!`)
     } catch (error) {
       console.error('Error generating questions:', error)
-      try {
-        console.log('❌ [QUESTION GENERATION] ERROR: Failed to generate questions or record usage')
-        console.log('🏷️  Tip: Ensure OPENAI_API_KEY is set and valid. If missing, usage will be estimated.')
-      } catch {}
+      console.log('❌ [QUESTION GENERATION] ERROR: Failed to generate questions')
       alert('Failed to generate questions. Please try again.')
     } finally {
       setGeneratingQuestions(false)
@@ -950,6 +957,9 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
         // Notice period
         if (formData.noticePeriodMonths) updates.notice_period_months = parseInt(formData.noticePeriodMonths)
         if (formData.noticePeriodNegotiable) updates.notice_period_negotiable = formData.noticePeriodNegotiable === 'yes'
+        // Currency and Resume Screening
+        if (formData.salaryCurrency) updates.salary_currency = formData.salaryCurrency
+        updates.resume_screening_enabled = formData.resumeScreeningEnabled === true
         res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}?company=${encodeURIComponent(company?.name || '')}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -1456,7 +1466,21 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="salaryCurrency">Currency</Label>
+                    <Select value={formData.salaryCurrency} onValueChange={(value)=>handleInputChange('salaryCurrency', value)} disabled={isReadOnly}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="INR">INR (₹)</SelectItem>
+                        <SelectItem value="USD">USD ($)</SelectItem>
+                        <SelectItem value="EUR">EUR (€)</SelectItem>
+                        <SelectItem value="GBP">GBP (£)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="salaryMin">Salary Min</Label>
                     <Input id="salaryMin" type="number" placeholder="e.g., 6000" value={formData.salaryMin} onChange={(e)=>handleInputChange('salaryMin', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
@@ -1564,6 +1588,120 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
 
                           {isExpanded && (
                             <CardContent className="pt-4 space-y-6 border-t bg-white">
+                              {/* Evaluation Criteria Section - MOVED TO TOP */}
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-sm font-semibold">Creating/Evaluation Criteria</Label>
+                                  <span className={`text-xs ${criteria.length > MAX_CRITERIA_SELECTION ? 'text-red-500 font-medium' : 'text-gray-500'}`}>
+                                    {criteria.length}/{MAX_CRITERIA_SELECTION} selected
+                                  </span>
+                                </div>
+                                
+                                {criteria.length > MAX_CRITERIA_SELECTION && (
+                                  <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                    <span>Maximum {MAX_CRITERIA_SELECTION} criteria allowed. Please deselect some criteria.</span>
+                                  </div>
+                                )}
+                                
+                                {/* Selected Criteria Badges */}
+                                {criteria.length > 0 && (
+                                  <div className="flex flex-wrap gap-2 pb-2">
+                                    {criteria.map((criterion, idx) => {
+                                      const criteriaInfo = EVALUATION_CRITERIA.find(c => c.name === criterion)
+                                      return (
+                                        <Badge
+                                          key={idx}
+                                          variant="secondary"
+                                          className={`px-3 py-1 text-xs flex items-center gap-1 ${criteriaInfo?.color || 'bg-gray-100 text-gray-800'}`}
+                                        >
+                                          <span>{criteriaInfo?.icon || '📋'}</span>
+                                          {criterion}
+                                          {isCreateFlow && (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const newCriteria = criteria.filter((_, i) => i !== idx)
+                                                setAgentCriteria({ ...agentCriteria, [round]: newCriteria })
+                                              }}
+                                              className="ml-1 hover:text-red-500 font-bold"
+                                            >
+                                              ×
+                                            </button>
+                                          )}
+                                        </Badge>
+                                      )
+                                    })}
+                                  </div>
+                                )}
+                                
+                                {/* Criteria Checkbox Grid */}
+                                {!isEditing && (
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                    {EVALUATION_CRITERIA.map((criteriaItem) => {
+                                      const isSelected = criteria.includes(criteriaItem.name)
+                                      const isDisabled = !isSelected && criteria.length >= MAX_CRITERIA_SELECTION
+                                      
+                                      return (
+                                        <label
+                                          key={criteriaItem.id}
+                                          className={`flex items-start gap-2 p-2 rounded-md cursor-pointer transition-colors ${
+                                            isSelected 
+                                              ? 'bg-emerald-50 border border-emerald-200' 
+                                              : isDisabled 
+                                                ? 'opacity-50 cursor-not-allowed' 
+                                                : 'hover:bg-gray-100'
+                                          }`}
+                                        >
+                                          <Checkbox
+                                            checked={isSelected}
+                                            disabled={isDisabled}
+                                            onCheckedChange={(checked) => {
+                                              if (checked) {
+                                                if (criteria.length < MAX_CRITERIA_SELECTION) {
+                                                  setAgentCriteria({
+                                                    ...agentCriteria,
+                                                    [round]: [...criteria, criteriaItem.name]
+                                                  })
+                                                }
+                                              } else {
+                                                setAgentCriteria({
+                                                  ...agentCriteria,
+                                                  [round]: criteria.filter(c => c !== criteriaItem.name)
+                                                })
+                                              }
+                                            }}
+                                            className="mt-0.5 h-4 w-4 data-[state=checked]:bg-emerald-600"
+                                          />
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1">
+                                              <span className="text-sm">{criteriaItem.icon}</span>
+                                              <span className="text-sm font-medium text-gray-900">{criteriaItem.name}</span>
+                                            </div>
+                                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{criteriaItem.description}</p>
+                                          </div>
+                                        </label>
+                                      )
+                                    })}
+                                  </div>
+                                )}
+                                
+                                {isEditing && (
+                                  <div className="text-sm text-gray-500 py-1">
+                                    Evaluation criteria cannot be modified in view mode
+                                  </div>
+                                )}
+                                
+                                {/* Info Box */}
+                                <div className="flex items-start gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-xs">
+                                  <Target className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                                  <div>
+                                    <span className="font-medium">AI will generate {TOTAL_AI_QUESTIONS} questions</span> distributed across your selected criteria. 
+                                    Select criteria that best match the role requirements.
+                                  </div>
+                                </div>
+                              </div>
+
                               {/* Interview Questions Section */}
                               <div className="space-y-3">
                                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1670,78 +1808,6 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
                                   </div>
                                 )}
                               </div>
-
-                              {/* Evaluation Criteria Section */}
-                              <div className="space-y-3">
-                                <Label className="text-sm font-semibold">Evaluation Criteria</Label>
-                                <div className="flex flex-wrap gap-2">
-                                  {criteria.map((criterion, idx) => (
-                                    <Badge
-                                      key={idx}
-                                      variant="secondary"
-                                      className={`px-3 py-1 text-xs flex items-center gap-1 ${isEditing ? 'opacity-100' : ''}`}
-                                    >
-                                      {criterion}
-                                      {isCreateFlow && (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const newCriteria = criteria.filter((_, i) => i !== idx)
-                                            setAgentCriteria({ ...agentCriteria, [round]: newCriteria })
-                                          }}
-                                          className="ml-1 hover:text-red-500"
-                                        >
-                                          ×
-                                        </button>
-                                      )}
-                                    </Badge>
-                                  ))}
-                                </div>
-                                
-                                {!isEditing ? (
-                                  <div className="flex flex-col sm:flex-row gap-2">
-                                    <Input
-                                      placeholder="Add evaluation criteria..."
-                                      className="text-sm h-8 w-full sm:flex-1"
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault()
-                                          const input = e.currentTarget
-                                          if (input.value.trim()) {
-                                            setAgentCriteria({
-                                              ...agentCriteria,
-                                              [round]: [...criteria, input.value.trim()]
-                                            })
-                                            input.value = ''
-                                          }
-                                        }
-                                      }}
-                                    />
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-8 px-3 w-full sm:w-auto"
-                                      onClick={(e) => {
-                                        const input = e.currentTarget.previousElementSibling as HTMLInputElement
-                                        if (input?.value.trim()) {
-                                          setAgentCriteria({
-                                            ...agentCriteria,
-                                            [round]: [...criteria, input.value.trim()]
-                                          })
-                                          input.value = ''
-                                        }
-                                      }}
-                                    >
-                                      <Plus className="w-3 h-3" />
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <div className="text-sm text-gray-500 py-1">
-                                    Evaluation criteria cannot be modified in view mode
-                                  </div>
-                                )}
-                              </div>
                             </CardContent>
                           )}
                         </Card>
@@ -1755,27 +1821,31 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
           <TabsContent value="resume-screening" className="space-y-6">
             <Card className="shadow-sm border-gray-200 rounded-xl bg-white">
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Screening Questions</CardTitle>
-                <CardDescription>Use this section only to check candidate eligibility before applying.</CardDescription>
+                <CardTitle className="text-lg">Resume Screening</CardTitle>
+                <CardDescription>Configure resume screening to filter candidates before they can apply.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
-                {/* Enable Toggle */}
-                <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                {/* Resume Screening Feature Toggle */}
+                <div className="flex items-center space-x-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
                   <Checkbox 
-                    id="enable-screening" 
-                    checked={!!formData.screeningEnabled}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, screeningEnabled: checked === true }))}
+                    id="resume-screening-enabled" 
+                    checked={!!formData.resumeScreeningEnabled}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, resumeScreeningEnabled: checked === true, screeningEnabled: checked === true }))}
                     className="h-5 w-5 data-[state=checked]:bg-emerald-600"
+                    disabled={isReadOnly}
                   />
                   <div>
-                    <Label htmlFor="enable-screening" className="font-medium cursor-pointer">
-                      Enable Screening for this Job
+                    <Label htmlFor="resume-screening-enabled" className="font-medium cursor-pointer">
+                      Enable Resume Screening for this Job
                     </Label>
-                    <p className="text-xs text-gray-500 mt-1">Turn this on to allow only eligible candidates to continue.</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      When enabled, candidates will be redirected to a screening page before applying. 
+                      When disabled, candidates go directly to the application form.
+                    </p>
                   </div>
                 </div>
 
-                {formData.screeningEnabled && (
+                {formData.resumeScreeningEnabled && (
                   <div className="space-y-5">
                     {/* Experience Section */}
                     <div className="space-y-3">
@@ -1787,21 +1857,23 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
                             type="number"
                             min="0"
                             placeholder="e.g., 5"
-                            value={formData.screeningOverallExp}
+                            value={formData.screeningOverallExp || formData.years?.match(/\d+/)?.[0] || ''}
                             onChange={(e) => handleInputChange('screeningOverallExp', e.target.value)}
                             className="mt-1"
                             required
+                            disabled={isReadOnly}
                           />
                         </div>
                         <div>
-                          <Label htmlFor="screeningPrimarySkill" className="text-sm text-gray-600">Primary Skill Experience <span className="text-red-500">*</span></Label>
+                          <Label htmlFor="screeningPrimarySkill" className="text-sm text-gray-600">Primary Skill <span className="text-red-500">*</span></Label>
                           <Input
                             id="screeningPrimarySkill"
-                            placeholder="UiPath - 3 years"
-                            value={formData.screeningPrimarySkill}
+                            placeholder="e.g., UiPath, React, Python"
+                            value={formData.screeningPrimarySkill || formData.technical || ''}
                             onChange={(e) => handleInputChange('screeningPrimarySkill', e.target.value)}
                             className="mt-1"
                             required
+                            disabled={isReadOnly}
                           />
                         </div>
                       </div>
@@ -1815,10 +1887,11 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
                           <Input
                             id="screeningCurrentLocation"
                             placeholder="e.g., Bangalore, India"
-                            value={formData.screeningCurrentLocation}
+                            value={formData.screeningCurrentLocation || formData.location || ''}
                             onChange={(e) => handleInputChange('screeningCurrentLocation', e.target.value)}
                             className="mt-1"
                             required
+                            disabled={isReadOnly}
                           />
                         </div>
                         <div>
@@ -1826,6 +1899,7 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
                           <Select 
                             value={formData.screeningNationality} 
                             onValueChange={(value) => handleInputChange('screeningNationality', value)}
+                            disabled={isReadOnly}
                           >
                             <SelectTrigger className="mt-1">
                               <SelectValue placeholder="Any" />
@@ -1846,7 +1920,7 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
                     <div className="space-y-3">
                       <Label className="text-sm font-medium text-gray-700">Work Authorization <span className="text-red-500">*</span></Label>
                       <div className="flex gap-6">
-                        <label className="flex items-center gap-2 cursor-pointer">
+                        <label className={`flex items-center gap-2 ${isReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
                           <input
                             type="radio"
                             name="visaRequired"
@@ -1854,10 +1928,11 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
                             checked={formData.screeningVisaRequired === 'yes'}
                             onChange={(e) => handleInputChange('screeningVisaRequired', e.target.value)}
                             className="h-4 w-4 text-emerald-600"
+                            disabled={isReadOnly}
                           />
                           <span className="text-sm">Visa sponsorship available</span>
                         </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
+                        <label className={`flex items-center gap-2 ${isReadOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
                           <input
                             type="radio"
                             name="visaRequired"
@@ -1865,43 +1940,51 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
                             checked={formData.screeningVisaRequired === 'no'}
                             onChange={(e) => handleInputChange('screeningVisaRequired', e.target.value)}
                             className="h-4 w-4 text-emerald-600"
+                            disabled={isReadOnly}
                           />
                           <span className="text-sm">Must already have work authorization</span>
                         </label>
                       </div>
                     </div>
 
-                    {/* Language & Salary */}
+                    {/* Expected Salary */}
                     <div className="space-y-3">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="screeningLanguage" className="text-sm text-gray-600">Language <span className="text-red-500">*</span></Label>
-                          <Select 
-                            value={formData.screeningLanguageProficiency} 
-                            onValueChange={(value) => handleInputChange('screeningLanguageProficiency', value)}
-                          >
-                            <SelectTrigger className="mt-1">
-                              <SelectValue placeholder="Select level" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="basic">Basic</SelectItem>
-                              <SelectItem value="intermediate">Intermediate</SelectItem>
-                              <SelectItem value="fluent">Fluent</SelectItem>
-                              <SelectItem value="native">Native</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <Label htmlFor="screeningCurrentSalary" className="text-sm text-gray-600">
+                            Expected Salary ({formData.salaryCurrency || 'INR'}) <span className="text-red-500">*</span>
+                          </Label>
+                          <div className="relative mt-1">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+                              {formData.salaryCurrency === 'INR' && '₹'}
+                              {formData.salaryCurrency === 'USD' && '$'}
+                              {formData.salaryCurrency === 'EUR' && '€'}
+                              {formData.salaryCurrency === 'GBP' && '£'}
+                              {!formData.salaryCurrency && '₹'}
+                            </span>
+                            <Input
+                              id="screeningCurrentSalary"
+                              type="number"
+                              min="0"
+                              placeholder="e.g., 150000"
+                              value={formData.screeningCurrentSalary || formData.salaryMax || ''}
+                              onChange={(e) => handleInputChange('screeningCurrentSalary', e.target.value)}
+                              className="pl-8"
+                              required
+                              disabled={isReadOnly}
+                            />
+                          </div>
                         </div>
                         <div>
-                          <Label htmlFor="screeningCurrentSalary" className="text-sm text-gray-600">Max Current Salary (Budget) <span className="text-red-500">*</span></Label>
+                          <Label htmlFor="screeningLanguage" className="text-sm text-gray-600">Language Proficiency</Label>
                           <Input
-                            id="screeningCurrentSalary"
-                            type="number"
-                            min="0"
-                            placeholder="e.g., 150000"
-                            value={formData.screeningCurrentSalary}
-                            onChange={(e) => handleInputChange('screeningCurrentSalary', e.target.value)}
+                            id="screeningLanguage"
+                            type="text"
+                            placeholder="e.g., English, Hindi, Spanish"
+                            value={formData.screeningLanguageProficiency || formData.languages || ''}
+                            onChange={(e) => handleInputChange('screeningLanguageProficiency', e.target.value)}
                             className="mt-1"
-                            required
+                            disabled={isReadOnly}
                           />
                         </div>
                       </div>
@@ -1921,6 +2004,7 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
                             onChange={(e) => handleInputChange('noticePeriodMonths', e.target.value)}
                             className="mt-1"
                             required
+                            disabled={isReadOnly}
                           />
                         </div>
                         <div>
@@ -1928,6 +2012,7 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
                           <Select 
                             value={formData.noticePeriodNegotiable} 
                             onValueChange={(value) => handleInputChange('noticePeriodNegotiable', value)}
+                            disabled={isReadOnly}
                           >
                             <SelectTrigger className="mt-1">
                               <SelectValue placeholder="Select option" />

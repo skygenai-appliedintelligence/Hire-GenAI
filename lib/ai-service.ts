@@ -752,6 +752,678 @@ HireGenAI Team`
       return "Error generating email template"
     }
   }
+
+  /**
+   * NEW: Criteria-Based Interview Question Generator
+   * Generates exactly 10 questions based on HR-selected evaluation criteria (max 5)
+   * No interview stages - questions are distributed across selected criteria
+   * 
+   * @param jobDescription - The complete job description
+   * @param selectedCriteria - Array of selected evaluation criteria (1-5 from the 9 available)
+   * @param companyApiKey - Optional company-specific OpenAI API key
+   * @param companyProjectId - Optional company-specific OpenAI project ID
+   * @returns Array of 10 questions and token usage
+   */
+  static async generateCriteriaBasedQuestions(
+    jobDescription: string,
+    selectedCriteria: string[],
+    existingQuestions?: string[],
+    companyApiKey?: string,
+    companyProjectId?: string
+  ): Promise<{ questions: string[], usage?: { promptTokens: number, completionTokens: number } }> {
+    
+    const TOTAL_QUESTIONS = 10
+    
+    // Validate criteria
+    if (!selectedCriteria || selectedCriteria.length === 0) {
+      console.error('❌ [AI Service] No evaluation criteria selected')
+      return { questions: this.getCriteriaMockQuestions(selectedCriteria, TOTAL_QUESTIONS), usage: undefined }
+    }
+    
+    if (selectedCriteria.length > 5) {
+      console.error('❌ [AI Service] Too many criteria selected (max 5)')
+      return { questions: this.getCriteriaMockQuestions(selectedCriteria.slice(0, 5), TOTAL_QUESTIONS), usage: undefined }
+    }
+
+    // Check if we're in the browser - use API route
+    if (typeof window !== "undefined") {
+      try {
+        const response = await fetch('/api/ai/generate-questions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobDescription,
+            selectedCriteria,
+            numberOfQuestions: TOTAL_QUESTIONS,
+            existingQuestions: Array.isArray(existingQuestions) ? existingQuestions : undefined,
+            useCriteriaBased: true
+          }),
+        })
+
+        if (!response.ok) {
+          console.error('AI API returned non-OK status', response.status)
+          return { questions: this.getCriteriaMockQuestions(selectedCriteria, TOTAL_QUESTIONS), usage: undefined }
+        }
+
+        const data = await response.json()
+        return { 
+          questions: Array.isArray(data.questions) ? data.questions.slice(0, TOTAL_QUESTIONS) : [],
+          usage: data.usage || undefined
+        }
+      } catch (error) {
+        console.error('Error calling AI API:', error)
+        return { questions: this.getCriteriaMockQuestions(selectedCriteria, TOTAL_QUESTIONS), usage: undefined }
+      }
+    }
+
+    // Server-side logic
+    const hasValidKey = companyApiKey || hasOpenAIKey()
+    if (!hasValidKey) {
+      console.log('⚠️  [AI Service] No OpenAI API key available, using mock questions')
+      return { questions: this.getCriteriaMockQuestions(selectedCriteria, TOTAL_QUESTIONS), usage: undefined }
+    }
+
+    // Create custom OpenAI provider with company credentials if available
+    const openaiProvider = companyApiKey 
+      ? createOpenAI({ 
+          apiKey: companyApiKey,
+          project: companyProjectId || undefined,
+        })
+      : openai
+
+    if (companyApiKey) {
+      console.log('✅ [AI Service] Using company service account key for criteria-based question generation')
+      if (companyProjectId) {
+        console.log('📊 [AI Service] Project ID:', companyProjectId)
+      }
+    } else {
+      console.log('⚠️  [AI Service] Using environment OPENAI_API_KEY for question generation')
+    }
+
+    // Build the criteria list for the prompt
+    const criteriaList = selectedCriteria.map((c, i) => `${i + 1}. ${c}`).join('\n')
+    
+    const prompt = `You are an AI Interview Question Generator for a hiring platform.
+
+Your task is to generate interview questions strictly based on the SELECTED EVALUATION CRITERIA provided by HR.
+
+==================================================
+AVAILABLE EVALUATION CRITERIA (REFERENCE ONLY)
+==================================================
+The system supports the following evaluation criteria:
+
+1. Technical Skills
+2. Problem Solving
+3. Communication
+4. Experience
+5. Culture Fit
+6. Teamwork / Collaboration
+7. Leadership
+8. Adaptability / Learning
+9. Work Ethic / Reliability
+
+NOTE:
+- HR has selected specific criteria from this list.
+- You MUST ONLY generate questions for the selected criteria.
+- There is NO interview stage concept. Do NOT assume or reference stages.
+
+==================================================
+JOB DESCRIPTION
+==================================================
+${jobDescription}
+
+==================================================
+SELECTED EVALUATION CRITERIA (${selectedCriteria.length} selected)
+==================================================
+${criteriaList}
+
+==================================================
+QUESTION GENERATION RULES (CRITICAL)
+==================================================
+
+1) Generate EXACTLY ${TOTAL_QUESTIONS} interview questions.
+2) Every question MUST clearly align with ONE of the selected criteria.
+3) Distribute questions reasonably across the selected criteria:
+   - If fewer criteria are selected, increase depth per criterion.
+   - If more criteria are selected, ensure each is covered at least once.
+4) Do NOT repeat intent or rephrase the same question.
+5) Each question must test a DIFFERENT aspect of the criterion.
+6) Questions must sound like they are asked by a real human interviewer.
+7) Avoid academic, exam-style, or textbook wording.
+8) Questions should work for both technical and non-technical roles, depending on the selected criteria.
+
+==================================================
+QUESTION STYLE GUIDELINES
+==================================================
+
+- Keep questions clear, practical, and conversational.
+- Do NOT force long explanations.
+- Short but insightful answers should be possible.
+- Avoid unnecessary multi-part or confusing questions.
+- Prefer real-world and experience-based phrasing.
+
+==================================================
+OUTPUT FORMAT (STRICT)
+==================================================
+
+Return ONLY the questions in this format:
+
+Q1: <question text>
+Q2: <question text>
+Q3: <question text>
+...
+Q${TOTAL_QUESTIONS}: <question text>
+
+- Do NOT mention criteria names in the output.
+- Do NOT include explanations.
+- Do NOT include any text before or after the questions.
+
+==================================================
+FINAL CHECK BEFORE OUTPUT
+==================================================
+
+Before responding, verify that:
+- All questions relate ONLY to the selected criteria
+- No selected criterion is ignored
+- No two questions test the same intent
+- Questions feel realistic and interview-appropriate
+
+Now generate the ${TOTAL_QUESTIONS} questions.`
+
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 15000)
+      
+      const { text, usage } = await generateText({
+        model: openaiProvider("gpt-4o"),
+        prompt,
+        system: "You are an AI Interview Question Generator. Generate exactly 10 unique, criteria-aligned interview questions. Each question must be conversational, practical, and test a different aspect. Do NOT mention criteria names in questions. Output ONLY Q1-Q10 format.",
+        maxRetries: 0,
+        abortSignal: controller.signal,
+      })
+      clearTimeout(timeout)
+
+      // Extract token usage
+      const tokenUsage = usage ? {
+        promptTokens: (usage as any).promptTokens || (usage as any).prompt_tokens || 0,
+        completionTokens: (usage as any).completionTokens || (usage as any).completion_tokens || 0
+      } : undefined
+
+      if (usage) {
+        console.log('🔍 [AI Service] Criteria-based generation - tokens:', {
+          promptTokens: tokenUsage?.promptTokens,
+          completionTokens: tokenUsage?.completionTokens
+        })
+      }
+
+      // Parse questions
+      const lines = text.split('\n').filter(line => line.trim().startsWith('Q'))
+      const parsed = lines.slice(0, TOTAL_QUESTIONS).map(line => {
+        const match = line.match(/Q\d+:\s*(.+)/)
+        return match ? match[1].trim() : line.replace(/Q\d+:\s*/, '').trim()
+      })
+
+      // Deduplicate
+      const norm = (s: string) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase().replace(/[.?!]+$/g, '')
+      const seed = Array.isArray(existingQuestions) ? existingQuestions.map(norm) : []
+      const seen = new Set<string>(seed)
+      const unique: string[] = []
+      
+      for (const q of parsed) {
+        const k = norm(q)
+        if (q && !seen.has(k)) {
+          unique.push(q)
+          seen.add(k)
+        }
+      }
+
+      // Backfill if needed
+      if (unique.length < TOTAL_QUESTIONS) {
+        const fill = this.getCriteriaMockQuestions(selectedCriteria, TOTAL_QUESTIONS * 2)
+        for (const q of fill) {
+          const k = norm(q)
+          if (!seen.has(k)) {
+            unique.push(q)
+            seen.add(k)
+          }
+          if (unique.length >= TOTAL_QUESTIONS) break
+        }
+      }
+
+      return { questions: unique.slice(0, TOTAL_QUESTIONS), usage: tokenUsage }
+    } catch (error) {
+      console.error("Criteria-based question generation error:", error)
+      return { questions: this.getCriteriaMockQuestions(selectedCriteria, TOTAL_QUESTIONS), usage: undefined }
+    }
+  }
+
+  /**
+   * Mock questions for criteria-based generation fallback
+   */
+  private static getCriteriaMockQuestions(selectedCriteria: string[], count: number): string[] {
+    const criteriaQuestions: Record<string, string[]> = {
+      'Technical Skills': [
+        "What technical tools or frameworks have you used most extensively in your recent work?",
+        "Can you walk me through a technical challenge you solved and the approach you took?",
+        "How do you stay current with new technologies in your field?",
+        "Describe a system or feature you built from scratch. What decisions did you make?",
+        "What's your debugging process when something isn't working as expected?"
+      ],
+      'Problem Solving': [
+        "Tell me about a complex problem you faced at work. How did you break it down?",
+        "Describe a situation where your initial solution didn't work. What did you do next?",
+        "How do you approach problems when you don't have all the information you need?",
+        "Give an example of a creative solution you came up with for a difficult challenge.",
+        "When faced with multiple possible solutions, how do you decide which one to pursue?"
+      ],
+      'Communication': [
+        "How do you explain technical concepts to non-technical stakeholders?",
+        "Describe a time when miscommunication caused an issue. How did you resolve it?",
+        "How do you handle giving feedback to a colleague who may not want to hear it?",
+        "Tell me about a presentation or document you created that had significant impact.",
+        "How do you ensure everyone on a project is aligned and informed?"
+      ],
+      'Experience': [
+        "Walk me through your most relevant experience for this role.",
+        "What's the most impactful project you've worked on and what was your contribution?",
+        "How has your career progression prepared you for this position?",
+        "Describe a situation where your past experience directly helped solve a current problem.",
+        "What lessons from previous roles do you apply regularly in your work?"
+      ],
+      'Culture Fit': [
+        "What type of work environment brings out your best performance?",
+        "What motivates you to do your best work?",
+        "How do you handle situations where company priorities conflict with your preferences?",
+        "What values are most important to you in a workplace?",
+        "Why are you interested in this particular role and company?"
+      ],
+      'Teamwork / Collaboration': [
+        "Describe your ideal team dynamic and your role within it.",
+        "Tell me about a successful collaboration. What made it work?",
+        "How do you handle disagreements with team members?",
+        "Give an example of how you supported a struggling colleague.",
+        "How do you contribute to a positive team environment?"
+      ],
+      'Leadership': [
+        "Describe a time when you led a project or initiative. What was your approach?",
+        "How do you motivate others when facing a challenging deadline?",
+        "Tell me about a difficult decision you had to make as a leader.",
+        "How do you handle underperforming team members?",
+        "What's your approach to mentoring or developing others?"
+      ],
+      'Adaptability / Learning': [
+        "Tell me about a time you had to learn something new quickly. How did you approach it?",
+        "Describe a significant change at work. How did you adapt?",
+        "How do you handle unexpected changes to project requirements?",
+        "Give an example of feedback that changed how you work.",
+        "What's the most recent skill you've developed and how did you learn it?"
+      ],
+      'Work Ethic / Reliability': [
+        "How do you prioritize when you have multiple competing deadlines?",
+        "Describe a time when you went above and beyond what was expected.",
+        "How do you ensure you meet your commitments consistently?",
+        "Tell me about a time you had to work under pressure. How did you handle it?",
+        "What does accountability mean to you in a professional context?"
+      ]
+    }
+
+    const questions: string[] = []
+    const usedQuestions = new Set<string>()
+    
+    // Distribute questions across selected criteria
+    const criteriaCount = selectedCriteria.length || 1
+    const questionsPerCriteria = Math.ceil(count / criteriaCount)
+    
+    for (const criterion of selectedCriteria) {
+      const pool = criteriaQuestions[criterion] || criteriaQuestions['Experience']
+      let added = 0
+      for (const q of pool) {
+        if (!usedQuestions.has(q) && questions.length < count) {
+          questions.push(q)
+          usedQuestions.add(q)
+          added++
+          if (added >= questionsPerCriteria) break
+        }
+      }
+    }
+
+    // Fill remaining with any unused questions
+    if (questions.length < count) {
+      for (const criterion of selectedCriteria) {
+        const pool = criteriaQuestions[criterion] || []
+        for (const q of pool) {
+          if (!usedQuestions.has(q) && questions.length < count) {
+            questions.push(q)
+            usedQuestions.add(q)
+          }
+        }
+      }
+    }
+
+    return questions.slice(0, count)
+  }
+
+  /**
+   * Map questions to criteria with importance levels
+   * This is the interview intelligence system that assigns evaluation metadata
+   */
+  static async mapQuestionsToCriteria(
+    jobTitle: string,
+    jobDescription: string,
+    selectedCriteria: string[],
+    questions: string[],
+    companyApiKey?: string,
+    companyProjectId?: string
+  ): Promise<{
+    mappedQuestions: Array<{
+      question_text: string
+      criterion: string
+      importance: 'high' | 'medium' | 'low'
+    }>
+    error?: string
+  }> {
+    // ==================================================
+    // PRE-CONDITION CHECK (MANDATORY)
+    // ==================================================
+    
+    // Check 1: Job Title is present and non-empty
+    if (!jobTitle || jobTitle.trim().length === 0) {
+      return {
+        mappedQuestions: [],
+        error: "Please complete the Job Description and select evaluation criteria before generating interview questions."
+      }
+    }
+
+    // Check 2: Job Description is present and sufficiently detailed
+    if (!jobDescription || jobDescription.trim().length < 50) {
+      return {
+        mappedQuestions: [],
+        error: "Please complete the Job Description and select evaluation criteria before generating interview questions."
+      }
+    }
+
+    // Check 3: At least ONE evaluation criterion is selected
+    if (!selectedCriteria || selectedCriteria.length === 0) {
+      return {
+        mappedQuestions: [],
+        error: "Please complete the Job Description and select evaluation criteria before generating interview questions."
+      }
+    }
+
+    // Check 4: Questions exist
+    if (!questions || questions.length === 0) {
+      return {
+        mappedQuestions: [],
+        error: "No questions to map. Please generate questions first."
+      }
+    }
+
+    // ==================================================
+    // TASK: Map questions to criteria with importance
+    // ==================================================
+
+    const criteriaList = selectedCriteria.join(', ')
+    const questionsFormatted = questions.map((q, i) => `Q${i + 1}: ${q}`).join('\n')
+
+    const prompt = `You are an internal interview intelligence system.
+
+==================================================
+TASK
+==================================================
+
+Your task is to ASSIGN evaluation metadata to interview questions.
+
+This includes:
+1) Mapping each question to ONE selected evaluation criterion
+2) Assigning an importance level to each question
+3) Ensuring FAIR and BALANCED distribution across criteria
+
+==================================================
+INPUT
+==================================================
+
+Job Title: ${jobTitle}
+
+Job Description:
+${jobDescription}
+
+Selected Evaluation Criteria: ${criteriaList}
+
+Interview Questions:
+${questionsFormatted}
+
+==================================================
+AVAILABLE EVALUATION CRITERIA
+==================================================
+
+You may ONLY use criteria from this list:
+${selectedCriteria.map(c => `- ${c}`).join('\n')}
+
+STRICT RULES:
+- Do NOT invent new criteria
+- Do NOT rename criteria
+- Do NOT map any question outside this list
+
+==================================================
+CRITERIA DISTRIBUTION RULE (CRITICAL)
+==================================================
+
+1) MINIMUM COVERAGE RULE
+   - EACH selected criterion MUST receive at least ONE question.
+
+2) BALANCED DISTRIBUTION RULE
+   - After minimum coverage is satisfied:
+     • Assign remaining questions based on BEST-FIT INTENT.
+     • Avoid overloading a single criterion.
+     • Prefer a balanced, realistic interview structure.
+
+3) HUMAN INTERVIEWER LOGIC
+   - Think like an experienced interviewer.
+   - Use judgment, not rigid math.
+   - Balance depth and coverage.
+
+==================================================
+QUESTION-TO-CRITERION MAPPING RULES
+==================================================
+
+For EACH question:
+- Assign EXACTLY ONE criterion.
+- Use the INTENT of the question, not just keywords.
+- No question may remain unmapped.
+
+==================================================
+IMPORTANCE ASSIGNMENT RULES
+==================================================
+
+Assign ONE importance level per question:
+- "high" - Core decision-impact questions
+- "medium" - Supporting or validation questions
+- "low" - Contextual, warm-up, or hygiene questions
+
+Do NOT assign the same importance to all questions.
+
+==================================================
+OUTPUT FORMAT (STRICT JSON ONLY)
+==================================================
+
+Return ONLY a JSON array. No explanation, no markdown, no extra text.
+
+[
+  {"question_text": "...", "criterion": "<one of selected criteria>", "importance": "high"},
+  {"question_text": "...", "criterion": "<one of selected criteria>", "importance": "medium"},
+  ...
+]
+
+Now perform the task. Return ONLY the JSON array.`
+
+    try {
+      const apiKey = companyApiKey || process.env.OPENAI_API_KEY
+      if (!apiKey) {
+        // Fallback to rule-based mapping
+        return { mappedQuestions: this.fallbackQuestionMapping(questions, selectedCriteria) }
+      }
+
+      const openai = createOpenAI({
+        apiKey,
+        ...(companyProjectId && { project: companyProjectId })
+      })
+
+      const { text, usage: tokenUsage } = await generateText({
+        model: openai('gpt-4o'),
+        prompt,
+        temperature: 0.3,
+        maxOutputTokens: 2000
+      })
+
+      // Parse JSON response
+      const jsonMatch = text.match(/\[[\s\S]*\]/)
+      if (!jsonMatch) {
+        console.error('Failed to parse mapping response, using fallback')
+        return { mappedQuestions: this.fallbackQuestionMapping(questions, selectedCriteria) }
+      }
+
+      const parsed = JSON.parse(jsonMatch[0])
+      
+      // Validate and sanitize response
+      const mappedQuestions = parsed.map((item: any, idx: number) => {
+        // Ensure criterion is from selected list
+        let criterion = item.criterion
+        if (!selectedCriteria.includes(criterion)) {
+          // Find best match or use first criterion
+          criterion = selectedCriteria[idx % selectedCriteria.length]
+        }
+        
+        // Ensure importance is valid
+        let importance = item.importance
+        if (!['high', 'medium', 'low'].includes(importance)) {
+          importance = 'medium'
+        }
+
+        return {
+          question_text: item.question_text || questions[idx],
+          criterion,
+          importance
+        }
+      })
+
+      // Validate minimum coverage - each criterion should have at least 1 question
+      const criteriaCount: Record<string, number> = {}
+      selectedCriteria.forEach(c => criteriaCount[c] = 0)
+      mappedQuestions.forEach((q: any) => {
+        if (criteriaCount[q.criterion] !== undefined) {
+          criteriaCount[q.criterion]++
+        }
+      })
+
+      // Fix any criteria with 0 questions
+      const zeroCriteria = selectedCriteria.filter(c => criteriaCount[c] === 0)
+      if (zeroCriteria.length > 0) {
+        // Find criteria with most questions and redistribute
+        const maxCriterion = Object.entries(criteriaCount)
+          .sort((a, b) => b[1] - a[1])[0][0]
+        
+        let reassigned = 0
+        for (let i = 0; i < mappedQuestions.length && reassigned < zeroCriteria.length; i++) {
+          if (mappedQuestions[i].criterion === maxCriterion && criteriaCount[maxCriterion] > 1) {
+            mappedQuestions[i].criterion = zeroCriteria[reassigned]
+            criteriaCount[maxCriterion]--
+            criteriaCount[zeroCriteria[reassigned]]++
+            reassigned++
+          }
+        }
+      }
+
+      return { mappedQuestions }
+    } catch (error) {
+      console.error('Question mapping error:', error)
+      return { mappedQuestions: this.fallbackQuestionMapping(questions, selectedCriteria) }
+    }
+  }
+
+  /**
+   * Fallback rule-based question mapping when AI is unavailable
+   */
+  private static fallbackQuestionMapping(
+    questions: string[],
+    selectedCriteria: string[]
+  ): Array<{ question_text: string; criterion: string; importance: 'high' | 'medium' | 'low' }> {
+    const keywordMap: Record<string, string[]> = {
+      'Technical Skills': ['technical', 'code', 'programming', 'framework', 'tool', 'system', 'debug', 'architecture', 'api', 'database'],
+      'Problem Solving': ['problem', 'challenge', 'solve', 'solution', 'approach', 'debug', 'issue', 'fix', 'analyze'],
+      'Communication': ['explain', 'communicate', 'present', 'feedback', 'stakeholder', 'team', 'align', 'inform'],
+      'Experience': ['experience', 'project', 'worked', 'previous', 'background', 'career', 'role'],
+      'Culture Fit': ['motivate', 'value', 'environment', 'company', 'culture', 'fit', 'why'],
+      'Teamwork / Collaboration': ['team', 'collaborate', 'together', 'colleague', 'support', 'group'],
+      'Leadership': ['lead', 'mentor', 'decision', 'guide', 'manage', 'initiative'],
+      'Adaptability / Learning': ['learn', 'adapt', 'change', 'new', 'flexible', 'grow'],
+      'Work Ethic / Reliability': ['deadline', 'commit', 'reliable', 'accountable', 'pressure', 'prioritize']
+    }
+
+    const result: Array<{ question_text: string; criterion: string; importance: 'high' | 'medium' | 'low' }> = []
+    const criteriaUsage: Record<string, number> = {}
+    selectedCriteria.forEach(c => criteriaUsage[c] = 0)
+
+    // First pass: assign based on keywords
+    for (const question of questions) {
+      const qLower = question.toLowerCase()
+      let bestCriterion = selectedCriteria[0]
+      let bestScore = 0
+
+      for (const criterion of selectedCriteria) {
+        const keywords = keywordMap[criterion] || []
+        const score = keywords.filter(kw => qLower.includes(kw)).length
+        if (score > bestScore) {
+          bestScore = score
+          bestCriterion = criterion
+        }
+      }
+
+      criteriaUsage[bestCriterion]++
+      result.push({
+        question_text: question,
+        criterion: bestCriterion,
+        importance: 'medium'
+      })
+    }
+
+    // Ensure minimum coverage
+    const zeroCriteria = selectedCriteria.filter(c => criteriaUsage[c] === 0)
+    if (zeroCriteria.length > 0) {
+      const maxCriterion = Object.entries(criteriaUsage)
+        .filter(([c]) => selectedCriteria.includes(c))
+        .sort((a, b) => b[1] - a[1])[0]?.[0]
+
+      if (maxCriterion) {
+        let reassigned = 0
+        for (let i = 0; i < result.length && reassigned < zeroCriteria.length; i++) {
+          if (result[i].criterion === maxCriterion && criteriaUsage[maxCriterion] > 1) {
+            result[i].criterion = zeroCriteria[reassigned]
+            criteriaUsage[maxCriterion]--
+            criteriaUsage[zeroCriteria[reassigned]]++
+            reassigned++
+          }
+        }
+      }
+    }
+
+    // Assign importance levels
+    const totalQuestions = result.length
+    const highCount = Math.ceil(totalQuestions * 0.3)  // 30% high
+    const lowCount = Math.ceil(totalQuestions * 0.2)   // 20% low
+    
+    // First few questions are warm-up (low), middle are high, rest are medium
+    for (let i = 0; i < result.length; i++) {
+      if (i < lowCount) {
+        result[i].importance = 'low'
+      } else if (i < lowCount + highCount) {
+        result[i].importance = 'high'
+      } else {
+        result[i].importance = 'medium'
+      }
+    }
+
+    return result
+  }
 }
 
 // ------------------ Multi-job question generation (JSON schema) ------------------

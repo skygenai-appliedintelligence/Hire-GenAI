@@ -4,6 +4,7 @@ import { DatabaseService } from '@/lib/database'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+// Add caching headers to improve performance
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -21,14 +22,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: true, interviews: [] })
     }
 
-    // Fetch real interview data from database
-    const interviews = await DatabaseService.getInterviews(companyId, jobId || undefined)
+    // Fetch real interview data from database with timeout
+    const interviews = await Promise.race([
+      DatabaseService.getInterviews(companyId, jobId || undefined),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database query timeout')), 3000)
+      )
+    ]) as any[]
 
     console.log(`Found ${interviews.length} interviews for company ${companyId}`)
 
     return NextResponse.json({
       ok: true,
       interviews: interviews
+    }, {
+      headers: {
+        'Cache-Control': 'private, max-age=30', // Cache for 30 seconds
+      }
     })
 
   } catch (error) {

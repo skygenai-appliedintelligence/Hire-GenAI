@@ -22,29 +22,43 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, jobs: [] })
     }
 
-    const query = `
-      SELECT 
-        id,
-        title,
-        status,
-        created_at
-      FROM jobs 
-      WHERE company_id = $1::uuid
-      ORDER BY created_at DESC
-    `
+    // Add timeout to prevent long-running queries
+    const result = await Promise.race([
+      (async () => {
+        const query = `
+          SELECT 
+            id,
+            title,
+            status,
+            created_at
+          FROM jobs 
+          WHERE company_id = $1::uuid
+          ORDER BY created_at DESC
+        `
 
-    console.log('🔍 Fetching jobs for company:', companyId)
-    const rows = await DatabaseService.query(query, [companyId]) as any[]
-    console.log('🔍 Found jobs:', rows.map(r => ({ id: r.id, title: r.title, status: r.status })))
+        console.log('🔍 Fetching jobs for company:', companyId)
+        const rows = await DatabaseService.query(query, [companyId]) as any[]
+        console.log('🔍 Found jobs:', rows.map(r => ({ id: r.id, title: r.title, status: r.status })))
 
-    const jobs = (rows || []).map((r: any) => ({
-      id: r.id,
-      title: r.title,
-      status: r.status,
-      createdAt: r.created_at,
-    }))
+        const jobs = (rows || []).map((r: any) => ({
+          id: r.id,
+          title: r.title,
+          status: r.status,
+          createdAt: r.created_at,
+        }))
 
-    return NextResponse.json({ ok: true, jobs })
+        return { ok: true, jobs }
+      })(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database query timeout')), 3000)
+      )
+    ])
+
+    return NextResponse.json(result, {
+      headers: {
+        'Cache-Control': 'private, max-age=120', // Cache for 2 minutes
+      }
+    })
   } catch (e: any) {
     console.error('Jobs titles fetch error:', e)
     return NextResponse.json({ ok: false, error: e?.message || 'Failed to load job titles' }, { status: 500 })
