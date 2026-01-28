@@ -268,23 +268,8 @@ export default function CandidateReportPage() {
         verificationPhotos: verificationPhotos,
         qualificationDetails: qualificationDetails ? {
           ...qualificationDetails,
-          // Add CV evaluation data for PDF - Generate strengths and gaps dynamically
-          strengths: [
-            ...(qualificationDetails.breakdown?.skill_set_match?.matched_skills?.slice(0, 3).map((skill: string) => 
-              `Strong proficiency in ${skill}`
-            ) || []),
-            ...(qualificationDetails.breakdown?.skill_set_match?.score >= 70 
-              ? ['Excellent skill set match with job requirements'] 
-              : []),
-            ...(qualificationDetails.breakdown?.experience_range_match?.years_actual >= 3 
-              ? [`Solid experience of ${qualificationDetails.breakdown.experience_range_match.years_actual} years`] 
-              : qualificationDetails.extracted?.total_experience_years_estimate >= 3
-              ? [`Solid experience of ${qualificationDetails.extracted.total_experience_years_estimate} years`]
-              : []),
-            ...(qualificationDetails.breakdown?.written_communication?.score >= 85
-              ? ['Professional CV with excellent communication']
-              : []),
-          ],
+          // Add CV evaluation data for PDF - Use actual matched skills
+          strengths: qualificationDetails.breakdown?.skill_set_match?.matched_skills || qualificationDetails.extracted?.skills || [],
           gaps: [
             ...(qualificationDetails.breakdown?.skill_set_match?.missing_skills?.slice(0, 3).map((skill: string) => 
               `Missing experience with ${skill}`
@@ -321,7 +306,19 @@ export default function CandidateReportPage() {
             notes: qualificationDetails.gaps_and_notes || [],
             workExperience: qualificationDetails.extracted?.work_experience || [],
           },
+          // Add new fields for Production, Tenure, Projects, Certifications
+          production_exposure: qualificationDetails.production_exposure,
+          tenure_analysis: qualificationDetails.tenure_analysis,
         } : null,
+        // New props to match React component exactly
+        totalScore: resumeScore,
+        explainableScore: qualificationDetails?.explainable_score || null,
+        riskAdjustments: qualificationDetails?.risk_adjustments || null,
+        missingMustHave: qualificationDetails?.eligibility?.missing_must_have || [],
+        eligibility: qualificationDetails?.eligibility || null,
+        candidateLocation: candidate.location || null,
+        extractedData: qualificationDetails?.extracted || null,
+        experienceRequired: qualificationDetails?.scores?.experience_match?.years_required || undefined,
       }
       
       // Generate and open PDF in new window
@@ -512,25 +509,41 @@ export default function CandidateReportPage() {
     : (typeof dbScore === 'number' ? dbScore : null)
   
   // Resume/Qualification score priority:
-  // 1. Use DB score first (always show resume score from database)
-  // 2. Use AI-calculated score from qualificationDetails.overall.score_percent (authoritative)
-  // 3. Calculate from breakdown
+  // 1. Use backend's final score (overall.score_percent) - AUTHORITATIVE (includes risk caps)
+  // 2. Use DB score (already stored from backend)
+  // 3. Calculate from explainable_score (raw score, for transparency only)
   // 4. Finally use 0
   const resumeScore = (() => {
-    // First priority: DB score (resume score from database)
+    // First priority: Backend's final score (includes risk adjustments/caps)
+    if (qualificationDetails?.overall?.score_percent != null) {
+      const finalScore = Math.round(qualificationDetails.overall.score_percent)
+      console.log('[Score Calc] Using backend final score (overall.score_percent):', finalScore)
+      return finalScore
+    }
+    
+    // Second priority: DB score (already stored from backend evaluation)
     if (typeof dbScore === 'number') {
       console.log('[Score Calc] Using DB score for resume:', dbScore)
       return dbScore
     }
     
-    // Second priority: AI-calculated score from overall
-    if (qualificationDetails?.overall?.score_percent != null) {
-      const aiScore = Math.round(qualificationDetails.overall.score_percent)
-      console.log('[Score Calc] Using AI-calculated score from overall:', aiScore)
-      return aiScore
+    // Third priority: Calculate from explainable_score (raw weighted sum - for transparency)
+    // NOTE: This is the RAW score before risk adjustments, may differ from final score
+    if (qualificationDetails?.explainable_score) {
+      const es = qualificationDetails.explainable_score
+      const calculatedSum = Math.round(
+        (es.skill_contribution || 0) +
+        (es.project_contribution || 0) +
+        (es.experience_contribution || 0) +
+        (es.edu_certs_contribution || 0) +
+        (es.location_contribution || 0) +
+        (es.quality_contribution || 0)
+      )
+      console.log('[Score Calc] Using sum of explainable_score contributions (raw):', calculatedSum)
+      return calculatedSum
     }
     
-    // Third priority: Calculate from breakdown
+    // Fourth priority: Calculate from breakdown
     if (qualificationDetails?.breakdown) {
       const calculatedScore = calculateWeightedScore(qualificationDetails.breakdown)
       console.log('[Score Calc] Using calculated score from breakdown:', calculatedScore)
@@ -655,7 +668,7 @@ export default function CandidateReportPage() {
       {/* Content Area */}
       <div className="px-2 sm:px-3 md:px-4 lg:px-6 py-4 sm:py-6 bg-gradient-to-b from-gray-50/60 via-white to-gray-50/40 max-w-full" ref={reportRef}>
 
-        {/* Application Details - Always at top for candidate tab */}
+        {/* Merged Card: Application Details with Resume Evaluation at top */}
         {activeTab === "candidate" && (
           <Card className="border-0 bg-white shadow-md mb-6 overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-slate-900 to-slate-800 border-b-0 py-4 px-6">
@@ -665,26 +678,109 @@ export default function CandidateReportPage() {
                     <FileText className="h-5 w-5 text-white" />
                   </div>
                   <div>
-                    <CardTitle className="text-white text-lg">Application Details</CardTitle>
-                    <CardDescription className="text-slate-300 text-xs mt-0.5">Candidate information & preferences</CardDescription>
+                    <CardTitle className="text-white text-lg">application Detail</CardTitle>
                   </div>
                 </div>
-                {candidate && (
-                  <Badge className={
-                    candidate.status === 'qualified' || candidate.status === 'CV Qualified' 
-                      ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100'
-                      : candidate.status === 'applied' 
-                      ? 'bg-blue-100 text-blue-800 hover:bg-blue-100'
-                      : 'bg-slate-100 text-slate-800 hover:bg-slate-100'
-                  }>
-                    {candidate.status}
-                  </Badge>
+                {candidateData?.resumeUrl && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="flex items-center space-x-2 text-xs sm:text-sm h-8 sm:h-9 bg-transparent border-emerald-400 text-emerald-400 hover:bg-emerald-400/10 hover:text-emerald-300"
+                    onClick={() => window.open(candidateData.resumeUrl, '_blank')}
+                  >
+                    <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span>download resume</span>
+                  </Button>
                 )}
               </div>
             </CardHeader>
-            <CardContent className="p-6">
+            <CardContent className="p-0">
+              {/* Candidate Overview Section - Resume Evaluation style */}
+              {qualificationDetails && (
+                <div className="bg-slate-50 p-4 sm:p-6 border-b border-slate-200">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div className="flex-1 w-full">
+                      <div className="flex items-center space-x-3 sm:space-x-4">
+                        <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg flex items-center justify-center border-2 sm:border-4 border-white shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200 flex-shrink-0 overflow-hidden">
+                          {candidateData?.photoUrl ? (
+                            <img 
+                              src={candidateData.photoUrl} 
+                              alt={candidateData.name} 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <User className="h-8 w-8 sm:h-12 sm:w-12 text-slate-500" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h2 className="text-base sm:text-xl font-bold text-slate-800 truncate">{qualificationDetails.extracted?.name || candidateData?.name}</h2>
+                          <div className="flex items-center text-slate-600 mt-1">
+                            <Briefcase className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 flex-shrink-0" />
+                            <span className="text-sm sm:text-base truncate">{jobTitle || 'N/A'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="md:border-l md:border-slate-300 md:pl-4 flex-1 w-full md:w-auto">
+                      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                        <div>
+                          <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-medium tracking-wide mb-1">Resume Score</p>
+                          <div className="flex items-center">
+                            <BarChart3 className={`w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 ${resumeScore >= 60 ? 'text-emerald-500' : 'text-red-500'}`} />
+                            <p className={`font-bold text-base sm:text-lg ${resumeScore >= 60 ? 'text-emerald-600' : 'text-red-600'}`}>{resumeScore}<span className="text-slate-400 text-[10px] sm:text-xs">/100</span></p>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-medium tracking-wide mb-1">Interview Score</p>
+                          {evaluation?.overallScore ? (
+                            <div className="flex items-center">
+                              <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 mr-1.5 sm:mr-2" />
+                              <p className="font-bold text-base sm:text-lg">{evaluation.overallScore}<span className="text-slate-400 text-[10px] sm:text-xs">/100</span></p>
+                            </div>
+                          ) : (
+                            <div className="flex items-center">
+                              <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 mr-1.5 sm:mr-2" />
+                              <p className="font-bold text-base sm:text-lg text-slate-400">—</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Donut Chart - Green for Qualified, Red for Unqualified */}
+                    <div className="w-24 h-24 relative hidden md:flex items-center justify-center">
+                      <svg className="w-24 h-24 transform -rotate-90">
+                        <circle
+                          cx="48"
+                          cy="48"
+                          r="40"
+                          stroke="#e5e7eb"
+                          strokeWidth="8"
+                          fill="none"
+                        />
+                        <circle
+                          cx="48"
+                          cy="48"
+                          r="40"
+                          stroke={resumeScore >= 60 ? "#10b981" : "#dc2626"}
+                          strokeWidth="8"
+                          fill="none"
+                          strokeDasharray={`${(resumeScore / 100) * 251.2} 251.2`}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <div className={`absolute inset-0 flex items-center justify-center text-2xl font-bold ${resumeScore >= 60 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {resumeScore}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Application Details Content */}
               {candidate ? (
-                <div className="space-y-6">
+                <div className="p-6 space-y-6">
                   {/* Row 1: Contact Information */}
                   <div>
                     <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Contact Information</h4>
@@ -880,22 +976,7 @@ export default function CandidateReportPage() {
                   communication: qualificationDetails.breakdown?.written_communication?.score || 90,
                   problemSolving: qualificationDetails.breakdown?.skills_in_recent_projects?.score || 80,
                 },
-                strengths: [
-                  ...(qualificationDetails.breakdown?.skill_set_match?.matched_skills?.slice(0, 3).map((skill: string) => 
-                    `Strong proficiency in ${skill}`
-                  ) || []),
-                  ...(qualificationDetails.breakdown?.skill_set_match?.score >= 70 
-                    ? ['Excellent skill set match with job requirements'] 
-                    : []),
-                  ...(qualificationDetails.breakdown?.experience_range_match?.years_actual >= 3 
-                    ? [`Solid experience of ${qualificationDetails.breakdown.experience_range_match.years_actual} years`] 
-                    : qualificationDetails.extracted?.total_experience_years_estimate >= 3
-                    ? [`Solid experience of ${qualificationDetails.extracted.total_experience_years_estimate} years`]
-                    : []),
-                  ...(qualificationDetails.breakdown?.written_communication?.score >= 85
-                    ? ['Professional CV with excellent communication']
-                    : []),
-                ],
+                strengths: qualificationDetails.breakdown?.skill_set_match?.matched_skills || qualificationDetails.extracted?.skills || [],
                 gaps: [
                   ...(qualificationDetails.breakdown?.skill_set_match?.missing_skills?.slice(0, 3).map((skill: string) => 
                     `Missing experience with ${skill}`
@@ -1251,7 +1332,233 @@ export default function CandidateReportPage() {
                 ]),
               }}
               isGeneratingPDF={isGeneratingPDF}
+              riskAdjustments={qualificationDetails?.risk_adjustments}
+              missingMustHave={qualificationDetails?.eligibility?.missing_must_have}
+              explainableScore={qualificationDetails?.explainable_score}
+              totalScore={resumeScore}
+              eligibility={qualificationDetails?.eligibility}
+              extractedData={qualificationDetails?.extracted}
+              experienceRequired={qualificationDetails?.scores?.experience_match?.years_required}
             />
+
+            {/* Production Exposure & Tenure Analysis */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+              {/* Production Exposure */}
+              {qualificationDetails?.production_exposure && (
+                <Card className="shadow-md border border-slate-200 overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 border-b border-blue-200 py-4 px-6">
+                    <CardTitle className="text-lg font-semibold flex items-center text-blue-800">
+                      <Briefcase className="w-5 h-5 text-blue-600 mr-3" />
+                      Production Experience
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className={`p-4 rounded-lg border-2 mb-4 ${
+                      qualificationDetails.production_exposure.has_prod_experience 
+                        ? 'bg-emerald-50 border-emerald-200' 
+                        : 'bg-amber-50 border-amber-200'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        {qualificationDetails.production_exposure.has_prod_experience 
+                          ? <CheckCircle className="w-8 h-8 text-emerald-600" />
+                          : <AlertTriangle className="w-8 h-8 text-amber-600" />
+                        }
+                        <div>
+                          <p className={`font-bold text-lg ${qualificationDetails.production_exposure.has_prod_experience ? 'text-emerald-700' : 'text-amber-700'}`}>
+                            {qualificationDetails.production_exposure.has_prod_experience ? 'Has Production Experience' : 'No Production Experience'}
+                          </p>
+                          <p className={`text-sm ${qualificationDetails.production_exposure.has_prod_experience ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {qualificationDetails.production_exposure.has_prod_experience 
+                              ? 'Candidate has worked in live/production environments' 
+                              : 'No evidence of production deployment experience'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {qualificationDetails.production_exposure.evidence?.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-slate-700 text-sm mb-2">Evidence</h4>
+                        <ul className="space-y-1">
+                          {qualificationDetails.production_exposure.evidence.map((e: string, idx: number) => (
+                            <li key={idx} className="text-sm text-slate-600 flex items-center gap-2">
+                              <CheckCircle2 className="w-3 h-3 text-blue-500" />
+                              {e}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Tenure Analysis */}
+              {qualificationDetails?.tenure_analysis && (
+                <Card className="shadow-md border border-slate-200 overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-purple-50 to-purple-100 border-b border-purple-200 py-4 px-6">
+                    <CardTitle className="text-lg font-semibold flex items-center text-purple-800">
+                      <Clock className="w-5 h-5 text-purple-600 mr-3" />
+                      Tenure Stability
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-4 bg-slate-50 rounded-lg">
+                        <p className="text-3xl font-bold text-slate-800">
+                          {qualificationDetails.tenure_analysis.average_tenure_months 
+                            ? `${qualificationDetails.tenure_analysis.average_tenure_months}` 
+                            : '—'}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">Avg. Tenure (months)</p>
+                      </div>
+                      <div className={`text-center p-4 rounded-lg ${
+                        qualificationDetails.tenure_analysis.job_hopping_risk === 'Low' 
+                          ? 'bg-emerald-50' 
+                          : qualificationDetails.tenure_analysis.job_hopping_risk === 'Medium'
+                          ? 'bg-amber-50'
+                          : 'bg-red-50'
+                      }`}>
+                        <p className={`text-xl font-bold ${
+                          qualificationDetails.tenure_analysis.job_hopping_risk === 'Low' 
+                            ? 'text-emerald-600' 
+                            : qualificationDetails.tenure_analysis.job_hopping_risk === 'Medium'
+                            ? 'text-amber-600'
+                            : 'text-red-600'
+                        }`}>
+                          {qualificationDetails.tenure_analysis.job_hopping_risk || 'Unknown'}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">Job Hopping Risk</p>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4 p-3 bg-slate-50 rounded-lg">
+                      <p className="text-xs text-slate-600">
+                        {qualificationDetails.tenure_analysis.job_hopping_risk === 'Low' 
+                          ? '✓ Candidate shows good job stability with consistent tenure.' 
+                          : qualificationDetails.tenure_analysis.job_hopping_risk === 'Medium'
+                          ? '⚠ Moderate tenure - some job changes but within acceptable range.'
+                          : '⚠ High turnover pattern detected - may need discussion during interview.'}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Recent Projects Section */}
+            {qualificationDetails?.extracted?.recent_projects && qualificationDetails.extracted.recent_projects.length > 0 && (
+              <Card className="shadow-md border border-slate-200 overflow-hidden mt-6">
+                <CardHeader className="bg-gradient-to-r from-indigo-50 to-indigo-100 border-b border-indigo-200 py-4 px-6">
+                  <CardTitle className="text-lg font-semibold flex items-center text-indigo-800">
+                    <Briefcase className="w-5 h-5 text-indigo-600 mr-3" />
+                    Recent Projects
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th className="text-left py-3 px-6 font-semibold text-slate-700">Project</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-700">Duration</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-700">Technologies</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {qualificationDetails.extracted.recent_projects.map((project: any, idx: number) => (
+                        <tr key={idx} className="border-b border-slate-100">
+                          <td className="py-3 px-6 text-slate-800">{project.title || 'N/A'}</td>
+                          <td className="py-3 px-4 text-slate-600">{project.duration || 'N/A'}</td>
+                          <td className="py-3 px-4 text-slate-600">{(project.technologies || []).join(', ') || 'N/A'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Certifications Section */}
+            {qualificationDetails?.extracted?.certifications && qualificationDetails.extracted.certifications.length > 0 && (
+              <Card className="shadow-md border border-slate-200 overflow-hidden mt-6">
+                <CardHeader className="bg-gradient-to-r from-amber-50 to-amber-100 border-b border-amber-200 py-4 px-6">
+                  <CardTitle className="text-lg font-semibold flex items-center text-amber-800">
+                    <Award className="w-5 h-5 text-amber-600 mr-3" />
+                    Certifications
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th className="text-left py-3 px-6 font-semibold text-slate-700">Name</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-700">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {qualificationDetails.extracted.certifications.map((cert: any, idx: number) => (
+                        <tr key={idx} className="border-b border-slate-100">
+                          <td className="py-3 px-6 text-slate-800">{cert.name || 'N/A'}</td>
+                          <td className="py-3 px-4">
+                            <span className={`font-medium ${cert.status === 'issued' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                              {cert.status === 'issued' ? 'Issued' : 'Pursuing'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Final Recommendation - At the very bottom */}
+            <Card className="shadow-md border border-slate-200 overflow-hidden mt-6">
+              <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200 py-4 px-6">
+                <CardTitle className="text-lg font-semibold flex items-center">
+                  {resumeScore >= 60 ? 
+                    <CheckCircle className="w-5 h-5 text-emerald-600 mr-3" /> : 
+                    <AlertTriangle className="w-5 h-5 text-amber-500 mr-3" />
+                  }
+                  Final Recommendation
+                </CardTitle>
+                <p className="text-slate-600 mt-1 ml-8 text-sm">
+                  Assessment outcome based on comprehensive evaluation
+                </p>
+              </CardHeader>
+              
+              <CardContent className="p-6">
+                <div className={`p-4 rounded-lg ${resumeScore >= 60 ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`}>
+                  <div className="flex items-start">
+                    {resumeScore >= 60 ? (
+                      <div className="mr-4 mt-1">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                          <CheckCircle className="w-5 h-5 text-emerald-600" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mr-4 mt-1">
+                        <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                          <XCircle className="w-5 h-5 text-red-600" />
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <h4 className={`font-semibold text-lg mb-2 ${resumeScore >= 60 ? 'text-emerald-700' : 'text-red-700'}`}>
+                        {resumeScore >= 60 ? "Proceed to Next Round" : "Not Recommended"}
+                      </h4>
+                      <p className="text-slate-700">
+                        {qualificationDetails?.overall?.reason_summary || 
+                          (resumeScore >= 60 
+                            ? '✅ Qualified - The candidate demonstrates strong relevant experience and meets the requirements. Recommended to proceed to next round.'
+                            : '❌ Not Qualified - The candidate does not meet the minimum requirements for this role.')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
           </div>
         )}
         {activeTab === "candidate" && !qualificationDetails && (

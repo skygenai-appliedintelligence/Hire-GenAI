@@ -483,7 +483,6 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
                 disabled={loading || hasCandidateDetails} 
                 readOnly={hasCandidateDetails}
               />
-              {hasCandidateDetails && <p className="text-xs text-gray-500 mt-1">Pre-filled from screening details</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="lastName">Last name *</Label>
@@ -497,7 +496,6 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
                 disabled={loading || hasCandidateDetails} 
                 readOnly={hasCandidateDetails}
               />
-              {hasCandidateDetails && <p className="text-xs text-gray-500 mt-1">Pre-filled from screening details</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email *</Label>
@@ -512,7 +510,6 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
                 disabled={loading || hasCandidateDetails} 
                 readOnly={hasCandidateDetails}
               />
-              {hasCandidateDetails && <p className="text-xs text-gray-500 mt-1">Pre-filled from screening details</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone *</Label>
@@ -527,7 +524,6 @@ export default function ApplyForm({ job, isJobOpen = true }: { job: any; isJobOp
                 disabled={loading || hasCandidateDetails} 
                 readOnly={hasCandidateDetails}
               />
-              {hasCandidateDetails && <p className="text-xs text-gray-500 mt-1">Pre-filled from screening details</p>}
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label>Expected salary *</Label>

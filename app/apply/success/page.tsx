@@ -60,26 +60,6 @@ export default function ApplicationSuccessPage() {
             </ul>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href={`/${companySlug}`}>
-              <Button 
-                size="lg" 
-                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                View More Jobs
-              </Button>
-            </Link>
-            <Link href="/">
-              <Button 
-                size="lg" 
-                variant="outline"
-                className="w-full sm:w-auto border-slate-300 hover:bg-slate-50"
-              >
-                Back to Home
-              </Button>
-            </Link>
-          </div>
 
           {/* Footer Note */}
           <p className="text-sm text-slate-500 mt-8">
