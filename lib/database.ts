@@ -1245,6 +1245,7 @@ export class DatabaseService {
     salary_min?: number | null
     salary_max?: number | null
     salary_period?: 'monthly' | 'yearly' | 'weekly' | 'daily' | null
+    salary_currency?: string | null
     bonus_incentives?: string | null
     perks_benefits?: string[] | null
     time_off_policy?: string | null
@@ -1256,6 +1257,7 @@ export class DatabaseService {
     screening_questions?: Record<string, any> | null
     status?: 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled' | null
     auto_schedule_interview?: boolean | null
+    resume_screening_enabled?: boolean | null
   }) {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
@@ -1287,9 +1289,9 @@ export class DatabaseService {
         technical_skills, domain_knowledge, soft_skills, languages,
         must_have_skills, nice_to_have_skills,
         duties_day_to_day, duties_strategic, stakeholders,
-        decision_scope, salary_min, salary_max, salary_period, bonus_incentives,
+        decision_scope, salary_min, salary_max, salary_period, salary_currency, bonus_incentives,
         perks_benefits, time_off_policy, joining_timeline, travel_requirements, visa_requirements,
-        status, auto_schedule_interview, is_public, created_by_email, screening_questions
+        status, auto_schedule_interview, is_public, created_by_email, screening_questions, resume_screening_enabled
       )
       VALUES (
         $1::uuid, $2, $3, $4, $5, $6::employment_type, $7::job_level, $8,
@@ -1297,9 +1299,9 @@ export class DatabaseService {
         $11::text[], $12::text[], $13::text[], $14::text[],
         $15::text[], $16::text[],
         $17::text[], $18::text[], $19::text[],
-        $20, $21, $22, $23::salary_period, $24,
-        $25::text[], $26, $27, $28, $29,
-        COALESCE($30, 'open'), COALESCE($31, true), COALESCE($32, true), $33, $34::jsonb
+        $20, $21, $22, $23::salary_period, $24, $25,
+        $26::text[], $27, $28, $29, $30,
+        COALESCE($31, 'open'), COALESCE($32, true), COALESCE($33, true), $34, $35::jsonb, COALESCE($36, false)
       )
       RETURNING id
     `
@@ -1328,17 +1330,19 @@ export class DatabaseService {
       input.salary_min ?? null,
       input.salary_max ?? null,
       input.salary_period ?? null,
+      input.salary_currency ?? 'INR', // $24 - salary_currency (defaults to 'INR')
       input.bonus_incentives ?? null,
       toPgArray(input.perks_benefits),
       input.time_off_policy ?? null,
       input.joining_timeline ?? null,
       input.travel_requirements ?? null,
       input.visa_requirements ?? null,
-      input.status ?? 'open', // $30 - status (defaults to 'open')
-      input.auto_schedule_interview ?? true, // $31
-      input.is_public ?? true, // $32
-      input.created_by_email ?? null, // $33
-      input.screening_questions ? JSON.stringify(input.screening_questions) : null, // $34
+      input.status ?? 'open', // $31 - status (defaults to 'open')
+      input.auto_schedule_interview ?? true, // $32
+      input.is_public ?? true, // $33
+      input.created_by_email ?? null, // $34
+      input.screening_questions ? JSON.stringify(input.screening_questions) : null, // $35
+      input.resume_screening_enabled ?? false, // $36 - resume_screening_enabled (defaults to false)
     ]
 
     const rows = (await this.query(q, params)) as any[]

@@ -4,7 +4,8 @@ import { DatabaseService } from '@/lib/database'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// Add caching headers to improve performance
+// GET /api/analytics/recommendation-breakdown
+// Returns hiring pipeline breakdown for recommended candidates
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -19,34 +20,33 @@ export async function GET(request: NextRequest) {
     }
 
     if (!DatabaseService.isDatabaseConfigured()) {
-      return NextResponse.json({ ok: true, interviews: [] })
+      return NextResponse.json({ 
+        ok: true, 
+        breakdown: {
+          total: 0,
+          sentToManager: 0,
+          offerExtended: 0,
+          offerAccepted: 0,
+          rejectedWithdraw: 0,
+          hired: 0
+        }
+      })
     }
 
-    // Fetch real interview data from database with timeout
-    const interviews = await Promise.race([
-      DatabaseService.getInterviews(companyId, jobId || undefined),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database query timeout')), 3000)
-      )
-    ]) as any[]
-
-    console.log(`Found ${interviews.length} interviews for company ${companyId}`)
+    // Fetch hiring pipeline breakdown
+    const breakdown = await DatabaseService.getHiringBucketCounts(companyId, jobId || undefined)
 
     return NextResponse.json({
       ok: true,
-      interviews: interviews
-    }, {
-      headers: {
-        'Cache-Control': 'private, max-age=30', // Cache for 30 seconds
-      }
+      breakdown: breakdown
     })
 
   } catch (error) {
-    console.error('Error fetching interviews:', error)
+    console.error('Error fetching recommendation breakdown:', error)
     return NextResponse.json(
-      { 
-        ok: false, 
-        error: 'Failed to fetch interviews',
+      {
+        ok: false,
+        error: 'Failed to fetch recommendation breakdown',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }

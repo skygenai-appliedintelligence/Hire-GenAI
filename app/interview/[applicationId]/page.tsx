@@ -38,6 +38,7 @@ export default function InterviewPage() {
   const [showInstructions, setShowInstructions] = useState(true)
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const dcRef = useRef<RTCDataChannel | null>(null)
+  const initSeqRef = useRef(0)
   const agentTextBufferRef = useRef<string>("")
   const userTextBufferRef = useRef<string>("")
   const avatarFirstPlayRef = useRef<boolean>(true)
@@ -696,6 +697,7 @@ export default function InterviewPage() {
   const requestPermissions = async (details: any, questions: any[] = [], duration: number = 30, fetchedCompanyId: string | null = null) => {
     setInitializing(true)
     setError(null)
+    const initSeq = ++initSeqRef.current
     try {
       console.log('[Init] Requesting camera + mic permissions…')
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -736,7 +738,7 @@ export default function InterviewPage() {
       const data = await resp.json()
       logTs('Init: Ephemeral session received')
       setSessionInfo(data)
-      await initRealtimeConnection(data, stream, details, questions, duration)
+      await initRealtimeConnection(data, stream, details, questions, duration, initSeq)
       setAgentReady(true)
       setInterviewPhase('greeting')
       setInterviewStartTime(Date.now())
@@ -750,7 +752,7 @@ export default function InterviewPage() {
   }
 
   // Initialize WebRTC connection with OpenAI Realtime
-  const initRealtimeConnection = async (session: any, localStream: MediaStream, details: any, questions: any[] = [], duration: number = 30) => {
+  const initRealtimeConnection = async (session: any, localStream: MediaStream, details: any, questions: any[] = [], duration: number = 30, initSeq?: number) => {
     pcRef.current?.close()
     pcRef.current = null
 
@@ -1014,7 +1016,37 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
     }
 
     logTs('RTC: Creating offer…')
+    if (initSeq != null && initSeq !== initSeqRef.current) return
+    try {
+      // Check if connection is still active (avoiding 'closed' state which isn't in TS types)
+      const isActive = pc.signalingState === 'stable' || 
+                      pc.signalingState === 'have-local-offer' ||
+                      pc.signalingState === 'have-remote-offer' ||
+                      pc.iceConnectionState === 'connected' ||
+                      pc.iceConnectionState === 'completed' ||
+                      pc.connectionState === 'connected' ||
+                      pc.connectionState === 'connecting'
+      if (!isActive) return
+    } catch {
+      // If any state check fails, assume connection is invalid
+      return
+    }
     const offer = await pc.createOffer()
+    if (initSeq != null && initSeq !== initSeqRef.current) return
+    try {
+      // Check if connection is still active (avoiding 'closed' state which isn't in TS types)
+      const isActive = pc.signalingState === 'stable' || 
+                      pc.signalingState === 'have-local-offer' ||
+                      pc.signalingState === 'have-remote-offer' ||
+                      pc.iceConnectionState === 'connected' ||
+                      pc.iceConnectionState === 'completed' ||
+                      pc.connectionState === 'connected' ||
+                      pc.connectionState === 'connecting'
+      if (!isActive) return
+    } catch {
+      // If any state check fails, assume connection is invalid
+      return
+    }
     await pc.setLocalDescription(offer)
 
     const baseUrl = 'https://api.openai.com/v1/realtime'
@@ -1036,13 +1068,48 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
       throw new Error(`Realtime SDP exchange failed: ${txt}`)
     }
     const answerSdp = await sdpResponse.text()
-    await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp })
+    if (initSeq != null && initSeq !== initSeqRef.current) return
+    try {
+      // Check if connection is still active (avoiding 'closed' state which isn't in TS types)
+      const isActive = pc.signalingState === 'stable' || 
+                      pc.signalingState === 'have-local-offer' ||
+                      pc.signalingState === 'have-remote-offer' ||
+                      pc.iceConnectionState === 'connected' ||
+                      pc.iceConnectionState === 'completed' ||
+                      pc.connectionState === 'connected' ||
+                      pc.connectionState === 'connecting'
+      if (!isActive) return
+    } catch {
+      // If any state check fails, assume connection is invalid
+      return
+    }
+    try {
+      await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp })
+    } catch (e) {
+      // Guard against race where pc was closed while awaiting SDP
+      try {
+      // Check if connection is still active (avoiding 'closed' state which isn't in TS types)
+      const isActive = pc.signalingState === 'stable' || 
+                      pc.signalingState === 'have-local-offer' ||
+                      pc.signalingState === 'have-remote-offer' ||
+                      pc.iceConnectionState === 'connected' ||
+                      pc.iceConnectionState === 'completed' ||
+                      pc.connectionState === 'connected' ||
+                      pc.connectionState === 'connecting'
+      if (!isActive) return
+    } catch {
+      // If any state check fails, assume connection is invalid
+      return
+    }
+      throw e
+    }
     logTs('RTC: Remote description set (answer). Waiting for tracks…')
   }
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      initSeqRef.current += 1
       streamRef.current?.getTracks().forEach(t => t.stop())
       streamRef.current = null
       pcRef.current?.close()
@@ -1457,16 +1524,16 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header with Controls */}
       <header className="border-b border-emerald-500/30 bg-gradient-to-r from-slate-900/80 via-slate-800/80 to-slate-900/80 backdrop-blur-lg sticky top-0 z-40 shadow-lg animate-in fade-in duration-500">
-        <div className="mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-6">
+        <div className="mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6">
           
           {/* Left: Logo + Title + Job Details (MERGED) */}
-          <div className="flex items-center gap-4 animate-in fade-in slide-in-from-left-4 duration-500">
+          <div className="flex items-center gap-3 sm:gap-4 animate-in fade-in slide-in-from-left-4 duration-500">
             <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg hover:shadow-emerald-500/50 transition-shadow duration-300 flex-shrink-0">
               <svg className="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
               </div>
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-0.5 min-w-0">
               <h1 className="text-base font-bold text-white leading-tight">AI Interview</h1>
               <p className="text-sm font-semibold text-emerald-300">{jobDetails?.jobTitle || 'Position'}</p>
               <p className="text-xs text-slate-400">{jobDetails?.company || 'Company'}</p>
@@ -1474,7 +1541,7 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
           </div>
 
           {/* Right: Controls (square buttons, no outer box) */}
-          <div className="ml-auto flex items-center gap-3 animate-in fade-in scale-in duration-500">
+          <div className="w-full sm:w-auto sm:ml-auto flex items-center justify-end gap-3 animate-in fade-in scale-in duration-500">
             {/* Mic Button */}
             <Button 
               size="icon" 
@@ -1519,7 +1586,7 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
       </header>
 
       {/* Main Content */}
-      <main className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex items-start justify-center px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
         {/* Video Container - Responsive with max-width constraint */}
         <div className="w-full max-w-4xl">
           {/* 16:9 Aspect Ratio Container */}
@@ -1545,12 +1612,12 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
             </div>
 
             {/* Picture-in-picture Avatar overlay */}
-            <div className="absolute right-4 bottom-6 md:right-6 md:bottom-8">
+            <div className="absolute right-2 bottom-2 sm:right-4 sm:bottom-6 md:right-6 md:bottom-8">
               <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-500/40 shadow-2xl bg-black/80 backdrop-blur-md hover:border-emerald-500/60 transition-all duration-300">
                 <video
                   ref={avatarVideoRef}
                   src="https://storage.googleapis.com/ai_recruiter_bucket_prod/assets/videos/olivia_character_no_audio.mp4"
-                  className="w-[150px] h-[84px] md:w-[220px] md:h-[124px] object-cover"
+                  className="w-[110px] h-[62px] sm:w-[150px] sm:h-[84px] md:w-[220px] md:h-[124px] object-cover"
                   muted
                   playsInline
                   preload="auto"
@@ -1577,7 +1644,7 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
 
 
             {/* Timer/Status - Top right */}
-            <div className="absolute top-6 right-6 flex flex-col items-end gap-2 z-40">
+            <div className="absolute top-3 right-3 sm:top-6 sm:right-6 flex flex-col items-end gap-2 z-40">
               {isInterviewClosing && closingCountdown !== null ? (
                 <div className="bg-amber-600/90 backdrop-blur-md border border-amber-500/50 text-white text-xs px-4 py-2 rounded-lg font-medium animate-pulse">
                   <span className="text-amber-100">Interview ending in </span>

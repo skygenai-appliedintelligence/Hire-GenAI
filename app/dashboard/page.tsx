@@ -50,69 +50,101 @@ export default function DashboardPage() {
     }
   })
   const [loading, setLoading] = useState(true)
+  const [initialLoad, setInitialLoad] = useState(true)
   
   useEffect(() => {
     if (company?.id) {
       fetchDashboardData()
+      // Show initial data quickly after first load
+      if (initialLoad) {
+        setInitialLoad(false)
+      }
     }
-  }, [company])
+  }, [company, initialLoad])
 
   const fetchDashboardData = async () => {
     if (!company?.id) return
     
     setLoading(true)
 
-    // Fetch jobs via internal API (same source as Jobs page)
-    let openJobsCount = 0
     try {
-      const companyName = company?.name ? encodeURIComponent(company.name) : ''
-      const url = companyName ? `/api/jobs?company=${companyName}` : '/api/jobs'
-      const res = await fetch(url)
-      const data = await res.json().catch(() => ({}))
-      if (res.ok && data?.ok && Array.isArray(data.jobs)) {
-        openJobsCount = data.jobs.filter((j: any) => {
-          const v = String(j.status || '').trim().toLowerCase()
-          if (v === 'closed') return false
-          if (['on hold','on_hold','on-hold','onhold','hold','paused','pause'].includes(v)) return false
-          if (['cancelled','canceled','cancel'].includes(v)) return false
-          return true // treat anything else as open
-        }).length
-      }
-    } catch (e) {
-      console.error('Failed to load jobs for dashboard:', e)
+      // Parallel fetch all data to reduce total loading time
+      const [jobsResponse, qualifiedResponse, interviewsResponse] = await Promise.all([
+        // Fetch jobs via internal API (same source as Jobs page)
+        (async () => {
+          let openJobsCount = 0
+          try {
+            const companyName = company?.name ? encodeURIComponent(company.name) : ''
+            const url = companyName ? `/api/jobs?company=${companyName}` : '/api/jobs'
+            const res = await fetch(url)
+            const data = await res.json().catch(() => ({}))
+            if (res.ok && data?.ok && Array.isArray(data.jobs)) {
+              openJobsCount = data.jobs.filter((j: any) => {
+                const v = String(j.status || '').trim().toLowerCase()
+                if (v === 'closed') return false
+                if (['on hold','on_hold','on-hold','onhold','hold','paused','pause'].includes(v)) return false
+                if (['cancelled','canceled','cancel'].includes(v)) return false
+                return true // treat anything else as open
+              }).length
+            }
+          } catch (e) {
+            console.error('Failed to load jobs for dashboard:', e)
+          }
+          return openJobsCount
+        })(),
+        
+        // Fetch qualified candidate statistics
+        fetch(`/api/analytics/qualified?companyId=${company.id}`).then(res => 
+          res.json().catch(() => ({ ok: false, candidates: [] }))
+        ).then(data => data.ok ? (data.candidates?.length || 0) : 0),
+        
+        // Fetch interview statistics using the same API as the interviews analytics page
+        fetch(`/api/analytics/interviews?companyId=${company.id}`).then(res => 
+          res.json().catch(() => ({ ok: false, interviews: [] }))
+        ).then(data => data.ok ? (data.interviews?.length || 0) : 0)
+      ])
+
+      const openJobsCount = jobsResponse
+      const qualifiedCandidatesCount = qualifiedResponse
+      const totalInterviewsCount = interviewsResponse
+      
+      // Calculate qualification rate
+      const qualificationRate = qualifiedCandidatesCount > 0 && openJobsCount > 0 
+        ? Math.round((qualifiedCandidatesCount / openJobsCount) * 100) 
+        : 0
+
+      // For now, we'll use some static values for previous month data
+      // In a real implementation, this would come from the API
+      setStats({
+        totalJobs: openJobsCount,
+        qualifiedCandidates: qualifiedCandidatesCount,
+        totalInterviews: totalInterviewsCount,
+        successRate: 85, // This would be calculated based on actual data
+        monthlyTrends: {
+          jobs: { current: openJobsCount, previous: openJobsCount - 2, change: 2 },
+          candidates: { current: qualifiedCandidatesCount, previous: qualifiedCandidatesCount, change: 0 },
+          interviews: { current: totalInterviewsCount, previous: totalInterviewsCount, change: 0 },
+          successRate: { current: 85, previous: 80, change: 5 }
+        }
+      })
+    } catch (error) {
+      console.error('Dashboard data fetch error:', error)
+      // Set default values on error
+      setStats({
+        totalJobs: 0,
+        qualifiedCandidates: 0,
+        totalInterviews: 0,
+        successRate: 0,
+        monthlyTrends: {
+          jobs: { current: 0, previous: 0, change: 0 },
+          candidates: { current: 0, previous: 0, change: 0 },
+          interviews: { current: 0, previous: 0, change: 0 },
+          successRate: { current: 0, previous: 0, change: 0 }
+        }
+      })
+    } finally {
+      setLoading(false)
     }
-
-    // Fetch qualified candidate statistics
-    const qualifiedRes = await fetch(`/api/analytics/qualified?companyId=${company.id}`)
-    const qualifiedData = await qualifiedRes.json().catch(() => ({ ok: false, candidates: [] }))
-    const qualifiedCandidatesCount = qualifiedData.ok ? (qualifiedData.candidates?.length || 0) : 0
-
-    // Fetch interview statistics using the same API as the interviews analytics page
-    const interviewsRes = await fetch(`/api/analytics/interviews?companyId=${company.id}`)
-    const interviewsData = await interviewsRes.json().catch(() => ({ ok: false, interviews: [] }))
-    const totalInterviewsCount = interviewsData.ok ? (interviewsData.interviews?.length || 0) : 0
-    
-    // Calculate qualification rate
-    const qualificationRate = qualifiedCandidatesCount > 0 && openJobsCount > 0 
-      ? Math.round((qualifiedCandidatesCount / openJobsCount) * 100) 
-      : 0
-
-    // For now, we'll use some static values for previous month data
-    // In a real implementation, this would come from the API
-    setStats({
-      totalJobs: openJobsCount,
-      qualifiedCandidates: qualifiedCandidatesCount,
-      totalInterviews: totalInterviewsCount,
-      successRate: 85, // This would be calculated based on actual data
-      monthlyTrends: {
-        jobs: { current: openJobsCount, previous: openJobsCount - 2, change: 2 },
-        candidates: { current: qualifiedCandidatesCount, previous: qualifiedCandidatesCount, change: 0 },
-        interviews: { current: totalInterviewsCount, previous: totalInterviewsCount, change: 0 },
-        successRate: { current: 85, previous: 80, change: 5 }
-      }
-    })
-    
-    setLoading(false)
   }
 
   // Helper functions for trend indicators, similar to analytics page
@@ -141,9 +173,25 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Cards */}
-      {loading ? (
+      {loading && initialLoad ? (
         <div className="py-12">
           <Spinner size="lg" text="Loading dashboard data..." className="mx-auto" />
+        </div>
+      ) : loading ? (
+        // Show skeleton cards on subsequent loads
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="h-4 bg-gray-200 rounded w-20"></div>
+                <div className="h-4 w-4 bg-gray-200 rounded"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-24"></div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">

@@ -235,10 +235,17 @@ export async function POST(request: NextRequest) {
                       if (cols.has('qualification_explanations')) {
                         updates.push(`qualification_explanations = $${p++}::jsonb`)
                         params.push(JSON.stringify({
-                          breakdown: evaluation.breakdown,
+                          // Core fields
+                          overall: evaluation.overall,
                           extracted: evaluation.extracted,
-                          gaps_and_notes: evaluation.gaps_and_notes,
-                          reason_summary: evaluation.overall.reason_summary
+                          scores: evaluation.scores,
+                          reason_summary: evaluation.overall.reason_summary,
+                          // Domain-agnostic CV evaluation fields
+                          eligibility: evaluation.eligibility,
+                          risk_adjustments: evaluation.risk_adjustments,
+                          production_exposure: evaluation.production_exposure,
+                          tenure_analysis: evaluation.tenure_analysis,
+                          explainable_score: evaluation.explainable_score
                         }))
                       }
 

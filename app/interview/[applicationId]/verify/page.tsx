@@ -106,22 +106,43 @@ export default function InterviewVerifyPage() {
   const otpSentRef = useRef(false)
   useEffect(() => {
     if (!applicationId) return
-    
+    // Restore OTP state on refresh so inputs don't disappear
+    const otpDataKey = `otp_data_${applicationId}`
+    const raw = sessionStorage.getItem(otpDataKey)
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as {
+          email?: string
+          maskedEmail?: string
+          candidateName?: string
+          ts?: number
+        }
+        const ts = typeof parsed.ts === 'number' ? parsed.ts : 0
+        const isFresh = ts > 0 ? (Date.now() - ts) < 10 * 60 * 1000 : false
+        if (isFresh && parsed.email) {
+          setOtpSent(true)
+          setCandidateEmail(parsed.email)
+          setMaskedEmail(parsed.maskedEmail || '')
+          setCandidateName(parsed.candidateName || '')
+          setCurrentStep(1)
+        } else {
+          sessionStorage.removeItem(otpDataKey)
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     // Check sessionStorage to prevent duplicate OTP sends in React Strict Mode
     const otpSentKey = `otp_sent_${applicationId}`
     const alreadySent = sessionStorage.getItem(otpSentKey)
-    
-    if (!otpSentRef.current && !alreadySent) {
+
+    // If we already have OTP state restored, don't auto-send again.
+    // If not restored (refresh) but flag exists, we should still send again so user isn't stuck.
+    if (!otpSentRef.current && (!alreadySent || !sessionStorage.getItem(`otp_data_${applicationId}`))) {
       otpSentRef.current = true
       sessionStorage.setItem(otpSentKey, 'true')
       sendOtp()
-    }
-    
-    // Cleanup on unmount - remove the flag after 30 seconds to allow resend on page refresh
-    return () => {
-      setTimeout(() => {
-        sessionStorage.removeItem(otpSentKey)
-      }, 30000)
     }
   }, [applicationId])
 
@@ -129,6 +150,7 @@ export default function InterviewVerifyPage() {
   const sendOtp = async () => {
     setOtpSending(true)
     setOtpError(null)
+    setOtp(['', '', '', '', '', ''])
     try {
       const res = await fetch('/api/interview/verify/send-otp', {
         method: 'POST',
@@ -141,6 +163,15 @@ export default function InterviewVerifyPage() {
         setMaskedEmail(data.maskedEmail || '')
         setCandidateName(data.candidateName || '')
         setCandidateEmail(data.email || '') // Store actual email for verification
+        // Persist OTP state for refresh
+        try {
+          sessionStorage.setItem(`otp_data_${applicationId}`, JSON.stringify({
+            email: data.email || '',
+            maskedEmail: data.maskedEmail || '',
+            candidateName: data.candidateName || '',
+            ts: Date.now(),
+          }))
+        } catch {}
         // Focus first OTP input
         setTimeout(() => otpRefs.current[0]?.focus(), 100)
       } else {
@@ -671,10 +702,17 @@ export default function InterviewVerifyPage() {
     await new Promise(resolve => setTimeout(resolve, 100))
     
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      // Mobile-friendly camera constraints
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+      const constraints = {
+        video: { 
+          facingMode: 'user', 
+          width: isMobile ? { ideal: 480 } : { ideal: 640 }, 
+          height: isMobile ? { ideal: 360 } : { ideal: 480 } 
+        },
         audio: false,
-      })
+      }
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
       streamRef.current = stream
       
       if (videoRef.current) {

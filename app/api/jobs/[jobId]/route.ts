@@ -97,6 +97,7 @@ export async function GET(req: Request, ctx: { params: { id?: string; jobId?: st
         salary_min: row.salary_min,
         salary_max: row.salary_max,
         salary_period: row.salary_period,
+        salary_currency: (row as any).salary_currency ?? 'INR',
         bonus_incentives: row.bonus_incentives,
         perks_benefits: row.perks_benefits,
         time_off_policy: row.time_off_policy,
@@ -104,6 +105,7 @@ export async function GET(req: Request, ctx: { params: { id?: string; jobId?: st
         travel_requirements: row.travel_requirements,
         visa_requirements: row.visa_requirements,
         auto_schedule_interview: row.auto_schedule_interview ?? false,
+        resume_screening_enabled: (row as any).resume_screening_enabled ?? false,
         created_by: row.created_by,
         created_at: row.created_at,
         updated_at: (row as any).updated_at ?? null,
@@ -179,6 +181,8 @@ export async function PATCH(req: Request, ctx: { params: { id?: string; jobId?: 
     if ('travel_requirements' in body) updates.travel_requirements = (body.travel_requirements ?? null)
     if ('visa_requirements' in body) updates.visa_requirements = (body.visa_requirements ?? null)
     if ('auto_schedule_interview' in body) updates.auto_schedule_interview = body.auto_schedule_interview === true
+    if ('salary_currency' in body) updates.salary_currency = (body.salary_currency ?? 'INR')
+    if ('resume_screening_enabled' in body) updates.resume_screening_enabled = body.resume_screening_enabled === true
 
     console.log('🔧 [JOB PATCH] Updates to apply:', updates)
 

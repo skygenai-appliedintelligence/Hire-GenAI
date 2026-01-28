@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { DatabaseService } from '@/lib/database'
 import { decrypt } from '@/lib/encryption'
+import { EVALUATION_CRITERIA } from '@/lib/evaluation-criteria'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -9,22 +10,19 @@ export const dynamic = 'force-dynamic'
 const TOTAL_MARKS = 100
 const DEFAULT_TOTAL_QUESTIONS = 10
 
-// Standard evaluation criteria with descriptions for AI guidance
-const CRITERIA_DESCRIPTIONS: Record<string, string> = {
-  // Standard criteria
-  "Technical": "Programming skills, frameworks, tools, databases, APIs, system design, technical accuracy and depth",
-  "Technical Skills": "Programming skills, frameworks, tools, databases, APIs, system design, technical accuracy and depth",
-  "Communication": "Clarity of expression, presenting ideas, explaining concepts, articulation, listening skills",
-  "Problem Solving": "Debugging, troubleshooting, analytical thinking, approach to challenges, logical reasoning",
-  "Cultural Fit": "Motivation, alignment with company values, work style preferences, career goals",
-  "Culture Fit": "Motivation, alignment with company values, work style preferences, career goals",
-  "Team Player": "Collaboration experience, working with cross-functional teams, teamwork, cooperation",
-  "Teamwork": "Collaboration experience, working with cross-functional teams, teamwork, cooperation",
-  "Leadership": "Leadership experience, mentoring, decision making, taking initiative",
-  "Adaptability": "Flexibility, learning new skills, handling change, resilience",
-  "Experience": "Relevant work experience, project examples, domain knowledge",
-  "Behavioral": "Past behavior examples, situational responses, work ethics"
-}
+// Build criteria descriptions from the centralized evaluation criteria
+const CRITERIA_DESCRIPTIONS: Record<string, string> = {}
+EVALUATION_CRITERIA.forEach(c => {
+  CRITERIA_DESCRIPTIONS[c.name] = c.description
+})
+// Add legacy aliases for backward compatibility
+CRITERIA_DESCRIPTIONS["Technical"] = CRITERIA_DESCRIPTIONS["Technical Skills"]
+CRITERIA_DESCRIPTIONS["Cultural Fit"] = CRITERIA_DESCRIPTIONS["Culture Fit"]
+CRITERIA_DESCRIPTIONS["Team Player"] = CRITERIA_DESCRIPTIONS["Teamwork / Collaboration"]
+CRITERIA_DESCRIPTIONS["Teamwork"] = CRITERIA_DESCRIPTIONS["Teamwork / Collaboration"]
+CRITERIA_DESCRIPTIONS["Adaptability"] = CRITERIA_DESCRIPTIONS["Adaptability / Learning"]
+CRITERIA_DESCRIPTIONS["Work Ethic"] = CRITERIA_DESCRIPTIONS["Work Ethic / Reliability"]
+CRITERIA_DESCRIPTIONS["Behavioral"] = "Past behavior examples, situational responses, work ethics"
 
 export async function POST(req: Request, ctx: { params: Promise<{ applicationId: string }> } | { params: { applicationId: string } }) {
   try {

@@ -206,14 +206,17 @@ export default function PostInterviewVerifyPage() {
     
     try {
       console.log('Starting camera...')
-      const stream = await navigator.mediaDevices.getUserMedia({
+      // Mobile-friendly camera constraints
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+      const constraints = {
         video: { 
           facingMode: 'user',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: isMobile ? { ideal: 640 } : { ideal: 1280 },
+          height: isMobile ? { ideal: 480 } : { ideal: 720 }
         },
         audio: false
-      })
+      }
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
       
       streamRef.current = stream
       
@@ -259,8 +262,14 @@ export default function PostInterviewVerifyPage() {
         const canvas = canvasRef.current
         const ctx = canvas.getContext('2d')
         if (ctx) {
+          if (!video.videoWidth || !video.videoHeight) {
+            setError('Camera is still starting. Please try again.')
+            setCountdown(null)
+            return
+          }
           canvas.width = video.videoWidth
           canvas.height = video.videoHeight
+          ctx.setTransform(1, 0, 0, 1, 0, 0)
           ctx.translate(canvas.width, 0)
           ctx.scale(-1, 1)
           ctx.drawImage(video, 0, 0)
@@ -279,6 +288,10 @@ export default function PostInterviewVerifyPage() {
     if (!videoRef.current || !canvasRef.current || !isCameraReady) {
       console.error('Cannot capture photo: video or canvas not ready')
       setError('Camera is not ready. Please refresh the page and try again.')
+      return
+    }
+    if (!videoRef.current.videoWidth || !videoRef.current.videoHeight) {
+      setError('Camera is still starting. Please wait 1-2 seconds and try again.')
       return
     }
     // Start countdown - capture happens in useEffect above
@@ -338,10 +351,10 @@ export default function PostInterviewVerifyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-xl">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-start justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="w-full max-w-xl mx-auto py-2 sm:py-4">
         {/* Interview Completed Message */}
-        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-6 mb-6 text-center backdrop-blur-sm">
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6 text-center backdrop-blur-sm">
           <div className="flex justify-center mb-4">
             <div className="h-16 w-16 rounded-full bg-emerald-500 flex items-center justify-center">
               <Check className="h-8 w-8 text-white" />
@@ -351,20 +364,20 @@ export default function PostInterviewVerifyPage() {
           <p className="text-slate-400">Please take a final verification photo to complete the process.</p>
         </div>
 
-        {/* Photo Capture Card */}
-        <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6 shadow-2xl">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-500/20 mb-4">
-              <Camera className="h-7 w-7 text-emerald-400" />
+        {/* Photo Capture Card - Mobile responsive */}
+        <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-4 sm:p-6 shadow-2xl">
+          <div className="text-center mb-4 sm:mb-6">
+            <div className="inline-flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-emerald-500/20 mb-3 sm:mb-4">
+              <Camera className="h-6 w-6 sm:h-7 sm:w-7 text-emerald-400" />
             </div>
-            <h2 className="text-xl font-semibold text-white">Final Photo Verification</h2>
-            <p className="text-slate-400 text-sm mt-1">Take a clear photo of your face</p>
+            <h2 className="text-lg sm:text-xl font-semibold text-white">Final Photo Verification</h2>
+            <p className="text-slate-400 text-xs sm:text-sm mt-1">Take a clear photo of your face</p>
           </div>
 
-          {/* Camera / Photo Display - OVAL SHAPE */}
-          <div className="relative aspect-[4/3] bg-slate-800 rounded-xl overflow-hidden mb-6 flex items-center justify-center">
+          {/* Camera / Photo Display - OVAL SHAPE - Mobile responsive */}
+          <div className="relative aspect-[4/3] bg-slate-800 rounded-xl overflow-hidden mb-3 sm:mb-6 flex items-center justify-center">
             {/* Oval mask container - ring color changes based on face status */}
-            <div className={`relative w-[240px] h-[300px] rounded-full overflow-hidden ring-4 bg-slate-800 ${
+            <div className={`relative w-[180px] h-[225px] sm:w-[240px] sm:h-[300px] rounded-full overflow-hidden ring-4 bg-slate-800 ${
               capturedPhoto ? 'ring-emerald-500' :
               faceStatus === 'ready' ? 'ring-emerald-500' :
               faceStatus === 'loading' ? 'ring-slate-500' :
@@ -372,7 +385,14 @@ export default function PostInterviewVerifyPage() {
             }`}>
               {!capturedPhoto ? (
                 <>
-                  <div className="absolute inset-0 flex items-center justify-center">
+                  <div
+                    className="absolute inset-0 flex items-center justify-center"
+                    onClick={() => {
+                      if (!isCameraReady && isCameraOpen) {
+                        videoRef.current?.play().then(() => setIsCameraReady(true)).catch(() => {})
+                      }
+                    }}
+                  >
                     <video
                       ref={videoRef}
                       autoPlay
@@ -417,9 +437,12 @@ export default function PostInterviewVerifyPage() {
               )}
             </div>
 
-            {/* Face status feedback - same as verify page */}
-            {isCameraReady && !capturedPhoto && (
-              <div className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-2 ${
+          </div>
+
+          {/* Face status feedback - below camera on mobile to avoid overlap */}
+          {isCameraReady && !capturedPhoto && (
+            <div className="mt-3 mb-4 flex justify-center">
+              <div className={`text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-2 max-w-[95%] ${
                 faceStatus === 'ready' ? 'bg-emerald-500' :
                 faceStatus === 'loading' ? 'bg-slate-600' :
                 'bg-red-500'
@@ -467,8 +490,8 @@ export default function PostInterviewVerifyPage() {
                   </>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           <canvas ref={canvasRef} className="hidden" />
 
@@ -481,12 +504,12 @@ export default function PostInterviewVerifyPage() {
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 mt-2">
             {!capturedPhoto ? (
               <Button
                 onClick={capturePhoto}
                 disabled={!isCameraReady || countdown !== null || faceStatus !== 'ready'}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-12 text-lg disabled:opacity-50"
+                className="w-full sm:flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-12 text-lg disabled:opacity-50"
               >
                 {countdown !== null ? (
                   <span>Capturing...</span>
@@ -504,7 +527,7 @@ export default function PostInterviewVerifyPage() {
                 <Button
                   onClick={retakePhoto}
                   variant="outline"
-                  className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700 h-12"
+                  className="w-full sm:flex-1 border-slate-600 text-slate-300 hover:bg-slate-700 h-12"
                   disabled={saving}
                 >
                   <RefreshCw className="h-5 w-5 mr-2" />
@@ -513,7 +536,7 @@ export default function PostInterviewVerifyPage() {
                 <Button
                   onClick={savePhotoAndContinue}
                   disabled={saving}
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-12"
+                  className="w-full sm:flex-1 bg-emerald-600 hover:bg-emerald-700 text-white h-12"
                 >
                   {saving ? (
                     <>

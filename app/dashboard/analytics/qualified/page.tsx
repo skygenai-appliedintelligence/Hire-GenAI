@@ -305,7 +305,7 @@ export default function QualifiedCandidatesInterviewFlowPage() {
     <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
         <h1 className="text-2xl font-bold text-gray-900">Qualified Candidates</h1>
-        <div className="flex flex-col xs:flex-row items-start xs:items-center gap-3 xs:space-x-4 w-full sm:w-auto">
+        <div className="flex items-center gap-4">
           <div className="flex items-center space-x-2">
             <Filter className="h-4 w-4 text-gray-500" />
             <Select value={selectedJobId} onValueChange={setSelectedJobId}>
@@ -322,7 +322,7 @@ export default function QualifiedCandidatesInterviewFlowPage() {
               </SelectContent>
             </Select>
           </div>
-          <Link href="/dashboard/analytics" className="text-sm text-blue-600 hover:underline">
+          <Link href="/dashboard/analytics" className="text-sm text-blue-600 hover:underline whitespace-nowrap">
             Back to Analytics
           </Link>
         </div>

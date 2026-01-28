@@ -76,7 +76,7 @@ export interface TranscriptData {
 }
 
 export interface QualificationDetails {
-  overall?: { score_percent?: number }
+  overall?: { score_percent?: number; reason_summary?: string }
   extracted?: {
     name?: string
     email?: string
@@ -86,6 +86,8 @@ export interface QualificationDetails {
     skills?: string[]
     education?: Array<{ institution?: string; degree?: string }>
     work_experience?: Array<{ company: string; title: string; duration: string; start_date?: string; end_date?: string }>
+    recent_projects?: Array<{ title?: string; duration?: string; technologies?: string[] }>
+    certifications?: Array<{ name?: string; status?: string }>
   }
   breakdown?: Record<string, any>
   gaps_and_notes?: string[]
@@ -122,6 +124,39 @@ export interface QualificationDetails {
     notes?: string[]
     workExperience?: Array<{ company: string; title: string; duration: string; start_date?: string; end_date?: string }>
   }
+  // New fields for Production & Tenure
+  production_exposure?: {
+    has_prod_experience?: boolean
+    evidence?: string[]
+  }
+  tenure_analysis?: {
+    average_tenure_months?: number
+    job_hopping_risk?: string
+  }
+}
+
+export interface RiskAdjustments {
+  critical_gaps?: string[]
+  risk_flags?: string[]
+  score_cap_applied?: number | null
+}
+
+export interface ExplainableScore {
+  skill_contribution?: number
+  project_contribution?: number
+  experience_contribution?: number
+  edu_certs_contribution?: number
+  location_contribution?: number
+  quality_contribution?: number
+}
+
+export interface EligibilityData {
+  domain_fit?: string
+  must_have_fit?: string
+  experience_fit?: string
+  language_fit?: string
+  fail_reasons?: string[]
+  missing_must_have?: string[]
 }
 
 export interface ReportPDFData {
@@ -137,6 +172,19 @@ export interface ReportPDFData {
     preInterviewPhoto: string | null
     postInterviewPhoto: string | null
   }
+  // New props to match React component
+  totalScore?: number
+  explainableScore?: ExplainableScore | null
+  riskAdjustments?: RiskAdjustments | null
+  missingMustHave?: string[]
+  eligibility?: EligibilityData | null
+  candidateLocation?: string | null
+  extractedData?: {
+    skills?: string[]
+    languages?: any[]
+    total_experience_years_estimate?: number
+  } | null
+  experienceRequired?: string
 }
 
 function escapeHtml(text: string | undefined | null): string {
@@ -175,7 +223,25 @@ function getScoreBgColor(score: number): string {
 }
 
 export function generateReportPDFHTML(data: ReportPDFData): string {
-  const { candidate, evaluation, transcript, jobTitle, resumeScore, qualificationDetails, interviewScore, verificationPhotos } = data
+  const { 
+    candidate, 
+    evaluation, 
+    transcript, 
+    jobTitle, 
+    resumeScore, 
+    qualificationDetails, 
+    interviewScore, 
+    verificationPhotos,
+    // New props matching React component
+    totalScore,
+    explainableScore,
+    riskAdjustments,
+    missingMustHave,
+    eligibility,
+    candidateLocation,
+    extractedData,
+    experienceRequired
+  } = data
   
   const overallScore = evaluation?.overallScore ?? 0
   const overallScoreDisplay = overallScore <= 10 ? Math.round(overallScore * 10) : Math.round(overallScore)
@@ -730,54 +796,67 @@ export function generateReportPDFHTML(data: ReportPDFData): string {
     </div>
   </div>
   
-  <!-- VERIFICATION PHOTOS SECTION -->
-  ${(verificationPhotos?.appliedPhoto || verificationPhotos?.preInterviewPhoto || verificationPhotos?.postInterviewPhoto) ? `
-  <div class="section avoid-break">
-    <div class="section-header purple">
-      <div class="section-title">📷 Verification Photos</div>
+  <!-- VERIFICATION PHOTOS SECTION - Matching UI exactly -->
+  <div class="section avoid-break" style="margin-top: 16px;">
+    <div class="section-header" style="background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); border-bottom: 1px solid #e9d5ff;">
+      <div class="section-title" style="display: flex; align-items: center; gap: 8px;">
+        <span>📷</span> Verification Photos
+      </div>
       <div class="section-subtitle">Identity verification photos captured during the application process</div>
     </div>
     <div class="section-content">
-      <div style="display: flex; justify-content: center; gap: 40px;">
+      <div style="display: flex; justify-content: center; gap: 50px; padding: 20px 0;">
         <!-- Applied Photo -->
         <div style="text-align: center;">
-          <div style="width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background: #f1f5f9; border: 3px solid #e2e8f0; margin: 0 auto 8px auto; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 90px; height: 90px; border-radius: 50%; overflow: hidden; background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); border: 4px solid #a78bfa; margin: 0 auto 10px auto; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(167, 139, 250, 0.3);">
             ${verificationPhotos?.appliedPhoto 
-              ? `<img src="${verificationPhotos.appliedPhoto}" alt="Applied Photo" style="width: 100%; height: 100%; object-fit: cover;" />`
-              : `<span style="color: #94a3b8; font-size: 24px;">📷</span>`
+              ? `<img src="${verificationPhotos.appliedPhoto}" alt="Applied Photo" style="width: 100%; height: 100%; object-fit: cover;" crossorigin="anonymous" />`
+              : `<span style="color: #a78bfa; font-size: 28px;">👤</span>`
             }
           </div>
-          <p style="font-size: 11px; font-weight: 600; color: #475569;">Applied Photo</p>
+          <p style="font-size: 11px; font-weight: 600; color: #7c3aed;">Applied Photo</p>
         </div>
         
         <!-- Pre-Interview Photo -->
         <div style="text-align: center;">
-          <div style="width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background: #f1f5f9; border: 3px solid #e2e8f0; margin: 0 auto 8px auto; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 90px; height: 90px; border-radius: 50%; overflow: hidden; background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); border: 4px solid #94a3b8; margin: 0 auto 10px auto; display: flex; align-items: center; justify-content: center;">
             ${verificationPhotos?.preInterviewPhoto 
-              ? `<img src="${verificationPhotos.preInterviewPhoto}" alt="Pre-Interview Photo" style="width: 100%; height: 100%; object-fit: cover;" />`
-              : `<span style="color: #94a3b8; font-size: 24px;">📷</span>`
+              ? `<img src="${verificationPhotos.preInterviewPhoto}" alt="Pre-Interview Photo" style="width: 100%; height: 100%; object-fit: cover;" crossorigin="anonymous" />`
+              : `<span style="color: #94a3b8; font-size: 28px;">📷</span>`
             }
           </div>
-          <p style="font-size: 11px; font-weight: 600; color: #475569;">Pre-Interview</p>
+          <p style="font-size: 11px; font-weight: 600; color: #64748b;">Pre-Interview</p>
         </div>
         
         <!-- Post-Interview Photo -->
         <div style="text-align: center;">
-          <div style="width: 80px; height: 80px; border-radius: 50%; overflow: hidden; background: #f1f5f9; border: 3px solid #e2e8f0; margin: 0 auto 8px auto; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 90px; height: 90px; border-radius: 50%; overflow: hidden; background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); border: 4px solid #94a3b8; margin: 0 auto 10px auto; display: flex; align-items: center; justify-content: center;">
             ${verificationPhotos?.postInterviewPhoto 
-              ? `<img src="${verificationPhotos.postInterviewPhoto}" alt="Post-Interview Photo" style="width: 100%; height: 100%; object-fit: cover;" />`
-              : `<span style="color: #94a3b8; font-size: 24px;">📷</span>`
+              ? `<img src="${verificationPhotos.postInterviewPhoto}" alt="Post-Interview Photo" style="width: 100%; height: 100%; object-fit: cover;" crossorigin="anonymous" />`
+              : `<span style="color: #94a3b8; font-size: 28px;">📷</span>`
             }
           </div>
-          <p style="font-size: 11px; font-weight: 600; color: #475569;">Post-Interview</p>
+          <p style="font-size: 11px; font-weight: 600; color: #64748b;">Post-Interview</p>
         </div>
       </div>
     </div>
   </div>
-  ` : ''}
   
   <!-- SECTION 2: RESUME EVALUATION -->
-  ${qualificationDetails ? generateResumeEvaluationSection(resumeScore, qualificationDetails, candidate, jobTitle, interviewScore || 0) : ''}
+  ${qualificationDetails ? generateResumeEvaluationSection(
+    resumeScore, 
+    qualificationDetails, 
+    candidate, 
+    jobTitle, 
+    interviewScore || 0,
+    totalScore,
+    explainableScore,
+    riskAdjustments,
+    missingMustHave,
+    eligibility,
+    extractedData,
+    experienceRequired
+  ) : ''}
   
   <!-- PAGE BREAK FOR EVALUATION -->
   <div class="page-break"></div>
@@ -813,7 +892,20 @@ export function generateReportPDFHTML(data: ReportPDFData): string {
 `
 }
 
-function generateResumeEvaluationSection(resumeScore: number, qualificationDetails: QualificationDetails, candidate: CandidateData, jobTitle: string, interviewScore: number = 0): string {
+function generateResumeEvaluationSection(
+  resumeScore: number, 
+  qualificationDetails: QualificationDetails, 
+  candidate: CandidateData, 
+  jobTitle: string, 
+  interviewScore: number = 0,
+  totalScore?: number,
+  explainableScore?: ExplainableScore | null,
+  riskAdjustments?: RiskAdjustments | null,
+  missingMustHave?: string[],
+  eligibility?: EligibilityData | null,
+  extractedData?: { skills?: string[]; languages?: any[]; total_experience_years_estimate?: number } | null,
+  experienceRequired?: string
+): string {
   const scoreColor = resumeScore >= 60 ? 'green' : resumeScore >= 40 ? 'yellow' : 'red'
   const breakdown = qualificationDetails.breakdown || {}
   const candidateProfile = qualificationDetails.candidateProfile
@@ -845,64 +937,60 @@ function generateResumeEvaluationSection(resumeScore: number, qualificationDetai
   const profileGroup = getProfileGroup()
   
   return `
-  <!-- RESUME EVALUATION REPORT HEADER (Matching candidate page) -->
-  <div class="section avoid-break" style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-    <!-- Header Bar -->
-    <div style="padding: 20px; border-bottom: 1px solid #e2e8f0;">
+  <!-- RESUME EVALUATION REPORT - Separate Card (Matching UI exactly) -->
+  <div class="section avoid-break" style="border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-top: 16px;">
+    <!-- Header with Icon, Title, and Qualified Badge -->
+    <div style="padding: 16px 20px; background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); border-bottom: 1px solid #e9d5ff;">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <div style="display: flex; align-items: center;">
-          <div style="width: 48px; height: 48px; background: #059669; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 14px;">
-            <span style="color: white; font-size: 20px;">📄</span>
+          <div style="width: 40px; height: 40px; background: #f97316; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+            <span style="color: white; font-size: 18px;">📄</span>
           </div>
           <div>
-            <h2 style="font-size: 18px; font-weight: 700; color: #1e293b; margin: 0;">Resume Evaluation Report</h2>
-            <p style="font-size: 11px; color: #64748b; margin: 4px 0 0 0;">Generated on ${new Date().toISOString().split('T')[0]}</p>
+            <h2 style="font-size: 16px; font-weight: 700; color: #1e293b; margin: 0;">Resume Evaluation Report</h2>
+            <p style="font-size: 10px; color: #64748b; margin: 2px 0 0 0;">Generated on ${new Date().toISOString().split('T')[0]}</p>
           </div>
         </div>
-        <div style="text-align: right;">
-          <div style="display: flex; align-items: center; justify-content: flex-end; margin-bottom: 6px;">
-            <span style="margin-right: 6px; color: ${qualified ? '#059669' : '#f59e0b'};">${qualified ? '✓' : '⚠'}</span>
-            <span style="background: ${qualified ? '#dcfce7' : '#fee2e2'}; color: ${qualified ? '#166534' : '#991b1b'}; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">
-              ${qualified ? 'Qualified' : 'Not Qualified'}
-            </span>
-          </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="color: ${qualified ? '#059669' : '#dc2626'};">${qualified ? '✓' : '✗'}</span>
+          <span style="background: ${qualified ? '#dcfce7' : '#fee2e2'}; color: ${qualified ? '#059669' : '#dc2626'}; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600;">
+            ${qualified ? 'Qualified' : 'Unqualified'}
+          </span>
         </div>
       </div>
     </div>
     
-    <!-- Candidate Overview Bar -->
-    <div style="background: #f8fafc; padding: 20px; border-bottom: 1px solid #e2e8f0;">
+    <!-- Candidate Overview Bar with Score Circle -->
+    <div style="background: #ffffff; padding: 16px 20px; border-bottom: 1px solid #e2e8f0;">
       <div style="display: flex; align-items: center; justify-content: space-between;">
-        <!-- Candidate Info -->
+        <!-- Candidate Info with Avatar -->
         <div style="display: flex; align-items: center;">
-          <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin-right: 14px;">
-            <span style="font-size: 28px; color: #64748b;">👤</span>
+          <div style="width: 50px; height: 50px; background: #f1f5f9; border-radius: 8px; display: flex; align-items: center; justify-content: center; border: 2px solid #e2e8f0; margin-right: 12px;">
+            <span style="font-size: 24px; color: #64748b;">👤</span>
           </div>
           <div>
-            <h3 style="font-size: 16px; font-weight: 700; color: #1e293b; margin: 0;">${escapeHtml(qualificationDetails.extracted?.name || candidate.name)}</h3>
-            <div style="display: flex; align-items: center; color: #475569; font-size: 12px; margin-top: 4px;">
-              <span style="margin-right: 6px;">💼</span>
+            <h3 style="font-size: 15px; font-weight: 700; color: #1e293b; margin: 0;">${escapeHtml(qualificationDetails.extracted?.name || candidate.name)}</h3>
+            <div style="display: flex; align-items: center; color: #059669; font-size: 11px; margin-top: 3px;">
+              <span style="margin-right: 4px;">💼</span>
               <span>${escapeHtml(jobTitle || 'N/A')}</span>
             </div>
           </div>
         </div>
         
-        <!-- Scores -->
-        <div style="display: flex; gap: 24px; border-left: 1px solid #cbd5e1; padding-left: 24px;">
-          <div>
-            <p style="font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 500; margin: 0 0 4px 0;">Resume Score</p>
-            <div style="display: flex; align-items: center;">
-              <span style="margin-right: 6px; color: #94a3b8;">📊</span>
-              <span style="font-size: 18px; font-weight: 700; color: #1e293b;">${resumeScore}</span>
-              <span style="font-size: 11px; color: #94a3b8;">/100</span>
-            </div>
+        <!-- Resume Score Label -->
+        <div style="text-align: center;">
+          <p style="font-size: 9px; color: #64748b; text-transform: uppercase; font-weight: 600; margin: 0 0 4px 0;">Resume Score</p>
+          <div style="display: flex; align-items: baseline; justify-content: center;">
+            <span style="margin-right: 4px; color: #94a3b8; font-size: 12px;">📊</span>
+            <span style="font-size: 20px; font-weight: 700; color: ${qualified ? '#059669' : '#dc2626'};">${resumeScore}</span>
+            <span style="font-size: 11px; color: #94a3b8;">/100</span>
           </div>
         </div>
         
-        <!-- Score Circle -->
-        <div style="width: 72px; height: 72px; border-radius: 50%; background: conic-gradient(${getScoreColor(resumeScore)} ${resumeScore * 3.6}deg, #e5e7eb ${resumeScore * 3.6}deg); display: flex; align-items: center; justify-content: center; position: relative;">
-          <div style="width: 58px; height: 58px; border-radius: 50%; background: white; display: flex; align-items: center; justify-content: center;">
-            <span style="font-size: 20px; font-weight: 700; color: ${getScoreColor(resumeScore)};">${resumeScore}</span>
+        <!-- Score Circle (Green for Qualified, Red for Unqualified) -->
+        <div style="width: 64px; height: 64px; border-radius: 50%; background: conic-gradient(${qualified ? '#059669' : '#dc2626'} ${resumeScore * 3.6}deg, ${qualified ? '#d1fae5' : '#fee2e2'} ${resumeScore * 3.6}deg); display: flex; align-items: center; justify-content: center; position: relative;">
+          <div style="width: 52px; height: 52px; border-radius: 50%; background: white; display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 18px; font-weight: 700; color: ${qualified ? '#059669' : '#dc2626'};">${resumeScore}</span>
           </div>
         </div>
       </div>
@@ -1068,8 +1156,24 @@ function generateResumeEvaluationSection(resumeScore: number, qualificationDetai
   </div>
   ` : ''}
   
-  <!-- DETAILED EVALUATION BREAKDOWN (Exact match with candidate page) -->
-  ${generateDetailedEvaluationBreakdown(evaluationBreakdown, breakdown)}
+  <!-- ELIGIBILITY GATES (Matching React component) -->
+  ${generateEligibilityGates(eligibility, extractedData, experienceRequired)}
+  
+  <!-- DETAILED EVALUATION BREAKDOWN (Exact match with candidate page) - Force page break to prevent cutoff -->
+  <div style="page-break-before: always;"></div>
+  ${generateDetailedEvaluationBreakdown(explainableScore, totalScore)}
+  
+  <!-- SKILL & GAP ANALYSIS -->
+  ${generateSkillGapAnalysis(strengths, gaps, riskAdjustments, missingMustHave, extractedData)}
+  
+  <!-- PRODUCTION EXPOSURE & TENURE ANALYSIS -->
+  ${generateProductionAndTenure(qualificationDetails)}
+  
+  <!-- RECENT PROJECTS -->
+  ${generateRecentProjects(qualificationDetails)}
+  
+  <!-- CERTIFICATIONS -->
+  ${generateCertifications(qualificationDetails)}
   
   <!-- FINAL RECOMMENDATION -->
   <div class="section avoid-break">
@@ -1117,231 +1221,442 @@ function generateBreakdownItem(label: string, score: number, weight: number, col
   `
 }
 
-function generateDetailedEvaluationBreakdown(evaluationBreakdown: any[], breakdown: Record<string, any>): string {
-  // Build all 9 categories from evaluationBreakdown or fallback to breakdown data
-  const categories = evaluationBreakdown.length > 0 ? evaluationBreakdown : [
-    // 1. Skill Set Match - Show Match Percentage, Skills Summary, and All Matched/Missing Skills
-    { 
-      category: 'Skill Set Match', 
-      score: breakdown.skill_set_match?.score || 0, 
-      weight: breakdown.skill_set_match?.weight || 30, 
-      isGrid: true, 
-      gridData: (() => {
-        const matchedSkills = breakdown.skill_set_match?.matched_skills || []
-        const missingSkills = breakdown.skill_set_match?.missing_skills || []
-        const matchedCount = matchedSkills.length
-        const missingCount = missingSkills.length
-        const totalSkills = matchedCount + missingCount
-        return [
-          { label: 'Match Percentage', value: (breakdown.skill_set_match?.match_percentage || (totalSkills > 0 ? Math.round((matchedCount / totalSkills) * 100) : 0)) + '%' },
-          { label: 'Skills Summary', value: matchedCount + ' matched / ' + totalSkills + ' total required' }
-        ]
-      })(),
-      fullMatchedSkills: breakdown.skill_set_match?.matched_skills || [], 
-      fullMissingSkills: breakdown.skill_set_match?.missing_skills || [] 
-    },
-    // 2. Skills in Recent Projects
-    { 
-      category: 'Skills in Recent Projects', 
-      score: breakdown.skills_in_recent_projects?.score || 80, 
-      weight: breakdown.skills_in_recent_projects?.weight || 15, 
-      isGrid: true, 
-      gridData: [
-        { label: 'Recent Skills Used', value: (breakdown.skills_in_recent_projects?.recent_skills_used || []).join(', ') || 'Not specified' },
-        { label: 'Projects Analyzed', value: (breakdown.skills_in_recent_projects?.projects_analyzed || 0) + ' projects' },
-        { label: 'Skill Relevance', value: 'High' },
-        { label: 'Experience Depth', value: 'Verified' }
-      ]
-    },
-    // 3. Experience Range Match
-    { 
-      category: 'Experience Range Match', 
-      score: breakdown.experience_range_match?.score || 0, 
-      weight: breakdown.experience_range_match?.weight || 15, 
-      isGrid: true, 
-      gridData: [
-        { label: 'Actual Experience', value: (breakdown.experience_range_match?.years_actual !== null && breakdown.experience_range_match?.years_actual !== undefined ? breakdown.experience_range_match.years_actual : 'N/A') + ' years' },
-        { label: 'Required Experience', value: (breakdown.experience_range_match?.years_required || 'Not specified') + ' years' },
-        { label: 'Match Level', value: breakdown.experience_range_match?.match_level || 'Not specified' },
-        { label: 'Experience Status', value: (breakdown.experience_range_match?.years_actual || 0) >= (parseInt(breakdown.experience_range_match?.years_required || '0') || 0) ? '✓ Meets Requirement' : '✗ Below Requirement' }
-      ]
-    },
-    // 4. Location Match
-    { 
-      category: 'Location Match', 
-      score: breakdown.location_match?.score || 50, 
-      weight: breakdown.location_match?.weight || 5, 
-      isGrid: true, 
-      gridData: [
-        { label: 'Candidate Location', value: breakdown.location_match?.candidate_location || 'Not specified' },
-        { label: 'Job Location', value: breakdown.location_match?.job_location || 'Not specified' },
-        { label: 'Remote Possible', value: breakdown.location_match?.remote_possible ? '✓ Yes' : '✗ No' },
-        { label: 'Location Status', value: breakdown.location_match?.is_match ? '✓ Match' : '⚠ Different' }
-      ]
-    },
-    // 5. Written Communication
-    { 
-      category: 'Written Communication', 
-      score: breakdown.written_communication?.score || 0, 
-      weight: breakdown.written_communication?.weight || 5, 
-      isGrid: true, 
-      gridData: [
-        { label: 'Grammar Score', value: (breakdown.written_communication?.grammar_score || 0) + '/100' },
-        { label: 'Structure Score', value: (breakdown.written_communication?.structure_score || 0) + '/100' },
-        { label: 'Formatting Score', value: (breakdown.written_communication?.formatting_score || 0) + '/100' },
-        { label: 'Issues Found', value: (breakdown.written_communication?.issues || []).length > 0 ? (breakdown.written_communication?.issues || []).join(', ') : '✓ None' }
-      ]
-    },
-    // 6. Education Qualification
-    { 
-      category: 'Education Qualification', 
-      score: breakdown.education_qualification?.score || 0, 
-      weight: breakdown.education_qualification?.weight || 10, 
-      isGrid: true, 
-      gridData: [
-        { label: 'Candidate Degree', value: breakdown.education_qualification?.candidate_degree || 'Not specified' },
-        { label: 'Required Degree', value: breakdown.education_qualification?.required_degree || 'Not specified' },
-        { label: 'Field Match', value: breakdown.education_qualification?.field_match ? '✓ Yes' : '✗ No' },
-        { label: 'Institution Rank', value: breakdown.education_qualification?.institution_rank || 'Not specified' }
-      ]
-    },
-    // 7. Certifications
-    { 
-      category: 'Certifications', 
-      score: breakdown.certifications_match?.score || 70, 
-      weight: breakdown.certifications_match?.weight || 5, 
-      isGrid: true, 
-      gridData: [
-        { label: '✓ Matched Certs', value: (breakdown.certifications_match?.matched_certs || []).join(', ') || 'None' },
-        { label: '✗ Missing Certs', value: (breakdown.certifications_match?.missing_certs || []).join(', ') || 'None' },
-        { label: '⏰ Expired Certs', value: (breakdown.certifications_match?.expired_certs || []).join(', ') || 'None' },
-        { label: 'Cert Status', value: (breakdown.certifications_match?.matched_certs || []).length > 0 ? '✓ Has Required' : '✗ Missing' }
-      ]
-    },
-    // 8. Language Skills
-    { 
-      category: 'Language Skills', 
-      score: breakdown.language_skills?.score || 95, 
-      weight: breakdown.language_skills?.weight || 2, 
-      isGrid: true, 
-      gridData: [
-        { label: 'Known Languages', value: (breakdown.language_skills?.matched_languages || []).map((l: any) => typeof l === 'string' ? l : l.language).join(', ') || 'Not specified' },
-        { label: 'Proficiency Levels', value: (breakdown.language_skills?.matched_languages || []).map((l: any) => typeof l === 'string' ? 'N/A' : l.proficiency).join(', ') || 'Not specified' },
-        { label: 'Language Details', value: (breakdown.language_skills?.matched_languages || []).length > 0 ? 'Languages provided' : 'No languages specified' },
-        { label: 'Status', value: (breakdown.language_skills?.matched_languages || []).length > 0 ? '✓ Languages Provided' : '⚠ No languages specified' }
-      ]
-    },
-    // 9. Profile Quality
-    { 
-      category: 'Profile Quality', 
-      score: breakdown.profile_quality?.score || 75, 
-      weight: breakdown.profile_quality?.weight || 2, 
-      isGrid: true, 
-      gridData: [
-        { label: 'Education Rank', value: breakdown.profile_quality?.education_rank || 'Not specified' },
-        { label: 'Employer Rank', value: breakdown.profile_quality?.employer_rank || 'Not specified' },
-        { label: 'Industry Relevance', value: breakdown.profile_quality?.industry_relevance || 'Not specified' },
-        { label: 'Overall Quality', value: (breakdown.profile_quality?.score || 0) >= 80 ? '✓ Excellent' : (breakdown.profile_quality?.score || 0) >= 60 ? '⚠ Good' : '✗ Fair' }
-      ]
-    }
-  ]
+function generateDetailedEvaluationBreakdown(explainableScore?: ExplainableScore | null, totalScore?: number): string {
+  // Calculate raw score (sum of all contributions) - EXACTLY like React component
+  const rawScore = Math.round(
+    (explainableScore?.skill_contribution || 0) +
+    (explainableScore?.project_contribution || 0) +
+    (explainableScore?.experience_contribution || 0) +
+    (explainableScore?.edu_certs_contribution || 0) +
+    (explainableScore?.location_contribution || 0) +
+    (explainableScore?.quality_contribution || 0)
+  )
+  // Scale factor to adjust points so they sum to final score
+  const finalScore = totalScore ?? rawScore
+  const scaleFactor = rawScore > 0 ? finalScore / rawScore : 1
+  
+  // Adjusted points - EXACTLY like React component
+  const skillPts = Math.round((explainableScore?.skill_contribution || 0) * scaleFactor)
+  const projectPts = Math.round((explainableScore?.project_contribution || 0) * scaleFactor)
+  const expPts = Math.round((explainableScore?.experience_contribution || 0) * scaleFactor)
+  const eduPts = Math.round((explainableScore?.edu_certs_contribution || 0) * scaleFactor)
+  const locPts = Math.round((explainableScore?.location_contribution || 0) * scaleFactor)
+  const qualityPts = Math.round((explainableScore?.quality_contribution || 0) * scaleFactor)
 
-  // Score-based color function
-  const getScoreColors = (score: number) => {
-    if (score >= 80) return { bg: '#ecfdf5', text: '#059669', badgeBg: '#dcfce7', badgeText: '#166534', badgeBorder: '#bbf7d0' }
-    if (score >= 70) return { bg: '#eff6ff', text: '#3b82f6', badgeBg: '#dbeafe', badgeText: '#1e40af', badgeBorder: '#93c5fd' }
-    if (score >= 60) return { bg: '#fffbeb', text: '#d97706', badgeBg: '#fef3c7', badgeText: '#92400e', badgeBorder: '#fde68a' }
-    return { bg: '#fef2f2', text: '#dc2626', badgeBg: '#fee2e2', badgeText: '#991b1b', badgeBorder: '#fecaca' }
-  }
-
-  const categoryCards = categories.map((category: any, index: number) => {
-    const colors = getScoreColors(category.score)
-    
-    // Generate grid data HTML
-    let gridHtml = ''
-    if (category.isGrid) {
-      // Only render grid container if there are grid items
-      if (category.gridData && category.gridData.length > 0) {
-        gridHtml = '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">'
-        category.gridData.forEach((item: any) => {
-          gridHtml += `
-            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
-              <div style="font-size: 11px; font-weight: 500; color: #64748b; margin-bottom: 6px;">${escapeHtml(item.label)}</div>
-              <div style="font-size: 12px; color: #1e293b; font-weight: 500;">${escapeHtml(item.value)}</div>
-            </div>
-          `
-        })
-        gridHtml += '</div>'
-      }
-      
-      // Add full matched skills (shown for Skill Set Match)
-      if (category.fullMatchedSkills && category.fullMatchedSkills.length > 0) {
-        gridHtml += `
-          <div style="${category.gridData && category.gridData.length > 0 ? 'margin-top: 12px;' : ''} background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
-            <div style="font-size: 11px; font-weight: 600; color: #166534; margin-bottom: 8px;">✓ All Matched Skills</div>
-            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-              ${category.fullMatchedSkills.map((s: string) => `<span class="badge badge-green">${escapeHtml(s)}</span>`).join('')}
-            </div>
-          </div>
-        `
-      }
-      
-      // Add full missing skills (shown for Skill Set Match)
-      if (category.fullMissingSkills && category.fullMissingSkills.length > 0) {
-        gridHtml += `
-          <div style="margin-top: 12px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px;">
-            <div style="font-size: 11px; font-weight: 600; color: #991b1b; margin-bottom: 8px;">✗ All Missing Skills</div>
-            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-              ${category.fullMissingSkills.map((s: string) => `<span class="badge badge-red">${escapeHtml(s)}</span>`).join('')}
-            </div>
-          </div>
-        `
-      }
-    }
-
-    return `
-      <div class="avoid-break" style="border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); background: ${colors.bg};">
-        <!-- Category Header -->
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: linear-gradient(to right, #f9fafb, #ffffff); border-bottom: 2px solid #e2e8f0;">
-          <div style="display: flex; align-items: center; gap: 14px;">
-            <!-- Numbered Circle -->
-            <div style="width: 42px; height: 42px; border-radius: 50%; background: ${colors.badgeBg}; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: ${colors.text}; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-              ${index + 1}
-            </div>
-            <div>
-              <h4 style="font-size: 15px; font-weight: 700; color: #0f172a; margin: 0; line-height: 1.3;">${escapeHtml(category.category)}</h4>
-              <div style="font-size: 12px; color: #475569; margin-top: 3px;">
-                Weight: <span style="font-weight: 600; color: #1e293b;">${category.weight}%</span>
-              </div>
-            </div>
-          </div>
-          <!-- Score Badge -->
-          <div style="background: ${colors.badgeBg}; border: 2px solid ${colors.badgeBorder}; padding: 8px 16px; border-radius: 8px;">
-            <span style="font-size: 18px; font-weight: 700; color: ${colors.badgeText};">${category.score}</span>
-            <span style="font-size: 12px; color: #64748b;">/100</span>
-          </div>
-        </div>
-        
-        <!-- Category Details Grid -->
-        <div style="padding: 16px 20px; background: rgba(255,255,255,0.8);">
-          ${gridHtml}
-        </div>
-      </div>
-    `
-  }).join('')
+  // Simple 6-category table matching the UI exactly
+  const simpleTableHtml = `
+    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+      <thead>
+        <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+          <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: #475569;">#</th>
+          <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: #475569;">Category</th>
+          <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: #475569;">Weight</th>
+          <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: #475569;">Points</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+          <td style="padding: 12px 16px; color: #64748b;">1</td>
+          <td style="padding: 12px 16px; font-weight: 600; color: #1e293b;">Skills Match</td>
+          <td style="padding: 12px 16px; color: #64748b;">30%</td>
+          <td style="padding: 12px 16px; font-weight: 600; color: #3b82f6;">+${skillPts}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+          <td style="padding: 12px 16px; color: #64748b;">2</td>
+          <td style="padding: 12px 16px; font-weight: 600; color: #1e293b;">Project Relevance</td>
+          <td style="padding: 12px 16px; color: #64748b;">20%</td>
+          <td style="padding: 12px 16px; font-weight: 600; color: #6366f1;">+${projectPts}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+          <td style="padding: 12px 16px; color: #64748b;">3</td>
+          <td style="padding: 12px 16px; font-weight: 600; color: #1e293b;">Experience Match</td>
+          <td style="padding: 12px 16px; color: #64748b;">20%</td>
+          <td style="padding: 12px 16px; font-weight: 600; color: #8b5cf6;">+${expPts}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+          <td style="padding: 12px 16px; color: #64748b;">4</td>
+          <td style="padding: 12px 16px; font-weight: 600; color: #1e293b;">Education & Certifications</td>
+          <td style="padding: 12px 16px; color: #64748b;">15%</td>
+          <td style="padding: 12px 16px; font-weight: 600; color: #f59e0b;">+${eduPts}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+          <td style="padding: 12px 16px; color: #64748b;">5</td>
+          <td style="padding: 12px 16px; font-weight: 600; color: #1e293b;">Location & Availability</td>
+          <td style="padding: 12px 16px; color: #64748b;">10%</td>
+          <td style="padding: 12px 16px; font-weight: 600; color: #10b981;">+${locPts}</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+          <td style="padding: 12px 16px; color: #64748b;">6</td>
+          <td style="padding: 12px 16px; font-weight: 600; color: #1e293b;">Resume Quality</td>
+          <td style="padding: 12px 16px; color: #64748b;">5%</td>
+          <td style="padding: 12px 16px; font-weight: 600; color: #64748b;">+${qualityPts}</td>
+        </tr>
+        <tr style="background: #ecfdf5; border-top: 2px solid #a7f3d0;">
+          <td style="padding: 12px 16px;"></td>
+          <td style="padding: 12px 16px; font-weight: 700; color: #065f46;">Total Score</td>
+          <td style="padding: 12px 16px; font-weight: 600; color: #065f46;">100%</td>
+          <td style="padding: 12px 16px; font-weight: 700; font-size: 16px; color: #065f46;">${finalScore} / 100</td>
+        </tr>
+      </tbody>
+    </table>
+  `
 
   return `
-  <div class="section page-break">
+  <div class="section">
     <div class="section-header" style="background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%); border-bottom: 1px solid #e5e7eb;">
       <div class="section-title" style="display: flex; align-items: center; gap: 10px;">
         <span style="color: #059669;">📊</span> Detailed Evaluation Breakdown
       </div>
-      <div class="section-subtitle">Weighted category assessment with supporting details</div>
+      <div class="section-subtitle">Weighted category assessment</div>
+    </div>
+    <div class="section-content" style="padding: 0;">
+      ${simpleTableHtml}
+    </div>
+  </div>
+  `
+}
+
+function generateEligibilityGates(
+  eligibility?: EligibilityData | null,
+  extractedData?: { skills?: string[]; languages?: any[]; total_experience_years_estimate?: number } | null,
+  experienceRequired?: string
+): string {
+  if (!eligibility) return ''
+  
+  const hasFailures = eligibility.fail_reasons && eligibility.fail_reasons.length > 0
+  
+  return `
+  <div class="section avoid-break">
+    <div class="section-header" style="background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%); border-bottom: 1px solid #e5e7eb;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="section-title" style="display: flex; align-items: center; gap: 10px;">
+          <span style="color: #6366f1;">🎯</span> Eligibility Gates
+        </div>
+        <span style="padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 600; background: ${hasFailures ? '#fee2e2' : '#dcfce7'}; color: ${hasFailures ? '#991b1b' : '#166534'};">
+          ${hasFailures ? 'Gates Failed' : 'All Gates Passed'}
+        </span>
+      </div>
+    </div>
+    <div class="section-content" style="padding: 0;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+        <thead>
+          <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+            <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: #475569; width: 25%;">Gate</th>
+            <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: #475569; width: 15%;">Status</th>
+            <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: #475569;">Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 12px 16px; color: #1e293b;">Domain Fit</td>
+            <td style="padding: 12px 16px;">
+              <span style="font-weight: 600; color: ${eligibility.domain_fit === 'PASS' ? '#059669' : '#dc2626'};">
+                ${eligibility.domain_fit || 'N/A'}
+              </span>
+            </td>
+            <td style="padding: 12px 16px; color: #64748b;">
+              ${eligibility.domain_fit === 'PASS' 
+                ? 'Relevant platforms detected from resume'
+                : 'Required domain platforms not found'}
+            </td>
+          </tr>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 12px 16px; color: #1e293b;">Must-Have Skills</td>
+            <td style="padding: 12px 16px;">
+              <span style="font-weight: 600; color: ${eligibility.must_have_fit === 'PASS' ? '#059669' : '#dc2626'};">
+                ${eligibility.must_have_fit || 'N/A'}
+              </span>
+            </td>
+            <td style="padding: 12px 16px; color: #64748b;">
+              ${eligibility.must_have_fit === 'PASS' 
+                ? 'All critical skills present' 
+                : `Missing: ${eligibility.missing_must_have?.slice(0, 5).join(', ') || 'critical skills'}`}
+            </td>
+          </tr>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 12px 16px; color: #1e293b;">Experience Fit</td>
+            <td style="padding: 12px 16px;">
+              <span style="font-weight: 600; color: ${eligibility.experience_fit === 'PASS' ? '#059669' : '#dc2626'};">
+                ${eligibility.experience_fit || 'N/A'}
+              </span>
+            </td>
+            <td style="padding: 12px 16px; color: #64748b;">
+              ${extractedData?.total_experience_years_estimate 
+                ? `${extractedData.total_experience_years_estimate} years vs required ${experienceRequired || '3+'} years`
+                : eligibility.experience_fit === 'PASS' 
+                  ? 'Experience meets requirements' 
+                  : 'Experience below requirement'}
+            </td>
+          </tr>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 12px 16px; color: #1e293b;">Language Fit</td>
+            <td style="padding: 12px 16px;">
+              <span style="font-weight: 600; color: ${eligibility.language_fit === 'PASS' ? '#059669' : '#f59e0b'};">
+                ${eligibility.language_fit || 'N/A'}
+              </span>
+            </td>
+            <td style="padding: 12px 16px; color: #64748b;">
+              ${eligibility.language_fit === 'PASS' 
+                ? `${(extractedData?.languages || []).map((l: any) => l.language || l).slice(0, 2).join(', ') || 'English'} present`
+                : 'Required language not found'}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  `
+}
+
+function generateSkillGapAnalysis(
+  strengths: string[], 
+  gaps: string[], 
+  riskAdjustments?: RiskAdjustments | null,
+  missingMustHave?: string[],
+  extractedData?: { skills?: string[]; languages?: any[]; total_experience_years_estimate?: number } | null
+): string {
+  // Get matched skills - use strengths, fallback to extractedData skills (EXACTLY like React component)
+  const matchedSkills = strengths.length > 0 ? strengths : (extractedData?.skills || [])
+  
+  return `
+  <div class="section avoid-break">
+    <div class="section-header" style="background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%); border-bottom: 1px solid #e5e7eb;">
+      <div class="section-title" style="display: flex; align-items: center; gap: 10px;">
+        <span style="color: #059669;">💡</span> Skill & Gap Analysis
+      </div>
+      <div class="section-subtitle">Matched skills and gaps from candidate assessment</div>
     </div>
     <div class="section-content">
-      <div style="display: flex; flex-direction: column; gap: 16px;">
-        ${categoryCards}
+      <!-- Matched Skills Section -->
+      <div style="margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 8px 12px; background: #f0fdf4; border-radius: 6px;">
+          <span style="color: #059669;">✓</span>
+          <span style="font-size: 12px; font-weight: 600; color: #166534;">Matched Skills</span>
+        </div>
+        ${matchedSkills.length > 0 ? `
+          <p style="font-size: 11px; color: #374151; margin-bottom: 12px; line-height: 1.5;">
+            The candidate demonstrates proficiency in ${matchedSkills.slice(0, 5).join(', ')}${matchedSkills.length > 5 ? ` and ${matchedSkills.length - 5} more skills` : ''}.
+          </p>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+            ${matchedSkills.map((skill: string) => `
+              <span style="display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 9999px; background: #dcfce7; color: #166534; font-size: 10px; font-weight: 500;">
+                ✓ ${escapeHtml(skill)}
+              </span>
+            `).join('')}
+          </div>
+        ` : `
+          <p style="font-size: 11px; color: #6b7280;">No matched skills identified.</p>
+        `}
       </div>
+      
+      <!-- Gaps Section -->
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 8px 12px; background: #fffbeb; border-radius: 6px;">
+          <span style="color: #d97706;">⚠</span>
+          <span style="font-size: 12px; font-weight: 600; color: #92400e;">Gaps</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0;">
+          <!-- Original gaps -->
+          ${gaps.map((gap: string) => `
+            <div style="display: flex; align-items: flex-start; gap: 8px; padding: 12px 16px; border-bottom: 1px solid #f1f5f9;">
+              <div style="width: 20px; height: 20px; border-radius: 50%; background: #fef3c7; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <span style="color: #d97706; font-size: 10px;">✗</span>
+              </div>
+              <span style="font-size: 11px; color: #64748b;">${escapeHtml(gap)}</span>
+            </div>
+          `).join('')}
+          
+          <!-- Critical gaps from risk analysis -->
+          ${(riskAdjustments?.critical_gaps || []).map((gap: string) => `
+            <div style="display: flex; align-items: flex-start; gap: 8px; padding: 12px 16px; background: #fef2f2; border-bottom: 1px solid #fecaca;">
+              <div style="width: 20px; height: 20px; border-radius: 50%; background: #fee2e2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <span style="color: #dc2626; font-size: 10px;">✗</span>
+              </div>
+              <span style="font-size: 11px; color: #991b1b;">${escapeHtml(gap)}</span>
+            </div>
+          `).join('')}
+          
+          <!-- Risk flags -->
+          ${(riskAdjustments?.risk_flags || []).map((flag: string) => `
+            <div style="display: flex; align-items: flex-start; gap: 8px; padding: 12px 16px; background: #fffbeb; border-bottom: 1px solid #fde68a;">
+              <div style="width: 20px; height: 20px; border-radius: 50%; background: #fef3c7; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <span style="color: #d97706; font-size: 10px;">⚠</span>
+              </div>
+              <span style="font-size: 11px; color: #92400e;">${escapeHtml(flag)}</span>
+            </div>
+          `).join('')}
+          
+          <!-- Missing must-have skills -->
+          ${missingMustHave && missingMustHave.length > 0 ? `
+            <div style="display: flex; align-items: flex-start; gap: 8px; padding: 12px 16px; background: #fff7ed; border-bottom: 1px solid #fed7aa;">
+              <div style="width: 20px; height: 20px; border-radius: 50%; background: #ffedd5; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <span style="color: #ea580c; font-size: 10px;">✗</span>
+              </div>
+              <span style="font-size: 11px; color: #c2410c;">Missing skills: ${missingMustHave.join(', ')}</span>
+            </div>
+          ` : ''}
+          
+          ${gaps.length === 0 && (!riskAdjustments?.critical_gaps || riskAdjustments.critical_gaps.length === 0) && (!riskAdjustments?.risk_flags || riskAdjustments.risk_flags.length === 0) && (!missingMustHave || missingMustHave.length === 0) ? `
+            <p style="font-size: 11px; color: #6b7280; padding: 12px 16px;">No significant gaps identified.</p>
+          ` : ''}
+        </div>
+        
+      </div>
+    </div>
+  </div>
+  `
+}
+
+function generateProductionAndTenure(qualificationDetails: QualificationDetails): string {
+  const production = qualificationDetails.production_exposure
+  const tenure = qualificationDetails.tenure_analysis
+  
+  if (!production && !tenure) return ''
+  
+  return `
+  <div class="section avoid-break">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+      ${production ? `
+      <!-- Production Experience -->
+      <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+        <div style="padding: 12px 16px; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-bottom: 1px solid #bfdbfe;">
+          <div style="font-size: 13px; font-weight: 600; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+            💼 Production Experience
+          </div>
+        </div>
+        <div style="padding: 16px;">
+          <div style="padding: 12px; border-radius: 8px; border: 2px solid ${production.has_prod_experience ? '#a7f3d0' : '#fde68a'}; background: ${production.has_prod_experience ? '#ecfdf5' : '#fffbeb'};">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 24px;">${production.has_prod_experience ? '✓' : '⚠'}</span>
+              <div>
+                <div style="font-size: 13px; font-weight: 700; color: ${production.has_prod_experience ? '#166534' : '#92400e'};">
+                  ${production.has_prod_experience ? 'Has Production Experience' : 'No Production Experience'}
+                </div>
+                <div style="font-size: 10px; color: ${production.has_prod_experience ? '#15803d' : '#b45309'};">
+                  ${production.has_prod_experience ? 'Candidate has worked in live/production environments' : 'No evidence of production deployment experience'}
+                </div>
+              </div>
+            </div>
+          </div>
+          ${production.evidence && production.evidence.length > 0 ? `
+            <div style="margin-top: 12px;">
+              <div style="font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 6px;">Evidence</div>
+              <ul style="margin: 0; padding-left: 16px;">
+                ${production.evidence.map(e => `<li style="font-size: 10px; color: #64748b; margin-bottom: 4px;">${escapeHtml(e)}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+      ` : ''}
+      
+      ${tenure ? `
+      <!-- Tenure Analysis -->
+      <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+        <div style="padding: 12px 16px; background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); border-bottom: 1px solid #e9d5ff;">
+          <div style="font-size: 13px; font-weight: 600; color: #7c3aed; display: flex; align-items: center; gap: 8px;">
+            ⏱️ Tenure Stability
+          </div>
+        </div>
+        <div style="padding: 16px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div style="text-align: center; padding: 12px; background: #f8fafc; border-radius: 8px;">
+              <div style="font-size: 24px; font-weight: 700; color: #1e293b;">
+                ${tenure.average_tenure_months ?? '—'}
+              </div>
+              <div style="font-size: 9px; color: #64748b; margin-top: 4px;">Avg. Tenure (months)</div>
+            </div>
+            <div style="text-align: center; padding: 12px; border-radius: 8px; background: ${tenure.job_hopping_risk === 'Low' ? '#ecfdf5' : tenure.job_hopping_risk === 'Medium' ? '#fffbeb' : '#fef2f2'};">
+              <div style="font-size: 16px; font-weight: 700; color: ${tenure.job_hopping_risk === 'Low' ? '#059669' : tenure.job_hopping_risk === 'Medium' ? '#d97706' : '#dc2626'};">
+                ${tenure.job_hopping_risk || 'Unknown'}
+              </div>
+              <div style="font-size: 9px; color: #64748b; margin-top: 4px;">Job Hopping Risk</div>
+            </div>
+          </div>
+          <div style="margin-top: 12px; padding: 8px; background: #f8fafc; border-radius: 6px;">
+            <div style="font-size: 10px; color: #64748b;">
+              ${tenure.job_hopping_risk === 'Low' 
+                ? '✓ Candidate shows good job stability with consistent tenure.' 
+                : tenure.job_hopping_risk === 'Medium'
+                ? '⚠ Moderate tenure - some job changes but within acceptable range.'
+                : '⚠ High turnover pattern detected - may need discussion during interview.'}
+            </div>
+          </div>
+        </div>
+      </div>
+      ` : ''}
+    </div>
+  </div>
+  `
+}
+
+function generateRecentProjects(qualificationDetails: QualificationDetails): string {
+  const projects = qualificationDetails.extracted?.recent_projects
+  if (!projects || projects.length === 0) return ''
+  
+  return `
+  <div class="section avoid-break">
+    <div class="section-header" style="background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); border-bottom: 1px solid #c7d2fe;">
+      <div class="section-title" style="display: flex; align-items: center; gap: 10px;">
+        <span style="color: #4f46e5;">💼</span> Recent Projects
+      </div>
+    </div>
+    <div class="section-content" style="padding: 0;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+        <thead>
+          <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+            <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: #475569;">Project</th>
+            <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: #475569;">Duration</th>
+            <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: #475569;">Technologies</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${projects.map(project => `
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+              <td style="padding: 12px 16px; color: #1e293b;">${escapeHtml(project.title || 'N/A')}</td>
+              <td style="padding: 12px 16px; color: #64748b;">${escapeHtml(project.duration || 'N/A')}</td>
+              <td style="padding: 12px 16px; color: #64748b;">${(project.technologies || []).join(', ') || 'N/A'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  `
+}
+
+function generateCertifications(qualificationDetails: QualificationDetails): string {
+  const certs = qualificationDetails.extracted?.certifications
+  if (!certs || certs.length === 0) return ''
+  
+  return `
+  <div class="section avoid-break">
+    <div class="section-header" style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-bottom: 1px solid #fde68a;">
+      <div class="section-title" style="display: flex; align-items: center; gap: 10px;">
+        <span style="color: #d97706;">🏆</span> Certifications
+      </div>
+    </div>
+    <div class="section-content" style="padding: 0;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+        <thead>
+          <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+            <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: #475569;">Name</th>
+            <th style="text-align: left; padding: 12px 16px; font-weight: 600; color: #475569;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${certs.map(cert => `
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+              <td style="padding: 12px 16px; color: #1e293b;">${escapeHtml(cert.name || 'N/A')}</td>
+              <td style="padding: 12px 16px;">
+                <span style="font-weight: 600; color: ${cert.status === 'issued' ? '#059669' : '#d97706'};">
+                  ${cert.status === 'issued' ? 'Issued' : 'Pursuing'}
+                </span>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
     </div>
   </div>
   `

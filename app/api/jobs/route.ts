@@ -44,6 +44,7 @@ type CreateJobBody = {
   salaryMin?: string
   salaryMax?: string
   period?: string
+  salaryCurrency?: string // NEW: Currency for salary (INR, USD, EUR, GBP)
   bonus?: string
   perks?: string
   timeOff?: string
@@ -61,6 +62,7 @@ type CreateJobBody = {
   screeningCurrentSalary?: string
   status?: string // 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled'
   auto_schedule_interview?: boolean
+  resumeScreeningEnabled?: boolean // NEW: Resume screening feature toggle
 }
 
 function normalizeJobType(value?: string | null): 'full_time' | 'part_time' | 'contract' | null {
@@ -351,6 +353,7 @@ Work Authorization: ${raw.visa || 'Work authorization required'}`
           salary_min: salaryMinNum,
           salary_max: salaryMaxNum,
           salary_period: salaryPeriod as any,
+          salary_currency: raw.salaryCurrency || 'INR',
           bonus_incentives: raw.bonus || null,
           perks_benefits,
           time_off_policy: raw.timeOff || null,
@@ -362,6 +365,7 @@ Work Authorization: ${raw.visa || 'Work authorization required'}`
           created_by_email: body.createdBy || null,
           screening_questions: screeningQuestions,
           status: (raw.status === 'draft' ? 'draft' : 'open') as any,
+          resume_screening_enabled: raw.resumeScreeningEnabled ?? false,
         })
       } catch (e: any) {
         const msg = String(e?.message || '')
@@ -394,6 +398,7 @@ Work Authorization: ${raw.visa || 'Work authorization required'}`
           salary_min: salaryMinNum,
           salary_max: salaryMaxNum,
           salary_period: salaryPeriod as any,
+          salary_currency: raw.salaryCurrency || 'INR',
           bonus_incentives: raw.bonus || null,
           perks_benefits,
           time_off_policy: raw.timeOff || null,
@@ -405,6 +410,7 @@ Work Authorization: ${raw.visa || 'Work authorization required'}`
           created_by_email: null,
           screening_questions: screeningQuestions,
           status: (raw.status === 'draft' ? 'draft' : 'open') as any,
+          resume_screening_enabled: raw.resumeScreeningEnabled ?? false,
         })
       }
 

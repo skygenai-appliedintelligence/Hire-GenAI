@@ -26,63 +26,68 @@ export default function AnalyticsPage() {
     }
   } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [initialLoad, setInitialLoad] = useState(true)
   const [jobs, setJobs] = useState<{ id: string; title: string }[]>([])
   const [selectedJobId, setSelectedJobId] = useState<string>("all")
 
   useEffect(() => {
-    const loadJobs = async () => {
-      if (!(company as any)?.id) return
-      try {
-        const res = await fetch(`/api/jobs/titles?companyId=${(company as any).id}`, { 
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        })
-        const data = await res.json()
-        console.log('🔍 Jobs API response:', data)
-        if (data.ok && data.jobs) {
-          console.log('🔍 Setting jobs in state:', data.jobs)
-          setJobs(data.jobs)
-        } else {
-          console.log('⚠️ No jobs found or API error:', data)
-        }
-      } catch (e) {
-        console.error('Failed to load job titles:', e)
-      }
-    }
-
-    // Check if coming from jobs page with selected job
-    const checkSelectedJob = () => {
-      try {
-        const selectedJob = localStorage.getItem('selectedJobForAnalytics')
-        if (selectedJob) {
-          const jobData = JSON.parse(selectedJob)
-          setSelectedJobId(jobData.id)
-          // Clear the localStorage after using it
-          localStorage.removeItem('selectedJobForAnalytics')
-          return jobData.id
-        }
-      } catch (e) {
-        console.error('Failed to parse selected job:', e)
-      }
-      return 'all'
-    }
-
-    const loadAnalytics = async (jobId: string) => {
+    const loadData = async () => {
       if (!(company as any)?.id) return
       
       setLoading(true)
       
       try {
-        const url = jobId === 'all' 
-          ? `/api/analytics?companyId=${(company as any).id}` 
-          : `/api/analytics?companyId=${(company as any).id}&jobId=${encodeURIComponent(jobId)}`
-        const res = await fetch(url, { cache: 'no-store' })
-        const data = await res.json()
-        if (data.ok && data.analytics) {
-          setAnalytics(data.analytics)
+        // Parallel fetch jobs and analytics data
+        const [jobsResponse, analyticsResponse] = await Promise.all([
+          // Load jobs
+          fetch(`/api/jobs/titles?companyId=${(company as any).id}`, { 
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache'
+            }
+          }).then(res => res.json().catch(() => ({ ok: false, jobs: [] }))),
+          
+          // Load analytics
+          (async () => {
+            // Check if coming from jobs page with selected job
+            const checkSelectedJob = () => {
+              try {
+                const selectedJob = localStorage.getItem('selectedJobForAnalytics')
+                if (selectedJob) {
+                  const jobData = JSON.parse(selectedJob)
+                  setSelectedJobId(jobData.id)
+                  // Clear the localStorage after using it
+                  localStorage.removeItem('selectedJobForAnalytics')
+                  return jobData.id
+                }
+              } catch (e) {
+                console.error('Failed to parse selected job:', e)
+              }
+              return 'all'
+            }
+            
+            const initialJobId = checkSelectedJob()
+            const url = initialJobId === 'all' 
+              ? `/api/analytics?companyId=${(company as any).id}` 
+              : `/api/analytics?companyId=${(company as any).id}&jobId=${encodeURIComponent(initialJobId)}`
+            
+            return fetch(url, { cache: 'no-store' })
+              .then(res => res.json().catch(() => ({ ok: false, analytics: null })))
+          })()
+        ])
+        
+        // Process jobs data
+        if (jobsResponse.ok && jobsResponse.jobs) {
+          console.log('🔍 Setting jobs in state:', jobsResponse.jobs)
+          setJobs(jobsResponse.jobs)
+        } else {
+          console.log('⚠️ No jobs found or API error:', jobsResponse)
+        }
+        
+        // Process analytics data
+        if (analyticsResponse.ok && analyticsResponse.analytics) {
+          setAnalytics(analyticsResponse.analytics)
         } else {
           setAnalytics({
             totalApplications: 0,
@@ -99,7 +104,8 @@ export default function AnalyticsPage() {
           })
         }
       } catch (e) {
-        console.error('Failed to load analytics:', e)
+        console.error('Failed to load data:', e)
+        // Set default values on error
         setAnalytics({
           totalApplications: 0,
           qualifiedCandidates: 0,
@@ -115,21 +121,21 @@ export default function AnalyticsPage() {
         })
       } finally {
         setLoading(false)
+        if (initialLoad) {
+          setInitialLoad(false)
+        }
       }
     }
-
-    // First check for selected job, then load analytics with the correct job ID
-    const initialJobId = checkSelectedJob()
+    
     if ((company as any)?.id) {
-      loadJobs()
-      loadAnalytics(initialJobId)
+      loadData()
     }
   }, [company])
 
-  // Reload analytics when job filter changes
+  // Reload analytics when job filter changes (with debouncing)
   useEffect(() => {
-    const loadAnalytics = async () => {
-      if (!(company as any)?.id) return
+    const loadFilteredAnalytics = async () => {
+      if (!(company as any)?.id || !selectedJobId) return
       
       setLoading(true)
       
@@ -176,9 +182,12 @@ export default function AnalyticsPage() {
       }
     }
 
-    if (selectedJobId && (company as any)?.id) {
-      loadAnalytics()
-    }
+    // Debounce the filter change to avoid excessive API calls
+    const timeoutId = setTimeout(() => {
+      loadFilteredAnalytics()
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
   }, [selectedJobId, company])
 
   const getTrendIcon = (change: number) => {
@@ -220,10 +229,68 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {loading ? (
+      {loading && initialLoad ? (
         <div className="py-16">
           <Spinner size="lg" text="Loading analytics data..." className="mx-auto" />
         </div>
+      ) : loading ? (
+        // Show skeleton cards on subsequent loads
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <div className="h-4 bg-gray-200 rounded w-24"></div>
+                  <div className="h-4 w-4 bg-gray-200 rounded"></div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-8 bg-gray-200 rounded w-16 mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-32"></div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          
+          {/* Skeleton for additional analytics */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mt-6">
+            <Card className="animate-pulse">
+              <CardHeader>
+                <div className="h-6 bg-gray-200 rounded w-32 mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-48"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="flex justify-between">
+                      <div className="h-4 bg-gray-200 rounded w-24"></div>
+                      <div className="h-4 bg-gray-200 rounded w-16"></div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="animate-pulse">
+              <CardHeader>
+                <div className="h-6 bg-gray-200 rounded w-40 mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-36"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i}>
+                      <div className="flex justify-between mb-2">
+                        <div className="h-4 bg-gray-200 rounded w-32"></div>
+                        <div className="h-6 bg-gray-200 rounded w-12"></div>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded w-full"></div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </>
       ) : (
       <>
       {/* Key Metrics */}
