@@ -53,7 +53,8 @@ export async function GET(req: NextRequest) {
         FROM interviews i
         JOIN application_rounds ar ON ar.id = i.application_round_id
         JOIN base_apps a ON a.id = ar.application_id
-        WHERE i.status = 'success'
+        LEFT JOIN evaluations e ON e.interview_id = i.id
+        WHERE i.status = 'success' AND (e.status = 'Pass' OR e.overall_score >= 65)
       ),
       apps_this_month AS (
         SELECT COUNT(*) AS cnt FROM base_apps WHERE date_trunc('month', created_at) = date_trunc('month', now())
@@ -68,10 +69,10 @@ export async function GET(req: NextRequest) {
         SELECT COUNT(*) AS cnt FROM base_interviews WHERE completed_at IS NOT NULL AND date_trunc('month', completed_at) = date_trunc('month', now() - interval '1 month')
       ),
       hires_this_month AS (
-        SELECT COUNT(*) AS cnt FROM passed_interviews WHERE date_trunc('month', completed_at) = date_trunc('month', now())
+        SELECT COUNT(*) AS cnt FROM passed_interviews WHERE completed_at IS NOT NULL AND date_trunc('month', completed_at) = date_trunc('month', now())
       ),
       hires_prev_month AS (
-        SELECT COUNT(*) AS cnt FROM passed_interviews WHERE date_trunc('month', completed_at) = date_trunc('month', now() - interval '1 month')
+        SELECT COUNT(*) AS cnt FROM passed_interviews WHERE completed_at IS NOT NULL AND date_trunc('month', completed_at) = date_trunc('month', now() - interval '1 month')
       )
       SELECT 
         (SELECT COUNT(*) FROM base_apps) AS total_applications,

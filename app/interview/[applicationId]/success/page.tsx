@@ -53,11 +53,6 @@ export default function InterviewSuccessPage() {
             Great things happen to those who prepare and perform well. We're excited to see what the future holds for you!
           </p>
 
-          <div className="mt-6 flex items-center justify-center gap-3">
-            <Button variant="outline" onClick={() => router.push("/")} className="border-slate-300">
-              <Home className="h-4 w-4 mr-2" /> Go to Home
-            </Button>
-          </div>
           
           {applicationId && (
             <div className="mt-4 text-xs text-slate-400">

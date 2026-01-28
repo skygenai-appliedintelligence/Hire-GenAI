@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { DatabaseService } from "@/lib/database"
+import { getAppUrl } from "@/lib/utils/url"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
           console.log(`🎯 [STATUS] Candidate marked qualified, triggering auto-email check...`)
           
           // Call the auto-send-interview-email API with 1 minute delay (60000ms)
-          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+          const baseUrl = getAppUrl()
           fetch(`${baseUrl}/api/applications/auto-send-interview-email`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

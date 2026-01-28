@@ -1093,7 +1093,7 @@ export class DatabaseService {
     title?: string | null
     description_md?: string | null
     location_text?: string | null
-    status?: 'open' | 'on_hold' | 'closed' | 'cancelled' | null
+    status?: 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled' | null
     employment_type?: 'full_time' | 'part_time' | 'contract' | null
     level?: 'intern' | 'junior' | 'mid' | 'senior' | 'lead' | 'principal' | null
     education?: string | null
@@ -1254,6 +1254,8 @@ export class DatabaseService {
     is_public?: boolean | null
     created_by_email?: string | null
     screening_questions?: Record<string, any> | null
+    status?: 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled' | null
+    auto_schedule_interview?: boolean | null
   }) {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
@@ -1287,7 +1289,7 @@ export class DatabaseService {
         duties_day_to_day, duties_strategic, stakeholders,
         decision_scope, salary_min, salary_max, salary_period, bonus_incentives,
         perks_benefits, time_off_policy, joining_timeline, travel_requirements, visa_requirements,
-        status, is_public, created_by_email, screening_questions
+        status, auto_schedule_interview, is_public, created_by_email, screening_questions
       )
       VALUES (
         $1::uuid, $2, $3, $4, $5, $6::employment_type, $7::job_level, $8,
@@ -1297,7 +1299,7 @@ export class DatabaseService {
         $17::text[], $18::text[], $19::text[],
         $20, $21, $22, $23::salary_period, $24,
         $25::text[], $26, $27, $28, $29,
-        'open', COALESCE($30, true), $31, $32::jsonb
+        COALESCE($30, 'open'), COALESCE($31, true), COALESCE($32, true), $33, $34::jsonb
       )
       RETURNING id
     `
@@ -1332,9 +1334,11 @@ export class DatabaseService {
       input.joining_timeline ?? null,
       input.travel_requirements ?? null,
       input.visa_requirements ?? null,
-      input.is_public ?? true,
-      input.created_by_email ?? null,
-      input.screening_questions ? JSON.stringify(input.screening_questions) : null,
+      input.status ?? 'open', // $30 - status (defaults to 'open')
+      input.auto_schedule_interview ?? true, // $31
+      input.is_public ?? true, // $32
+      input.created_by_email ?? null, // $33
+      input.screening_questions ? JSON.stringify(input.screening_questions) : null, // $34
     ]
 
     const rows = (await this.query(q, params)) as any[]
@@ -2029,6 +2033,7 @@ export class DatabaseService {
       return {
         id: row.id,
         jobId: row.job_id,
+        applicationId: row.application_id,
         candidateName,
         appliedJD: row.job_title || 'Unknown Position',
         email,
@@ -2042,6 +2047,72 @@ export class DatabaseService {
     })
   }
 
+  // Get hiring bucket counts for recommended candidates
+  static async getHiringBucketCounts(companyId: string, jobId?: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    let query = `
+      SELECT 
+        COUNT(*) FILTER (WHERE a.hiring_status = 'sent_to_manager') as sent_to_manager,
+        COUNT(*) FILTER (WHERE a.hiring_status = 'offer_extended') as offer_extended,
+        COUNT(*) FILTER (WHERE a.hiring_status = 'offer_accepted') as offer_accepted,
+        COUNT(*) FILTER (WHERE a.hiring_status IN ('rejected_withdraw', 'rejected', 'withdrawn')) as rejected_withdraw,
+        COUNT(*) FILTER (WHERE a.hiring_status = 'hired') as hired,
+        COUNT(*) as total
+      FROM applications a
+      JOIN application_rounds ar ON ar.application_id = a.id
+      JOIN interviews i ON i.application_round_id = ar.id
+      LEFT JOIN evaluations e ON e.interview_id = i.id
+      JOIN jobs j ON a.job_id = j.id
+      WHERE j.company_id = $1::uuid
+        AND i.status = 'success'
+        AND (e.status = 'Pass' OR e.overall_score >= 65)
+    `
+
+    const params: any[] = [companyId]
+    
+    if (jobId && jobId !== 'all') {
+      query += ` AND a.job_id = $2::uuid`
+      params.push(jobId)
+    }
+
+    const result = await this.query(query, params) as any[]
+    const row = result[0] || {}
+
+    return {
+      total: parseInt(row.total) || 0,
+      sentToManager: parseInt(row.sent_to_manager) || 0,
+      offerExtended: parseInt(row.offer_extended) || 0,
+      offerAccepted: parseInt(row.offer_accepted) || 0,
+      rejectedWithdraw: parseInt(row.rejected_withdraw) || 0,
+      hired: parseInt(row.hired) || 0
+    }
+  }
+
+  // Update hiring status for an application
+  static async updateHiringStatus(applicationId: string, hiringStatus: string) {
+    if (!this.isDatabaseConfigured()) {
+      throw new Error('Database not configured')
+    }
+
+    const validStatuses = ['sent_to_manager', 'offer_extended', 'offer_accepted', 'rejected_withdraw', 'hired']
+    if (!validStatuses.includes(hiringStatus)) {
+      throw new Error(`Invalid hiring status. Must be one of: ${validStatuses.join(', ')}`)
+    }
+
+    const query = `
+      UPDATE applications 
+      SET hiring_status = $1
+      WHERE id = $2::uuid
+      RETURNING id, hiring_status
+    `
+    
+    const result = await this.query(query, [hiringStatus, applicationId]) as any[]
+    return result[0] || null
+  }
+  
   // =========================
   // BILLING & USAGE TRACKING
   // ALL PRICING FROM .env FILE ONLY - NO OpenAI API, NO external sources

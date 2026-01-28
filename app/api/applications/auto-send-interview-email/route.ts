@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { DatabaseService } from "@/lib/database"
 import { EmailService } from "@/lib/email-service"
+import { getInterviewStartLink } from "@/lib/utils/url"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -181,9 +182,8 @@ async function sendInterviewEmail(applicationId: string, jobId: string) {
   // Default message template if none saved
   let messageContent = messageRows?.[0]?.content || getDefaultInterviewMessage()
 
-  // Generate interview link
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-  const interviewLink = `${baseUrl}/interview/${encodeURIComponent(applicationId)}/start`
+  // Generate interview link using dynamic URL
+  const interviewLink = getInterviewStartLink(applicationId)
 
   // Replace placeholders in the message
   messageContent = messageContent

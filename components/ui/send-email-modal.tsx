@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { X, Send, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { getAppUrl, getInterviewStartLink, getAppLink } from "@/lib/utils/url"
 
 interface SendEmailModalProps {
   isOpen: boolean
@@ -131,9 +132,8 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, us
 
   const loadCompanyData = async () => {
     try {
-      // Generate the actual interview link using the same format as the API
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-      const interviewLink = `${baseUrl}/interview/${encodeURIComponent(candidate.id)}/start`
+      // Generate the actual interview link using dynamic URL
+      const interviewLink = getInterviewStartLink(candidate.id)
       
       // Prefer company prop, then enhance from localStorage if available
       const savedCompanyData = localStorage.getItem('companyData')
@@ -160,11 +160,10 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, us
     } catch (error) {
       console.error('Error loading company data:', error)
       // Fallback to defaults with correct company name
-      const baseUrl = "http://localhost:3000"
       setCompanyData({
         companyName: (company as any)?.name || "",
         userJobTitle: "HR Manager", 
-        interviewLink: `${baseUrl}/interview/${encodeURIComponent(candidate.id)}/start`,
+        interviewLink: getInterviewStartLink(candidate.id),
         recruiterName: user?.full_name || ""
       })
     }
@@ -198,10 +197,9 @@ export default function SendEmailModal({ isOpen, onClose, candidate, company, us
     )
 
     if (matched) {
-      // Generate the apply link
+      // Generate the apply link using dynamic URL
       const companySlug = (company?.name || '').toLowerCase().replace(/\s+/g, '-')
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
-      const applyLink = `${baseUrl}/jobs/${companySlug}/${matched.id}`
+      const applyLink = getAppLink(`/jobs/${companySlug}/${matched.id}`)
       
       setMatchedJob({
         id: matched.id,

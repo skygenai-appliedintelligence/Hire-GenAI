@@ -3,6 +3,7 @@ import { CVEvaluator } from '@/lib/cv-evaluator'
 import { DatabaseService } from '@/lib/database'
 import { checkOpenAIPermissions } from '@/lib/config'
 import { decrypt } from '@/lib/encryption'
+import { getAppUrl } from '@/lib/utils/url'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -162,10 +163,17 @@ export async function POST(request: NextRequest) {
           if (cols.has('qualification_explanations')) {
             updates.push(`qualification_explanations = $${p++}::jsonb`)
             params.push(JSON.stringify({
-              breakdown: evaluation.breakdown,
+              // Core fields
+              overall: evaluation.overall,
               extracted: evaluation.extracted,
-              gaps_and_notes: evaluation.gaps_and_notes,
-              reason_summary: evaluation.overall.reason_summary
+              scores: evaluation.scores,
+              reason_summary: evaluation.overall.reason_summary,
+              // Domain-agnostic CV evaluation fields
+              eligibility: evaluation.eligibility,
+              risk_adjustments: evaluation.risk_adjustments,
+              production_exposure: evaluation.production_exposure,
+              tenure_analysis: evaluation.tenure_analysis,
+              explainable_score: evaluation.explainable_score
             }))
           }
 
@@ -223,7 +231,7 @@ export async function POST(request: NextRequest) {
                 console.log(`🎯 [CV EVALUATOR] Candidate qualified, triggering auto-email check...`)
                 
                 // Call the auto-send-interview-email API with 1 minute delay (60000ms)
-                const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+                const baseUrl = getAppUrl()
                 fetch(`${baseUrl}/api/applications/auto-send-interview-email`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },

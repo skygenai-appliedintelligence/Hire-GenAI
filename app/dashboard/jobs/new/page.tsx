@@ -10,9 +10,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, ArrowRight, Building2, Users, Briefcase, Target, CheckCircle, Clock, Bot, ChevronDown, ChevronUp, Trash2, Plus, RefreshCw } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Building2, Users, Briefcase, Target, CheckCircle, Clock, Bot, ChevronDown, ChevronUp, Trash2, Plus, RefreshCw, Save } from 'lucide-react'
 import { useAuth } from "@/contexts/auth-context"
 import { parseJobDescription, renderLinkedInJobDescription } from "@/lib/job-description-parser"
 
@@ -22,7 +23,27 @@ export default function CreateJobPage() {
   const searchParams = useSearchParams()
   const { company, user } = useAuth()
   const isEditing = !!searchParams.get('jobId')
+  const isDraftEdit = searchParams.get('draft') === 'true'
+  const isCreateFlow = !isEditing || isDraftEdit
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
+
+  const mergePreferNonEmpty = (base: any, incoming: any) => {
+    const out: any = { ...base }
+    for (const [k, v] of Object.entries(incoming || {})) {
+      const b = (base as any)[k]
+      const baseEmpty =
+        b === '' ||
+        b === null ||
+        b === undefined ||
+        (Array.isArray(b) && b.length === 0)
+      const incomingEmpty = v === '' || v === null || v === undefined
+      if (baseEmpty && !incomingEmpty) {
+        out[k] = v
+      }
+    }
+    return out
+  }
 
   // Generate temporary UUID for draft jobs (for billing tracking)
   useEffect(() => {
@@ -64,9 +85,10 @@ export default function CreateJobPage() {
   }, [isEditing]);
 
   // Helper: parse varied salary labels into structured fields
-  const normalizeStatus = (val?: string | null): 'open' | 'on_hold' | 'closed' | 'cancelled' | undefined => {
+  const normalizeStatus = (val?: string | null): 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled' | undefined => {
     if (!val) return undefined
     const v = String(val).toLowerCase().trim()
+    if (v === 'draft') return 'draft'
     if (v === 'open') return 'open'
     if (v === 'closed' || v === 'close') return 'closed'
     if (v === 'on_hold' || v === 'on-hold' || v === 'onhold' || v === 'hold' || v === 'on hold') return 'on_hold'
@@ -125,15 +147,16 @@ export default function CreateJobPage() {
   // Form state
   const [formData, setFormData] = useState(() => {
     // Determine initial status from localStorage synchronously to avoid flicker to "open"
-    let initialStatus: 'open' | 'on_hold' | 'closed' | 'cancelled' = 'open'
+    let initialStatus: 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled' = 'open'
     try {
       if (typeof window !== 'undefined') {
         const sp = new URLSearchParams(window.location.search)
         const jobId = sp.get('jobId')
         if (jobId) {
           const saved = localStorage.getItem(`jobStatus:${jobId}`)
-          const norm = ((): 'open' | 'on_hold' | 'closed' | 'cancelled' | undefined => {
+          const norm = ((): 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled' | undefined => {
             const v = saved?.toLowerCase().trim()
+            if (v === 'draft') return 'draft'
             if (v === 'open') return 'open'
             if (v === 'closed' || v === 'close') return 'closed'
             if (v === 'on_hold' || v === 'on-hold' || v === 'onhold' || v === 'hold' || v === 'on hold') return 'on_hold'
@@ -160,7 +183,7 @@ export default function CreateJobPage() {
       location: "",
       jobType: "full-time", // maps Work Arrangement
       experienceLevel: "entry", // maps Level/Seniority
-      status: initialStatus, // job status
+      status: initialStatus as 'draft' | 'open' | 'on_hold' | 'closed' | 'cancelled', // job status
 
       // New sections: Requirements
       education: "",
@@ -191,6 +214,15 @@ export default function CreateJobPage() {
       travel: "",
       visa: "",
 
+      // Notice Period
+      noticePeriodMonths: "",
+      noticePeriodNegotiable: "",
+
+      // Summary Tab
+      sendInterviewLinkAutomatically: true,
+      detailsConfirmed: false,
+      descriptionMd: "",
+
       // Legacy fields kept for API compatibility (will be compiled before submit)
       description: "",
       requirements: "",
@@ -216,12 +248,37 @@ export default function CreateJobPage() {
     }
   })
 
+  // Determine if form should be read-only based on job status
+  // Draft jobs should be editable, all other statuses (open, closed, on_hold, cancelled) remain read-only
+  const isReadOnly = isEditing && formData.status !== 'draft'
+
   // Prefill when editing: if jobId is present in URL, fetch job and populate form
   useEffect(() => {
     const jobId = searchParams.get('jobId')
     if (!jobId) return
     ;(async () => {
       try {
+        // Draft edit: load full saved draft form data (if available)
+        let hasLocalDraftForm = false
+        if (isDraftEdit && typeof window !== 'undefined') {
+          const savedDraftForm = localStorage.getItem(`draftFormData:${jobId}`)
+          if (savedDraftForm) {
+            try {
+              const parsed = JSON.parse(savedDraftForm)
+              if (parsed && typeof parsed === 'object') {
+                hasLocalDraftForm = true
+                setFormData((prev) => ({ ...prev, ...parsed, status: 'draft' }))
+                setCreatedJobId(jobId)
+                statusInitializedRef.current = true
+                try {
+                  localStorage.setItem(`jobStatus:${jobId}`, 'draft')
+                  localStorage.setItem(`applyFormEnabled:${jobId}`, 'false')
+                } catch {}
+              }
+            } catch {}
+          }
+        }
+
         // Try localStorage first for instant prefill
         const draft = typeof window !== 'undefined' ? localStorage.getItem('editJobDraft') : null
         if (draft) {
@@ -240,6 +297,10 @@ export default function CreateJobPage() {
                 location: j.location_text || prev.location,
                 jobType: j.employment_type || prev.jobType,
                 status: (normalized as any) || (normalizeStatus(j.status) as any) || prev.status,
+                sendInterviewLinkAutomatically:
+                  typeof (j as any).auto_schedule_interview === 'boolean'
+                    ? (j as any).auto_schedule_interview
+                    : prev.sendInterviewLinkAutomatically,
                 description: j.description || prev.description,
                 requirements: j.requirements || prev.requirements,
                 salaryRange: j.salary_range || prev.salaryRange,
@@ -251,6 +312,9 @@ export default function CreateJobPage() {
               // so we don't persist API 'open' into localStorage.
               if (normalized) {
                 statusInitializedRef.current = true
+              }
+              if (isDraftEdit && hasLocalDraftForm) {
+                return mergePreferNonEmpty(prev, next)
               }
               return next
             })
@@ -325,6 +389,10 @@ export default function CreateJobPage() {
                 location: j.location_text || prev.location,
                 jobType: j.employment_type || prev.jobType,
                 status: (normalized as any) || (normalizeStatus(j.status) as any) || prev.status,
+                sendInterviewLinkAutomatically:
+                  typeof j.auto_schedule_interview === 'boolean'
+                    ? j.auto_schedule_interview
+                    : prev.sendInterviewLinkAutomatically,
                 description: j.description_md || j.summary || j.description || prev.description,
                 requirements: j.responsibilities_md || j.requirements || prev.requirements,
                 benefits: j.benefits_md || prev.benefits,
@@ -354,13 +422,16 @@ export default function CreateJobPage() {
                 bonus: j.bonus_incentives ?? prev.bonus,
                 perks: joinLines(j.perks_benefits) || prev.perks,
                 timeOff: j.time_off_policy ?? prev.timeOff,
-                // Logistics tab
-                joining: j.joining_timeline ?? prev.joining,
-                travel: j.travel_requirements ?? prev.travel,
-                visa: j.visa_requirements ?? prev.visa,
+                // Notice Period
+                noticePeriodMonths: j.notice_period_months != null ? String(j.notice_period_months) : prev.noticePeriodMonths,
+                noticePeriodNegotiable: j.notice_period_negotiable ? 'yes' : 'no',
               }
               // Mark status initialized after deriving it and persist server truth to localStorage
               statusInitializedRef.current = true
+              // If we already restored a full draft from localStorage, do not overwrite non-empty fields
+              if (isDraftEdit && hasLocalDraftForm) {
+                return mergePreferNonEmpty(prev, next)
+              }
               return next
             })
             try {
@@ -478,7 +549,7 @@ export default function CreateJobPage() {
   // Initialize tab from URL once on mount to avoid feedback loops
   useEffect(() => {
     const t = searchParams.get('tab')
-    const allowed = ['basic', 'requirements', 'responsibilities', 'compensation', 'logistics', 'resume-screening', 'interview']
+    const allowed = ['basic', 'requirements', 'responsibilities', 'compensation', 'resume-screening', 'interview', 'summary']
     const next = t && allowed.includes(t) ? t : 'basic'
     lastSyncedTabRef.current = next
     setCurrentTab(next)
@@ -538,6 +609,14 @@ export default function CreateJobPage() {
     } catch {}
   }, [formData.status, searchParams])
 
+  // Auto-populate descriptionMd when navigating to Summary tab
+  useEffect(() => {
+    if (currentTab === 'summary' && !formData.descriptionMd) {
+      const generatedDesc = generateStructuredDescription()
+      setFormData(prev => ({ ...prev, descriptionMd: generatedDesc }))
+    }
+  }, [currentTab])
+
   const handleInputChange = (field: string, value: string) => {
     if (field === 'status') {
       // Mark initialized and persist immediately so it survives navigation
@@ -593,7 +672,10 @@ export default function CreateJobPage() {
   }
 
   const isRequirementsValid = () => {
-    return formData.technical.trim() !== '' || formData.mustHave.trim() !== ''
+    // Mandatory: Years of Experience, Primary Skills (technical), Languages
+    return formData.years.trim() !== '' && 
+           formData.technical.trim() !== '' && 
+           formData.languages.trim() !== ''
   }
 
   const isResponsibilitiesValid = () => {
@@ -601,19 +683,51 @@ export default function CreateJobPage() {
   }
 
   const isCompensationValid = () => {
-    return formData.salaryMin.trim() !== '' && formData.salaryMax.trim() !== ''
-  }
-
-  const isLogisticsValid = () => {
-    return true // Optional fields
+    // Mandatory: Salary Min, Salary Max, Visa/Work Authorization
+    return formData.salaryMin.trim() !== '' && 
+           formData.salaryMax.trim() !== '' &&
+           formData.visa.trim() !== ''
   }
 
   const isResumeScreeningValid = () => {
-    return true // Auto-configured
+    // If screening is not enabled, it's valid
+    if (!formData.screeningEnabled) return true
+    
+    // All screening fields are mandatory when enabled
+    return formData.screeningOverallExp.trim() !== '' &&
+           formData.screeningPrimarySkill.trim() !== '' &&
+           formData.screeningCurrentLocation.trim() !== '' &&
+           formData.screeningNationality.trim() !== '' &&
+           formData.screeningVisaRequired.trim() !== '' &&
+           formData.screeningLanguageProficiency.trim() !== '' &&
+           formData.screeningCurrentSalary.trim() !== '' &&
+           formData.noticePeriodMonths.trim() !== '' &&
+           formData.noticePeriodNegotiable.trim() !== ''
   }
 
   const isInterviewValid = () => {
     return formData.interviewRounds.length > 0
+  }
+
+  const isSummaryValid = () => {
+    return formData.detailsConfirmed === true
+  }
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      alert('Copied to clipboard!')
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+
+  const generateJobLink = () => {
+    const jobId = createdJobId || searchParams.get('jobId')
+    if (jobId) {
+      return `${typeof window !== 'undefined' ? window.location.origin : ''}/apply?jobId=${jobId}`
+    }
+    return `${typeof window !== 'undefined' ? window.location.origin : ''}/jobs/apply`
   }
 
   // Get validation status for current tab
@@ -623,16 +737,16 @@ export default function CreateJobPage() {
       case 'requirements': return isRequirementsValid()
       case 'responsibilities': return isResponsibilitiesValid()
       case 'compensation': return isCompensationValid()
-      case 'logistics': return isLogisticsValid()
       case 'resume-screening': return isResumeScreeningValid()
       case 'interview': return isInterviewValid()
+      case 'summary': return isSummaryValid()
       default: return false
     }
   }
 
   // Navigate to next tab
   const goToNextTab = () => {
-    const tabs = ['basic', 'requirements', 'responsibilities', 'compensation', 'logistics', 'resume-screening', 'interview']
+    const tabs = ['basic', 'requirements', 'responsibilities', 'compensation', 'resume-screening', 'interview', 'summary']
     const currentIndex = tabs.indexOf(currentTab)
     if (currentIndex < tabs.length - 1) {
       setCurrentTab(tabs[currentIndex + 1])
@@ -740,58 +854,50 @@ export default function CreateJobPage() {
     }
   }
 
-  // Generate structured description
+  // Generate structured description (without basic info - that's shown separately in Summary tab)
   const generateStructuredDescription = () => {
     const salaryRange = formData.salaryMin && formData.salaryMax 
       ? `₹${parseInt(formData.salaryMin).toLocaleString()} – ₹${parseInt(formData.salaryMax).toLocaleString()} per ${formData.period?.toLowerCase() || 'month'}`
       : 'Competitive salary'
     
-    const workArrangement = formData.jobType?.replace(/[_-]/g, '-') || 'Full-time'
-    const location = formData.location || 'Remote'
-    
-    return `// Basic Information
-Job Title* → ${formData.jobTitle || 'Position Title'}
-Company* → ${company?.name || 'Company'}
-Location* → ${location}
-Work Arrangement* → ${workArrangement}, ${location.toLowerCase().includes('remote') ? 'Remote' : 'Onsite'}
-Job Level / Seniority → ${formData.experienceLevel || 'As per experience'}
-
-About the Role
+    return `About the Role
 We are seeking a ${formData.jobTitle || 'professional'} to join ${company?.name || 'our team'}. This role involves ${formData.day ? formData.day.split(',')[0]?.trim() : 'contributing to our team\'s success'} while collaborating with ${formData.collaboration ? formData.collaboration.split(',').slice(0,2).join(' and ') : 'cross-functional teams'} to deliver business impact.
 
 🔹 Key Responsibilities
-${formData.day ? formData.day.split(/[,\n]/).map((d: string) => d.trim()).filter(Boolean).map((duty: string) => `${duty.charAt(0).toUpperCase() + duty.slice(1)}.`).join('\n') : 'Develop and maintain solutions as per business requirements.'}
-${formData.project ? formData.project.split(/[,\n]/).map((d: string) => d.trim()).filter(Boolean).map((duty: string) => `${duty.charAt(0).toUpperCase() + duty.slice(1)}.`).join('\n') : 'Drive strategic initiatives and process improvements.'}
-${formData.collaboration ? `Collaborate with ${formData.collaboration.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).join(', ')}.` : 'Collaborate with cross-functional teams.'}
-${formData.scope ? `${formData.scope}.` : 'Provide technical guidance and mentorship.'}
+${formData.day ? formData.day.split(/[,\n]/).map((d: string) => d.trim()).filter(Boolean).map((duty: string) => `• ${duty.charAt(0).toUpperCase() + duty.slice(1)}`).join('\n') : '• Develop and maintain solutions as per business requirements.'}
+${formData.project ? formData.project.split(/[,\n]/).map((d: string) => d.trim()).filter(Boolean).map((duty: string) => `• ${duty.charAt(0).toUpperCase() + duty.slice(1)}`).join('\n') : ''}
+${formData.collaboration ? `• Collaborate with ${formData.collaboration.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).join(', ')}` : ''}
+${formData.scope ? `• ${formData.scope}` : ''}
 
 🔹 Requirements
-Education & Certifications
+🎓 Education & Certifications
 ${formData.education || 'Bachelor\'s degree in relevant field or equivalent experience.'}
 
-Experience
+📅 Experience
 ${formData.years || 'Experience as per role requirements'}
 
-Technical Skills (Must-Have)
-${formData.technical ? formData.technical.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).join('\n') : 'Technical skills as per job requirements'}
-${formData.mustHave ? formData.mustHave.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).join('\n') : ''}
+🛠️ Primary Skills (Must-Have)
+${formData.technical ? formData.technical.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).map((s: string) => `• ${s}`).join('\n') : '• Technical skills as per job requirements'}
+${formData.mustHave ? formData.mustHave.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).map((s: string) => `• ${s}`).join('\n') : ''}
 
-Nice-to-Have Skills
-${formData.niceToHave ? formData.niceToHave.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).join('\n') : 'Additional skills welcome'}
+✨ Nice-to-Have Skills
+${formData.niceToHave ? formData.niceToHave.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).map((s: string) => `• ${s}`).join('\n') : '• Additional skills welcome'}
 
-${formData.domain ? `Domain Knowledge\n${formData.domain}\n\n` : ''}Soft Skills
-${formData.soft ? formData.soft.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).join('\n') : 'Strong communication and stakeholder management\nProblem-solving and adaptability\nLeadership and team collaboration'}
+${formData.domain ? `🌐 Domain Knowledge\n${formData.domain.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).map((s: string) => `• ${s}`).join('\n')}\n\n` : ''}🤝 Soft Skills
+${formData.soft ? formData.soft.split(/[,\n]/).map((s: string) => s.trim()).filter(Boolean).map((s: string) => `• ${s}`).join('\n') : '• Strong communication and stakeholder management\n• Problem-solving and adaptability\n• Leadership and team collaboration'}
 
-${formData.languages ? `Languages\n${formData.languages.split(/[,\n]/).map((l: string) => l.trim()).filter(Boolean).join('\n')}\n\n` : ''}🔹 Compensation & Benefits
+${formData.languages ? `🗣️ Languages\n${formData.languages.split(/[,\n]/).map((l: string) => l.trim()).filter(Boolean).map((l: string) => `• ${l}`).join('\n')}\n\n` : ''}🔹 Compensation & Benefits
 💰 Salary Range: ${salaryRange}
 ${formData.bonus ? `🎁 Bonus: ${formData.bonus}` : '🎁 Bonus: Performance-based incentives'}
 ${formData.perks ? `✨ Perks: ${formData.perks.split(/[,\n]/).map((p: string) => p.trim()).filter(Boolean).join(', ')}` : '✨ Perks: Health insurance, flexible working hours, wellness programs'}
 ${formData.timeOff ? `🌴 Time Off Policy: ${formData.timeOff}` : '🌴 Time Off Policy: Competitive leave policy'}
 
 🔹 Logistics
-Joining Timeline: ${formData.joining || 'Within 30 days'}
-${formData.travel ? `Travel Requirements: ${formData.travel}` : 'Travel Requirements: Minimal travel as per project needs'}
-Work Authorization: ${formData.visa || 'Work authorization required'}`
+📆 Joining Timeline: ${formData.joining || 'Within 30 days'}
+${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ Travel Requirements: Minimal travel as per project needs'}
+📝 Work Authorization: ${formData.visa || 'Work authorization required'}
+⏰ Notice Period: ${formData.noticePeriodMonths || 'Negotiable'} months ${formData.noticePeriodNegotiable === 'yes' ? '(negotiable)' : ''}
+`
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -799,7 +905,8 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
     setIsSubmitting(true)
 
     try {
-      const compiledDescription = generateStructuredDescription()
+      // Use user-edited descriptionMd if available, otherwise generate fresh
+      const compiledDescription = formData.descriptionMd || generateStructuredDescription()
       const compiledRequirements = formData.requirements || 'As per job requirements'
 
       // Optional sanity check for salary range
@@ -826,7 +933,9 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
         if (formData.location) updates.location = formData.location
         const mappedEmpType = toDbEmploymentType(formData.jobType)
         if (mappedEmpType) updates.employment_type = mappedEmpType
-        if (formData.status) updates.status = formData.status
+        // Auto-transition from DRAFT to OPEN on final submission
+        updates.status = formData.status === 'draft' ? 'open' : formData.status
+        updates.auto_schedule_interview = formData.sendInterviewLinkAutomatically === true
         const mappedLevel = toDbExperienceLevel(formData.experienceLevel)
         if (mappedLevel) updates.experience_level = mappedLevel
         if (compiledDescription || formData.description) updates.description_md = compiledDescription || formData.description || ''
@@ -838,6 +947,9 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
         if (formData.salaryMin || formData.salaryMax || formData.period) {
           updates.salary_level = `${formData.salaryMin || ''}-${formData.salaryMax || ''} (${formData.period || 'Monthly'})`
         }
+        // Notice period
+        if (formData.noticePeriodMonths) updates.notice_period_months = parseInt(formData.noticePeriodMonths)
+        if (formData.noticePeriodNegotiable) updates.notice_period_negotiable = formData.noticePeriodNegotiable === 'yes'
         res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}?company=${encodeURIComponent(company?.name || '')}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -845,12 +957,14 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
         })
         data = await res.json()
       } else {
-        // POST create flow
+        // POST create flow - always create as 'open' status (not draft)
         res = await fetch('/api/jobs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ...formData,
+            status: 'open', // Final submission always creates as Open
+            auto_schedule_interview: formData.sendInterviewLinkAutomatically,
             description: compiledDescription || formData.description || '',
             requirements: compiledRequirements || formData.requirements || '',
             companyId: company?.id, // Pass companyId directly
@@ -872,15 +986,22 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
         throw new Error(data?.error || 'Failed to save job')
       }
 
-      // Store minimal info
+      // Store minimal info - status is now 'open' after final submission
       const finalJobId = data.jobId || jobIdToUpdate
+      const finalStatus = 'open' // After final submission, job is always open
       const jobData = {
         ...formData,
+        status: finalStatus,
         id: finalJobId,
         createdAt: new Date().toISOString(),
       }
       localStorage.setItem('newJobData', JSON.stringify(jobData))
       localStorage.setItem('selectedInterviewRounds', JSON.stringify(formData.interviewRounds))
+      // Update localStorage status to 'open' (no longer draft)
+      if (finalJobId) {
+        localStorage.setItem(`jobStatus:${finalJobId}`, finalStatus)
+        localStorage.setItem(`applyFormEnabled:${finalJobId}`, 'true')
+      }
 
       // Save interview questions and criteria to database
       if (formData.interviewRounds.length > 0 && finalJobId) {
@@ -918,6 +1039,104 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
       console.error('Error creating job:', error)
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  // Save as Draft handler
+  const handleSaveDraft = async () => {
+    setIsSavingDraft(true)
+    try {
+      const compiledDescription = formData.descriptionMd || generateStructuredDescription()
+      const compiledRequirements = formData.requirements || 'As per job requirements'
+      
+      const jobIdToUpdate = createdJobId || searchParams.get('jobId')
+      
+      if (jobIdToUpdate) {
+        // Update existing draft
+        const updates: any = {
+          status: 'draft',
+          title: formData.jobTitle || 'Untitled Draft',
+          location: formData.location || '',
+          description_md: compiledDescription,
+          responsibilities_md: compiledRequirements,
+          auto_schedule_interview: formData.sendInterviewLinkAutomatically === true,
+        }
+        if (formData.jobType) {
+          const mappedEmpType = toDbEmploymentType(formData.jobType)
+          if (mappedEmpType) updates.employment_type = mappedEmpType
+        }
+        if (formData.experienceLevel) {
+          const mappedLevel = toDbExperienceLevel(formData.experienceLevel)
+          if (mappedLevel) updates.experience_level = mappedLevel
+        }
+        if (formData.salaryMin || formData.salaryMax) {
+          updates.salary_level = `${formData.salaryMin || ''}-${formData.salaryMax || ''} (${formData.period || 'Monthly'})`
+        }
+        
+        const res = await fetch(`/api/jobs/${encodeURIComponent(jobIdToUpdate)}?company=${encodeURIComponent(company?.name || '')}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        })
+        const data = await res.json()
+        if (!res.ok || !data?.ok) {
+          throw new Error(data?.error || 'Failed to save draft')
+        }
+        try {
+          setCreatedJobId(jobIdToUpdate)
+          localStorage.setItem(
+            `draftFormData:${jobIdToUpdate}`,
+            JSON.stringify({ ...formData, status: 'draft' })
+          )
+          localStorage.setItem(`jobStatus:${jobIdToUpdate}`, 'draft')
+          localStorage.setItem(`applyFormEnabled:${jobIdToUpdate}`, 'false')
+        } catch {}
+        alert('Draft saved successfully!')
+      } else {
+        // Create new draft
+        const res = await fetch('/api/jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...formData,
+            status: 'draft',
+            auto_schedule_interview: formData.sendInterviewLinkAutomatically === true,
+            jobTitle: formData.jobTitle || 'Untitled Draft',
+            description: compiledDescription,
+            requirements: compiledRequirements,
+            companyId: company?.id,
+            createdBy: user?.email || null,
+            draftJobId: draftJobId || null,
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok || !data?.ok) {
+          if (data?.code === 'TRIAL_JD_LIMIT_REACHED') {
+            alert('🎉 Free Trial Limit Reached!\n\n' + data?.error)
+          } else {
+            throw new Error(data?.error || 'Failed to save draft')
+          }
+          return
+        }
+        // Store the created job ID for future saves
+        if (data.jobId) {
+          setCreatedJobId(data.jobId)
+          try {
+            localStorage.setItem(
+              `draftFormData:${data.jobId}`,
+              JSON.stringify({ ...formData, status: 'draft' })
+            )
+            localStorage.setItem(`jobStatus:${data.jobId}`, 'draft')
+            localStorage.setItem(`applyFormEnabled:${data.jobId}`, 'false')
+          } catch {}
+        }
+        alert('Draft saved successfully!')
+      }
+    } catch (error) {
+      console.error('Error saving draft:', error)
+      alert((error as Error).message || 'Failed to save draft')
+    } finally {
+      setIsSavingDraft(false)
     }
   }
 
@@ -980,30 +1199,43 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{searchParams.get('jobId') ? 'Edit Job' : 'Create New Job'}</h1>
-        <p className="text-sm sm:text-base text-gray-600 mt-1">{searchParams.get('jobId') ? 'Review and update the job details' : 'Fill out the details to create a comprehensive job posting'}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+          {isDraftEdit ? 'Complete the Draft Job' : (isEditing ? 'Edit Job' : 'Create New Job')}
+        </h1>
+        <p className="text-sm sm:text-base text-gray-600 mt-1">
+          {isDraftEdit ? 'Finish your draft and publish it when ready' : (isEditing ? 'Review and update the job details' : 'Fill out the details to create a comprehensive job posting')}
+        </p>
 
         {/* Top bar Job Status selector */}
         <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-4 shadow-sm">
           <div>
             <div className="font-semibold text-gray-900">Job Status</div>
-            <div className="text-sm text-gray-600">Set whether the job is open, on hold, or closed</div>
+            <div className="text-sm text-gray-600">
+              {formData.status === 'draft' ? 'This job is in draft mode. Submit to publish.' : 'Set whether the job is open, on hold, or closed'}
+            </div>
           </div>
           <div className="w-full sm:w-auto">
-            <Select
-              value={formData.status}
-              onValueChange={(val) => handleInputChange('status', val)}
-            >
-              <SelectTrigger className="w-full sm:w-[200px] bg-white border-gray-300">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="on_hold">On Hold</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Draft jobs show only Draft status (not changeable until final submission) */}
+            {formData.status === 'draft' ? (
+              <div className="w-full sm:w-[200px] px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-amber-700 font-medium text-sm">
+                Draft
+              </div>
+            ) : (
+              <Select
+                value={formData.status}
+                onValueChange={(val) => handleInputChange('status', val)}
+              >
+                <SelectTrigger className="w-full sm:w-[200px] bg-white border-gray-300">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="on_hold">On Hold</SelectItem>
+                  <SelectItem value="closed">Closed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
       </div>
@@ -1030,9 +1262,9 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
               <TabsTrigger value="requirements" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Requirements</TabsTrigger>
               <TabsTrigger value="responsibilities" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Responsibilities</TabsTrigger>
               <TabsTrigger value="compensation" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Compensation</TabsTrigger>
-              <TabsTrigger value="logistics" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Visa & Others</TabsTrigger>
               <TabsTrigger value="resume-screening" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Screening Questions</TabsTrigger>
               <TabsTrigger value="interview" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Interview Process</TabsTrigger>
+              <TabsTrigger value="summary" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-emerald-50 data-[state=inactive]:text-gray-700 data-[state=inactive]:bg-transparent px-2 sm:px-3 py-2 text-[9px] sm:text-xs rounded-lg font-medium whitespace-nowrap transition-all flex items-center justify-center">Summary</TabsTrigger>
             </TabsList>
           </div>
 
@@ -1059,8 +1291,8 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                       value={formData.jobTitle}
                       onChange={(e) => handleInputChange('jobTitle', e.target.value)}
                       required
-                      readOnly={isEditing}
-                      disabled={isEditing}
+                      readOnly={isReadOnly}
+                      disabled={isReadOnly}
                     />
                   </div>
                   <div className="space-y-2">
@@ -1084,13 +1316,13 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                       value={formData.location}
                       onChange={(e) => handleInputChange('location', e.target.value)}
                       required
-                      readOnly={isEditing}
-                      disabled={isEditing}
+                      readOnly={isReadOnly}
+                      disabled={isReadOnly}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="jobType">Work Arrangement *</Label>
-                    <Select value={formData.jobType} onValueChange={(value) => handleInputChange('jobType', value)} disabled={isEditing}>
+                    <Select value={formData.jobType} onValueChange={(value) => handleInputChange('jobType', value)} disabled={isReadOnly}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select work arrangement" />
                       </SelectTrigger>
@@ -1107,7 +1339,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
 
                 <div className="space-y-2">
                   <Label htmlFor="experienceLevel">Job Level / Seniority</Label>
-                  <Select value={formData.experienceLevel} onValueChange={(value) => handleInputChange('experienceLevel', value)} disabled={isEditing}>
+                  <Select value={formData.experienceLevel} onValueChange={(value) => handleInputChange('experienceLevel', value)} disabled={isReadOnly}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select experience level" />
                     </SelectTrigger>
@@ -1140,40 +1372,40 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="education">Educational Background</Label>
-                    <Input id="education" placeholder="e.g., BSc CS; Azure Certs" value={formData.education} onChange={(e)=>handleInputChange('education', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                    <Input id="education" placeholder="e.g., BSc CS; Azure Certs" value={formData.education} onChange={(e)=>handleInputChange('education', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="years">Years of Experience</Label>
-                    <Input id="years" placeholder="e.g., 5–8 years (min 5)" value={formData.years} onChange={(e)=>handleInputChange('years', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                    <Label htmlFor="years">Years of Experience <span className="text-red-500">*</span></Label>
+                    <Input id="years" placeholder="e.g., 5–8 years (min 5)" value={formData.years} onChange={(e)=>handleInputChange('years', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="technical">Technical Skills</Label>
-                  <Textarea id="technical" placeholder="Hard skills, tools, languages, platforms" value={formData.technical} onChange={(e)=>handleInputChange('technical', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                  <Label htmlFor="technical">Primary Skills <span className="text-red-500">*</span></Label>
+                  <Textarea id="technical" placeholder="Hard skills, tools, languages, platforms" value={formData.technical} onChange={(e)=>handleInputChange('technical', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="domain">Domain Knowledge</Label>
-                  <Textarea id="domain" placeholder="Industry-specific expertise" value={formData.domain} onChange={(e)=>handleInputChange('domain', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                  <Textarea id="domain" placeholder="Industry-specific expertise" value={formData.domain} onChange={(e)=>handleInputChange('domain', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="soft">Soft Skills</Label>
-                  <Textarea id="soft" placeholder="Communication, leadership, problem-solving, adaptability" value={formData.soft} onChange={(e)=>handleInputChange('soft', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                  <Textarea id="soft" placeholder="Communication, leadership, problem-solving, adaptability" value={formData.soft} onChange={(e)=>handleInputChange('soft', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="languages">Languages</Label>
-                    <Input id="languages" placeholder="e.g., English (required), Mandarin (nice-to-have)" value={formData.languages} onChange={(e)=>handleInputChange('languages', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                    <Label htmlFor="languages">Languages <span className="text-red-500">*</span></Label>
+                    <Input id="languages" placeholder="e.g., English (required), Mandarin (nice-to-have)" value={formData.languages} onChange={(e)=>handleInputChange('languages', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                   </div>
                   <div className="space-y-2"></div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="mustHave">Must‑Have Skills</Label>
-                    <Textarea id="mustHave" placeholder="List must-haves, one per line" value={formData.mustHave} onChange={(e)=>handleInputChange('mustHave', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                    <Textarea id="mustHave" placeholder="List must-haves, one per line" value={formData.mustHave} onChange={(e)=>handleInputChange('mustHave', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="niceToHave">Nice‑to‑Have Skills</Label>
-                    <Textarea id="niceToHave" placeholder="List nice-to-haves, one per line" value={formData.niceToHave} onChange={(e)=>handleInputChange('niceToHave', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                    <Textarea id="niceToHave" placeholder="List nice-to-haves, one per line" value={formData.niceToHave} onChange={(e)=>handleInputChange('niceToHave', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                   </div>
                 </div>
               </CardContent>
@@ -1194,19 +1426,19 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="day">Day‑to‑Day Duties</Label>
-                  <Textarea id="day" placeholder="Regular tasks (one per line)" value={formData.day} onChange={(e)=>handleInputChange('day', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                  <Textarea id="day" placeholder="Regular tasks (one per line)" value={formData.day} onChange={(e)=>handleInputChange('day', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="project">Project / Strategic Duties</Label>
-                  <Textarea id="project" placeholder="Long‑term contributions (one per line)" value={formData.project} onChange={(e)=>handleInputChange('project', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                  <Textarea id="project" placeholder="Long‑term contributions (one per line)" value={formData.project} onChange={(e)=>handleInputChange('project', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="collaboration">Team Collaboration / Stakeholders</Label>
-                  <Textarea id="collaboration" placeholder="Cross‑functional interactions (one per line)" value={formData.collaboration} onChange={(e)=>handleInputChange('collaboration', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                  <Textarea id="collaboration" placeholder="Cross‑functional interactions (one per line)" value={formData.collaboration} onChange={(e)=>handleInputChange('collaboration', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="scope">Decision‑Making Scope</Label>
-                  <Textarea id="scope" placeholder="Budget, people management, strategic influence" value={formData.scope} onChange={(e)=>handleInputChange('scope', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                  <Textarea id="scope" placeholder="Budget, people management, strategic influence" value={formData.scope} onChange={(e)=>handleInputChange('scope', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                 </div>
               </CardContent>
             </Card>
@@ -1227,15 +1459,15 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="salaryMin">Salary Min</Label>
-                    <Input id="salaryMin" type="number" placeholder="e.g., 6000" value={formData.salaryMin} onChange={(e)=>handleInputChange('salaryMin', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                    <Input id="salaryMin" type="number" placeholder="e.g., 6000" value={formData.salaryMin} onChange={(e)=>handleInputChange('salaryMin', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="salaryMax">Salary Max</Label>
-                    <Input id="salaryMax" type="number" placeholder="e.g., 9000" value={formData.salaryMax} onChange={(e)=>handleInputChange('salaryMax', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                    <Input id="salaryMax" type="number" placeholder="e.g., 9000" value={formData.salaryMax} onChange={(e)=>handleInputChange('salaryMax', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="period">Period</Label>
-                    <Select value={formData.period} onValueChange={(value)=>handleInputChange('period', value)} disabled={isEditing}>
+                    <Select value={formData.period} onValueChange={(value)=>handleInputChange('period', value)} disabled={isReadOnly}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -1248,51 +1480,20 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="bonus">Bonus / Incentives</Label>
-                  <Input id="bonus" placeholder="e.g., 10% annual bonus; RSUs" value={formData.bonus} onChange={(e)=>handleInputChange('bonus', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                  <Input id="bonus" placeholder="e.g., 10% annual bonus; RSUs" value={formData.bonus} onChange={(e)=>handleInputChange('bonus', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="perks">Perks & Benefits</Label>
-                  <Textarea id="perks" placeholder="Health, insurance, stock options, learning budget, wellness" value={formData.perks} onChange={(e)=>handleInputChange('perks', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                  <Textarea id="perks" placeholder="Health, insurance, stock options, learning budget, wellness" value={formData.perks} onChange={(e)=>handleInputChange('perks', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="timeOff">Time Off Policy</Label>
-                  <Input id="timeOff" placeholder="e.g., 18 AL, sick leave, parental leave" value={formData.timeOff} onChange={(e)=>handleInputChange('timeOff', e.target.value)} readOnly={isEditing} disabled={isEditing} />
+                  <Input id="timeOff" placeholder="e.g., 18 AL, sick leave, parental leave" value={formData.timeOff} onChange={(e)=>handleInputChange('timeOff', e.target.value)} readOnly={isReadOnly} disabled={isReadOnly} />
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="logistics" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Briefcase className="h-5 w-5" />
-                  Visa & Others
-                </CardTitle>
-                <CardDescription>
-                  Final details to help candidates plan
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="joining">Joining Timeline</Label>
-                    <Input id="joining" placeholder="e.g., Within 30 days" value={formData.joining} onChange={(e)=>handleInputChange('joining', e.target.value)} readOnly={isEditing} disabled={isEditing} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="travel">Travel Requirements</Label>
-                    <Input id="travel" placeholder="e.g., Up to 20%" value={formData.travel} onChange={(e)=>handleInputChange('travel', e.target.value)} readOnly={isEditing} disabled={isEditing} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="visa">Work Authorization / Visa</Label>
-                  <Input id="visa" placeholder="e.g., Open to sponsorship / PR required" value={formData.visa} onChange={(e)=>handleInputChange('visa', e.target.value)} readOnly={isEditing} disabled={isEditing} />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          
 
           <TabsContent value="interview" className="space-y-6">
             <Card>
@@ -1342,7 +1543,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                     if (isEditing) return
                                     handleArrayChange('interviewRounds', round, e.target.checked)
                                   }}
-                                  disabled={isEditing}
+                                  disabled={isReadOnly}
                                   onClick={(e) => e.stopPropagation()}
                                   className="h-4 w-4 rounded border border-gray-300 text-blue-600 focus:ring-blue-500 mt-1 sm:mt-0"
                                 />
@@ -1407,7 +1608,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                             }}
                                             className="flex-1 text-sm min-w-0"
                                             placeholder={isEditing ? "Questions are not editable in view mode" : "Enter question..."}
-                                            readOnly={isEditing}
+                                            readOnly={isReadOnly}
                                           />
                                           <Button
                                             type="button"
@@ -1438,7 +1639,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                           })
                                         }
                                       }}
-                                      disabled={isEditing}
+                                      disabled={isReadOnly}
                                     >
                                       <Plus className="w-3 h-3 mr-1" />
                                       {isEditing ? "View mode - questions cannot be modified" : "Add a custom question..."}
@@ -1461,7 +1662,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                           })
                                         }
                                       }}
-                                      disabled={isEditing}
+                                      disabled={isReadOnly}
                                     >
                                       <Plus className="w-3 h-3 mr-1" />
                                       {isEditing ? "View mode - questions cannot be modified" : "Add a custom question..."}
@@ -1481,7 +1682,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                                       className={`px-3 py-1 text-xs flex items-center gap-1 ${isEditing ? 'opacity-100' : ''}`}
                                     >
                                       {criterion}
-                                      {!isEditing && (
+                                      {isCreateFlow && (
                                         <button
                                           type="button"
                                           onClick={() => {
@@ -1578,10 +1779,9 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                   <div className="space-y-5">
                     {/* Experience Section */}
                     <div className="space-y-3">
-                      <Label className="text-sm font-medium text-gray-700">Experience</Label>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="screeningOverallExp" className="text-sm text-gray-600">Total Years of Experience</Label>
+                          <Label htmlFor="screeningOverallExp" className="text-sm text-gray-600">Total Years of Experience <span className="text-red-500">*</span></Label>
                           <Input
                             id="screeningOverallExp"
                             type="number"
@@ -1590,47 +1790,39 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                             value={formData.screeningOverallExp}
                             onChange={(e) => handleInputChange('screeningOverallExp', e.target.value)}
                             className="mt-1"
+                            required
                           />
-                          <p className="text-xs text-gray-500 mt-1">
-                            Enter the minimum total experience required for this role.
-                          </p>
                         </div>
                         <div>
-                          <Label htmlFor="screeningPrimarySkill" className="text-sm text-gray-600">Primary Skill Experience</Label>
+                          <Label htmlFor="screeningPrimarySkill" className="text-sm text-gray-600">Primary Skill Experience <span className="text-red-500">*</span></Label>
                           <Input
                             id="screeningPrimarySkill"
                             placeholder="UiPath - 3 years"
                             value={formData.screeningPrimarySkill}
                             onChange={(e) => handleInputChange('screeningPrimarySkill', e.target.value)}
                             className="mt-1"
+                            required
                           />
-                          <p className="text-xs text-gray-500 mt-1">
-                            Enter the main skill and required years of experience.
-                          </p>
                         </div>
                       </div>
                     </div>
 
                     {/* Location */}
                     <div className="space-y-3">
-                      <Label className="text-sm font-medium text-gray-700">Location</Label>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="screeningCurrentLocation" className="text-sm text-gray-600">Preferred Location</Label>
+                          <Label htmlFor="screeningCurrentLocation" className="text-sm text-gray-600">Preferred Location <span className="text-red-500">*</span></Label>
                           <Input
                             id="screeningCurrentLocation"
                             placeholder="e.g., Bangalore, India"
                             value={formData.screeningCurrentLocation}
                             onChange={(e) => handleInputChange('screeningCurrentLocation', e.target.value)}
                             className="mt-1"
+                            required
                           />
-                          <p className="text-xs text-gray-500 mt-1">
-                            Enter preferred current working location (optional).<br />
-                            Example: Bangalore, India
-                          </p>
                         </div>
                         <div>
-                          <Label htmlFor="screeningNationality" className="text-sm text-gray-600">Nationality</Label>
+                          <Label htmlFor="screeningNationality" className="text-sm text-gray-600">Nationality <span className="text-red-500">*</span></Label>
                           <Select 
                             value={formData.screeningNationality} 
                             onValueChange={(value) => handleInputChange('screeningNationality', value)}
@@ -1646,17 +1838,13 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                               <SelectItem value="eu">EU Citizen</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Select nationality if required, otherwise keep Any.
-                          </p>
                         </div>
                       </div>
                     </div>
 
                     {/* Work Authorization */}
                     <div className="space-y-3">
-                      <Label className="text-sm font-medium text-gray-700">Work Authorization</Label>
-                      <p className="text-xs text-gray-500">Select one option:</p>
+                      <Label className="text-sm font-medium text-gray-700">Work Authorization <span className="text-red-500">*</span></Label>
                       <div className="flex gap-6">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
@@ -1685,10 +1873,9 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
 
                     {/* Language & Salary */}
                     <div className="space-y-3">
-                      <Label className="text-sm font-medium text-gray-700">Other Requirements</Label>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="screeningLanguage" className="text-sm text-gray-600">English Proficiency</Label>
+                          <Label htmlFor="screeningLanguage" className="text-sm text-gray-600">Language <span className="text-red-500">*</span></Label>
                           <Select 
                             value={formData.screeningLanguageProficiency} 
                             onValueChange={(value) => handleInputChange('screeningLanguageProficiency', value)}
@@ -1703,13 +1890,9 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                               <SelectItem value="native">Native</SelectItem>
                             </SelectContent>
                           </Select>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Select the minimum required level.<br />
-                            Example: Intermediate
-                          </p>
                         </div>
                         <div>
-                          <Label htmlFor="screeningCurrentSalary" className="text-sm text-gray-600">Max Current Salary (Budget)</Label>
+                          <Label htmlFor="screeningCurrentSalary" className="text-sm text-gray-600">Max Current Salary (Budget) <span className="text-red-500">*</span></Label>
                           <Input
                             id="screeningCurrentSalary"
                             type="number"
@@ -1718,15 +1901,248 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
                             value={formData.screeningCurrentSalary}
                             onChange={(e) => handleInputChange('screeningCurrentSalary', e.target.value)}
                             className="mt-1"
+                            required
                           />
-                          <p className="text-xs text-gray-500 mt-1">
-                            Enter the maximum current salary allowed for this role.
-                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Notice Period */}
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="noticePeriodMonths" className="text-sm text-gray-600">Notice Period in Months <span className="text-red-500">*</span></Label>
+                          <Input
+                            id="noticePeriodMonths"
+                            type="number"
+                            min="0"
+                            placeholder="e.g., 1"
+                            value={formData.noticePeriodMonths}
+                            onChange={(e) => handleInputChange('noticePeriodMonths', e.target.value)}
+                            className="mt-1"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="noticePeriodNegotiable" className="text-sm text-gray-600">Notice Period Negotiable <span className="text-red-500">*</span></Label>
+                          <Select 
+                            value={formData.noticePeriodNegotiable} 
+                            onValueChange={(value) => handleInputChange('noticePeriodNegotiable', value)}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue placeholder="Select option" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="yes">Yes</SelectItem>
+                              <SelectItem value="no">No</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                     </div>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Summary Tab - LinkedIn Style Structure */}
+          <TabsContent value="summary" className="space-y-6">
+            <Card className="shadow-sm border-gray-200 rounded-xl bg-white">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                  <div className="p-2 bg-emerald-100 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-emerald-600" />
+                  </div>
+                  Job Summary
+                </CardTitle>
+                <CardDescription className="text-gray-500">
+                  Review your job posting before publishing
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                
+                {/* Checkboxes Section */}
+                <div className="space-y-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-start gap-3">
+                    <Switch
+                      id="send-interview-link"
+                      checked={!!formData.sendInterviewLinkAutomatically}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, sendInterviewLinkAutomatically: checked }))}
+                      className="mt-0.5 data-[state=checked]:bg-emerald-600"
+                    />
+                    <div>
+                      <Label htmlFor="send-interview-link" className="font-medium cursor-pointer">
+                        Send Interview Link to Qualified Candidate Automatically
+                      </Label>
+                      <p className="text-xs text-gray-500 mt-1">Candidates who pass screening will automatically receive interview links</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <Checkbox 
+                      id="details-confirmed"
+                      checked={!!formData.detailsConfirmed}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, detailsConfirmed: checked === true }))}
+                      className="h-5 w-5 data-[state=checked]:bg-emerald-600 mt-0.5"
+                    />
+                    <div>
+                      <Label htmlFor="details-confirmed" className="font-medium cursor-pointer text-red-600">
+                        Please confirm if all the details in JD is complete as once Submitted, it cannot be updated. *
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* LinkedIn Style Job Post Structure */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden space-y-4">
+                  
+                  {/* Header Section */}
+                  <div className="p-6 border-b border-gray-200">
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <div className="p-1.5 bg-emerald-100 rounded-lg">
+                        <Briefcase className="h-4 w-4 text-emerald-600" />
+                      </div>
+                      Job Details
+                    </h2>
+                    
+                    {/* Company */}
+                    <div className="mb-4">
+                      <Label htmlFor="company-display" className="font-medium text-gray-700">Company</Label>
+                      <div id="company-display" className="w-full mt-1 p-2.5 bg-gray-50 border border-gray-200 rounded-md text-gray-900 text-sm">
+                        {company?.name || 'Company Name'}
+                      </div>
+                    </div>
+
+                    {/* Job Title & Location - Inline */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="job-title-display" className="font-medium">Job Title</Label>
+                        <div id="job-title-display" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-md text-gray-900 text-sm">
+                          {formData.jobTitle || 'Position Title'}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="location-display" className="font-medium">Job Location</Label>
+                        <div id="location-display" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-md text-gray-900 text-sm">
+                          {formData.location || 'Location'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Workplace, Employment, Seniority - Inline */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="workplace-display" className="font-medium">Workplace Type</Label>
+                        <div id="workplace-display" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-md text-gray-900 text-sm capitalize">
+                          {formData.location?.toLowerCase().includes('remote') ? 'Remote' : 'On-site'}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="employment-display" className="font-medium">Employment Type</Label>
+                        <div id="employment-display" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-md text-gray-900 text-sm capitalize">
+                          {formData.jobType?.replace(/[-_]/g, ' ') || 'Full-time'}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="seniority-display" className="font-medium">Seniority Level</Label>
+                        <div id="seniority-display" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-md text-gray-900 text-sm capitalize">
+                          {formData.experienceLevel || 'Entry'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Skills Tags */}
+                    {formData.technical && (
+                      <div className="space-y-2 mb-4">
+                        <Label htmlFor="skills-display" className="font-medium">Skills</Label>
+                        <div id="skills-display" className="flex flex-wrap gap-2 mt-1">
+                          {formData.technical.split(/[,\n]/).filter(Boolean).slice(0, 10).map((skill, index) => (
+                            <Badge key={index} className="bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 px-2.5 py-0.5 rounded-md text-xs font-medium">
+                              {skill.trim()}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Job Description Section - Editable */}
+                  <div className="p-6 border-b border-gray-200">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="description-md" className="font-medium text-gray-700">Job Description</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setFormData(prev => ({ ...prev, descriptionMd: generateStructuredDescription() }))}
+                          className="text-xs h-7"
+                        >
+                          Regenerate
+                        </Button>
+                      </div>
+                      <Textarea
+                        id="description-md"
+                        value={formData.descriptionMd}
+                        onChange={(e) => handleInputChange('descriptionMd', e.target.value)}
+                        placeholder="Job description will be auto-generated from your inputs..."
+                        className="min-h-[400px] bg-gray-50 border-gray-200 rounded-md text-gray-700 text-sm leading-relaxed font-mono whitespace-pre-wrap"
+                      />
+                      <p className="text-xs text-gray-500">This description is auto-generated from your inputs. You can edit it as needed before submitting.</p>
+                    </div>
+                  </div>
+
+                  {/* Additional Skills Tags */}
+                  {formData.soft && (
+                    <div className="p-6 border-b border-gray-200">
+                      <div className="space-y-2">
+                        <Label htmlFor="soft-skills" className="font-medium">Soft Skills (up to 10)</Label>
+                        <p className="text-xs text-gray-500">These skills will appear on the job post and be used to show the listing to relevant candidates.</p>
+                        <div id="soft-skills" className="flex flex-wrap gap-2 mt-2">
+                          {formData.soft.split(/[,\n]/).filter(Boolean).slice(0, 10).map((skill, index) => (
+                            <Badge key={index} className="bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 px-2.5 py-0.5 rounded-md text-xs font-medium">
+                              {skill.trim()}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Job Link Section */}
+                  <div className="p-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="job-link" className="font-medium">Job Application Link</Label>
+                      <div className="flex items-center gap-3 mt-1">
+                        <div id="job-link" className="flex-1 p-2.5 bg-gray-50 border border-gray-200 rounded-md text-blue-600 text-sm break-all">
+                          {generateJobLink()}
+                        </div>
+                        <Button 
+                          type="button"
+                          onClick={() => copyToClipboard(generateJobLink())}
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 h-9"
+                        >
+                          Copy Link
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Copy Full Description Button */}
+                <div className="flex justify-center gap-4">
+                  <Button 
+                    type="button"
+                    onClick={() => copyToClipboard(formData.descriptionMd || generateStructuredDescription())}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    Copy Job Description
+                  </Button>
+                </div>
+
               </CardContent>
             </Card>
           </TabsContent>
@@ -1742,7 +2158,29 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
             <Button type="button" variant="outline" onClick={() => router.back()} className="flex-1 sm:flex-none">
               Cancel
             </Button>
-            {isEditing ? (
+            {/* Save as Draft button - available on all tabs in create flow (new job + draft edit) */}
+            {isCreateFlow && (
+              <Button 
+                type="button"
+                variant="outline"
+                onClick={handleSaveDraft}
+                disabled={isSavingDraft}
+                className="flex-1 sm:flex-none border-amber-500 text-amber-700 hover:bg-amber-50"
+              >
+                {isSavingDraft ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-600 mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Draft
+                  </>
+                )}
+              </Button>
+            )}
+            {!isCreateFlow ? (
               // Edit mode: Show Save Status button
               <Button 
                 type="submit" 
@@ -1764,7 +2202,7 @@ Work Authorization: ${formData.visa || 'Work authorization required'}`
             ) : (
               // Create mode: Show Next and Create Job buttons
               <>
-                {currentTab === 'interview' ? (
+                {currentTab === 'summary' ? (
                   <Button 
                     type="submit" 
                     disabled={isSubmitting || !isCurrentTabValid()}

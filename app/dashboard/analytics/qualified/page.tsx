@@ -15,6 +15,7 @@ import SendEmailModal from "@/components/ui/send-email-modal"
 import SendBulkEmailModal from "@/components/ui/send-bulk-email-modal"
 import { Spinner } from "@/components/ui/spinner"
 import { Mail } from "lucide-react"
+import { getAppUrl, getInterviewStartLink } from "@/lib/utils/url"
 
 // Status and Bucket typings
 export type InterviewStatus = "Unqualified" | "Qualified" | "Pending" | "Expired"
@@ -228,7 +229,6 @@ export default function QualifiedCandidatesInterviewFlowPage() {
 
   // Handle bulk email sending
   const handleSendBulkEmail = async (candidates: CandidateRow[], messageTemplate: string, category: 'interview' | 'new_job') => {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
     const companyName = (company as any)?.name || ''
     const recruiterName = user?.full_name || "Recruitment Team"
     const userJobTitle = "HR Manager"
@@ -238,8 +238,8 @@ export default function QualifiedCandidatesInterviewFlowPage() {
 
     for (const candidate of candidates) {
       try {
-        // Generate interview link for this candidate
-        const interviewLink = `${baseUrl}/interview/${encodeURIComponent(candidate.id)}/start`
+        // Generate interview link for this candidate using dynamic URL
+        const interviewLink = getInterviewStartLink(candidate.id)
         const jobTitle = candidate.jobTitle || candidate.appliedJD || "N/A"
 
         // Replace placeholders for this specific candidate
@@ -305,7 +305,7 @@ export default function QualifiedCandidatesInterviewFlowPage() {
     <div className="space-y-6 px-4 md:px-6 py-6 bg-gradient-to-b from-emerald-50/60 via-white to-emerald-50/40">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
         <h1 className="text-2xl font-bold text-gray-900">Qualified Candidates</h1>
-        <div className="flex flex-col xs:flex-row items-start xs:items-center gap-3 xs:space-x-4 w-full sm:w-auto">
+        <div className="flex items-center gap-4">
           <div className="flex items-center space-x-2">
             <Filter className="h-4 w-4 text-gray-500" />
             <Select value={selectedJobId} onValueChange={setSelectedJobId}>
@@ -322,7 +322,7 @@ export default function QualifiedCandidatesInterviewFlowPage() {
               </SelectContent>
             </Select>
           </div>
-          <Link href="/dashboard/analytics" className="text-sm text-blue-600 hover:underline">
+          <Link href="/dashboard/analytics" className="text-sm text-blue-600 hover:underline whitespace-nowrap">
             Back to Analytics
           </Link>
         </div>
