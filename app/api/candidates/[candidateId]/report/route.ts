@@ -17,87 +17,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
 
   try {
     if (!DatabaseService.isDatabaseConfigured()) {
-      // Return mock data if database not configured
-      return NextResponse.json({
-        ok: true,
-        candidate: {
-          id: candidateId,
-          name: "John Doe",
-          email: "john.doe@example.com",
-          phone: "+1 234 567 8900",
-          resumeUrl: "#",
-          appliedAt: new Date().toISOString(),
-          location: "New York, USA",
-          status: "CV Qualified"
-        },
-        evaluation: {
-          overallScore: 85,
-          decision: "qualified",
-          scores: {
-            technical: 88,
-            communication: 82,
-            experience: 85,
-            cultural_fit: 85
-          },
-          strengths: [
-            "Strong technical background in React and Node.js",
-            "Excellent problem-solving skills",
-            "Good communication and teamwork"
-          ],
-          weaknesses: [
-            "Limited experience with cloud platforms",
-            "Could improve system design knowledge"
-          ],
-          reviewerComments: "Strong candidate with solid technical skills. Recommended for next round.",
-          reviewedAt: new Date().toISOString(),
-          reviewedBy: "AI Recruiter"
-        },
-        transcript: {
-          text: "This is a sample transcript of the interview conversation...",
-          duration: "45 minutes",
-          interviewDate: new Date().toISOString(),
-          interviewer: "AI Agent",
-          rounds: [
-            {
-              round: "Technical Round",
-              questions: [
-                {
-                  question: "Explain the difference between var, let, and const in JavaScript",
-                  answer: "var is function-scoped, let and const are block-scoped. const cannot be reassigned.",
-                  score: 90
-                },
-                {
-                  question: "What is the virtual DOM in React?",
-                  answer: "The virtual DOM is a lightweight copy of the actual DOM that React uses for efficient updates.",
-                  score: 85
-                }
-              ]
-            }
-          ]
-        },
-        sectionPointers: {
-          technical: {
-            score: 88,
-            label: "88/100",
-            summary: "Strong technical proficiency. Strong technical background in React and Node.js"
-          },
-          communication: {
-            score: 82,
-            label: "82/100",
-            summary: "Excellent communication skills and clear articulation. Good communication and teamwork"
-          },
-          experience: {
-            score: 85,
-            label: "85/100",
-            summary: "Extensive relevant experience matching job requirements. Excellent problem-solving skills"
-          },
-          cultural: {
-            score: 85,
-            label: "85/100",
-            summary: "Good alignment with team communication and values. Good communication and teamwork"
-          }
-        }
-      })
+      return NextResponse.json({ ok: false, error: "Database not configured" }, { status: 500 })
     }
 
     // Fetch candidate info from applications table
@@ -131,10 +51,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
         c.last_name as c_last_name,
         c.location,
         c.resume_url,
-        f.storage_key as resume_storage_key
+        f.storage_key as resume_storage_key,
+        j.title as job_title
       FROM applications a
       LEFT JOIN candidates c ON a.candidate_id = c.id
       LEFT JOIN files f ON c.resume_file_id = f.id
+      LEFT JOIN jobs j ON a.job_id = j.id
       WHERE a.id = $1::uuid
       ${jobId ? 'AND a.job_id = $2::uuid' : ''}
       LIMIT 1
@@ -148,6 +70,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
     }
 
     const row = candidateRows[0]
+    const jobTitle = row.job_title || 'Position'
     const candidateName = row.c_first_name && row.c_last_name 
       ? `${row.c_first_name} ${row.c_last_name}`
       : row.first_name && row.last_name 
@@ -696,6 +619,193 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
     console.log('📤 Final evaluation object being sent:', JSON.stringify(evaluation, null, 2))
     console.log('📤 Final sectionPointers being sent:', JSON.stringify(sectionPointers, null, 2))
 
+    // CHANGE 2: Classification logic - PROFILE-ONLY (NO SCORES)
+    const candidateProfile = qualificationDetails?.candidateProfile
+    const breakdown = qualificationDetails?.breakdown
+    const university = candidateProfile?.university || 'non-targeted' // Default to non-targeted
+    const employer = candidateProfile?.employer || 'non-targeted' // Default to non-targeted
+    const hasRelevantEducation = breakdown?.education_qualification?.field_match === true || qualificationDetails?.scores?.education_and_certs?.field_match === true
+
+    // Base match decision matrix (NO SCORE INVOLVEMENT)
+    let baseMatch: string
+    if (university === 'targeted' || employer === 'targeted') {
+      baseMatch = "Strong Match"
+    } else if (university === 'non-targeted' && hasRelevantEducation) {
+      baseMatch = "Good Match"
+    } else if (university === 'non-targeted') {
+      baseMatch = "Partial Match"
+    } else {
+      baseMatch = "Weak Match"
+    }
+
+    // Build details array for parentheses
+    const classificationDetails: string[] = []
+    if (university === 'targeted') classificationDetails.push("Targeted institute")
+    if (university === 'non-targeted') classificationDetails.push("Non-targeted institute")
+    if (employer === 'targeted') classificationDetails.push("Tier-1 employer")
+    if (hasRelevantEducation) classificationDetails.push("Relevant education")
+
+    // Grammar fix: "but" instead of comma for non-targeted + relevant education
+    let detailText = classificationDetails.join(", ")
+    if (classificationDetails.includes("Non-targeted institute") && classificationDetails.includes("Relevant education")) {
+      detailText = "Non-targeted institute but Relevant education"
+    }
+
+    const classification = detailText.length > 0 ? `${baseMatch} (${detailText})` : baseMatch
+
+    // CHANGE 3: Show ALL education degrees
+    const education = qualificationDetails?.extracted?.education || []
+    const educationText = education.length > 0
+      ? education.map((e: any) => `${e.degree || 'Degree'} from ${e.institution || 'Institution'}`).join(", ")
+      : "Not specified"
+
+    // CHANGE 5: Extract projects from work_experience
+    const extractedProjects = qualificationDetails?.extracted?.work_experience?.flatMap((exp: any) => 
+      (exp.projects || []).map((project: any) => ({
+        title: project.name || project.title || "Project",
+        company: exp.company || exp.employer || "Company",
+        year: project.year || exp.end_date || exp.duration || "Recent",
+        description: project.description || "",
+        technologies: project.technologies || project.tech_stack || []
+      }))
+    ).slice(0, 3) || []
+
+    // CHANGE 5: Process certifications (support string and object formats)
+    const rawCertifications = qualificationDetails?.extracted?.certifications || []
+    const processedCertifications = rawCertifications.map((c: any) => 
+      typeof c === 'string' ? c : c.name || c.title || 'Certification'
+    )
+
+    // CHANGE 4: Skills alignment with real values - use qualificationDetails.scores structure
+    // Support both new format (scores.skill_match) and old format (breakdown.skill_set_match)
+    const scoresData = qualificationDetails?.scores || {}
+    const breakdownData = qualificationDetails?.breakdown || {}
+    
+    // Skill Match - try scores.skill_match first, fallback to breakdown.skill_set_match
+    const skillMatch = scoresData.skill_match || breakdownData.skill_set_match || {}
+    // Project Relevance - try scores.project_relevance first, fallback to breakdown.project_relevance
+    const projectRelevance = scoresData.project_relevance || breakdownData.project_relevance || {}
+    // Experience Match - try scores.experience_match first, fallback to breakdown.experience_match
+    const experienceMatch = scoresData.experience_match || breakdownData.experience_match || {}
+    // Education & Certs - try scores.education_and_certs first, fallback to breakdown.education_qualification
+    const educationAndCerts = scoresData.education_and_certs || breakdownData.education_qualification || {}
+    // Location & Availability - try scores.location_and_availability first, fallback to breakdown.location_availability
+    const locationAndAvailability = scoresData.location_and_availability || breakdownData.location_availability || {}
+    // Resume Quality - try scores.resume_quality first, fallback to breakdown.resume_quality
+    const resumeQuality = scoresData.resume_quality || breakdownData.resume_quality || {}
+    // Explainable Score - contains the contribution points for each category
+    const explainableScore = qualificationDetails?.explainable_score || {}
+    
+    // Debug: Log the actual data structure being used
+    console.log('📊 [SKILLS ALIGNMENT] Raw scores:', JSON.stringify(scoresData, null, 2).substring(0, 500))
+    console.log('📊 [SKILLS ALIGNMENT] Raw breakdown:', JSON.stringify(breakdownData, null, 2).substring(0, 500))
+    console.log('📊 [SKILLS ALIGNMENT] explainable_score:', JSON.stringify(explainableScore, null, 2))
+
+    // Support both naming conventions: matched_critical (new) vs matched_skills (old)
+    const matchedSkills = skillMatch.matched_critical || skillMatch.matched_skills || []
+    const missingSkills = skillMatch.missing_critical || skillMatch.missing_skills || []
+    const matchedImportant = skillMatch.matched_important || []
+    const totalSkills = matchedSkills.length + missingSkills.length || skillMatch.total_skills || 8
+
+    // Build last role info for experience details
+    const lastExp = qualificationDetails?.extracted?.work_experience?.[0]
+    const lastRole = lastExp ? `${lastExp.title || lastExp.role || 'Role'} at ${lastExp.company || lastExp.employer || 'Company'} (${lastExp.duration || 'N/A'})` : 'Not specified'
+
+    // Get recent projects from extracted.recent_projects
+    const recentProjects = qualificationDetails?.extracted?.recent_projects || []
+
+    // Create structured report data for new UI layout
+    const reportData = {
+      header: {
+        candidateName: candidate.name || 'Candidate',
+        position: jobTitle || 'Position',
+        recommendation: row.is_qualified ? "RECOMMENDED: PROCEED TO NEXT ROUND" : "NOT RECOMMENDED",
+        overallScore: row.qualification_score || 0,
+        reportDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        expectedSalary: row.expected_salary ? `${row.salary_currency || 'USD'} ${row.expected_salary}` : "Not specified",
+        experience: `${qualificationDetails?.extracted?.total_experience_years_estimate || 0}+ years relevant`
+      },
+      
+      profileSnapshot: {
+        name: candidate.name,
+        expectedSalary: row.expected_salary ? `${row.salary_currency || 'USD'} ${row.expected_salary}` : "Not specified",
+        availability: row.available_start_date || "Immediately",
+        classification: classification,
+        education: educationText,
+        employerHistory: qualificationDetails?.extracted?.work_experience?.map((exp: any) => 
+          `${exp.company || exp.employer} (${exp.duration || 'N/A'})`).join(' & ') || "Not specified",
+        locationPreference: row.app_location || row.location || "Not specified"
+      },
+      
+      skillsAlignment: [
+        {
+          area: "Skills Match",
+          score: `${skillMatch.score || skillMatch.overall_score || 0}/100`,
+          points: `+${explainableScore.skill_contribution ?? 0}`,
+          details: `${matchedSkills.length}/${totalSkills || 1} required skills matched\n✓ Strong in: ${matchedSkills.slice(0, 3).join(', ') || 'None'}\n✗ Missing: ${missingSkills.slice(0, 2).join(', ') || 'None'}`
+        },
+        {
+          area: "Project Relevance",
+          score: `${projectRelevance.score || projectRelevance.overall_score || 0}/100`,
+          points: `+${explainableScore.project_contribution ?? 0}`,
+          details: `${projectRelevance.relevant_projects || recentProjects.length || 0} relevant projects analyzed\nRecent: ${lastExp?.company || lastExp?.employer || 'Not specified'}`
+        },
+        {
+          area: "Experience Match",
+          score: `${experienceMatch.score || experienceMatch.overall_score || 0}/100`,
+          points: `+${explainableScore.experience_contribution ?? 0}`,
+          details: `${qualificationDetails?.extracted?.total_experience_years_estimate || 0}+ years in relevant domain\nLast role: ${lastRole}\nVerified in ${recentProjects.length || 0} recent projects`
+        },
+        {
+          area: "Education & Certifications",
+          score: `${educationAndCerts.score || educationAndCerts.overall_score || 0}/100`,
+          points: `+${explainableScore.edu_certs_contribution ?? 0}`,
+          details: `${education[0]?.degree || 'Degree'} from ${education[0]?.institution || 'Institution'}\n${processedCertifications[0] || 'No certifications'}`
+        },
+        {
+          area: "Location & Availability",
+          score: `${locationAndAvailability.score || locationAndAvailability.overall_score || 0}/100`,
+          points: `+${explainableScore.location_contribution ?? 0}`,
+          details: `${locationAndAvailability.candidate_location || row.app_location || row.location || 'Not specified'}\nAvailable: ${row.available_start_date ? new Date(row.available_start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Immediate'}`
+        },
+        {
+          area: "Resume Quality",
+          score: `${resumeQuality.score || resumeQuality.overall_score || 0}/100`,
+          points: `+${explainableScore.quality_contribution ?? 0}`,
+          details: `${resumeQuality.completeness || resumeQuality.clarity || 'Well formatted'}`
+        }
+      ],
+      
+      certificationsAndProjects: {
+        certifications: processedCertifications,
+        projects: recentProjects.map((p: any) => ({
+          title: p.title || p.name || "Project",
+          company: lastExp?.company || lastExp?.employer || "Company",
+          year: p.duration || p.year || "Recent",
+          description: p.description || "",
+          technologies: p.technologies || []
+        }))
+      },
+      
+      recommendation: {
+        decision: row.is_qualified ? "PROCEED TO TECHNICAL INTERVIEW" : "NOT RECOMMENDED",
+        strengths: matchedSkills.slice(0, 3).join(', ') || "None identified",
+        gaps: missingSkills.slice(0, 2).join(', ') || "None identified",
+        nextSteps: row.is_qualified ? [
+          "Technical interview to verify claimed skills",
+          "Validate work experience with references",
+          "Assess problem-solving and communication abilities"
+        ] : [
+          "Consider for junior roles if skill gaps can be addressed",
+          "Recommend additional training or certifications"
+        ]
+      }
+    }
+
+    // CHANGE 4: Add debugging logs
+    console.log("📊 reportData.skillsAlignment", JSON.stringify(reportData.skillsAlignment, null, 2))
+    console.log("📊 Classification:", classification)
+
     return NextResponse.json({
       ok: true,
       candidate,
@@ -706,7 +816,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ candidateId: st
       isQualified: row.is_qualified || null,
       qualificationDetails,
       sectionPointers,
-      verificationPhotos
+      verificationPhotos,
+      reportData,
+      jobTitle
     })
   } catch (e: any) {
     console.error('Failed to load candidate report:', e)

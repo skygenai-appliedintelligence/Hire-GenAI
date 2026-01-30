@@ -33,8 +33,12 @@ export async function POST(req: Request) {
       jobTitle,
       companyName,
       companyId,
-      applicationId
+      applicationId,
+      jobLevel = 'mid' // Job level for adaptive evaluation
     } = body
+
+    // Normalize jobLevel to lowercase
+    const normalizedJobLevel = (jobLevel || 'mid').toLowerCase()
 
     console.log('\n' + '='.repeat(80))
     console.log('🎯 [REAL-TIME EVAL] Starting real-time answer evaluation')
@@ -42,6 +46,7 @@ export async function POST(req: Request) {
     console.log('📝 Question:', question?.substring(0, 100))
     console.log('💬 Answer Length:', answer?.length || 0)
     console.log('🎯 Criterion:', criterion)
+    console.log('📊 Job Level:', normalizedJobLevel)
     console.log('🏢 Company ID:', companyId)
 
     // Validate required fields
@@ -265,65 +270,107 @@ Respond with ONLY the criterion name, nothing else. Example response: "Technical
     // Build evaluation prompt with the mapped criterion
     const evaluationFocus = CRITERIA_EVALUATION_FOCUS[mappedCriterion] || 'general relevance and completeness'
 
-    const evaluationPrompt = `You are an expert interview evaluator conducting real-time answer evaluation.
+    // Build level-specific expectations (inline, no separate helper)
+    const levelExpectations = normalizedJobLevel === 'junior'
+      ? `**JUNIOR LEVEL EXPECTATIONS:**
+- Focus on thinking process, learning ability, and potential
+- Look for clear communication and basic concept understanding
+- Value enthusiasm, willingness to learn, and growth mindset
+- Don't expect extensive production experience or deep expertise
+- Evaluate on HOW they think, not just WHAT they know`
+      : normalizedJobLevel === 'senior'
+      ? `**SENIOR LEVEL EXPECTATIONS:**
+- Expect ownership, specific contributions, and measurable impact
+- Demand concrete examples: "I built", "I fixed", "I designed", "I led"
+- Penalize vague "we worked on" or "team handled" answers - push for individual contribution
+- Look for architectural thinking, technical leadership, and team influence
+- Evaluate on OWNERSHIP and IMPACT, not just knowledge`
+      : `**MID-LEVEL EXPECTATIONS:**
+- Balance of technical skills and practical experience
+- Look for solid contributions with reasonable ownership
+- Expect production experience with some independence
+- Evaluate on both knowledge AND application`
+
+    const evaluationPrompt = `You are an expert interview evaluator.
+
+**IMPORTANT ROLE SEPARATION (DO NOT VIOLATE):**
+- "Strengths" and "Gaps" are ANALYTICAL INSIGHTS derived ONLY from the answer content.
+- The "Score" is a SEPARATE evaluative outcome.
+- Do NOT use the score to decide or justify strengths or gaps.
+- Assume the score does NOT exist while writing strengths and gaps.
 
 **Context:**
 - Position: ${jobTitle || 'Not specified'}
 - Company: ${companyName || 'Not specified'}
+- Job Level: ${normalizedJobLevel.toUpperCase()}
 - Question ${questionNumber || '?'} of ${totalQuestions || '10'}
+- Criterion: ${mappedCriterion || 'General'}
+- Evaluation Focus: ${evaluationFocus}
+
+${levelExpectations}
 
 **Question Asked:**
 "${question}"
 
-**Assigned Criterion:** ${mappedCriterion || 'General'}
-- Evaluation Focus: ${evaluationFocus}
-
 **Candidate's Full Answer:**
 "${answer}"
 
-**EVALUATE THE ANSWER AND PROVIDE A DETAILED JSON RESPONSE:**
+**EVALUATION ORDER (STRICT):**
 
+1. FIRST, analyze the candidate's answer in isolation.
+   - Identify specific skills, tools, actions, concepts, or claims explicitly mentioned.
+   - Identify what is explicitly missing based on the question.
+   - Do NOT think about scoring yet.
+
+2. SECOND, generate strengths and gaps:
+
+   RULES FOR STRENGTHS:
+   - Must be based ONLY on what the candidate actually said.
+   - Each strength must be a complete sentence.
+   - Each strength must reference a concrete detail (tool, concept, action, domain, or experience).
+   - Do NOT write resume-style phrases.
+   - Do NOT use generic terms like "good knowledge", "strong skills", "well explained".
+
+   RULES FOR GAPS (Areas for Improvement):
+   - Must clearly state WHAT was missing from the answer.
+   - Must explain WHY that missing detail matters for this question.
+   - Must be actionable (what could have been added).
+   - Do NOT reference the score or evaluation labels.
+
+3. ONLY AFTER strengths and gaps are written:
+   - Assign a score from 0-100 based on how well the answer meets ${normalizedJobLevel} level expectations.
+   - The score must be consistent with the strengths and gaps already listed.
+   - Do NOT modify strengths or gaps after scoring.
+
+**SCORING GUIDELINES (0-100 scale for ${normalizedJobLevel.toUpperCase()} level):**
+- 90-100: EXCEPTIONAL - Goes beyond ${normalizedJobLevel} expectations
+- 80-89: EXCELLENT - Strong answer meeting ${normalizedJobLevel} expectations with good examples
+- 70-79: GOOD - Solid answer for a ${normalizedJobLevel} candidate
+- 60-69: ADEQUATE - Basic but acceptable for ${normalizedJobLevel}
+- 50-59: BELOW AVERAGE - Does not meet ${normalizedJobLevel} expectations
+- 40-49: WEAK - Significantly below ${normalizedJobLevel} expectations
+- Below 40: POOR - Unacceptable for any level
+
+**Return JSON:**
 {
   "matches_question": true/false,
   "completeness": "complete" | "partial" | "incomplete" | "off_topic",
+  "strengths": [
+    "Complete sentence describing specific strength with concrete detail from answer",
+    "Another complete sentence with tool/concept/action mentioned by candidate"
+  ],
+  "gaps": [
+    "What was missing + why it matters + what could have been added",
+    "Another missing element with explanation"
+  ],
   "score": 0-100,
-  "reasoning": "Detailed explanation of why this score was given, citing specific parts of the answer",
+  "reasoning": "Level-aware evaluation reasoning for ${normalizedJobLevel.toUpperCase()} candidate. Must reference job level and be consistent with strengths/gaps listed above.",
   "criterion_match": {
     "assigned_criterion": "${mappedCriterion || 'General'}",
-    "matches_criterion": true/false,
-    "criterion_reasoning": "How well the answer demonstrates the ${mappedCriterion || 'expected'} criterion"
-  },
-  "answer_analysis": {
-    "key_points_covered": ["point1", "point2"],
-    "missing_elements": ["what was not addressed"],
-    "strengths": ["specific strength from answer"],
-    "weaknesses": ["specific weakness or gap"]
+    "matches_criterion": true/false
   },
   "recommendation": "proceed" | "needs_improvement" | "insufficient"
 }
-
-**STRICT SCORING GUIDELINES - BE HIGHLY CRITICAL:**
-- 90-100: EXCEPTIONAL - Comprehensive answer with multiple specific examples, deep technical/domain knowledge, goes beyond expectations. RARELY given.
-- 80-89: EXCELLENT - Very strong answer with concrete examples, demonstrates clear expertise, covers all aspects thoroughly
-- 70-79: GOOD - Solid answer with some examples, shows competence but lacks exceptional depth or detail
-- 60-69: ADEQUATE - Basic answer that addresses the question but lacks examples, depth, or specificity
-- 50-59: BELOW AVERAGE - Superficial answer with minimal detail, vague responses, lacks concrete examples
-- 40-49: WEAK - Very brief or generic answer, missing key points, shows limited understanding
-- 30-39: POOR - Mostly off-topic, incoherent, or demonstrates lack of knowledge
-- 20-29: VERY POOR - Almost no relevant content, refused to answer properly, or completely off-topic
-- 0-19: UNACCEPTABLE - No answer, inaudible, or completely irrelevant
-
-**CRITICAL STRICT EVALUATION RULES:**
-1. BE HIGHLY CRITICAL - Most answers should score 50-70, not 80-90
-2. Score 80+ ONLY if answer has MULTIPLE specific examples and exceptional depth
-3. Generic or vague answers without examples should score 40-60 maximum
-4. Brief answers (< 30 words) should score below 50 unless perfectly targeted
-5. Answers lacking concrete examples should lose 20-30 points
-6. Off-topic or irrelevant content should score below 30
-7. "I don't know" or skipped questions = 0 points
-8. DO NOT be lenient - evaluate strictly as if this is a competitive hiring process
-9. If answer doesn't demonstrate CLEAR expertise, score should be 60 or below
-10. Default assumption: answers are average (50-60) unless they prove otherwise
 
 Return ONLY the JSON object, no other text.`
 
@@ -347,7 +394,7 @@ Return ONLY the JSON object, no other text.`
         messages: [
           {
             role: 'system',
-            content: 'You are a STRICT expert interview evaluator for a highly competitive hiring process. Be critical and demanding. Most answers should score 40-70. Only exceptional answers with multiple specific examples deserve 80+. Provide detailed, objective evaluations in JSON format only.'
+            content: `You are an expert interview evaluator. Follow STRICT role separation: analyze strengths and gaps FIRST from the answer content only, THEN assign a score. Never let the score influence strengths/gaps. You are evaluating a ${normalizedJobLevel.toUpperCase()} level candidate. Adapt expectations: juniors on thinking/learning, seniors on ownership/impact, mid on balanced skills. Provide JSON output only.`
           },
           {
             role: 'user',
@@ -411,17 +458,13 @@ Return ONLY the JSON object, no other text.`
         score: evaluation.score || 0,
         matches_question: evaluation.matches_question ?? true,
         completeness: evaluation.completeness || 'partial',
-        reasoning: evaluation.reasoning || '',
+        // New strict separation fields
+        strengths: evaluation.strengths || [], // Extracted from answer content only
+        gaps: evaluation.gaps || [], // Missing elements with explanations
+        reasoning: evaluation.reasoning || '', // Level-aware reasoning
         criterion_match: evaluation.criterion_match || {
           assigned_criterion: mappedCriterion,
-          matches_criterion: true,
-          criterion_reasoning: ''
-        },
-        answer_analysis: evaluation.answer_analysis || {
-          key_points_covered: [],
-          missing_elements: [],
-          strengths: [],
-          weaknesses: []
+          matches_criterion: true
         },
         recommendation: evaluation.recommendation || 'proceed',
         evaluated_at: new Date().toISOString(),

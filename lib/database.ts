@@ -1384,23 +1384,79 @@ export class DatabaseService {
     return rows as any
   }
 
-  // Update job_round configuration with questions and criteria
-  static async updateJobRoundConfiguration(jobId: string, roundName: string, questions: string[], criteria: string[]): Promise<void> {
+  // NEW FORMAT for questions:
+  // { questions: [{ id, question, criterion, weight }, ...] }
+  // 
+  // OLD FORMAT (backward compatible):
+  // { questions: ["q1", "q2"], criteria: ["Technical Skills", ...] }
+  //
+  // This method accepts either:
+  // 1. questionsWithWeight: Array<{ id, question, criterion, weight }> - NEW format
+  // 2. questions: string[], criteria: string[] - OLD format (will be transformed)
+  static async updateJobRoundConfiguration(
+    jobId: string, 
+    roundName: string, 
+    questions: string[] | Array<{ id: number; question: string; criterion: string; weight: 'high' | 'medium' | 'low' }>, 
+    criteria?: string[]
+  ): Promise<void> {
     if (!this.isDatabaseConfigured()) {
       throw new Error('Database not configured. Please set DATABASE_URL in your .env.local file.')
     }
     
-    console.log('📝 Saving configuration for:', { jobId, roundName, questionsCount: questions.length, criteriaCount: criteria.length })
+    // Detect format: new (objects with id/question/criterion/weight) or old (string array)
+    const isNewFormat = Array.isArray(questions) && questions.length > 0 && 
+      typeof questions[0] === 'object' && 'question' in questions[0] && 'criterion' in questions[0]
+    
+    let configuration: string
+    
+    if (isNewFormat) {
+      // NEW FORMAT: Store questions as array of objects with id, question, criterion, weight
+      const questionsWithWeight = questions as Array<{ id: number; question: string; criterion: string; weight: 'high' | 'medium' | 'low' }>
+      console.log('📝 Saving NEW FORMAT configuration for:', { jobId, roundName, questionsCount: questionsWithWeight.length })
+      
+      configuration = JSON.stringify({
+        questions: questionsWithWeight
+      })
+    } else {
+      // OLD FORMAT: Transform string array to new format with weight mapping
+      const oldQuestions = questions as string[]
+      const oldCriteria = criteria || []
+      
+      console.log('📝 Transforming OLD FORMAT to NEW FORMAT for:', { jobId, roundName, questionsCount: oldQuestions.length, criteriaCount: oldCriteria.length })
+      
+      // Rule-based weight mapping (deterministic)
+      const CRITERION_WEIGHT_MAP: Record<string, 'high' | 'medium' | 'low'> = {
+        'Technical Skills': 'high',
+        'Problem Solving': 'high',
+        'Communication': 'medium',
+        'Adaptability / Learning': 'medium',
+        'Culture Fit': 'low',
+        'Experience': 'medium',
+        'Teamwork / Collaboration': 'medium',
+        'Leadership': 'medium',
+        'Work Ethic / Reliability': 'medium'
+      }
+      
+      // Transform old format to new format
+      const transformedQuestions = oldQuestions.map((q, idx) => {
+        const criterion = oldCriteria[idx % oldCriteria.length] || 'Technical Skills'
+        return {
+          id: idx + 1,
+          question: q,
+          criterion: criterion,
+          weight: CRITERION_WEIGHT_MAP[criterion] || 'medium'
+        }
+      })
+      
+      configuration = JSON.stringify({
+        questions: transformedQuestions
+      })
+    }
     
     // First check if the round exists
     const checkQ = `SELECT id, name, seq FROM job_rounds WHERE job_id = $1::uuid`
     const existingRounds = await this.query(checkQ, [jobId]) as any[]
     console.log('🔍 Existing rounds in DB:', existingRounds.map(r => `${r.name} (seq:${r.seq})`))
-    
-    const configuration = JSON.stringify({
-      questions: questions || [],
-      criteria: criteria || []
-    })
     
     // Find the round's seq number or use 1 as default
     const existingRound = existingRounds.find(r => r.name === roundName)
@@ -1424,31 +1480,38 @@ export class DatabaseService {
     if (result.length === 0) {
       console.error('❌ Failed to save round:', roundName)
     } else {
-      console.log('✅ Saved round:', result[0].name, 'with', questions.length, 'questions')
+      // Get the count from the parsed configuration
+      const parsedConfig = JSON.parse(configuration)
+      const questionCount = parsedConfig.questions?.length || 0
+      console.log('✅ Saved round:', result[0].name, 'with', questionCount, 'questions in NEW format')
       
       // Also store individual questions in the questions table
       try {
         const companyId = await this.getCompanyIdForJob(jobId)
         console.log('💾 Storing individual questions in questions table...')
         
-        for (let i = 0; i < questions.length; i++) {
-          const question = questions[i]
-          const questionType = i < 2 ? 'introduction' : i < 5 ? 'behavioral' : 'technical'
+        const questionsArray = parsedConfig.questions || []
+        for (let i = 0; i < questionsArray.length; i++) {
+          const q = questionsArray[i]
+          const questionText = typeof q === 'string' ? q : q.question
+          const criterion = typeof q === 'object' ? q.criterion : (criteria?.[i % (criteria?.length || 1)] || 'Technical Skills')
+          const weight = typeof q === 'object' ? q.weight : 'medium'
           
           await this.createQuestion({
             company_id: companyId,
-            text_md: question,
+            text_md: questionText,
             difficulty: 'medium',
-            category: questionType,
+            category: criterion.toLowerCase().includes('technical') ? 'technical' : 'behavioral',
             metadata: {
               roundName: roundName,
               jobId: jobId,
               sequence: i + 1,
-              criteria: criteria
+              criterion: criterion,
+              weight: weight
             }
           })
         }
-        console.log('✅ Stored', questions.length, 'individual questions in questions table')
+        console.log('✅ Stored', questionsArray.length, 'individual questions in questions table')
       } catch (error) {
         console.error('⚠️ Failed to store individual questions:', error)
       }

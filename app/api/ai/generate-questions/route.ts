@@ -3,6 +3,45 @@ import { AIService } from '@/lib/ai-service'
 import { DatabaseService } from '@/lib/database'
 import { EVALUATION_CRITERIA, validateCriteriaSelection } from '@/lib/evaluation-criteria'
 
+// RULE-BASED WEIGHT MAPPING (DETERMINISTIC - NOT AI)
+// This mapping is fixed and never changes
+const CRITERION_WEIGHT_MAP: Record<string, 'high' | 'medium' | 'low'> = {
+  'Technical Skills': 'high',
+  'Problem Solving': 'high',
+  'Communication': 'medium',
+  'Adaptability / Learning': 'medium',
+  'Culture Fit': 'low',
+  // Defaults for other criteria
+  'Experience': 'medium',
+  'Teamwork / Collaboration': 'medium',
+  'Leadership': 'medium',
+  'Work Ethic / Reliability': 'low'
+}
+
+// Get weight for a criterion - DETERMINISTIC, no AI
+function getWeightForCriterion(criterion: string): 'high' | 'medium' | 'low' {
+  return CRITERION_WEIGHT_MAP[criterion] || 'medium'
+}
+
+// Transform questions to new format with weight
+interface QuestionWithWeight {
+  id: number
+  question: string
+  criterion: string
+  weight: 'high' | 'medium' | 'low'
+}
+
+function transformQuestionsToNewFormat(
+  questionsWithCriteria: Array<{ id: number; question: string; criterion: string }>
+): QuestionWithWeight[] {
+  return questionsWithCriteria.map(q => ({
+    id: q.id,
+    question: q.question,
+    criterion: q.criterion,
+    weight: getWeightForCriterion(q.criterion) // RULE-BASED, not AI
+  }))
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { 
@@ -118,8 +157,8 @@ export async function POST(request: NextRequest) {
     console.log('🏷️  Credential Source:', projectId ? 'company-database' : 'environment-variable')
     console.log('='.repeat(60) + '\n')
 
-    let result: { questions: string[], usage?: { promptTokens: number, completionTokens: number } }
-    let mappedQuestions: Array<{ question_text: string; criterion: string; importance: 'high' | 'medium' | 'low' }> | null = null
+    let result: { questions: string[], questionsWithCriteria?: Array<{ id: number; question: string; criterion: string }>, usage?: { promptTokens: number, completionTokens: number } }
+    let questionsWithWeight: QuestionWithWeight[] | null = null
 
     // Check if using new criteria-based generation
     if (useCriteriaBased && selectedCriteria && Array.isArray(selectedCriteria)) {
@@ -144,33 +183,25 @@ export async function POST(request: NextRequest) {
       )
 
       // ==================================================
-      // STEP 2: Map questions to criteria with importance
+      // STEP 2: Apply RULE-BASED weight mapping (NO AI)
       // ==================================================
-      if (result.questions.length > 0) {
-        console.log('🎯 [QUESTION MAPPING] Mapping questions to criteria with importance levels...')
+      if (result.questionsWithCriteria && result.questionsWithCriteria.length > 0) {
+        console.log('🎯 [WEIGHT MAPPING] Applying RULE-BASED weight mapping (deterministic)...')
         
-        const mappingResult = await AIService.mapQuestionsToCriteria(
-          jobTitle,
-          jobDescription,
-          selectedCriteria,
-          result.questions,
-          apiKey || undefined,
-          projectId || undefined
-        )
-
-        if (mappingResult.error) {
-          console.error('❌ [QUESTION MAPPING] Error:', mappingResult.error)
-        } else {
-          mappedQuestions = mappingResult.mappedQuestions
-          console.log('✅ [QUESTION MAPPING] Successfully mapped', mappedQuestions.length, 'questions')
-          
-          // Log distribution
-          const distribution: Record<string, number> = {}
-          mappedQuestions.forEach(q => {
-            distribution[q.criterion] = (distribution[q.criterion] || 0) + 1
-          })
-          console.log('📊 [QUESTION MAPPING] Distribution:', distribution)
-        }
+        // Transform to new format with weight
+        questionsWithWeight = transformQuestionsToNewFormat(result.questionsWithCriteria)
+        
+        console.log('✅ [WEIGHT MAPPING] Successfully assigned weights to', questionsWithWeight.length, 'questions')
+        
+        // Log distribution by criterion and weight
+        const criterionDist: Record<string, number> = {}
+        const weightDist: Record<string, number> = { high: 0, medium: 0, low: 0 }
+        questionsWithWeight.forEach(q => {
+          criterionDist[q.criterion] = (criterionDist[q.criterion] || 0) + 1
+          weightDist[q.weight]++
+        })
+        console.log('📊 [WEIGHT MAPPING] Criterion distribution:', criterionDist)
+        console.log('⚖️  [WEIGHT MAPPING] Weight distribution:', weightDist)
       }
     } else {
       // Legacy: Use old agent-type based generation
@@ -256,8 +287,15 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ 
-      questions: result.questions, 
-      mappedQuestions: mappedQuestions || null,
+      questions: result.questions,
+      // NEW FORMAT: questions with id, question, criterion, weight
+      questionsWithWeight: questionsWithWeight || null,
+      // Legacy format for backward compatibility
+      mappedQuestions: questionsWithWeight ? questionsWithWeight.map(q => ({
+        question_text: q.question,
+        criterion: q.criterion,
+        importance: q.weight
+      })) : null,
       usage: result.usage,
       mode: useCriteriaBased ? 'criteria-based' : 'legacy'
     })

@@ -58,9 +58,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ applicationId:
     console.log('📊 Transcript received, proceeding with evaluation...')
     console.log('🔍 Starting evaluation for application:', applicationId)
 
-    // Get application and job details for evaluation context
+    // Get application and job details for evaluation context (including job level)
     const applicationQuery = `
-      SELECT a.id, a.job_id, j.title as job_title, c.name as company_name,
+      SELECT a.id, a.job_id, j.title as job_title, j.level as job_level, c.name as company_name,
              cand.first_name, cand.last_name
       FROM applications a
       JOIN jobs j ON a.job_id = j.id
@@ -76,6 +76,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ applicationId:
 
     const application = applicationRows[0]
     const jobId = application.job_id
+    const jobLevel = (application.job_level || 'mid').toLowerCase()
+    console.log('📊 Job Level for evaluation:', jobLevel)
 
     // Get company ID for fetching service account key
     const companyQuery = `SELECT company_id FROM jobs WHERE id = $1::uuid`
@@ -150,12 +152,46 @@ Q8. [Technical] How do you stay updated with the latest technologies in your fie
 Q9. [Problem Solving] Describe a technical problem you solved recently.
 Q10. [Culture Fit] What are your salary expectations?`
 
+    // Build level-specific expectations for final evaluation
+    const levelExpectationsForFinal = jobLevel === 'junior'
+      ? `**JUNIOR LEVEL EXPECTATIONS:**
+- Focus on thinking process, learning ability, and potential
+- Look for clear communication and basic concept understanding
+- Value enthusiasm, willingness to learn, and growth mindset
+- Don't expect extensive production experience or deep expertise
+- Evaluate on HOW they think, not just WHAT they know`
+      : jobLevel === 'senior'
+      ? `**SENIOR LEVEL EXPECTATIONS:**
+- Expect ownership, specific contributions, and measurable impact
+- Demand concrete examples: "I built", "I fixed", "I designed", "I led"
+- Penalize vague "we worked on" or "team handled" answers
+- Look for architectural thinking, technical leadership, and team influence
+- Evaluate on OWNERSHIP and IMPACT, not just knowledge`
+      : `**MID-LEVEL EXPECTATIONS:**
+- Balance of technical skills and practical experience
+- Look for solid contributions with reasonable ownership
+- Expect production experience with some independence
+- Evaluate on both knowledge AND application`
+
     // Call OpenAI API for evaluation with DB QUESTIONS
-    const evaluationPrompt = `You are an expert HR evaluator. Evaluate the candidate's answers to the SPECIFIC questions listed below.
+    const evaluationPrompt = `You are an expert interview evaluator.
+
+**IMPORTANT ROLE SEPARATION (DO NOT VIOLATE):**
+- "Strengths" and "Gaps" are ANALYTICAL INSIGHTS derived ONLY from the answer content.
+- The "Score" is a SEPARATE evaluative outcome.
+- Do NOT use the score to decide or justify strengths or gaps.
+- Assume the score does NOT exist while writing strengths and gaps.
+
+**Job Details:**
+- Position: ${application.job_title}
+- Company: ${application.company_name}
+- Candidate: ${application.first_name} ${application.last_name}
+- Job Level: ${jobLevel.toUpperCase()}
+
+${levelExpectationsForFinal}
 
 **CRITICAL: USE ONLY THE DATABASE QUESTIONS BELOW**
 You MUST evaluate ONLY the ${totalInterviewQuestions} questions listed below.
-- Do NOT evaluate any other questions from the transcript
 - Do NOT evaluate closing messages like "Do you have any questions for me?"
 - Do NOT evaluate thank-you messages or interview wrap-up
 - ONLY evaluate answers to the specific questions listed below
@@ -165,86 +201,96 @@ You MUST evaluate ONLY the ${totalInterviewQuestions} questions listed below.
 - Communication: 20% (ALWAYS)
 - Other criteria: 30% (distributed equally among remaining criteria)
 
-**Job Details:**
-- Position: ${application.job_title}
-- Company: ${application.company_name}
-- Candidate: ${application.first_name} ${application.last_name}
-
 **THE ${totalInterviewQuestions} INTERVIEW QUESTIONS TO EVALUATE (from database):**
 ${dbQuestionsForPrompt}
 
 **Interview Transcript:**
 ${transcript}
 
-**STEP-BY-STEP EVALUATION PROCESS:**
+**EVALUATION ORDER (STRICT) - FOR EACH QUESTION:**
 
-**STEP 1: FIND ANSWERS TO DATABASE QUESTIONS ONLY**
-For EACH of the ${totalInterviewQuestions} questions listed above:
-1. Find where the interviewer asked this question (or similar wording) in the transcript
-2. Find the candidate's answer that follows
-3. If the question was not asked or no answer was given, score it as 0
+1. FIRST, analyze the candidate's answer in isolation.
+   - Identify specific skills, tools, actions, concepts, or claims explicitly mentioned.
+   - Identify what is explicitly missing based on the question.
+   - Do NOT think about scoring yet.
 
-**CRITICAL: IGNORE THESE TRANSCRIPT ELEMENTS:**
-- "Do you have any questions for me?" → NOT a database question, do NOT evaluate
-- "Thank you for your time" → closing message, do NOT evaluate
-- "Our team will respond soon" → closing message, do NOT evaluate
-- Any question not in the ${totalInterviewQuestions} database questions above → do NOT evaluate
+2. SECOND, generate strengths and gaps:
 
-**STEP 2: USE THE PRE-ASSIGNED CRITERIA**
-Each question already has its criterion assigned in brackets [Technical], [Communication], etc.
-Use the criterion exactly as specified - do NOT re-categorize.
+   RULES FOR STRENGTHS:
+   - Must be based ONLY on what the candidate actually said.
+   - Each strength must be a complete sentence.
+   - Each strength must reference a concrete detail (tool, concept, action, domain, or experience).
+   - Do NOT write resume-style phrases.
+   - Do NOT use generic terms like "good knowledge", "strong skills", "well explained".
 
-**STEP 3: EVALUATE EACH ANSWER**
-For each of the ${totalInterviewQuestions} database questions:
-- Score from 0-100 based on answer quality
-- Document WHY this score was given (specific evidence from transcript)
-- Note if answer was complete, partial, or missing
+   RULES FOR GAPS (Areas for Improvement):
+   - Must clearly state WHAT was missing from the answer.
+   - Must explain WHY that missing detail matters for this question.
+   - Must be actionable (what could have been added).
+   - Do NOT reference the score or evaluation labels.
 
-**STEP 4: EVALUATE ANSWER QUALITY - BE EXTREMELY STRICT**
-For each question, evaluate the candidate's answer based on the assigned criterion:
-- **Technical**: Demand specific tools, frameworks, code examples, technical depth. Generic answers score 40-60 max.
-- **Communication**: Require clear structure, concrete examples, articulate explanations. Vague answers score below 60.
-- **Cultural Fit**: Look for specific motivation, research about company, clear career alignment. Generic interest scores 40-50.
-- **Team Player**: Demand specific collaboration examples with outcomes. "I work well with others" = 30-40 max.
+3. ONLY AFTER strengths and gaps are written:
+   - Assign a score from 0-100 based on how well the answer meets ${jobLevel} level expectations.
+   - The score must be consistent with the strengths and gaps already listed.
+   - Do NOT modify strengths or gaps after scoring.
 
-**STEP 5: STRICT SCORING RULES - MOST ANSWERS SHOULD SCORE 40-70**
-- Total marks = 100, distributed equally across ALL ${totalInterviewQuestions} configured questions
-- Each question is worth approximately ${Math.floor(100 / totalInterviewQuestions)} marks
-- Score each answer from 0-100 based on quality, then we'll convert to marks
+**SCORING GUIDELINES (0-100 scale for ${jobLevel.toUpperCase()} level) - BE STRICT:**
+- 90-100: EXCEPTIONAL - Reserve ONLY for outstanding answers with specific metrics, measurable impact, and industry best practices. Very rare.
+- 80-89: EXCELLENT - Detailed answer with concrete examples, specific tools/technologies mentioned, and clear ownership. Should be uncommon.
+- 70-79: GOOD - Solid answer but lacks depth, specifics, or measurable outcomes. Most answers fall here.
+- 60-69: ADEQUATE - Generic answer without concrete examples. Missing key details expected for the role.
+- 50-59: BELOW AVERAGE - Vague, incomplete, or off-topic. Does not demonstrate competency.
+- 40-49: WEAK - Significantly lacks substance. Shows no real understanding.
+- Below 40: POOR - Unacceptable. Did not answer the question or completely irrelevant.
 
-**STRICT SCORING SCALE:**
-- 90-100: EXCEPTIONAL - Multiple specific examples, deep expertise, goes beyond expectations (RARELY given)
-- 80-89: EXCELLENT - Strong concrete examples, clear expertise, thorough coverage
-- 70-79: GOOD - Solid answer with some examples, shows competence
-- 60-69: ADEQUATE - Basic answer, addresses question but lacks depth/examples
-- 50-59: BELOW AVERAGE - Superficial, vague, minimal detail
-- 40-49: WEAK - Very brief, generic, missing key points
-- 30-39: POOR - Off-topic, incoherent, lacks knowledge
-- 0-29: UNACCEPTABLE - No answer, refused, completely irrelevant
+**STRICT EVALUATION RULES:**
+- Do NOT give 80+ unless the answer includes SPECIFIC metrics, tools, or measurable outcomes
+- Do NOT give 70+ if the answer is generic without concrete examples
+- Penalize answers that say "we did" instead of "I did" - look for individual ownership
+- Penalize lack of specifics: numbers, percentages, team sizes, timelines
+- If candidate doesn't mention the EXACT tools asked about in the question, penalize by 10-15 points
+- Partial or incomplete answers should NEVER score above 65
 
-**CRITICAL: BE HIGHLY CRITICAL**
-- Default assumption: answers are average (50-60) unless proven otherwise
-- Score 80+ ONLY with multiple specific examples and exceptional depth
-- Generic answers without examples: 40-60 maximum
-- Brief answers (< 30 words): below 50
-- No concrete examples: lose 20-30 points
-- "I don't know" or skipped: 0 points
+**LEVEL-SPECIFIC EVALUATION RULES for ${jobLevel.toUpperCase()}:**
+${jobLevel === 'junior' ? `
+- Score higher on clear thinking and learning ability
+- Don't penalize for lack of production experience
+- Value enthusiasm and problem-solving approach
+- Look for potential, not just current skills` 
+: jobLevel === 'senior' ? `
+- Score lower on vague "we worked on" answers without ownership
+- Expect specific examples with measurable impact
+- Penalize lack of leadership or architectural thinking
+- Demand "I built/designed/led" statements, not just "was involved"
+- Senior answers without metrics or business impact should score below 70`
+: `
+- MID-LEVEL candidates MUST show ownership and concrete examples
+- Penalize heavily for "we did" without "I specifically did"
+- Expect production experience with real examples
+- Generic answers without specifics should score 60-65 max
+- Only give 75+ if candidate shows initiative, problem-solving, and clear individual contribution`}
 
 **Response Format (JSON):**
 {
   "questions": [
     {
       "question_number": 1,
-      "question_text": "Exact question from transcript",
+      "question_text": "Exact question from database",
       "criteria": "Technical Skills",
-      "criteria_reasoning": "Why this question falls under Technical Skills",
-      "score": 85,
+      "score": 65,
       "max_score": 100,
+      "completeness": "complete" | "partial" | "incomplete",
       "answered": true,
-      "candidate_response": "FULL exact text of candidate's answer - do NOT summarize or truncate",
-      "evaluation_reasoning": "Detailed explanation of why this score was given, citing specific parts of the answer",
-      "strengths_in_answer": ["Specific strength 1", "Specific strength 2"],
-      "gaps_in_answer": ["What was missing or could be improved"]
+      "candidate_response": "FULL exact text of candidate's answer from transcript",
+      "strengths": [
+        "Complete sentence describing specific strength with concrete detail from answer",
+        "Another complete sentence with tool/concept/action mentioned by candidate"
+      ],
+      "gaps": [
+        "What was missing + why it matters + what could have been added",
+        "Another missing element with explanation"
+      ],
+      "evaluation_reasoning": "Level-aware reasoning for ${jobLevel.toUpperCase()} candidate. Must reference job level and be consistent with strengths/gaps listed above."
     }
   ],
   "criteria_breakdown": {
@@ -398,10 +444,19 @@ For each question, evaluate the candidate's answer based on the assigned criteri
       }
     }
 
-    // CRITICAL: If we have real-time evaluations from OpenAI, use them directly
-    // This ensures we never use mock scores
-    if (hasRealTimeEvaluations) {
-      console.log('✅ [INTERVIEW EVAL] Using real-time OpenAI evaluations (no mock scores)')
+    // ALWAYS use batch OpenAI evaluation for complete and accurate results
+    // Real-time evaluations are often incomplete (missing questions, truncated answers)
+    // Batch evaluation parses the full transcript and evaluates ALL questions
+    const forceFullBatchEvaluation = true // Always do full batch evaluation
+    
+    // Only use real-time evaluations if they cover ALL expected questions
+    const realTimeEvalComplete = hasRealTimeEvaluations && 
+      realTimeEvaluations.length >= totalInterviewQuestions
+    
+    // ALWAYS use batch evaluation - this ensures complete report like re-evaluate button
+    // The condition will never be true because forceFullBatchEvaluation = true
+    if (hasRealTimeEvaluations && realTimeEvalComplete && !forceFullBatchEvaluation) {
+      console.log('✅ [INTERVIEW EVAL] Using real-time OpenAI evaluations (complete coverage)')
       console.log('📊 [INTERVIEW EVAL] Processing', realTimeEvaluations.length, 'real-time evaluations')
       console.log('📊 [INTERVIEW EVAL] DB question count:', totalInterviewQuestions)
       
@@ -503,14 +558,14 @@ Respond with ONLY the criterion name.`
           question_number: rtEval.question_number || index + 1,
           question_text: rtEval.question_text || '',
           criteria: criterion,
-          criteria_reasoning: rtEval.criterion_match?.criterion_reasoning || '',
+          criteria_reasoning: rtEval.reasoning || rtEval.criterion_match?.criterion_reasoning || '',
           score: rtEval.score || 0,
           max_score: 100,
           answered: rtEval.matches_question !== false,
           candidate_response: rtEval.full_answer || '', // Store FULL answer
           evaluation_reasoning: rtEval.reasoning || '',
-          strengths_in_answer: rtEval.answer_analysis?.strengths || [],
-          gaps_in_answer: rtEval.answer_analysis?.weaknesses || [],
+          strengths_in_answer: rtEval.strengths || rtEval.answer_analysis?.strengths || [],
+          gaps_in_answer: rtEval.gaps || rtEval.answer_analysis?.weaknesses || [],
           completeness: rtEval.completeness || 'partial',
           source: 'openai-realtime' // Mark as real OpenAI evaluation
         }
@@ -653,8 +708,8 @@ ${evaluation.scoring_explanation}
       }, { status: 400 })
     }
     
-    // Proceed with batch OpenAI evaluation (when no real-time evaluations available)
-    console.log('🤖 [INTERVIEW EVAL] Proceeding with batch OpenAI evaluation...')
+    // ALWAYS use batch OpenAI evaluation - this creates complete report like re-evaluate button
+    console.log('🤖 [INTERVIEW EVAL] Running batch evaluation for complete report...')
     console.log('🔑 [INTERVIEW EVAL] Using API key:', openaiApiKey.substring(0, 15) + '...')
     
     // Build headers with project ID if available (for proper attribution)
@@ -675,7 +730,21 @@ ${evaluation.scoring_explanation}
         messages: [
           {
             role: 'system',
-            content: 'You are a STRICT expert HR evaluator for a highly competitive hiring process. Be critical and demanding in your assessment. Most candidates should score 40-70, not 70-90. Only truly exceptional answers with multiple specific examples and deep expertise deserve scores of 80+. Analyze interview transcripts and provide detailed, objective, and STRICT evaluations.'
+            content: `You are a STRICT and CRITICAL interview evaluator. Be demanding - most answers should score 60-75, not 75-85. 
+
+STRICT SCORING RULES:
+- 80+ ONLY for exceptional answers with specific metrics, tools, and measurable outcomes
+- 70-79 for good answers with concrete examples but lacking some depth
+- 60-69 for generic answers without specifics
+- Below 60 for vague or incomplete answers
+
+PENALTIES:
+- No mention of exact tools asked about: -15 points
+- "We did" instead of "I did": -10 points  
+- No specific metrics/numbers: -10 points
+- Partial/incomplete answer: cap at 65 max
+
+You are evaluating a ${jobLevel.toUpperCase()} level candidate. Be critical and look for gaps. Provide JSON output only.`
           },
           {
             role: 'user',
@@ -683,7 +752,7 @@ ${evaluation.scoring_explanation}
           }
         ],
         temperature: 0.3,
-        max_tokens: 2000
+        max_tokens: 4000 // Increased for detailed strengths/gaps per question
       })
     })
 
@@ -992,7 +1061,11 @@ function calculateCriteriaBasedScore(questions: any[], totalInterviewQuestions: 
       score: isUnanswered ? 0 : (q.score || 0),
       marks_obtained: marksObtained,
       max_marks: marksPerQuestion,
-      answered: !isUnanswered
+      answered: !isUnanswered,
+      // Map OpenAI response fields to report page expected fields
+      strengths_in_answer: q.strengths_in_answer || q.strengths || [],
+      gaps_in_answer: q.gaps_in_answer || q.gaps || [],
+      criteria_reasoning: q.criteria_reasoning || q.evaluation_reasoning || ''
     }
   })
   

@@ -17,9 +17,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ applicationId:
       return NextResponse.json({ ok: false, error: 'Database not configured' }, { status: 500 })
     }
 
-    // Get application details to find the job
+    // Get application details to find the job (including job level for adaptive evaluation)
     const applicationQuery = `
-      SELECT a.job_id, j.title as job_title, c.name as company_name,
+      SELECT a.job_id, j.title as job_title, j.level as job_level, c.name as company_name,
              c.id as company_id, cand.first_name, cand.last_name
       FROM applications a
       JOIN jobs j ON a.job_id = j.id
@@ -77,6 +77,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ applicationId:
         id: applicationId,
         jobId: jobId,
         jobTitle: application.job_title,
+        jobLevel: application.job_level || 'mid', // Job level for adaptive evaluation
         companyName: application.company_name,
         companyId: application.company_id,
         candidateName: `${application.first_name || ''} ${application.last_name || ''}`.trim() || 'Candidate'

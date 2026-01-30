@@ -30,6 +30,8 @@ export default function InterviewPage() {
   const [sessionInfo, setSessionInfo] = useState<any>(null)
   const [jobDetails, setJobDetails] = useState<any>(null)
   const [companyId, setCompanyId] = useState<string | null>(null)
+  const [jobLevel, setJobLevel] = useState<string>('mid') // Job level for adaptive evaluation
+  const jobLevelRef = useRef<string>('mid') // Ref to avoid stale closure
   const [interviewQuestions, setInterviewQuestions] = useState<any[]>([])
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [interviewPhase, setInterviewPhase] = useState<'setup' | 'greeting' | 'questions' | 'candidate_questions' | 'closing'>('setup')
@@ -129,6 +131,7 @@ export default function InterviewPage() {
       console.log('📝 Question:', question.substring(0, 80))
       console.log('💬 Answer length:', answer.length)
       console.log('🎯 Criterion:', criterion)
+      console.log('📊 Job Level:', jobLevelRef.current)
       
       const response = await fetch('/api/interview/evaluate-answer', {
         method: 'POST',
@@ -142,7 +145,8 @@ export default function InterviewPage() {
           jobTitle: jobDetails?.jobTitle,
           companyName: jobDetails?.company,
           companyId: companyIdRef.current, // Use ref instead of state
-          applicationId: applicationId
+          applicationId: applicationId,
+          jobLevel: jobLevelRef.current // Job level for adaptive evaluation
         })
       })
       
@@ -655,6 +659,12 @@ export default function InterviewPage() {
           } else {
             console.warn('⚠️ No company ID found in application data')
           }
+          
+          // Store jobLevel for adaptive evaluation
+          const fetchedJobLevel = json.application?.jobLevel || 'mid'
+          setJobLevel(fetchedJobLevel)
+          jobLevelRef.current = fetchedJobLevel
+          console.log('📊 [INIT] Job Level set:', fetchedJobLevel)
           
           // Extract all questions from all rounds
           const allQuestions = json.rounds?.flatMap((round: any) => 
@@ -1313,19 +1323,18 @@ ${questions?.[0]?.criteria?.join(', ') || 'Communication, Technical skills, Cult
           console.log('📸 [SCREENSHOT] No screenshot data stored')
         }
         
-        // Trigger evaluation pipeline with real-time evaluations
-        // Use ref to get current evaluations (avoids stale closure)
+        // Trigger batch evaluation pipeline - this creates complete report like re-evaluate button
+        // The evaluation API will ignore realTimeEvaluations and do full batch evaluation
         const evaluationsToSend = realTimeEvaluationsRef.current
-        console.log('🔍 Starting evaluation pipeline...')
-        console.log('📊 Sending', evaluationsToSend.length, 'real-time evaluations to final evaluation')
-        console.log('📋 Evaluation details:', evaluationsToSend.map(e => ({ q: e.question_number, score: e.score })))
+        console.log('🔍 Starting batch evaluation pipeline...')
+        console.log('📊 Transcript length:', transcript.length, 'characters')
         
         const evaluationResponse = await fetch(`/api/applications/${encodeURIComponent(applicationId)}/evaluate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             transcript,
-            realTimeEvaluations: evaluationsToSend, // Use ref to get current evaluations
+            realTimeEvaluations: evaluationsToSend, // Sent but ignored due to forceFullBatchEvaluation=true
             companyId: companyId // Include company ID for credential lookup
           })
         }).catch(e => {

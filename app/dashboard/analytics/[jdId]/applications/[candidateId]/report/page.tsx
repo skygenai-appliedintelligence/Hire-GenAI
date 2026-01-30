@@ -221,6 +221,7 @@ export default function CandidateReportPage() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [expandedSkillSetMatch, setExpandedSkillSetMatch] = useState(false)
   const [verificationPhotos, setVerificationPhotos] = useState<{ appliedPhoto: string | null; preInterviewPhoto: string | null; duringInterviewPhoto: string | null; postInterviewPhoto: string | null }>({ appliedPhoto: null, preInterviewPhoto: null, duringInterviewPhoto: null, postInterviewPhoto: null })
+  const [reportData, setReportData] = useState<any>(null)
 
   // Download report as PDF
   const downloadReport = async () => {
@@ -319,6 +320,8 @@ export default function CandidateReportPage() {
         candidateLocation: candidate.location || null,
         extractedData: qualificationDetails?.extracted || null,
         experienceRequired: qualificationDetails?.scores?.experience_match?.years_required || undefined,
+        // NEW: Pass reportData for the new 3-page PDF layout
+        reportData: reportData || undefined,
       }
       
       // Generate and open PDF in new window
@@ -373,9 +376,13 @@ export default function CandidateReportPage() {
         setResumeText(typeof json.resumeText === 'string' ? json.resumeText : null)
         setQualificationDetails(json.qualificationDetails || null)
         setSectionPointers(json.sectionPointers || null)
+        setReportData(json.reportData || null)
+        // CHANGE 4: Frontend debugging log
+        console.log("📊 reportData from API", json.reportData)
         if (json.verificationPhotos) setVerificationPhotos(json.verificationPhotos)
         if (json.qualificationScore) setDbScore(json.qualificationScore)
         if (typeof json.isQualified === 'boolean') setDbQualified(json.isQualified)
+        if (json.jobTitle) setJobTitle(json.jobTitle)
 
         // Fetch job data for this job
         if (jdId) {
@@ -668,292 +675,193 @@ export default function CandidateReportPage() {
       {/* Content Area */}
       <div className="px-2 sm:px-3 md:px-4 lg:px-6 py-4 sm:py-6 bg-gradient-to-b from-gray-50/60 via-white to-gray-50/40 max-w-full" ref={reportRef}>
 
-        {/* Merged Card: Application Details with Resume Evaluation at top */}
-        {activeTab === "candidate" && (
-          <Card className="border-0 bg-white shadow-md mb-6 overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-slate-900 to-slate-800 border-b-0 py-4 px-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/10 rounded-lg">
-                    <FileText className="h-5 w-5 text-white" />
-                  </div>
+        {/* NEW: Structured Report Cards UI */}
+        {activeTab === "candidate" && reportData && (
+          <div className="space-y-4 mb-6">
+            {/* Header Card */}
+            <Card className="border-0 shadow-lg overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white p-4">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div>
-                    <CardTitle className="text-white text-lg">application Detail</CardTitle>
+                    <h2 className="text-xl font-bold">{reportData.header?.candidateName}</h2>
+                    <p className="text-blue-100">{reportData.header?.position}</p>
+                    <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold ${reportData.header?.recommendation.includes('RECOMMENDED') ? 'bg-green-500' : 'bg-red-500'}`}>
+                      {reportData.header?.recommendation}
+                    </span>
+                  </div>
+                  <div className="flex flex-col md:flex-row items-center gap-3">
+                    {candidateData?.resumeUrl && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="flex items-center space-x-2 text-xs sm:text-sm h-8 sm:h-9 bg-transparent border-emerald-400 text-emerald-400 hover:bg-emerald-400/10 hover:text-emerald-300"
+                        onClick={() => window.open(candidateData.resumeUrl, '_blank')}
+                      >
+                        <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span>Download Resume</span>
+                      </Button>
+                    )}
+                    <div className="bg-white/15 p-2 rounded text-center">
+                      <div className="text-xs text-blue-100">Score</div>
+                      <div className="font-bold">{reportData.header?.overallScore}/100</div>
+                    </div>
                   </div>
                 </div>
-                {candidateData?.resumeUrl && (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="flex items-center space-x-2 text-xs sm:text-sm h-8 sm:h-9 bg-transparent border-emerald-400 text-emerald-400 hover:bg-emerald-400/10 hover:text-emerald-300"
-                    onClick={() => window.open(candidateData.resumeUrl, '_blank')}
-                  >
-                    <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span>download resume</span>
-                  </Button>
-                )}
               </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {/* Candidate Overview Section - Resume Evaluation style */}
-              {qualificationDetails && (
-                <div className="bg-slate-50 p-4 sm:p-6 border-b border-slate-200">
-                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                    <div className="flex-1 w-full">
-                      <div className="flex items-center space-x-3 sm:space-x-4">
-                        <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg flex items-center justify-center border-2 sm:border-4 border-white shadow-lg cursor-pointer hover:shadow-xl transition-shadow duration-200 flex-shrink-0 overflow-hidden">
-                          {candidateData?.photoUrl ? (
-                            <img 
-                              src={candidateData.photoUrl} 
-                              alt={candidateData.name} 
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <User className="h-8 w-8 sm:h-12 sm:w-12 text-slate-500" />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <h2 className="text-base sm:text-xl font-bold text-slate-800 truncate">{qualificationDetails.extracted?.name || candidateData?.name}</h2>
-                          <div className="flex items-center text-slate-600 mt-1">
-                            <Briefcase className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 flex-shrink-0" />
-                            <span className="text-sm sm:text-base truncate">{jobTitle || 'N/A'}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="md:border-l md:border-slate-300 md:pl-4 flex-1 w-full md:w-auto">
-                      <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                        <div>
-                          <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-medium tracking-wide mb-1">Resume Score</p>
-                          <div className="flex items-center">
-                            <BarChart3 className={`w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 ${resumeScore >= 60 ? 'text-emerald-500' : 'text-red-500'}`} />
-                            <p className={`font-bold text-base sm:text-lg ${resumeScore >= 60 ? 'text-emerald-600' : 'text-red-600'}`}>{resumeScore}<span className="text-slate-400 text-[10px] sm:text-xs">/100</span></p>
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-medium tracking-wide mb-1">Interview Score</p>
-                          {evaluation?.overallScore ? (
-                            <div className="flex items-center">
-                              <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 mr-1.5 sm:mr-2" />
-                              <p className="font-bold text-base sm:text-lg">{evaluation.overallScore}<span className="text-slate-400 text-[10px] sm:text-xs">/100</span></p>
-                            </div>
-                          ) : (
-                            <div className="flex items-center">
-                              <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 mr-1.5 sm:mr-2" />
-                              <p className="font-bold text-base sm:text-lg text-slate-400">—</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Donut Chart - Green for Qualified, Red for Unqualified */}
-                    <div className="w-24 h-24 relative hidden md:flex items-center justify-center">
-                      <svg className="w-24 h-24 transform -rotate-90">
-                        <circle
-                          cx="48"
-                          cy="48"
-                          r="40"
-                          stroke="#e5e7eb"
-                          strokeWidth="8"
-                          fill="none"
-                        />
-                        <circle
-                          cx="48"
-                          cy="48"
-                          r="40"
-                          stroke={resumeScore >= 60 ? "#10b981" : "#dc2626"}
-                          strokeWidth="8"
-                          fill="none"
-                          strokeDasharray={`${(resumeScore / 100) * 251.2} 251.2`}
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                      <div className={`absolute inset-0 flex items-center justify-center text-2xl font-bold ${resumeScore >= 60 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {resumeScore}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+            </Card>
 
-              {/* Application Details Content */}
-              {candidate ? (
-                <div className="p-6 space-y-6">
-                  {/* Row 1: Contact Information */}
+            {/* Profile Snapshot Card */}
+            <Card className="border shadow-sm">
+              <CardHeader className="py-3 bg-slate-50 border-b">
+                <CardTitle className="text-sm font-semibold text-blue-700 flex items-center gap-2">
+                  <User className="h-4 w-4" /> Candidate Profile Snapshot
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <table className="w-full text-sm">
+                  <tbody>
+                    {[
+                      ['Name', reportData.profileSnapshot?.name],
+                      ['Expected Salary', reportData.profileSnapshot?.expectedSalary],
+                      ['Availability', reportData.profileSnapshot?.availability ? new Date(reportData.profileSnapshot.availability).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'}) : 'Immediately'],
+                      ['Classification', reportData.profileSnapshot?.classification],
+                      ['Education', reportData.profileSnapshot?.education],
+                      ['Employer History', reportData.profileSnapshot?.employerHistory],
+                      ['Location', reportData.profileSnapshot?.locationPreference],
+                    ].map(([label, value], i) => (
+                      <tr key={i} className="border-b last:border-0">
+                        <td className="py-2 px-4 font-medium text-gray-600 bg-gray-50 w-1/3">{label}</td>
+                        <td className="py-2 px-4 text-gray-800">{value || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+
+            {/* Skills & Experience Alignment Card */}
+            <Card className="border shadow-sm">
+              <CardHeader className="py-3 bg-slate-50 border-b">
+                <CardTitle className="text-sm font-semibold text-blue-700 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" /> Skills & Experience Alignment
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-100 text-gray-700">
+                      <th className="py-2 px-3 text-left font-semibold">Area</th>
+                      <th className="py-2 px-3 text-center font-semibold">Score</th>
+                      <th className="py-2 px-3 text-center font-semibold">Points</th>
+                      <th className="py-2 px-3 text-left font-semibold">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reportData.skillsAlignment?.map((item: any, idx: number) => (
+                      <tr key={idx} className="border-b hover:bg-gray-50">
+                        <td className="py-2 px-3 font-medium">{item.area}</td>
+                        <td className="py-2 px-3 text-center">
+                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                            parseInt(item.score) >= 70 ? 'bg-green-100 text-green-800' :
+                            parseInt(item.score) >= 50 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                          }`}>{item.score}</span>
+                        </td>
+                        <td className="py-2 px-3 text-center font-bold text-blue-600">{item.points}</td>
+                        <td className="py-2 px-3 text-xs text-gray-600 whitespace-pre-line">{item.details}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+
+            {/* Certifications & Projects Card */}
+            <Card className="border shadow-sm">
+              <CardHeader className="py-3 bg-slate-50 border-b">
+                <CardTitle className="text-sm font-semibold text-blue-700 flex items-center gap-2">
+                  <Award className="h-4 w-4" /> Certifications & Recent Projects
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Contact Information</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                      <div className="flex items-start gap-3">
-                        <div className="text-slate-400 mt-0.5">
-                          <User className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs text-slate-500 font-medium">Name</p>
-                          <p className="text-sm text-slate-900 font-medium truncate">{candidate.name || '—'}</p>
-                        </div>
+                    <h4 className="font-medium text-gray-800 mb-2 text-sm">Certifications</h4>
+                    {reportData.certificationsAndProjects?.certifications?.length > 0 ? (
+                      <div className="space-y-1">
+                        {reportData.certificationsAndProjects.certifications.map((cert: any, i: number) => (
+                          <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
+                            <CheckCircle2 className="h-3 w-3 text-green-500 flex-shrink-0" />
+                            {typeof cert === 'string' ? cert : cert?.name || cert?.title || 'Certification'}
+                          </div>
+                        ))}
                       </div>
-                      <div className="flex items-start gap-3">
-                        <div className="text-slate-400 mt-0.5">
-                          <Mail className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs text-slate-500 font-medium">Email</p>
-                          <p className="text-sm text-slate-900 truncate">{candidate.email || '—'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="text-slate-400 mt-0.5">
-                          <Phone className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs text-slate-500 font-medium">Phone</p>
-                          <p className="text-sm text-slate-900">{candidate.phone || '—'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="text-slate-400 mt-0.5">
-                          <MapPin className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs text-slate-500 font-medium">Location</p>
-                          <p className="text-sm text-slate-900 truncate">{candidate.location || '—'}</p>
-                        </div>
-                      </div>
-                    </div>
+                    ) : <p className="text-sm text-gray-500">No certifications</p>}
                   </div>
-
-                  {/* Row 2: Compensation & Availability */}
-                  <div className="pt-2 border-t border-slate-200">
-                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Compensation & Availability</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                      <div className="flex items-start gap-3">
-                        <div className="text-emerald-600 mt-0.5">
-                          <DollarSign className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs text-slate-500 font-medium">Expected Salary</p>
-                          <p className="text-sm text-slate-900 font-semibold">
-                            {candidate.expectedSalary 
-                              ? `${candidate.salaryCurrency || 'USD'} ${Number(candidate.expectedSalary).toLocaleString()}`
-                              : '—'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="text-slate-400 mt-0.5">
-                          <Clock className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs text-slate-500 font-medium">Pay Period</p>
-                          <p className="text-sm text-slate-900 capitalize">{candidate.salaryPeriod || 'Monthly'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="text-orange-600 mt-0.5">
-                          <Calendar className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs text-slate-500 font-medium">Available From</p>
-                          <p className="text-sm text-slate-900">
-                            {candidate.availableStartDate 
-                              ? new Date(candidate.availableStartDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                              : '—'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className={candidate.willingToRelocate ? 'text-emerald-600' : 'text-slate-400'} >
-                          <MapPin className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs text-slate-500 font-medium">Willing to Relocate</p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            {candidate.willingToRelocate ? (
-                              <>
-                                <CheckCircle className="h-4 w-4 text-emerald-600" />
-                                <span className="text-sm text-emerald-700 font-medium">Yes</span>
-                              </>
-                            ) : (
-                              <>
-                                <XCircle className="h-4 w-4 text-slate-400" />
-                                <span className="text-sm text-slate-600">No</span>
-                              </>
+                  <div>
+                    <h4 className="font-medium text-gray-800 mb-2 text-sm">Recent Projects</h4>
+                    {reportData.certificationsAndProjects?.projects?.length > 0 ? (
+                      <div className="space-y-3">
+                        {reportData.certificationsAndProjects.projects.map((p: any, i: number) => (
+                          <div key={i} className="text-sm border-l-2 border-blue-300 pl-2">
+                            <div className="font-medium text-gray-800">{p.title}</div>
+                            <div className="text-xs text-gray-500">{p.company}, {p.year}</div>
+                            {p.description && <div className="text-xs text-gray-600 mt-1">{p.description}</div>}
+                            {p.technologies?.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {p.technologies.slice(0, 3).map((tech: string, j: number) => (
+                                  <span key={j} className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{tech}</span>
+                                ))}
+                              </div>
                             )}
                           </div>
-                        </div>
+                        ))}
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Row 3: Languages & Links */}
-                  <div className="pt-2 border-t border-slate-200">
-                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Additional Information</h4>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <div className="flex items-start gap-3">
-                        <div className="text-blue-600 mt-0.5">
-                          <Globe className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs text-slate-500 font-medium mb-2">Languages</p>
-                          <div className="flex flex-wrap gap-2">
-                            {candidate.languages && candidate.languages.length > 0 ? (
-                              candidate.languages.map((lang, idx) => (
-                                <Badge key={idx} variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
-                                  {lang.language}
-                                </Badge>
-                              ))
-                            ) : (
-                              <span className="text-sm text-slate-500">—</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="text-indigo-600 mt-0.5">
-                          <LinkIcon className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs text-slate-500 font-medium mb-2">Professional Links</p>
-                          <div className="flex flex-wrap gap-3">
-                            {candidate.linkedinUrl ? (
-                              <a href={candidate.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700 text-sm font-medium flex items-center gap-1 hover:underline">
-                                <ExternalLink className="h-3.5 w-3.5" /> LinkedIn
-                              </a>
-                            ) : null}
-                            {candidate.portfolioUrl ? (
-                              <a href={candidate.portfolioUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700 text-sm font-medium flex items-center gap-1 hover:underline">
-                                <ExternalLink className="h-3.5 w-3.5" /> Portfolio
-                              </a>
-                            ) : null}
-                            {!candidate.linkedinUrl && !candidate.portfolioUrl && <span className="text-sm text-slate-500">—</span>}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Applied Date */}
-                  <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                      <Clock className="h-3.5 w-3.5" />
-                      <span>Applied on {new Date(candidate.appliedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
+                    ) : <p className="text-sm text-gray-500">No projects listed</p>}
                   </div>
                 </div>
-              ) : (
-                <div className="text-center py-8">
-                  <FileText className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                  <p className="text-slate-600 font-medium">No application data available</p>
+              </CardContent>
+            </Card>
+
+            {/* Final Recommendation Card */}
+            <Card className="border shadow-sm">
+              <CardHeader className="py-3 bg-slate-50 border-b">
+                <CardTitle className="text-sm font-semibold text-blue-700 flex items-center gap-2">
+                  <Target className="h-4 w-4" /> Final Recommendation
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className={`p-3 rounded-lg ${reportData.header?.overallScore >= 60 ? 'bg-blue-50' : 'bg-red-50'}`}>
+                  <div className="font-semibold mb-2">
+                    Recommendation: <span className="text-blue-700">{reportData.recommendation?.decision}</span>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-3 text-sm mb-3">
+                    <div>
+                      <span className="font-medium text-green-700">Strengths:</span>
+                      <span className="ml-1 text-gray-700">{reportData.recommendation?.strengths || 'None'}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-orange-700">Gaps:</span>
+                      <span className="ml-1 text-gray-700">{reportData.recommendation?.gaps || 'None'}</span>
+                    </div>
+                  </div>
+                  <div className="text-sm">
+                    <span className="font-medium">Next Steps:</span>
+                    <ul className="mt-1 space-y-1">
+                      {reportData.recommendation?.nextSteps?.map((step: string, i: number) => (
+                        <li key={i} className="flex items-start gap-1 text-gray-700">
+                          <span className="text-blue-600">→</span> {step}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
-        {/* Candidate Tab Content */}
-        {activeTab === "candidate" && qualificationDetails && (
+        {/* Candidate Tab Content - OLD UI (hidden when reportData exists) */}
+        {activeTab === "candidate" && qualificationDetails && !reportData && (
           <div>
             <CVEvaluationReport 
               expandedSkillSetMatch={expandedSkillSetMatch}
@@ -2445,11 +2353,14 @@ export default function CandidateReportPage() {
                       })
                       
                       // PRIORITY: Use configured_criteria from job_rounds (contains ALL criteria)
-                      // This ensures we show all 4 (or N) criteria even if no questions were asked
-                      const configuredCriteria = evalAny.configured_criteria || evalAny.evaluation_criteria || []
+                      // Fallback to criteria extracted from questions if not available
+                      const configuredCriteria = evalAny.configured_criteria || evalAny.evaluation_criteria || evalAny.categoriesUsed || []
                       
-                      // Filter out "General" and use configured criteria
-                      const criteriaList = configuredCriteria.filter((c: string) => c && c !== 'General')
+                      // If no configured criteria, extract unique criteria from questions
+                      let criteriaList = configuredCriteria.filter((c: string) => c && c !== 'General')
+                      if (criteriaList.length === 0 && Object.keys(criteriaFromQuestions).length > 0) {
+                        criteriaList = Object.keys(criteriaFromQuestions).filter(c => c && c !== 'General')
+                      }
                       
                       const getCriteriaIcon = (criteria: string) => {
                         const icons: Record<string, any> = {
@@ -2611,6 +2522,42 @@ export default function CandidateReportPage() {
                           Detailed evaluation of each question with AI-powered scoring
                         </CardDescription>
                       </div>
+                      {/* Re-evaluate Button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100"
+                        onClick={async () => {
+                          try {
+                            // Get transcript from state (already loaded)
+                            const transcriptText = transcript?.text || ''
+                            if (!transcriptText) {
+                              alert('No transcript available for re-evaluation')
+                              return
+                            }
+                            
+                            const res = await fetch(`/api/applications/${candidateId}/evaluate`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ 
+                                transcript: transcriptText,
+                                forceReEvaluate: true 
+                              })
+                            })
+                            if (res.ok) {
+                              alert('Re-evaluation completed! Refreshing page...')
+                              window.location.reload()
+                            } else {
+                              const errorData = await res.json().catch(() => ({}))
+                              alert('Re-evaluation failed: ' + (errorData.error || 'Unknown error'))
+                            }
+                          } catch (e) {
+                            alert('Error: ' + (e as any)?.message)
+                          }
+                        }}
+                      >
+                        🔄 Re-evaluate Interview
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent className="p-6">
@@ -2838,61 +2785,82 @@ export default function CandidateReportPage() {
                                     </div>
                                   )}
                                   
-                                  {/* Evaluation Reasoning */}
-                                  {q.criteria_reasoning && (() => {
-                                    const criterionMatchText = q.criteria_reasoning.replace(/Criterion Match:\s*/i, '').trim()
+                                  {/* Evaluation Reasoning (Level-Aware) - At the top */}
+                                  {(() => {
+                                    const reasoning = q.criteria_reasoning || q.evaluation_reasoning || q.feedback || ''
+                                    const criterionMatchText = reasoning.replace(/Criterion Match:\s*/i, '').trim()
                                     return criterionMatchText ? (
                                       <div className="mb-5">
-                                        <div className="flex items-center gap-2 mb-2">
+                                        <div className="flex items-center gap-2 mb-3">
                                           <Brain className="h-5 w-5 text-blue-500" />
-                                          <span className="text-base font-semibold text-gray-800">Evaluation Reason</span>
+                                          <span className="text-base font-semibold text-gray-800">📊 Evaluation Reasoning (Level-Aware)</span>
                                         </div>
                                         <div className="bg-blue-50 p-5 rounded-xl border border-blue-100">
-                                          <p className="text-base text-gray-800 leading-relaxed">
-                                            {criterionMatchText}
+                                          <p className="text-base text-gray-800 leading-relaxed italic">
+                                            "{criterionMatchText}"
                                           </p>
                                         </div>
                                       </div>
                                     ) : null
                                   })()}
                                   
-                                  {/* Strengths & Gaps */}
-                                  {((q.strengths_in_answer && q.strengths_in_answer.length > 0) || (q.gaps_in_answer && q.gaps_in_answer.length > 0)) && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                      {q.strengths_in_answer && q.strengths_in_answer.length > 0 && (
-                                        <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
-                                          <div className="flex items-center gap-2 mb-3">
-                                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                                            <span className="text-sm font-semibold text-emerald-800">Strengths</span>
-                                          </div>
-                                          <ul className="space-y-2">
-                                            {q.strengths_in_answer.map((s: string, sIdx: number) => (
-                                              <li key={sIdx} className="text-sm text-emerald-700 flex items-start gap-2">
-                                                <span className="text-emerald-500 mt-0.5">✓</span>
-                                                <span>{s}</span>
-                                              </li>
-                                            ))}
-                                          </ul>
+                                  {/* Strengths & Gaps - Side by Side */}
+                                  {(() => {
+                                    const strengths = q.strengths_in_answer || q.strengths || []
+                                    const gaps = q.gaps_in_answer || q.gaps || []
+                                    const hasStrengths = strengths.length > 0
+                                    const hasGaps = gaps.length > 0
+                                    
+                                    if (!hasStrengths && !hasGaps) return null
+                                    
+                                    return (
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                                        {/* Key Strengths */}
+                                        <div className={hasStrengths ? '' : 'hidden md:block'}>
+                                          {hasStrengths && (
+                                            <div className="h-full">
+                                              <div className="flex items-center gap-2 mb-3">
+                                                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                                <span className="text-base font-semibold text-gray-800">💪 Key Strengths</span>
+                                              </div>
+                                              <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200 h-full">
+                                                <ul className="space-y-2">
+                                                  {strengths.map((s: string, sIdx: number) => (
+                                                    <li key={sIdx} className="text-sm text-emerald-700 flex items-start gap-2">
+                                                      <span className="text-emerald-500 mt-1">•</span>
+                                                      <span>{s}</span>
+                                                    </li>
+                                                  ))}
+                                                </ul>
+                                              </div>
+                                            </div>
+                                          )}
                                         </div>
-                                      )}
-                                      {q.gaps_in_answer && q.gaps_in_answer.length > 0 && (
-                                        <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
-                                          <div className="flex items-center gap-2 mb-3">
-                                            <AlertTriangle className="h-4 w-4 text-amber-600" />
-                                            <span className="text-sm font-semibold text-amber-800">Areas to Improve</span>
-                                          </div>
-                                          <ul className="space-y-2">
-                                            {q.gaps_in_answer.map((g: string, gIdx: number) => (
-                                              <li key={gIdx} className="text-sm text-amber-700 flex items-start gap-2">
-                                                <span className="text-amber-500 mt-0.5">•</span>
-                                                <span>{g}</span>
-                                              </li>
-                                            ))}
-                                          </ul>
+                                        
+                                        {/* Gaps / Missing Signals */}
+                                        <div className={hasGaps ? '' : 'hidden md:block'}>
+                                          {hasGaps && (
+                                            <div className="h-full">
+                                              <div className="flex items-center gap-2 mb-3">
+                                                <AlertTriangle className="h-5 w-5 text-amber-600" />
+                                                <span className="text-base font-semibold text-gray-800">⚠️ Gaps / Missing Signals</span>
+                                              </div>
+                                              <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 h-full">
+                                                <ul className="space-y-2">
+                                                  {gaps.map((g: string, gIdx: number) => (
+                                                    <li key={gIdx} className="text-sm text-amber-700 flex items-start gap-2">
+                                                      <span className="text-amber-500 mt-1">•</span>
+                                                      <span>{g}</span>
+                                                    </li>
+                                                  ))}
+                                                </ul>
+                                              </div>
+                                            </div>
+                                          )}
                                         </div>
-                                      )}
-                                    </div>
-                                  )}
+                                      </div>
+                                    )
+                                  })()}
                                 </div>
                               </div>
                             )
