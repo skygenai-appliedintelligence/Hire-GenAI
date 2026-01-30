@@ -62,6 +62,10 @@ export default function CreateJobPage() {
   const [agentQuestions, setAgentQuestions] = useState<Record<string, string[]>>({
     "Phone Screening": []
   })
+  // NEW FORMAT: Questions with id, question, criterion, weight
+  const [agentQuestionsWithWeight, setAgentQuestionsWithWeight] = useState<Record<string, Array<{ id: number; question: string; criterion: string; weight: 'high' | 'medium' | 'low' }>>>({
+    "Phone Screening": []
+  })
   const [agentCriteria, setAgentCriteria] = useState<Record<string, string[]>>({
     "Phone Screening": ["Technical Skills", "Communication", "Experience"]
   })
@@ -505,6 +509,7 @@ export default function CreateJobPage() {
           
           // Extract questions and criteria from job_rounds configuration
           const loadedQuestions: Record<string, string[]> = {}
+          const loadedQuestionsWithWeight: Record<string, Array<{ id: number; question: string; criterion: string; weight: 'high' | 'medium' | 'low' }>> = {}
           const loadedCriteria: Record<string, string[]> = {}
           
           // Process each round's configuration
@@ -518,11 +523,31 @@ export default function CreateJobPage() {
                   : round.configuration
                 
                 if (config.questions && Array.isArray(config.questions)) {
-                  loadedQuestions[roundName] = config.questions
-                  console.log(`✅ Loaded ${config.questions.length} questions for round: ${roundName}`)
+                  // Check if NEW FORMAT (objects with id, question, criterion, weight)
+                  const isNewFormat = config.questions.length > 0 && 
+                    typeof config.questions[0] === 'object' && 
+                    'question' in config.questions[0] && 
+                    'criterion' in config.questions[0]
+                  
+                  if (isNewFormat) {
+                    // NEW FORMAT: Store in both states
+                    loadedQuestionsWithWeight[roundName] = config.questions
+                    loadedQuestions[roundName] = config.questions.map((q: any) => q.question)
+                    
+                    // Extract unique criteria from questions
+                    const criteriaSet = new Set(config.questions.map((q: any) => q.criterion))
+                    loadedCriteria[roundName] = Array.from(criteriaSet) as string[]
+                    
+                    console.log(`✅ Loaded ${config.questions.length} questions in NEW FORMAT for round: ${roundName}`)
+                  } else {
+                    // OLD FORMAT: string array
+                    loadedQuestions[roundName] = config.questions
+                    console.log(`✅ Loaded ${config.questions.length} questions in OLD FORMAT for round: ${roundName}`)
+                  }
                 }
                 
-                if (config.criteria && Array.isArray(config.criteria)) {
+                // Also load criteria if stored separately (for backward compat)
+                if (config.criteria && Array.isArray(config.criteria) && !loadedCriteria[roundName]) {
                   loadedCriteria[roundName] = config.criteria
                   console.log(`✅ Loaded ${config.criteria.length} criteria for round: ${roundName}`)
                 }
@@ -536,6 +561,11 @@ export default function CreateJobPage() {
           if (Object.keys(loadedQuestions).length > 0) {
             setAgentQuestions(prev => ({ ...prev, ...loadedQuestions }))
             console.log('📋 Updated agentQuestions with loaded data')
+          }
+          
+          if (Object.keys(loadedQuestionsWithWeight).length > 0) {
+            setAgentQuestionsWithWeight(prev => ({ ...prev, ...loadedQuestionsWithWeight }))
+            console.log('📋 Updated agentQuestionsWithWeight with NEW FORMAT data')
           }
           
           if (Object.keys(loadedCriteria).length > 0) {
@@ -693,18 +723,9 @@ export default function CreateJobPage() {
   }
 
   const isResumeScreeningValid = () => {
-    // If screening is not enabled, it's valid
-    if (!formData.screeningEnabled) return true
-    
-    // All screening fields are mandatory when enabled (except Language Proficiency)
-    return formData.screeningOverallExp.trim() !== '' &&
-           formData.screeningPrimarySkill.trim() !== '' &&
-           formData.screeningCurrentLocation.trim() !== '' &&
-           formData.screeningNationality.trim() !== '' &&
-           formData.screeningVisaRequired.trim() !== '' &&
-           formData.screeningCurrentSalary.trim() !== '' &&
-           formData.noticePeriodMonths.trim() !== '' &&
-           formData.noticePeriodNegotiable.trim() !== ''
+    // Resume screening tab is always valid - it's optional configuration
+    // Users can skip it or fill it partially
+    return true
   }
 
   const isInterviewValid = () => {
@@ -827,30 +848,49 @@ export default function CreateJobPage() {
         console.log('-'.repeat(60) + '\n')
       }
 
-      // Use mapped questions if available, otherwise use plain questions
-      const mappedQuestions = data.mappedQuestions
+      // Use NEW FORMAT (questionsWithWeight) if available
+      const questionsWithWeight = data.questionsWithWeight
       const generatedQuestions = data.questions || []
       
-      if (mappedQuestions && mappedQuestions.length > 0) {
-        // Store questions with their criterion and importance metadata
-        console.log('📊 [QUESTION MAPPING] Questions mapped with criteria and importance:')
-        mappedQuestions.forEach((q: any, i: number) => {
-          console.log(`  Q${i + 1}: [${q.criterion}] (${q.importance}) ${q.question_text.substring(0, 50)}...`)
+      if (questionsWithWeight && questionsWithWeight.length > 0) {
+        // Store questions in NEW FORMAT with id, question, criterion, weight
+        console.log('📊 [NEW FORMAT] Questions with criterion and weight:')
+        questionsWithWeight.forEach((q: any, i: number) => {
+          console.log(`  Q${q.id}: [${q.criterion}] (${q.weight}) ${q.question.substring(0, 50)}...`)
         })
         
-        // For now, store just the question text (UI can be enhanced later to show criterion/importance)
+        // Store in new format state
+        setAgentQuestionsWithWeight({
+          ...agentQuestionsWithWeight,
+          [round]: questionsWithWeight
+        })
+        
+        // Also store plain question text for backward compatibility
         setAgentQuestions({
           ...agentQuestions,
-          [round]: mappedQuestions.map((q: any) => q.question_text)
+          [round]: questionsWithWeight.map((q: any) => q.question)
         })
       } else {
+        // Fallback to old format - transform to new format with default criterion
+        const transformedQuestions = generatedQuestions.map((q: string, idx: number) => ({
+          id: idx + 1,
+          question: q,
+          criterion: selectedCriteria[idx % selectedCriteria.length] || 'Technical Skills',
+          weight: 'medium' as const
+        }))
+        
+        setAgentQuestionsWithWeight({
+          ...agentQuestionsWithWeight,
+          [round]: transformedQuestions
+        })
+        
         setAgentQuestions({
           ...agentQuestions,
           [round]: generatedQuestions
         })
       }
 
-      console.log('🎉 [QUESTION GENERATION] Generated', generatedQuestions.length, 'questions successfully!')
+      console.log('🎉 [QUESTION GENERATION] Generated', generatedQuestions.length, 'questions in NEW FORMAT!')
       alert(`Generated ${generatedQuestions.length} questions successfully!`)
     } catch (error) {
       console.error('Error generating questions:', error)
@@ -1013,16 +1053,41 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
         localStorage.setItem(`applyFormEnabled:${finalJobId}`, 'true')
       }
 
-      // Save interview questions and criteria to database
+      // Save interview questions in NEW FORMAT to database
       if (formData.interviewRounds.length > 0 && finalJobId) {
         try {
-          const roundsData = formData.interviewRounds.map(round => ({
-            roundName: round,
-            questions: agentQuestions[round] || [],
-            criteria: agentCriteria[round] || []
-          }))
+          // Use NEW FORMAT: questions with id, question, criterion, weight
+          const roundsData = formData.interviewRounds.map(round => {
+            const questionsWithWeight = agentQuestionsWithWeight[round] || []
+            
+            // If we have new format, use it directly
+            if (questionsWithWeight.length > 0) {
+              return {
+                roundName: round,
+                questions: questionsWithWeight, // NEW FORMAT: Array<{ id, question, criterion, weight }>
+                criteria: agentCriteria[round] || [] // Keep for backward compat
+              }
+            }
+            
+            // Fallback: transform old format to new format
+            const oldQuestions = agentQuestions[round] || []
+            const criteria = agentCriteria[round] || ['Technical Skills']
+            const transformedQuestions = oldQuestions.map((q, idx) => ({
+              id: idx + 1,
+              question: q,
+              criterion: criteria[idx % criteria.length] || 'Technical Skills',
+              weight: 'medium' as const
+            }))
+            
+            return {
+              roundName: round,
+              questions: transformedQuestions,
+              criteria: criteria
+            }
+          })
 
-          console.log('Saving questions for job:', finalJobId, roundsData)
+          console.log('📝 Saving questions in NEW FORMAT for job:', finalJobId)
+          console.log('📋 Rounds data:', JSON.stringify(roundsData, null, 2))
 
           const saveRes = await fetch(`/api/jobs/${encodeURIComponent(finalJobId)}/rounds`, {
             method: 'POST',
@@ -1033,12 +1098,12 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
           const saveData = await saveRes.json()
           
           if (!saveRes.ok) {
-            console.error('Failed to save interview questions:', saveData)
+            console.error('❌ Failed to save interview questions:', saveData)
           } else {
-            console.log('Questions saved successfully')
+            console.log('✅ Questions saved successfully in NEW FORMAT')
           }
         } catch (error) {
-          console.error('Error saving interview questions:', error)
+          console.error('❌ Error saving interview questions:', error)
         }
       }
 
@@ -1478,6 +1543,56 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
                         <SelectItem value="USD">USD ($)</SelectItem>
                         <SelectItem value="EUR">EUR (€)</SelectItem>
                         <SelectItem value="GBP">GBP (£)</SelectItem>
+                        <SelectItem value="JPY">JPY (¥)</SelectItem>
+                        <SelectItem value="CNY">CNY (¥)</SelectItem>
+                        <SelectItem value="CAD">CAD ($)</SelectItem>
+                        <SelectItem value="AUD">AUD ($)</SelectItem>
+                        <SelectItem value="CHF">CHF (Fr)</SelectItem>
+                        <SelectItem value="SGD">SGD ($)</SelectItem>
+                        <SelectItem value="HKD">HKD ($)</SelectItem>
+                        <SelectItem value="NZD">NZD ($)</SelectItem>
+                        <SelectItem value="SEK">SEK (kr)</SelectItem>
+                        <SelectItem value="NOK">NOK (kr)</SelectItem>
+                        <SelectItem value="DKK">DKK (kr)</SelectItem>
+                        <SelectItem value="PLN">PLN (zł)</SelectItem>
+                        <SelectItem value="CZK">CZK (Kč)</SelectItem>
+                        <SelectItem value="HUF">HUF (Ft)</SelectItem>
+                        <SelectItem value="RUB">RUB (₽)</SelectItem>
+                        <SelectItem value="BRL">BRL (R$)</SelectItem>
+                        <SelectItem value="MXN">MXN ($)</SelectItem>
+                        <SelectItem value="ZAR">ZAR (R)</SelectItem>
+                        <SelectItem value="AED">AED (د.إ)</SelectItem>
+                        <SelectItem value="SAR">SAR (﷼)</SelectItem>
+                        <SelectItem value="KWD">KWD (د.ك)</SelectItem>
+                        <SelectItem value="QAR">QAR (﷼)</SelectItem>
+                        <SelectItem value="BHD">BHD (د.ب)</SelectItem>
+                        <SelectItem value="OMR">OMR (ر.ع.)</SelectItem>
+                        <SelectItem value="JOD">JOD (د.ا)</SelectItem>
+                        <SelectItem value="LKR">LKR (රු)</SelectItem>
+                        <SelectItem value="NPR">NPR (रू)</SelectItem>
+                        <SelectItem value="BDT">BDT (৳)</SelectItem>
+                        <SelectItem value="PKR">PKR (₨)</SelectItem>
+                        <SelectItem value="LBP">LBP (ل.ل)</SelectItem>
+                        <SelectItem value="EGP">EGP (ج.م)</SelectItem>
+                        <SelectItem value="KES">KES (KSh)</SelectItem>
+                        <SelectItem value="UGX">UGX (USh)</SelectItem>
+                        <SelectItem value="TZS">TZS (TSh)</SelectItem>
+                        <SelectItem value="GHS">GHS (GH₵)</SelectItem>
+                        <SelectItem value="NGN">NGN (₦)</SelectItem>
+                        <SelectItem value="XAF">XAF (FCFA)</SelectItem>
+                        <SelectItem value="XOF">XOF (CFA)</SelectItem>
+                        <SelectItem value="XPF">XPF (₣)</SelectItem>
+                        <SelectItem value="VND">VND (₫)</SelectItem>
+                        <SelectItem value="THB">THB (฿)</SelectItem>
+                        <SelectItem value="MYR">MYR (RM)</SelectItem>
+                        <SelectItem value="IDR">IDR (Rp)</SelectItem>
+                        <SelectItem value="PHP">PHP (₱)</SelectItem>
+                        <SelectItem value="KRW">KRW (₩)</SelectItem>
+                        <SelectItem value="TWD">TWD (NT$)</SelectItem>
+                        <SelectItem value="MOP">MOP (MOP$)</SelectItem>
+                        <SelectItem value="ISK">ISK (kr)</SelectItem>
+                        <SelectItem value="TRY">TRY (₺)</SelectItem>
+                        <SelectItem value="ILS">ILS (₪)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1960,6 +2075,56 @@ ${formData.travel ? `✈️ Travel Requirements: ${formData.travel}` : '✈️ T
                               {formData.salaryCurrency === 'USD' && '$'}
                               {formData.salaryCurrency === 'EUR' && '€'}
                               {formData.salaryCurrency === 'GBP' && '£'}
+                              {formData.salaryCurrency === 'JPY' && '¥'}
+                              {formData.salaryCurrency === 'CNY' && '¥'}
+                              {formData.salaryCurrency === 'CAD' && '$'}
+                              {formData.salaryCurrency === 'AUD' && '$'}
+                              {formData.salaryCurrency === 'CHF' && 'Fr'}
+                              {formData.salaryCurrency === 'SGD' && '$'}
+                              {formData.salaryCurrency === 'HKD' && '$'}
+                              {formData.salaryCurrency === 'NZD' && '$'}
+                              {formData.salaryCurrency === 'SEK' && 'kr'}
+                              {formData.salaryCurrency === 'NOK' && 'kr'}
+                              {formData.salaryCurrency === 'DKK' && 'kr'}
+                              {formData.salaryCurrency === 'PLN' && 'zł'}
+                              {formData.salaryCurrency === 'CZK' && 'Kč'}
+                              {formData.salaryCurrency === 'HUF' && 'Ft'}
+                              {formData.salaryCurrency === 'RUB' && '₽'}
+                              {formData.salaryCurrency === 'BRL' && 'R$'}
+                              {formData.salaryCurrency === 'MXN' && '$'}
+                              {formData.salaryCurrency === 'ZAR' && 'R'}
+                              {formData.salaryCurrency === 'AED' && 'د.إ'}
+                              {formData.salaryCurrency === 'SAR' && '﷼'}
+                              {formData.salaryCurrency === 'KWD' && 'د.ك'}
+                              {formData.salaryCurrency === 'QAR' && '﷼'}
+                              {formData.salaryCurrency === 'BHD' && 'د.ب'}
+                              {formData.salaryCurrency === 'OMR' && 'ر.ع.'}
+                              {formData.salaryCurrency === 'JOD' && 'د.ا'}
+                              {formData.salaryCurrency === 'LKR' && 'රු'}
+                              {formData.salaryCurrency === 'NPR' && 'रू'}
+                              {formData.salaryCurrency === 'BDT' && '৳'}
+                              {formData.salaryCurrency === 'PKR' && '₨'}
+                              {formData.salaryCurrency === 'LBP' && 'ل.ل'}
+                              {formData.salaryCurrency === 'EGP' && 'ج.م'}
+                              {formData.salaryCurrency === 'KES' && 'KSh'}
+                              {formData.salaryCurrency === 'UGX' && 'USh'}
+                              {formData.salaryCurrency === 'TZS' && 'TSh'}
+                              {formData.salaryCurrency === 'GHS' && 'GH₵'}
+                              {formData.salaryCurrency === 'NGN' && '₦'}
+                              {formData.salaryCurrency === 'XAF' && 'FCFA'}
+                              {formData.salaryCurrency === 'XOF' && 'CFA'}
+                              {formData.salaryCurrency === 'XPF' && '₣'}
+                              {formData.salaryCurrency === 'VND' && '₫'}
+                              {formData.salaryCurrency === 'THB' && '฿'}
+                              {formData.salaryCurrency === 'MYR' && 'RM'}
+                              {formData.salaryCurrency === 'IDR' && 'Rp'}
+                              {formData.salaryCurrency === 'PHP' && '₱'}
+                              {formData.salaryCurrency === 'KRW' && '₩'}
+                              {formData.salaryCurrency === 'TWD' && 'NT$'}
+                              {formData.salaryCurrency === 'MOP' && 'MOP$'}
+                              {formData.salaryCurrency === 'ISK' && 'kr'}
+                              {formData.salaryCurrency === 'TRY' && '₺'}
+                              {formData.salaryCurrency === 'ILS' && '₪'}
                               {!formData.salaryCurrency && '₹'}
                             </span>
                             <Input

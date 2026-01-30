@@ -334,8 +334,47 @@ export class CVEvaluator {
   }
 
   /**
+   * DOMAIN-AGNOSTIC: Define equivalent tool groups
+   * Tools in the same group are considered interchangeable alternatives
+   * If JD requires one tool from a group, having ANY tool from that group is acceptable
+   */
+  private static readonly EQUIVALENT_TOOL_GROUPS: string[][] = [
+    // RPA Tools - any one is acceptable if JD mentions RPA
+    ['uipath', 'automation anywhere', 'blue prism', 'power automate', 'workfusion', 'pega', 'nice', 'kofax', 'a360', 'a2019'],
+    // Backend Frameworks - similar purpose
+    ['spring', 'django', 'flask', 'express', 'fastapi', 'rails'],
+    // Frontend Frameworks - similar purpose
+    ['react', 'angular', 'vue', 'svelte'],
+    // Cloud Platforms - similar purpose
+    ['aws', 'azure', 'gcp', 'google cloud'],
+    // Container/Orchestration - similar purpose
+    ['kubernetes', 'docker swarm', 'openshift', 'ecs'],
+    // CI/CD Tools - similar purpose
+    ['jenkins', 'gitlab', 'github actions', 'circleci', 'azure devops'],
+    // Databases - SQL databases are often interchangeable
+    ['postgresql', 'mysql', 'sql server', 'oracle', 'mariadb'],
+    // NoSQL Databases
+    ['mongodb', 'dynamodb', 'couchdb', 'cassandra'],
+  ]
+
+  /**
+   * Find equivalent tools for a given platform
+   * Returns all tools in the same group, or just the platform itself if no group found
+   */
+  private static getEquivalentTools(platform: string): string[] {
+    const platformLower = platform.toLowerCase()
+    for (const group of this.EQUIVALENT_TOOL_GROUPS) {
+      if (group.some(tool => platformLower.includes(tool) || tool.includes(platformLower))) {
+        return group
+      }
+    }
+    return [platformLower] // No equivalent group found, return just the platform
+  }
+
+  /**
    * DOMAIN-AGNOSTIC: Check domain fit
-   * If JD specifies critical platforms and resume has NONE of them, fail
+   * If JD specifies critical platforms, check if resume has ANY equivalent tool
+   * Example: JD says "UiPath required" but resume has "Automation Anywhere" → PASS (same RPA domain)
    */
   private static checkDomainFit(resumeText: string, jd: string): {
     pass: boolean
@@ -345,14 +384,48 @@ export class CVEvaluator {
   } {
     const criticalPlatforms = this.extractCriticalPlatforms(jd)
     const textLower = resumeText.toLowerCase()
+    const jdLower = jd.toLowerCase()
+    
+    // Direct matches
     const foundPlatforms = criticalPlatforms.filter(p => textLower.includes(p))
     
-    // If JD has critical platforms and resume has NONE, fail
-    if (criticalPlatforms.length > 0 && foundPlatforms.length === 0) {
+    // If direct match found, pass immediately
+    if (foundPlatforms.length > 0) {
+      return { pass: true, criticalPlatforms, foundPlatforms, reason: null }
+    }
+    
+    // If no direct match, check for equivalent tools
+    if (criticalPlatforms.length > 0) {
+      // For each critical platform, check if resume has ANY equivalent tool
+      for (const platform of criticalPlatforms) {
+        const equivalentTools = this.getEquivalentTools(platform)
+        
+        // Check if resume has any equivalent tool
+        for (const eqTool of equivalentTools) {
+          if (textLower.includes(eqTool)) {
+            // Found an equivalent tool - check if JD also mentions this category broadly
+            // or if JD lists multiple options (e.g., "UiPath/Automation Anywhere")
+            const jdMentionsEquivalent = equivalentTools.some(t => jdLower.includes(t))
+            
+            if (jdMentionsEquivalent) {
+              // JD mentions tools from same category, so equivalent is acceptable
+              foundPlatforms.push(eqTool)
+              return { 
+                pass: true, 
+                criticalPlatforms, 
+                foundPlatforms: [eqTool],
+                reason: null 
+              }
+            }
+          }
+        }
+      }
+      
+      // No direct or equivalent match found
       return {
         pass: false,
         criticalPlatforms,
-        foundPlatforms,
+        foundPlatforms: [],
         reason: `Domain mismatch: JD requires ${criticalPlatforms.slice(0, 3).join('/')} but resume shows none of these`
       }
     }
@@ -500,8 +573,9 @@ export class CVEvaluator {
   }
 
   /**
-   * DOMAIN-AGNOSTIC: Check must-have skills
+   * DOMAIN-AGNOSTIC: Check must-have skills with equivalent tool support
    * FIX A: Fail if ANY critical skill is missing (preserved)
+   * NEW: Accept equivalent tools for critical platform skills
    * Percentage matching does NOT override missing critical skills
    * Works for ANY domain - no RPA-specific logic
    */
@@ -515,12 +589,21 @@ export class CVEvaluator {
     
     // Check each critical skill - ALL must be present
     for (const skill of mustHaveSkills.critical) {
-      if (!textLower.includes(skill)) {
+      // First check direct match
+      if (textLower.includes(skill)) {
+        continue // Skill found directly
+      }
+      
+      // If not found directly, check for equivalent tools
+      const equivalentTools = this.getEquivalentTools(skill)
+      const hasEquivalent = equivalentTools.some(eqTool => textLower.includes(eqTool))
+      
+      if (!hasEquivalent) {
         missingCritical.push(skill)
       }
     }
     
-    // Check important skills
+    // Check important skills (no equivalent logic for important skills)
     for (const skill of mustHaveSkills.important) {
       if (!textLower.includes(skill)) {
         missingImportant.push(skill)

@@ -159,6 +159,61 @@ export interface EligibilityData {
   missing_must_have?: string[]
 }
 
+// New ReportData interface matching the UI layout
+export interface ReportDataHeader {
+  candidateName: string
+  position: string
+  recommendation: string
+  overallScore: number
+  reportDate: string
+  expectedSalary: string
+  experience: string
+  resumeUrl?: string
+}
+
+export interface ReportDataProfileSnapshot {
+  name: string
+  expectedSalary: string
+  availability: string
+  classification: string
+  education: string
+  employerHistory: string
+  locationPreference: string
+}
+
+export interface ReportDataSkillsAlignment {
+  area: string
+  score: string
+  points: string
+  details: string
+}
+
+export interface ReportDataCertificationsAndProjects {
+  certifications: string[]
+  projects: Array<{
+    title: string
+    company: string
+    year: string
+    description?: string
+    technologies?: string[]
+  }>
+}
+
+export interface ReportDataRecommendation {
+  decision: string
+  strengths: string
+  gaps: string
+  nextSteps: string[]
+}
+
+export interface ReportData {
+  header: ReportDataHeader
+  profileSnapshot: ReportDataProfileSnapshot
+  skillsAlignment: ReportDataSkillsAlignment[]
+  certificationsAndProjects: ReportDataCertificationsAndProjects
+  recommendation: ReportDataRecommendation
+}
+
 export interface ReportPDFData {
   candidate: CandidateData
   evaluation: EvaluationData | null
@@ -185,6 +240,8 @@ export interface ReportPDFData {
     total_experience_years_estimate?: number
   } | null
   experienceRequired?: string
+  // NEW: ReportData from UI
+  reportData?: ReportData | null
 }
 
 function escapeHtml(text: string | undefined | null): string {
@@ -240,11 +297,18 @@ export function generateReportPDFHTML(data: ReportPDFData): string {
     eligibility,
     candidateLocation,
     extractedData,
-    experienceRequired
+    experienceRequired,
+    // NEW: ReportData from UI
+    reportData
   } = data
   
   const overallScore = evaluation?.overallScore ?? 0
   const overallScoreDisplay = overallScore <= 10 ? Math.round(overallScore * 10) : Math.round(overallScore)
+  
+  // If reportData is available, use new 3-page layout
+  if (reportData) {
+    return generateNewLayoutPDF(data, reportData, overallScoreDisplay)
+  }
   
   return `
 <!DOCTYPE html>
@@ -2176,6 +2240,931 @@ function generateTranscriptSection(transcript: TranscriptData | null): string {
     </div>
   </div>
   `
+}
+
+/**
+ * Generate transcript section for new PDF layout
+ */
+function generateTranscriptSectionNew(transcript: TranscriptData | null): string {
+  if (!transcript || !transcript.text) {
+    return `
+    <div style="text-align: center; padding: 60px 40px; background: #f8fafc; border-radius: 12px;">
+      <div style="font-size: 48px; margin-bottom: 16px;">💬</div>
+      <div style="font-size: 16px; font-weight: 600; color: #374151;">No Transcript Available</div>
+      <div style="font-size: 12px; color: #6b7280; margin-top: 8px;">The interview transcript has not been recorded yet.</div>
+    </div>
+    `
+  }
+  
+  // Header with interview details
+  let html = `
+  <div style="background: #f8fafc; border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+    <div style="display: flex; gap: 20px; font-size: 11px; color: #64748b;">
+      ${transcript.interviewDate ? `<span>📅 ${formatDate(transcript.interviewDate)}</span>` : ''}
+      ${transcript.duration ? `<span>⏱️ ${escapeHtml(transcript.duration)}</span>` : ''}
+      ${transcript.interviewer ? `<span>👤 ${escapeHtml(transcript.interviewer)}</span>` : ''}
+    </div>
+  </div>
+  `
+  
+  // Check for rounds format
+  if (transcript.rounds && transcript.rounds.length > 0) {
+    for (const round of transcript.rounds) {
+      html += `
+      <div style="margin-bottom: 20px;">
+        <div style="font-size: 13px; font-weight: 600; color: #1e40af; border-bottom: 2px solid #bfdbfe; padding-bottom: 8px; margin-bottom: 12px;">
+          ${escapeHtml(round.round)}
+        </div>
+      `
+      for (const qa of round.questions) {
+        const scoreClass = qa.score !== undefined ? (qa.score >= 70 ? 'high' : qa.score >= 50 ? 'medium' : 'low') : ''
+        html += `
+        <div style="margin-bottom: 12px; padding-left: 12px; border-left: 3px solid #bfdbfe;">
+          <div style="font-size: 11px; font-weight: 600; color: #1f2937; margin-bottom: 6px;">Q: ${escapeHtml(qa.question)}</div>
+          <div style="font-size: 11px; color: #4b5563; padding-left: 12px;">A: ${escapeHtml(qa.answer)}</div>
+          ${qa.score !== undefined ? `<div style="margin-top: 4px;"><span class="score-badge ${scoreClass}">Score: ${qa.score}/100</span></div>` : ''}
+        </div>
+        `
+      }
+      html += `</div>`
+    }
+    return html
+  }
+  
+  // Parse text-based transcript
+  const lines = transcript.text.split('\n').filter(line => line.trim())
+  const messages: Array<{ role: 'agent' | 'candidate', text: string }> = []
+  
+  for (const line of lines) {
+    const trimmedLine = line.trim()
+    if (!trimmedLine) continue
+    
+    let role: 'agent' | 'candidate' = 'candidate'
+    let messageText = trimmedLine
+    
+    if (trimmedLine.startsWith('[Agent]') || trimmedLine.startsWith('Agent:') || /^(Olivia|AI Agent|interviewer):/i.test(trimmedLine)) {
+      role = 'agent'
+      messageText = trimmedLine.replace(/^\[(Agent|Olivia|AI Agent|interviewer)\]:?\s*/i, '').replace(/^(Agent|Olivia|AI Agent|interviewer):\s*/i, '')
+    } else if (trimmedLine.startsWith('[You]') || trimmedLine.startsWith('You:') || /^(candidate|user):/i.test(trimmedLine)) {
+      role = 'candidate'
+      messageText = trimmedLine.replace(/^\[(You|candidate|user)\]:?\s*/i, '').replace(/^(You|candidate|user):\s*/i, '')
+    } else if (trimmedLine.includes('?') && trimmedLine.length > 10) {
+      role = 'agent'
+    }
+    
+    if (messageText.trim()) {
+      messages.push({ role, text: messageText.trim() })
+    }
+  }
+  
+  if (messages.length > 0) {
+    for (const msg of messages) {
+      html += `
+      <div class="transcript-message">
+        <div class="transcript-bubble ${msg.role}">
+          <div class="transcript-role ${msg.role}">${msg.role === 'agent' ? '🤖 Agent' : '👤 Candidate'}</div>
+          <div class="transcript-text">${escapeHtml(msg.text)}</div>
+        </div>
+      </div>
+      `
+    }
+  } else {
+    html += `<div style="text-align: center; padding: 40px; color: #6b7280;">No transcript messages found</div>`
+  }
+  
+  return html
+}
+
+/**
+ * NEW 3-PAGE PDF LAYOUT
+ * Page 1: Resume Evaluation Report
+ * Page 2: Interview Evaluation  
+ * Page 3: Interview Transcript
+ */
+function generateNewLayoutPDF(data: ReportPDFData, reportData: ReportData, overallScoreDisplay: number): string {
+  const { candidate, evaluation, transcript, jobTitle, resumeScore } = data
+  const isQualified = reportData.header.recommendation.includes('RECOMMENDED')
+  
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(candidate.name)} - Evaluation Report</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    
+    @media print {
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .page-break { page-break-before: always; }
+      .avoid-break { page-break-inside: avoid; }
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #1f2937;
+      background: #fff;
+      padding: 24px;
+    }
+    
+    .page-break { page-break-before: always; }
+    .avoid-break { page-break-inside: avoid; }
+    
+    /* Page Title */
+    .page-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1e3a8a;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 3px solid #3b82f6;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    /* Header Card */
+    .header-card {
+      background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+      color: white;
+      padding: 20px 24px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+    }
+    
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    
+    .header-name {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    
+    .header-position {
+      font-size: 13px;
+      opacity: 0.9;
+      margin-bottom: 10px;
+    }
+    
+    .recommendation-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    
+    .recommendation-badge.qualified {
+      background: #22c55e;
+      color: white;
+    }
+    
+    .recommendation-badge.not-qualified {
+      background: #ef4444;
+      color: white;
+    }
+    
+    .score-circle {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 3px solid rgba(255,255,255,0.4);
+    }
+    
+    .score-value {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    
+    .score-label {
+      font-size: 9px;
+      opacity: 0.8;
+    }
+    
+    /* Section Card */
+    .section-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    
+    .section-header {
+      background: #f8fafc;
+      padding: 12px 16px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 13px;
+      font-weight: 600;
+      color: #1e40af;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .section-content {
+      padding: 0;
+    }
+    
+    /* Table */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    .data-table th,
+    .data-table td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    
+    .data-table th {
+      background: #f1f5f9;
+      font-weight: 600;
+      color: #475569;
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+    
+    .data-table tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .data-table .label-cell {
+      background: #f8fafc;
+      font-weight: 500;
+      color: #64748b;
+      width: 30%;
+    }
+    
+    /* Score Badge */
+    .score-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    
+    .score-badge.high { background: #dcfce7; color: #166534; }
+    .score-badge.medium { background: #fef3c7; color: #92400e; }
+    .score-badge.low { background: #fee2e2; color: #991b1b; }
+    
+    /* Points Badge */
+    .points-badge {
+      font-weight: 700;
+      color: #2563eb;
+    }
+    
+    /* Certification Item */
+    .cert-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      font-size: 11px;
+    }
+    
+    .cert-icon {
+      color: #22c55e;
+    }
+    
+    /* Project Item */
+    .project-item {
+      padding: 10px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    
+    .project-item:last-child {
+      border-bottom: none;
+    }
+    
+    .project-title {
+      font-weight: 600;
+      color: #1e293b;
+      font-size: 12px;
+    }
+    
+    .project-meta {
+      font-size: 10px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+    
+    .project-desc {
+      font-size: 10px;
+      color: #475569;
+      margin-top: 4px;
+    }
+    
+    .tech-badge {
+      display: inline-block;
+      background: #dbeafe;
+      color: #1e40af;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 9px;
+      margin-right: 4px;
+      margin-top: 4px;
+    }
+    
+    /* Recommendation Card */
+    .recommendation-card {
+      padding: 16px;
+      border-radius: 10px;
+      margin-top: 16px;
+    }
+    
+    .recommendation-card.qualified {
+      background: #f0fdf4;
+      border: 2px solid #86efac;
+    }
+    
+    .recommendation-card.not-qualified {
+      background: #fef2f2;
+      border: 2px solid #fecaca;
+    }
+    
+    .recommendation-title {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    
+    .recommendation-title.qualified { color: #166534; }
+    .recommendation-title.not-qualified { color: #991b1b; }
+    
+    .recommendation-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    
+    .recommendation-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    
+    .recommendation-label.green { color: #059669; }
+    .recommendation-label.orange { color: #ea580c; }
+    
+    .recommendation-value {
+      font-size: 11px;
+      color: #374151;
+    }
+    
+    .next-steps {
+      margin-top: 10px;
+    }
+    
+    .next-step-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      font-size: 11px;
+      color: #374151;
+      padding: 4px 0;
+    }
+    
+    .next-step-arrow {
+      color: #3b82f6;
+      font-weight: 700;
+    }
+    
+    /* Interview Section */
+    .interview-hero {
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .interview-score-circle {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 3px solid rgba(255,255,255,0.4);
+    }
+    
+    .criteria-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    
+    .criteria-card {
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+    }
+    
+    .criteria-card.blue { background: #eff6ff; border-color: #93c5fd; }
+    .criteria-card.green { background: #f0fdf4; border-color: #86efac; }
+    .criteria-card.purple { background: #faf5ff; border-color: #d8b4fe; }
+    .criteria-card.orange { background: #fff7ed; border-color: #fdba74; }
+    
+    .criteria-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: #374151;
+    }
+    
+    .criteria-score {
+      font-size: 20px;
+      font-weight: 700;
+    }
+    
+    .progress-bar {
+      height: 6px;
+      background: #e5e7eb;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      border-radius: 3px;
+    }
+    
+    .progress-fill.green { background: #22c55e; }
+    .progress-fill.blue { background: #3b82f6; }
+    .progress-fill.yellow { background: #eab308; }
+    .progress-fill.red { background: #ef4444; }
+    
+    /* Q&A Section */
+    .qa-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    
+    .qa-header {
+      background: #f8fafc;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .qa-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #3b82f6;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 12px;
+      margin-right: 10px;
+      flex-shrink: 0;
+    }
+    
+    .qa-question {
+      font-size: 11px;
+      font-weight: 500;
+      color: #1e293b;
+      flex: 1;
+    }
+    
+    .qa-score {
+      text-align: right;
+    }
+    
+    .qa-score-value {
+      font-size: 18px;
+      font-weight: 700;
+    }
+    
+    .qa-score-max {
+      font-size: 9px;
+      color: #64748b;
+    }
+    
+    .qa-content {
+      padding: 12px 14px;
+    }
+    
+    .qa-response {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    
+    .qa-response-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: #64748b;
+      margin-bottom: 6px;
+    }
+    
+    .qa-response-text {
+      font-size: 11px;
+      color: #374151;
+    }
+    
+    /* Transcript Section */
+    .transcript-message {
+      margin-bottom: 10px;
+    }
+    
+    .transcript-bubble {
+      padding: 10px 14px;
+      border-radius: 12px;
+      max-width: 85%;
+    }
+    
+    .transcript-bubble.agent {
+      background: #f1f5f9;
+      margin-right: auto;
+      border-bottom-left-radius: 4px;
+    }
+    
+    .transcript-bubble.candidate {
+      background: #dbeafe;
+      margin-left: auto;
+      border-bottom-right-radius: 4px;
+    }
+    
+    .transcript-role {
+      font-size: 10px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    
+    .transcript-role.agent { color: #64748b; }
+    .transcript-role.candidate { color: #1e40af; }
+    
+    .transcript-text {
+      font-size: 11px;
+      color: #1e293b;
+    }
+    
+    /* Footer */
+    .pdf-footer {
+      margin-top: 24px;
+      padding-top: 12px;
+      border-top: 1px solid #e5e7eb;
+      text-align: center;
+      font-size: 9px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ==================== PAGE 1: RESUME EVALUATION REPORT ==================== -->
+<div class="page-title">📄 Resume Evaluation Report</div>
+
+<!-- Header Card -->
+<div class="header-card">
+  <div class="header-top">
+    <div>
+      <div class="header-name">${escapeHtml(reportData.header.candidateName)}</div>
+      <div class="header-position">${escapeHtml(reportData.header.position)}</div>
+      <span class="recommendation-badge ${isQualified ? 'qualified' : 'not-qualified'}">
+        ${escapeHtml(reportData.header.recommendation)}
+      </span>
+    </div>
+    <div class="score-circle">
+      <div class="score-value">${reportData.header.overallScore}</div>
+      <div class="score-label">/ 100</div>
+    </div>
+  </div>
+</div>
+
+<!-- Profile Snapshot -->
+<div class="section-card avoid-break">
+  <div class="section-header">👤 Candidate Profile Snapshot</div>
+  <div class="section-content">
+    <table class="data-table">
+      <tbody>
+        <tr>
+          <td class="label-cell">Name</td>
+          <td>${escapeHtml(reportData.profileSnapshot.name) || '—'}</td>
+        </tr>
+        <tr>
+          <td class="label-cell">Expected Salary</td>
+          <td>${escapeHtml(reportData.profileSnapshot.expectedSalary) || '—'}</td>
+        </tr>
+        <tr>
+          <td class="label-cell">Availability</td>
+          <td>${reportData.profileSnapshot.availability ? formatDate(reportData.profileSnapshot.availability) : 'Immediately'}</td>
+        </tr>
+        <tr>
+          <td class="label-cell">Classification</td>
+          <td><strong>${escapeHtml(reportData.profileSnapshot.classification) || '—'}</strong></td>
+        </tr>
+        <tr>
+          <td class="label-cell">Education</td>
+          <td>${escapeHtml(reportData.profileSnapshot.education) || '—'}</td>
+        </tr>
+        <tr>
+          <td class="label-cell">Employer History</td>
+          <td>${escapeHtml(reportData.profileSnapshot.employerHistory) || '—'}</td>
+        </tr>
+        <tr>
+          <td class="label-cell">Location</td>
+          <td>${escapeHtml(reportData.profileSnapshot.locationPreference) || '—'}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Skills & Experience Alignment -->
+<div class="section-card avoid-break">
+  <div class="section-header">📊 Skills & Experience Alignment</div>
+  <div class="section-content">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Area</th>
+          <th style="text-align: center;">Score</th>
+          <th style="text-align: center;">Points</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${(reportData.skillsAlignment || []).map(item => {
+          const scoreNum = parseInt(item.score) || 0
+          const scoreClass = scoreNum >= 70 ? 'high' : scoreNum >= 50 ? 'medium' : 'low'
+          return `
+          <tr>
+            <td><strong>${escapeHtml(item.area)}</strong></td>
+            <td style="text-align: center;">
+              <span class="score-badge ${scoreClass}">${escapeHtml(item.score)}</span>
+            </td>
+            <td style="text-align: center;">
+              <span class="points-badge">${escapeHtml(item.points)}</span>
+            </td>
+            <td style="font-size: 10px; color: #64748b; white-space: pre-line;">${escapeHtml(item.details)}</td>
+          </tr>
+          `
+        }).join('')}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Certifications & Recent Projects -->
+<div class="section-card avoid-break">
+  <div class="section-header">🏆 Certifications & Recent Projects</div>
+  <div class="section-content" style="padding: 16px;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+      <!-- Certifications -->
+      <div>
+        <div style="font-weight: 600; color: #374151; margin-bottom: 10px; font-size: 12px;">Certifications</div>
+        ${(reportData.certificationsAndProjects?.certifications || []).length > 0 
+          ? (reportData.certificationsAndProjects.certifications || []).map(cert => `
+            <div class="cert-item">
+              <span class="cert-icon">✓</span>
+              <span>${escapeHtml(typeof cert === 'string' ? cert : (cert as any)?.name || 'Certification')}</span>
+            </div>
+          `).join('')
+          : '<div style="font-size: 11px; color: #94a3b8;">No certifications listed</div>'
+        }
+      </div>
+      
+      <!-- Projects -->
+      <div>
+        <div style="font-weight: 600; color: #374141; margin-bottom: 10px; font-size: 12px;">Recent Projects</div>
+        ${(reportData.certificationsAndProjects?.projects || []).length > 0
+          ? (reportData.certificationsAndProjects.projects || []).slice(0, 3).map(p => `
+            <div class="project-item">
+              <div class="project-title">${escapeHtml(p.title)}</div>
+              <div class="project-meta">${escapeHtml(p.company)} • ${escapeHtml(p.year)}</div>
+              ${p.description ? `<div class="project-desc">${escapeHtml(p.description)}</div>` : ''}
+              ${(p.technologies || []).length > 0 
+                ? `<div>${(p.technologies || []).slice(0, 3).map(t => `<span class="tech-badge">${escapeHtml(t)}</span>`).join('')}</div>`
+                : ''
+              }
+            </div>
+          `).join('')
+          : '<div style="font-size: 11px; color: #94a3b8;">No projects listed</div>'
+        }
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Final Recommendation -->
+<div class="recommendation-card ${isQualified ? 'qualified' : 'not-qualified'} avoid-break">
+  <div class="recommendation-title ${isQualified ? 'qualified' : 'not-qualified'}">
+    ${isQualified ? '✅' : '⚠️'} Recommendation: ${escapeHtml(reportData.recommendation.decision)}
+  </div>
+  
+  <div class="recommendation-grid">
+    <div>
+      <div class="recommendation-label green">Strengths</div>
+      <div class="recommendation-value">${escapeHtml(reportData.recommendation.strengths) || 'None identified'}</div>
+    </div>
+    <div>
+      <div class="recommendation-label orange">Gaps</div>
+      <div class="recommendation-value">${escapeHtml(reportData.recommendation.gaps) || 'None identified'}</div>
+    </div>
+  </div>
+  
+  <div class="next-steps">
+    <div class="recommendation-label" style="color: #374151;">Next Steps</div>
+    ${(reportData.recommendation.nextSteps || []).map(step => `
+      <div class="next-step-item">
+        <span class="next-step-arrow">→</span>
+        <span>${escapeHtml(step)}</span>
+      </div>
+    `).join('')}
+  </div>
+</div>
+
+<!-- ==================== PAGE 2: INTERVIEW EVALUATION ==================== -->
+<div class="page-break"></div>
+<div class="page-title">🎤 Interview Evaluation</div>
+
+${evaluation ? `
+<!-- Interview Hero -->
+<div class="interview-hero">
+  <div style="display: flex; align-items: center; gap: 16px;">
+    <div class="interview-score-circle">
+      <div class="score-value">${overallScoreDisplay}</div>
+      <div class="score-label">/ 100</div>
+    </div>
+    <div>
+      <div style="font-size: 18px; font-weight: 600;">Interview Evaluation</div>
+      <div style="font-size: 11px; opacity: 0.9;">Score based on ${(evaluation.questions || []).length || 5} questions</div>
+      <div style="margin-top: 8px;">
+        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 10px; font-weight: 600;">
+          ${evaluation.decision === 'qualified' ? '✓ Qualified' : evaluation.decision === 'unqualified' ? '✗ Not Qualified' : '⏳ Pending'}
+        </span>
+      </div>
+    </div>
+  </div>
+  <div style="text-align: right;">
+    <div style="font-size: 10px; opacity: 0.8;">Recommendation</div>
+    <div style="font-size: 16px; font-weight: 600;">${overallScoreDisplay >= 60 ? 'Hire' : 'Not Hire'}</div>
+  </div>
+</div>
+
+<!-- Criteria Breakdown -->
+${evaluation.scores ? `
+<div style="margin-bottom: 16px;">
+  <div style="font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 12px;">Criteria-Based Score Breakdown</div>
+  <div class="criteria-grid">
+    <div class="criteria-card blue">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="criteria-name">Technical Skills</div>
+        <div class="criteria-score" style="color: ${getScoreColor(evaluation.scores.technical || 0)}">${evaluation.scores.technical || 0}</div>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill ${(evaluation.scores.technical || 0) >= 70 ? 'green' : (evaluation.scores.technical || 0) >= 50 ? 'blue' : 'red'}" style="width: ${evaluation.scores.technical || 0}%"></div>
+      </div>
+    </div>
+    <div class="criteria-card green">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="criteria-name">Communication</div>
+        <div class="criteria-score" style="color: ${getScoreColor(evaluation.scores.communication || 0)}">${evaluation.scores.communication || 0}</div>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill ${(evaluation.scores.communication || 0) >= 70 ? 'green' : (evaluation.scores.communication || 0) >= 50 ? 'blue' : 'red'}" style="width: ${evaluation.scores.communication || 0}%"></div>
+      </div>
+    </div>
+    <div class="criteria-card purple">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="criteria-name">Experience</div>
+        <div class="criteria-score" style="color: ${getScoreColor(evaluation.scores.experience || 0)}">${evaluation.scores.experience || 0}</div>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill ${(evaluation.scores.experience || 0) >= 70 ? 'green' : (evaluation.scores.experience || 0) >= 50 ? 'blue' : 'red'}" style="width: ${evaluation.scores.experience || 0}%"></div>
+      </div>
+    </div>
+    <div class="criteria-card orange">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="criteria-name">Cultural Fit</div>
+        <div class="criteria-score" style="color: ${getScoreColor(evaluation.scores.cultural_fit || 0)}">${evaluation.scores.cultural_fit || 0}</div>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill ${(evaluation.scores.cultural_fit || 0) >= 70 ? 'green' : (evaluation.scores.cultural_fit || 0) >= 50 ? 'blue' : 'red'}" style="width: ${evaluation.scores.cultural_fit || 0}%"></div>
+      </div>
+    </div>
+  </div>
+</div>
+` : ''}
+
+<!-- Q&A Analysis -->
+${(evaluation.questions || []).length > 0 ? `
+<div style="margin-bottom: 16px;">
+  <div style="font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 12px;">Q&A Analysis</div>
+  ${(evaluation.questions || []).map((q: any, idx: number) => {
+    const score = q.score || q.marks_obtained || 0
+    const maxScore = q.max_score || q.max_marks || 100
+    return `
+    <div class="qa-card avoid-break">
+      <div class="qa-header">
+        <div style="display: flex; align-items: flex-start;">
+          <div class="qa-number">${idx + 1}</div>
+          <div class="qa-question">${escapeHtml(q.question_text || q.question || 'Question')}</div>
+        </div>
+        <div class="qa-score">
+          <div class="qa-score-value" style="color: ${getScoreColor(score)}">${score}</div>
+          <div class="qa-score-max">/ ${maxScore}</div>
+        </div>
+      </div>
+      <div class="qa-content">
+        <div class="qa-response">
+          <div class="qa-response-label">Candidate Response</div>
+          <div class="qa-response-text">${escapeHtml(q.candidate_response || q.answer || 'No response recorded')}</div>
+        </div>
+        ${q.criteria_reasoning ? `
+        <div style="margin-top: 8px; font-size: 10px; color: #64748b;">
+          <strong>Analysis:</strong> ${escapeHtml(q.criteria_reasoning)}
+        </div>
+        ` : ''}
+      </div>
+    </div>
+    `
+  }).join('')}
+</div>
+` : ''}
+
+<!-- Interview Strengths & Weaknesses -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+  <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; padding: 14px;">
+    <div style="font-size: 11px; font-weight: 600; color: #166534; margin-bottom: 8px;">💪 Strengths</div>
+    ${(evaluation.strengths || []).length > 0 
+      ? (evaluation.strengths || []).map(s => `<div style="font-size: 10px; color: #15803d; padding: 3px 0;">• ${escapeHtml(s)}</div>`).join('')
+      : '<div style="font-size: 10px; color: #6b7280;">No specific strengths identified</div>'
+    }
+  </div>
+  <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 14px;">
+    <div style="font-size: 11px; font-weight: 600; color: #991b1b; margin-bottom: 8px;">⚠️ Areas for Improvement</div>
+    ${(evaluation.weaknesses || []).length > 0 
+      ? (evaluation.weaknesses || []).map(w => `<div style="font-size: 10px; color: #b91c1c; padding: 3px 0;">• ${escapeHtml(w)}</div>`).join('')
+      : '<div style="font-size: 10px; color: #6b7280;">No specific weaknesses identified</div>'
+    }
+  </div>
+</div>
+` : `
+<div style="text-align: center; padding: 60px 40px; background: #f8fafc; border-radius: 12px;">
+  <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+  <div style="font-size: 16px; font-weight: 600; color: #374151;">No Interview Evaluation Available</div>
+  <div style="font-size: 12px; color: #6b7280; margin-top: 8px;">The interview evaluation has not been completed yet.</div>
+</div>
+`}
+
+<!-- ==================== PAGE 3: INTERVIEW TRANSCRIPT ==================== -->
+<div class="page-break"></div>
+<div class="page-title">💬 Interview Transcript</div>
+
+${generateTranscriptSectionNew(transcript)}
+
+<!-- Footer -->
+<div class="pdf-footer">
+  <div>Generated by HireGenAI • Confidential Candidate Report</div>
+  <div style="margin-top: 4px;">${new Date().toISOString()}</div>
+</div>
+
+</body>
+</html>
+`
 }
 
 /**

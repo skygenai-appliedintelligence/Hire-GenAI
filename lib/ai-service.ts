@@ -770,7 +770,7 @@ HireGenAI Team`
     existingQuestions?: string[],
     companyApiKey?: string,
     companyProjectId?: string
-  ): Promise<{ questions: string[], usage?: { promptTokens: number, completionTokens: number } }> {
+  ): Promise<{ questions: string[], questionsWithCriteria?: Array<{ id: number; question: string; criterion: string }>, usage?: { promptTokens: number, completionTokens: number } }> {
     
     const TOTAL_QUESTIONS = 10
     
@@ -903,32 +903,44 @@ QUESTION STYLE GUIDELINES
 - Prefer real-world and experience-based phrasing.
 
 ==================================================
-OUTPUT FORMAT (STRICT)
+OUTPUT FORMAT (STRICT JSON ONLY)
 ==================================================
 
-Return ONLY the questions in this format:
+Return ONLY a JSON array with exactly ${TOTAL_QUESTIONS} questions.
+Each question MUST include:
+- "id": sequential number (1, 2, 3...)
+- "question": the question text
+- "criterion": EXACTLY ONE criterion from the selected list
 
-Q1: <question text>
-Q2: <question text>
-Q3: <question text>
-...
-Q${TOTAL_QUESTIONS}: <question text>
+Do NOT include "weight" or "importance" - that is assigned separately.
 
-- Do NOT mention criteria names in the output.
-- Do NOT include explanations.
-- Do NOT include any text before or after the questions.
+Example format:
+[
+  {"id": 1, "question": "Tell me about...", "criterion": "Technical Skills"},
+  {"id": 2, "question": "Describe a time...", "criterion": "Communication"}
+]
+
+==================================================
+DISTRIBUTION RULES
+==================================================
+
+1) If "Technical Skills" is selected → minimum 3 technical questions
+2) Distribute questions evenly across selected criteria
+3) Each criterion must have at least 1 question
+4) Each question maps to exactly ONE criterion
 
 ==================================================
 FINAL CHECK BEFORE OUTPUT
 ==================================================
 
 Before responding, verify that:
+- Output is valid JSON array
 - All questions relate ONLY to the selected criteria
 - No selected criterion is ignored
 - No two questions test the same intent
-- Questions feel realistic and interview-appropriate
+- If Technical Skills selected, at least 3 technical questions exist
 
-Now generate the ${TOTAL_QUESTIONS} questions.`
+Return ONLY the JSON array. No explanations.`
 
     try {
       const controller = new AbortController()
@@ -937,7 +949,7 @@ Now generate the ${TOTAL_QUESTIONS} questions.`
       const { text, usage } = await generateText({
         model: openaiProvider("gpt-4o"),
         prompt,
-        system: "You are an AI Interview Question Generator. Generate exactly 10 unique, criteria-aligned interview questions. Each question must be conversational, practical, and test a different aspect. Do NOT mention criteria names in questions. Output ONLY Q1-Q10 format.",
+        system: "You are an AI Interview Question Generator. Generate exactly 10 unique, criteria-aligned interview questions as a JSON array. Each question must include id, question text, and criterion. Output ONLY valid JSON array.",
         maxRetries: 0,
         abortSignal: controller.signal,
       })
@@ -956,41 +968,87 @@ Now generate the ${TOTAL_QUESTIONS} questions.`
         })
       }
 
-      // Parse questions
-      const lines = text.split('\n').filter(line => line.trim().startsWith('Q'))
-      const parsed = lines.slice(0, TOTAL_QUESTIONS).map(line => {
-        const match = line.match(/Q\d+:\s*(.+)/)
-        return match ? match[1].trim() : line.replace(/Q\d+:\s*/, '').trim()
+      // Parse JSON response - AI returns [{id, question, criterion}, ...]
+      let parsed: Array<{ id: number; question: string; criterion: string }> = []
+      try {
+        const jsonMatch = text.match(/\[[\s\S]*\]/)
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[0])
+        }
+      } catch (e) {
+        console.error('Failed to parse JSON response, falling back to line parsing')
+        // Fallback: try line-based parsing
+        const lines = text.split('\n').filter(line => line.trim().startsWith('Q') || line.trim().startsWith('{'))
+        parsed = lines.slice(0, TOTAL_QUESTIONS).map((line, idx) => {
+          const match = line.match(/Q\d+:\s*(.+)/)
+          const questionText = match ? match[1].trim() : line.replace(/Q\d+:\s*/, '').trim()
+          return {
+            id: idx + 1,
+            question: questionText,
+            criterion: selectedCriteria[idx % selectedCriteria.length]
+          }
+        })
+      }
+
+      // Validate and ensure criterion is from selected list
+      const validatedQuestions = parsed.map((q, idx) => {
+        let criterion = q.criterion
+        if (!selectedCriteria.includes(criterion)) {
+          criterion = selectedCriteria[idx % selectedCriteria.length]
+        }
+        return {
+          id: q.id || idx + 1,
+          question: q.question,
+          criterion
+        }
       })
 
       // Deduplicate
       const norm = (s: string) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase().replace(/[.?!]+$/g, '')
       const seed = Array.isArray(existingQuestions) ? existingQuestions.map(norm) : []
       const seen = new Set<string>(seed)
-      const unique: string[] = []
+      const unique: Array<{ id: number; question: string; criterion: string }> = []
       
-      for (const q of parsed) {
-        const k = norm(q)
-        if (q && !seen.has(k)) {
+      for (const q of validatedQuestions) {
+        const k = norm(q.question)
+        if (q.question && !seen.has(k)) {
           unique.push(q)
           seen.add(k)
         }
       }
 
-      // Backfill if needed
+      // Backfill if needed using mock questions with criterion assignment
       if (unique.length < TOTAL_QUESTIONS) {
         const fill = this.getCriteriaMockQuestions(selectedCriteria, TOTAL_QUESTIONS * 2)
+        let fillIdx = unique.length
         for (const q of fill) {
           const k = norm(q)
           if (!seen.has(k)) {
-            unique.push(q)
+            unique.push({
+              id: fillIdx + 1,
+              question: q,
+              criterion: selectedCriteria[fillIdx % selectedCriteria.length]
+            })
             seen.add(k)
+            fillIdx++
           }
           if (unique.length >= TOTAL_QUESTIONS) break
         }
       }
 
-      return { questions: unique.slice(0, TOTAL_QUESTIONS), usage: tokenUsage }
+      // Re-number IDs sequentially
+      const finalQuestions = unique.slice(0, TOTAL_QUESTIONS).map((q, idx) => ({
+        id: idx + 1,
+        question: q.question,
+        criterion: q.criterion
+      }))
+
+      // Return questions array (strings) for backward compatibility, plus structured data
+      return { 
+        questions: finalQuestions.map(q => q.question),
+        questionsWithCriteria: finalQuestions,
+        usage: tokenUsage 
+      }
     } catch (error) {
       console.error("Criteria-based question generation error:", error)
       return { questions: this.getCriteriaMockQuestions(selectedCriteria, TOTAL_QUESTIONS), usage: undefined }
@@ -1423,6 +1481,91 @@ Now perform the task. Return ONLY the JSON array.`
     }
 
     return result
+  }
+
+  /**
+   * Classify a manual HR question into one of the selected criteria using AI
+   * Used when HR adds a question manually - automatically assigns criterion
+   */
+  static async classifyQuestionCriterion(
+    question: string,
+    selectedCriteria: string[],
+    companyApiKey?: string,
+    companyProjectId?: string
+  ): Promise<string> {
+    if (!question || selectedCriteria.length === 0) {
+      return selectedCriteria[0] || 'Technical Skills'
+    }
+
+    // Try AI classification first
+    const apiKey = companyApiKey || process.env.OPENAI_API_KEY
+    if (apiKey) {
+      try {
+        const openaiProvider = createOpenAI({
+          apiKey,
+          ...(companyProjectId && { project: companyProjectId })
+        })
+
+        const prompt = `Classify this interview question into exactly one of the provided criteria.
+
+Question: "${question}"
+
+Available Criteria:
+${selectedCriteria.map(c => `- ${c}`).join('\n')}
+
+Return ONLY the criterion name, nothing else.`
+
+        const { text } = await generateText({
+          model: openaiProvider('gpt-4o-mini'),
+          prompt,
+          system: 'Classify the interview question into exactly one criterion. Return ONLY the criterion name.',
+          maxRetries: 0,
+        })
+
+        const criterion = text.trim()
+        if (selectedCriteria.includes(criterion)) {
+          return criterion
+        }
+        
+        // Try partial match
+        const matched = selectedCriteria.find(c => 
+          c.toLowerCase() === criterion.toLowerCase() ||
+          c.toLowerCase().includes(criterion.toLowerCase()) ||
+          criterion.toLowerCase().includes(c.toLowerCase())
+        )
+        if (matched) return matched
+      } catch (e) {
+        console.error('AI classification failed, using keyword fallback:', e)
+      }
+    }
+
+    // Fallback: keyword-based classification
+    const keywordMap: Record<string, string[]> = {
+      'Technical Skills': ['technical', 'code', 'programming', 'framework', 'tool', 'system', 'debug', 'architecture', 'api', 'database', 'design', 'build'],
+      'Problem Solving': ['problem', 'challenge', 'solve', 'solution', 'approach', 'debug', 'issue', 'fix', 'analyze', 'complex'],
+      'Communication': ['explain', 'communicate', 'present', 'feedback', 'stakeholder', 'align', 'inform', 'describe'],
+      'Experience': ['experience', 'project', 'worked', 'previous', 'background', 'career', 'role', 'history'],
+      'Culture Fit': ['motivate', 'value', 'environment', 'company', 'culture', 'fit', 'why', 'interest'],
+      'Teamwork / Collaboration': ['team', 'collaborate', 'together', 'colleague', 'support', 'group', 'work with'],
+      'Leadership': ['lead', 'mentor', 'decision', 'guide', 'manage', 'initiative', 'direct'],
+      'Adaptability / Learning': ['learn', 'adapt', 'change', 'new', 'flexible', 'grow', 'quick'],
+      'Work Ethic / Reliability': ['deadline', 'commit', 'reliable', 'accountable', 'pressure', 'prioritize', 'responsibility']
+    }
+
+    const qLower = question.toLowerCase()
+    let bestCriterion = selectedCriteria[0]
+    let bestScore = 0
+
+    for (const criterion of selectedCriteria) {
+      const keywords = keywordMap[criterion] || []
+      const score = keywords.filter(kw => qLower.includes(kw)).length
+      if (score > bestScore) {
+        bestScore = score
+        bestCriterion = criterion
+      }
+    }
+
+    return bestCriterion
   }
 }
 
